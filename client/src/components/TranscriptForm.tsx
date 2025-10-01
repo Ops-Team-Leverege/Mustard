@@ -16,6 +16,10 @@ export interface TranscriptData {
   transcript: string;
   leverageTeam: string;
   customerNames: string;
+  companyDescription?: string;
+  numberOfStores?: string;
+  contactJobTitle?: string;
+  mainInterestAreas?: string;
 }
 
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
@@ -24,6 +28,10 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     transcript: '',
     leverageTeam: '',
     customerNames: '',
+    companyDescription: '',
+    numberOfStores: '',
+    contactJobTitle: '',
+    mainInterestAreas: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -95,6 +103,52 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             <p className="text-xs text-muted-foreground">
               Comma-separated list of customer attendees
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="companyDescription" data-testid="label-company-description">Company Description</Label>
+            <Textarea
+              id="companyDescription"
+              data-testid="input-company-description"
+              placeholder="Describe the company, their business model, and key details..."
+              className="min-h-[100px]"
+              value={formData.companyDescription}
+              onChange={(e) => setFormData({ ...formData, companyDescription: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="numberOfStores" data-testid="label-number-of-stores">Number of Stores</Label>
+            <Input
+              id="numberOfStores"
+              data-testid="input-number-of-stores"
+              placeholder="e.g., 150 or Not applicable"
+              value={formData.numberOfStores}
+              onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contactJobTitle" data-testid="label-contact-job-title">Contact Job Title</Label>
+            <Input
+              id="contactJobTitle"
+              data-testid="input-contact-job-title"
+              placeholder="e.g., VP of Operations, CTO"
+              value={formData.contactJobTitle}
+              onChange={(e) => setFormData({ ...formData, contactJobTitle: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="mainInterestAreas" data-testid="label-main-interest-areas">Main Interest Areas in Product</Label>
+            <Textarea
+              id="mainInterestAreas"
+              data-testid="input-main-interest-areas"
+              placeholder="Describe the main product features or areas they're interested in..."
+              className="min-h-[100px]"
+              value={formData.mainInterestAreas}
+              onChange={(e) => setFormData({ ...formData, mainInterestAreas: e.target.value })}
+            />
           </div>
 
           <Button

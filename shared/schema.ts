@@ -10,6 +10,10 @@ export const transcripts = pgTable("transcripts", {
   transcript: text("transcript").notNull(),
   leverageTeam: text("leverage_team").notNull(),
   customerNames: text("customer_names").notNull(),
+  companyDescription: text("company_description"),
+  numberOfStores: text("number_of_stores"),
+  contactJobTitle: text("contact_job_title"),
+  mainInterestAreas: text("main_interest_areas"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
