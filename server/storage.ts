@@ -460,9 +460,9 @@ export class MemStorage implements IStorage {
     const company = await this.getCompanyBySlug(slug);
     if (!company) return null;
 
-    // Get transcripts for this company
+    // Get transcripts for this company - match by both companyId and legacy companyName field
     const companyTranscripts = Array.from(this.transcripts.values()).filter(
-      t => t.companyName.toLowerCase() === company.name.toLowerCase()
+      t => t.companyId === company.id || t.companyName.toLowerCase() === company.name.toLowerCase()
     );
 
     // Get insights - both by legacy company field and new companyId
@@ -830,11 +830,13 @@ export class DbStorage implements IStorage {
     const company = await this.getCompanyBySlug(slug);
     if (!company) return null;
 
-    // Get transcripts for this company (using legacy companyName field)
+    // Get transcripts for this company - match by both companyId and legacy companyName field
     const companyTranscripts = await this.db
       .select()
       .from(transcriptsTable)
-      .where(drizzleSql`LOWER(${transcriptsTable.companyName}) = LOWER(${company.name})`);
+      .where(
+        drizzleSql`${transcriptsTable.companyId} = ${company.id} OR LOWER(${transcriptsTable.companyName}) = LOWER(${company.name})`
+      );
 
     // Get insights with category names - match by both companyId and legacy company field
     const insights = await this.db

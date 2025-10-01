@@ -5,7 +5,8 @@ import { z } from "zod";
 
 export const transcripts = pgTable("transcripts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyName: text("company_name").notNull(),
+  companyName: text("company_name").notNull(), // Legacy field, kept for backward compatibility
+  companyId: varchar("company_id"), // New normalized field
   transcript: text("transcript").notNull(),
   leverageTeam: text("leverage_team").notNull(),
   customerNames: text("customer_names").notNull(),

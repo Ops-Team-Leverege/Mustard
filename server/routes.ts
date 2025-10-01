@@ -9,12 +9,31 @@ import {
   type ProductInsightWithCategory,
 } from "@shared/schema";
 import { z } from "zod";
+import { randomUUID } from "crypto";
+
+function generateSlug(companyName: string): string {
+  const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  // If slug is empty (no alphanumerics in name), use a uuid suffix
+  return slug || `company-${randomUUID().split('-')[0]}`;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Transcripts
   app.post("/api/transcripts", async (req, res) => {
     try {
       const data = insertTranscriptSchema.parse(req.body);
+      
+      // Find or create company
+      const slug = generateSlug(data.companyName);
+      let company = await storage.getCompanyBySlug(slug);
+      
+      if (!company) {
+        company = await storage.createCompany({
+          name: data.companyName,
+          slug,
+          notes: null,
+        });
+      }
       
       // Analyze with AI first (before persisting transcript)
       const categories = await storage.getCategories();
@@ -29,10 +48,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categories,
       });
       
-      // Only create transcript after successful analysis
-      const transcript = await storage.createTranscript(data);
+      // Only create transcript after successful analysis, including companyId
+      const transcript = await storage.createTranscript({
+        ...data,
+        companyId: company.id,
+      });
       
-      // Save insights
+      // Save insights with companyId
       const insights = await storage.createProductInsights(
         analysis.insights.map(insight => ({
           transcriptId: transcript.id,
@@ -40,11 +62,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           context: insight.context,
           quote: insight.quote,
           company: data.companyName,
+          companyId: company.id,
           categoryId: insight.categoryId,
         }))
       );
       
-      // Save Q&A pairs
+      // Save Q&A pairs with companyId
       const qaPairs = await storage.createQAPairs(
         analysis.qaPairs.map(qa => ({
           transcriptId: transcript.id,
@@ -52,6 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           answer: qa.answer,
           asker: qa.asker,
           company: data.companyName,
+          companyId: company.id,
         }))
       );
       
@@ -189,12 +213,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      // Find or create company
+      const slug = generateSlug(company);
+      let companyRecord = await storage.getCompanyBySlug(slug);
+      
+      if (!companyRecord) {
+        companyRecord = await storage.createCompany({
+          name: company,
+          slug,
+          notes: null,
+        });
+      }
+      
       const insight = await storage.createProductInsight({
         transcriptId: null,
         feature,
         context,
         quote,
         company,
+        companyId: companyRecord.id,
         categoryId: categoryId || null,
       });
       
@@ -308,12 +345,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      // Find or create company
+      const slug = generateSlug(company);
+      let companyRecord = await storage.getCompanyBySlug(slug);
+      
+      if (!companyRecord) {
+        companyRecord = await storage.createCompany({
+          name: company,
+          slug,
+          notes: null,
+        });
+      }
+      
       const qaPair = await storage.createQAPair({
         transcriptId: null,
         question,
         answer,
         asker,
         company,
+        companyId: companyRecord.id,
         categoryId: categoryId || null,
       });
       
