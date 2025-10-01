@@ -14,7 +14,7 @@ import {
   categories as categoriesTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
-import { drizzle } from "drizzle-orm/neon-serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
 import { eq, sql as drizzleSql } from "drizzle-orm";
 
@@ -368,8 +368,8 @@ export class DbStorage implements IStorage {
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set");
     }
-    const sql = neon(process.env.DATABASE_URL);
-    this.db = drizzle(sql);
+    const queryClient = neon(process.env.DATABASE_URL);
+    this.db = drizzle(queryClient);
   }
 
   // Transcripts

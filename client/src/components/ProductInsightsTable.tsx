@@ -3,7 +3,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Search, Pencil, Trash2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export interface ProductInsight {
   id: string;
@@ -22,6 +30,64 @@ interface ProductInsightsTableProps {
 export default function ProductInsightsTable({ insights, categories = [] }: ProductInsightsTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [editingInsight, setEditingInsight] = useState<ProductInsight | null>(null);
+  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '' });
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/insights/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      toast({
+        title: "Success",
+        description: "Insight deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete insight",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: async ({ id, feature, context, quote }: { id: string; feature: string; context: string; quote: string }) => {
+      const res = await apiRequest('PATCH', `/api/insights/${id}`, { feature, context, quote });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
+      setEditingInsight(null);
+      toast({
+        title: "Success",
+        description: "Insight updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update insight",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEdit = (insight: ProductInsight) => {
+    setEditingInsight(insight);
+    setEditForm({ feature: insight.feature, context: insight.context, quote: insight.quote });
+  };
+
+  const handleSaveEdit = () => {
+    if (editingInsight) {
+      editMutation.mutate({ id: editingInsight.id, ...editForm });
+    }
+  };
 
   const filteredInsights = insights.filter(insight => {
     const matchesSearch = 
@@ -70,12 +136,13 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
               <TableHead>Customer Quote</TableHead>
               <TableHead className="w-[150px]">Company</TableHead>
               <TableHead className="w-[120px]">Category</TableHead>
+              <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredInsights.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No insights found
                 </TableCell>
               </TableRow>
@@ -107,12 +174,82 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
                       {insight.category}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleEdit(insight)}
+                        data-testid={`button-edit-${insight.id}`}
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => deleteMutation.mutate(insight.id)}
+                        disabled={deleteMutation.isPending}
+                        data-testid={`button-delete-${insight.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={!!editingInsight} onOpenChange={() => setEditingInsight(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Insight</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="feature">Feature</Label>
+              <Input
+                id="feature"
+                value={editForm.feature}
+                onChange={(e) => setEditForm({ ...editForm, feature: e.target.value })}
+                data-testid="input-edit-feature"
+              />
+            </div>
+            <div>
+              <Label htmlFor="context">Context</Label>
+              <Textarea
+                id="context"
+                value={editForm.context}
+                onChange={(e) => setEditForm({ ...editForm, context: e.target.value })}
+                data-testid="textarea-edit-context"
+              />
+            </div>
+            <div>
+              <Label htmlFor="quote">Quote</Label>
+              <Textarea
+                id="quote"
+                value={editForm.quote}
+                onChange={(e) => setEditForm({ ...editForm, quote: e.target.value })}
+                data-testid="textarea-edit-quote"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingInsight(null)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSaveEdit} 
+              disabled={editMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {editMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
