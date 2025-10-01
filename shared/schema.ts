@@ -12,6 +12,14 @@ export const transcripts = pgTable("transcripts", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const companies = pgTable("companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
@@ -25,7 +33,8 @@ export const productInsights = pgTable("product_insights", {
   feature: text("feature").notNull(),
   context: text("context").notNull(),
   quote: text("quote").notNull(),
-  company: text("company").notNull(),
+  company: text("company").notNull(), // Legacy field, kept for backward compatibility
+  companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
 });
 
@@ -35,7 +44,8 @@ export const qaPairs = pgTable("qa_pairs", {
   question: text("question").notNull(),
   answer: text("answer").notNull(),
   asker: text("asker").notNull(),
-  company: text("company").notNull(),
+  company: text("company").notNull(), // Legacy field, kept for backward compatibility
+  companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
 });
 
@@ -57,8 +67,16 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
   createdAt: true,
 });
 
+export const insertCompanySchema = createInsertSchema(companies).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertTranscript = z.infer<typeof insertTranscriptSchema>;
 export type Transcript = typeof transcripts.$inferSelect;
+
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
 
 export type InsertProductInsight = z.infer<typeof insertProductInsightSchema>;
 export type ProductInsight = typeof productInsights.$inferSelect;
@@ -76,4 +94,14 @@ export type ProductInsightWithCategory = ProductInsight & {
 
 export type QAPairWithCategory = QAPair & {
   categoryName: string | null;
+};
+
+// Company overview type for dashboard
+export type CompanyOverview = {
+  company: Company;
+  transcriptCount: number;
+  insightCount: number;
+  qaCount: number;
+  insights: ProductInsightWithCategory[];
+  qaPairs: QAPairWithCategory[];
 };

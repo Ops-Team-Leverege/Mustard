@@ -5,6 +5,7 @@ import { analyzeTranscript } from "./transcriptAnalyzer";
 import {
   insertTranscriptSchema,
   insertCategorySchema,
+  insertCompanySchema,
   type ProductInsightWithCategory,
 } from "@shared/schema";
 import { z } from "zod";
@@ -397,6 +398,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!success) {
         res.status(404).json({ error: "Category not found" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Companies
+  app.get("/api/companies", async (req, res) => {
+    try {
+      const companies = await storage.getCompanies();
+      res.json(companies);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/companies/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await storage.getCompanyBySlug(slug);
+      
+      if (!company) {
+        res.status(404).json({ error: "Company not found" });
+        return;
+      }
+      
+      res.json(company);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/companies/:slug/overview", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const overview = await storage.getCompanyOverview(slug);
+      
+      if (!overview) {
+        res.status(404).json({ error: "Company not found" });
+        return;
+      }
+      
+      res.json(overview);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/companies", async (req, res) => {
+    try {
+      const data = insertCompanySchema.parse(req.body);
+      const company = await storage.createCompany(data);
+      res.json(company);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Unknown error occurred" });
+      }
+    }
+  });
+
+  app.patch("/api/companies/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, notes } = req.body;
+      
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: "Name is required" });
+        return;
+      }
+      
+      const company = await storage.updateCompany(id, name, notes);
+      
+      if (!company) {
+        res.status(404).json({ error: "Company not found" });
+        return;
+      }
+      
+      res.json(company);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/companies/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteCompany(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "Company not found" });
         return;
       }
       

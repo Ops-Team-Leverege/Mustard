@@ -5,13 +5,18 @@ import {
   type ProductInsightWithCategory,
   type InsertProductInsight,
   type QAPair,
+  type QAPairWithCategory,
   type InsertQAPair,
   type Category,
   type InsertCategory,
+  type Company,
+  type InsertCompany,
+  type CompanyOverview,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
   categories as categoriesTable,
+  companies as companiesTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -50,6 +55,15 @@ export interface IStorage {
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
+
+  // Companies
+  getCompanies(): Promise<Company[]>;
+  getCompany(id: string): Promise<Company | undefined>;
+  getCompanyBySlug(slug: string): Promise<Company | undefined>;
+  createCompany(company: InsertCompany): Promise<Company>;
+  updateCompany(id: string, name: string, notes?: string | null): Promise<Company | undefined>;
+  deleteCompany(id: string): Promise<boolean>;
+  getCompanyOverview(slug: string): Promise<CompanyOverview | null>;
 }
 
 export class MemStorage implements IStorage {
@@ -57,12 +71,14 @@ export class MemStorage implements IStorage {
   private productInsights: Map<string, ProductInsight>;
   private qaPairs: Map<string, QAPair>;
   private categories: Map<string, Category>;
+  private companies: Map<string, Company>;
 
   constructor() {
     this.transcripts = new Map();
     this.productInsights = new Map();
     this.qaPairs = new Map();
     this.categories = new Map();
+    this.companies = new Map();
 
     // Initialize with default categories
     const defaultCategories = [
@@ -387,6 +403,93 @@ export class MemStorage implements IStorage {
     
     return deleted;
   }
+
+  // Companies
+  async getCompanies(): Promise<Company[]> {
+    return Array.from(this.companies.values()).sort((a, b) => 
+      a.name.localeCompare(b.name)
+    );
+  }
+
+  async getCompany(id: string): Promise<Company | undefined> {
+    return this.companies.get(id);
+  }
+
+  async getCompanyBySlug(slug: string): Promise<Company | undefined> {
+    return Array.from(this.companies.values()).find(c => c.slug === slug);
+  }
+
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    // Check for duplicate slug
+    const existingSlug = Array.from(this.companies.values()).find(
+      c => c.slug === insertCompany.slug
+    );
+    if (existingSlug) {
+      throw new Error(`Company with slug "${insertCompany.slug}" already exists`);
+    }
+    
+    const id = randomUUID();
+    const company: Company = {
+      ...insertCompany,
+      notes: insertCompany.notes ?? null,
+      id,
+      createdAt: new Date(),
+    };
+    this.companies.set(id, company);
+    return company;
+  }
+
+  async updateCompany(id: string, name: string, notes?: string | null): Promise<Company | undefined> {
+    const company = this.companies.get(id);
+    if (!company) return undefined;
+    
+    const updated: Company = {
+      ...company,
+      name,
+      notes: notes !== undefined ? (notes ?? null) : company.notes,
+    };
+    this.companies.set(id, updated);
+    return updated;
+  }
+
+  async deleteCompany(id: string): Promise<boolean> {
+    return this.companies.delete(id);
+  }
+
+  async getCompanyOverview(slug: string): Promise<CompanyOverview | null> {
+    const company = await this.getCompanyBySlug(slug);
+    if (!company) return null;
+
+    // Get transcripts for this company
+    const companyTranscripts = Array.from(this.transcripts.values()).filter(
+      t => t.companyName.toLowerCase() === company.name.toLowerCase()
+    );
+
+    // Get insights - both by legacy company field and new companyId
+    const insights = Array.from(this.productInsights.values())
+      .filter(i => 
+        i.companyId === company.id || 
+        i.company.toLowerCase() === company.name.toLowerCase()
+      )
+      .map(i => this.enrichInsightWithCategory(i));
+
+    // Get Q&A pairs - both by legacy company field and new companyId
+    const qaPairs = Array.from(this.qaPairs.values())
+      .filter(qa => 
+        qa.companyId === company.id || 
+        qa.company.toLowerCase() === company.name.toLowerCase()
+      )
+      .map(qa => this.enrichQAPairWithCategory(qa));
+
+    return {
+      company,
+      transcriptCount: companyTranscripts.length,
+      insightCount: insights.length,
+      qaCount: qaPairs.length,
+      insights,
+      qaPairs,
+    };
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -667,6 +770,124 @@ export class DbStorage implements IStorage {
       .where(eq(categoriesTable.id, id))
       .returning();
     return results.length > 0;
+  }
+
+  // Companies
+  async getCompanies(): Promise<Company[]> {
+    return await this.db
+      .select()
+      .from(companiesTable)
+      .orderBy(companiesTable.name);
+  }
+
+  async getCompany(id: string): Promise<Company | undefined> {
+    const results = await this.db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async getCompanyBySlug(slug: string): Promise<Company | undefined> {
+    const results = await this.db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.slug, slug))
+      .limit(1);
+    return results[0];
+  }
+
+  async createCompany(insertCompany: InsertCompany): Promise<Company> {
+    const results = await this.db
+      .insert(companiesTable)
+      .values(insertCompany)
+      .returning();
+    return results[0];
+  }
+
+  async updateCompany(id: string, name: string, notes?: string | null): Promise<Company | undefined> {
+    const results = await this.db
+      .update(companiesTable)
+      .set({ 
+        name, 
+        notes: notes !== undefined ? (notes ?? null) : undefined 
+      })
+      .where(eq(companiesTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteCompany(id: string): Promise<boolean> {
+    const results = await this.db
+      .delete(companiesTable)
+      .where(eq(companiesTable.id, id))
+      .returning();
+    return results.length > 0;
+  }
+
+  async getCompanyOverview(slug: string): Promise<CompanyOverview | null> {
+    const company = await this.getCompanyBySlug(slug);
+    if (!company) return null;
+
+    // Get transcripts for this company (using legacy companyName field)
+    const companyTranscripts = await this.db
+      .select()
+      .from(transcriptsTable)
+      .where(drizzleSql`LOWER(${transcriptsTable.companyName}) = LOWER(${company.name})`);
+
+    // Get insights with category names - match by both companyId and legacy company field
+    const insights = await this.db
+      .select({
+        id: productInsightsTable.id,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        companyId: productInsightsTable.companyId,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .where(
+        drizzleSql`${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name})`
+      );
+
+    // Get Q&A pairs with category names - match by both companyId and legacy company field
+    const qaPairs = await this.db
+      .select({
+        id: qaPairsTable.id,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .where(
+        drizzleSql`${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name})`
+      );
+
+    return {
+      company,
+      transcriptCount: companyTranscripts.length,
+      insightCount: insights.length,
+      qaCount: qaPairs.length,
+      insights: insights.map(i => ({
+        ...i,
+        categoryName: i.categoryName || null,
+      })),
+      qaPairs: qaPairs.map(qa => ({
+        ...qa,
+        categoryName: qa.categoryName || null,
+      })),
+    };
   }
 }
 
