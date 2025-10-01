@@ -63,7 +63,7 @@ export interface IStorage {
   getCompany(id: string): Promise<Company | undefined>;
   getCompanyBySlug(slug: string): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
-  updateCompany(id: string, name: string, notes?: string | null): Promise<Company | undefined>;
+  updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<boolean>;
   getCompanyOverview(slug: string): Promise<CompanyOverview | null>;
 }
@@ -441,7 +441,7 @@ export class MemStorage implements IStorage {
     return company;
   }
 
-  async updateCompany(id: string, name: string, notes?: string | null): Promise<Company | undefined> {
+  async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null): Promise<Company | undefined> {
     const company = this.companies.get(id);
     if (!company) return undefined;
     
@@ -449,6 +449,9 @@ export class MemStorage implements IStorage {
       ...company,
       name,
       notes: notes !== undefined ? (notes ?? null) : company.notes,
+      companyDescription: companyDescription !== undefined ? (companyDescription ?? null) : company.companyDescription,
+      mainInterestAreas: mainInterestAreas !== undefined ? (mainInterestAreas ?? null) : company.mainInterestAreas,
+      numberOfStores: numberOfStores !== undefined ? (numberOfStores ?? null) : company.numberOfStores,
     };
     this.companies.set(id, updated);
     return updated;
@@ -832,12 +835,15 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateCompany(id: string, name: string, notes?: string | null): Promise<Company | undefined> {
+  async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null): Promise<Company | undefined> {
     const results = await this.db
       .update(companiesTable)
       .set({ 
         name, 
-        notes: notes !== undefined ? (notes ?? null) : undefined 
+        notes: notes !== undefined ? (notes ?? null) : undefined,
+        companyDescription: companyDescription !== undefined ? (companyDescription ?? null) : undefined,
+        mainInterestAreas: mainInterestAreas !== undefined ? (mainInterestAreas ?? null) : undefined,
+        numberOfStores: numberOfStores !== undefined ? (numberOfStores ?? null) : undefined,
       })
       .where(eq(companiesTable.id, id))
       .returning();
