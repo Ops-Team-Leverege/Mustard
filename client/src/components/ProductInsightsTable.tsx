@@ -205,8 +205,8 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
           <Combobox
             options={[
               { value: 'all', label: 'All categories' },
-              ...categories.map(cat => ({ value: cat.id, label: cat.name })),
-              { value: 'NEW', label: 'NEW' }
+              { value: 'NEW', label: 'NEW' },
+              ...categories.map(cat => ({ value: cat.id, label: cat.name }))
             ]}
             value={categoryFilter}
             onValueChange={setCategoryFilter}
