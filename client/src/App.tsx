@@ -9,12 +9,14 @@ import TranscriptInput from "@/pages/TranscriptInput";
 import ProductInsights from "@/pages/ProductInsights";
 import QADatabase from "@/pages/QADatabase";
 import Categories from "@/pages/Categories";
+import Companies from "@/pages/Companies";
 import CompanyPage from "@/pages/CompanyPage";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
   { id: 'insights', label: 'Product Insights', path: '/insights' },
   { id: 'qa', label: 'Q&A Database', path: '/qa' },
+  { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Manage Categories', path: '/categories' },
 ];
 
@@ -24,8 +26,9 @@ function Router() {
       <Route path="/" component={TranscriptInput} />
       <Route path="/insights" component={ProductInsights} />
       <Route path="/qa" component={QADatabase} />
-      <Route path="/categories" component={Categories} />
+      <Route path="/companies" component={Companies} />
       <Route path="/companies/:slug" component={CompanyPage} />
+      <Route path="/categories" component={Categories} />
     </Switch>
   );
 }
