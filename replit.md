@@ -1,0 +1,130 @@
+# BD Transcript Analyzer
+
+## Overview
+
+BD Transcript Analyzer is a SaaS application for analyzing Business Development call transcripts using AI. The application extracts product insights and customer Q&A pairs from transcripts, organizing them into searchable, categorized tables. Built with a modern tech stack, it features AI-powered analysis via OpenAI's GPT-5, real-time categorization, and a polished dark-mode-first interface.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+
+**Framework & Build System**
+- React with TypeScript for type safety and developer experience
+- Vite as the build tool and development server for fast HMR and optimized production builds
+- Wouter for lightweight client-side routing (no React Router)
+- Path aliases configured (`@/` for client components, `@shared/` for shared types)
+
+**UI Component Strategy**
+- Shadcn/ui components (New York style) for consistent, accessible UI primitives
+- Radix UI headless components as the foundation for all interactive elements
+- Tailwind CSS for styling with custom design system variables
+- Class Variance Authority (CVA) for component variant management
+
+**State Management**
+- TanStack Query (React Query) for server state management, caching, and data fetching
+- Local component state with React hooks for UI-specific state
+- No global state management library (Redux/Zustand) needed due to server-state-first approach
+
+**Design System**
+- Dark mode as primary theme with light mode support
+- Modern SaaS aesthetic inspired by Linear, Notion, and Carbon Design
+- Custom color palette defined in CSS variables for theme consistency
+- Inter font family for all typography
+- Emphasis on data clarity, whitespace, and visual hierarchy for dense tabular information
+
+### Backend Architecture
+
+**Server Framework**
+- Express.js as the HTTP server
+- TypeScript throughout for type safety across frontend and backend
+- ESM modules (not CommonJS) for modern JavaScript
+- Vite integration in development for seamless HMR
+
+**API Design**
+- RESTful API endpoints under `/api` prefix
+- JSON request/response format
+- Centralized error handling middleware
+- Request/response logging for debugging
+
+**Data Layer**
+- Drizzle ORM for database interactions with PostgreSQL
+- Schema-first approach with Zod validation via drizzle-zod
+- In-memory storage fallback (MemStorage class) for development/testing
+- Neon serverless Postgres driver for production database connectivity
+
+**AI Integration**
+- OpenAI API integration for transcript analysis (GPT-5 model)
+- Structured prompt engineering to extract product insights and Q&A pairs
+- Category matching during AI analysis for automatic insight classification
+- Error handling for AI service failures
+
+**Database Schema**
+- `transcripts`: Stores raw call transcripts with company and participant metadata
+- `categories`: User-defined categories for organizing product insights
+- `product_insights`: Feature requests extracted from transcripts with category assignment
+- `qa_pairs`: Question-answer pairs from BD calls
+
+### Key Architectural Decisions
+
+**Single-Page Application (SPA)**
+- Client-side routing with Wouter minimizes bundle size vs React Router
+- All pages mounted under single root with tab-based navigation
+- Sticky header with theme toggle for consistent UX
+
+**AI-First Workflow**
+- Transcript analysis happens before database persistence to fail fast
+- Analysis results determine what gets saved (no partial data on AI failure)
+- Categories pre-fetched and sent to AI for intelligent auto-categorization
+
+**Type Safety Across Stack**
+- Shared schema definitions in `shared/schema.ts` used by both client and server
+- Zod schemas for runtime validation derived from Drizzle schemas
+- TypeScript path aliases ensure clean imports throughout codebase
+
+**Session Management**
+- Express sessions with PostgreSQL session store (connect-pg-simple)
+- Session-based authentication ready but not yet implemented in current codebase
+
+**Development Experience**
+- Replit-specific plugins for enhanced debugging and development
+- Separate dev and production build configurations
+- Hot module replacement in development with production-optimized builds
+
+## External Dependencies
+
+### AI Services
+- **OpenAI API (GPT-5)**: Powers transcript analysis for extracting product insights and Q&A pairs. Requires `OPENAI_API_KEY` environment variable.
+
+### Database
+- **PostgreSQL**: Primary database for persistent storage (Neon serverless driver)
+- **Drizzle ORM**: Database toolkit and query builder
+- **drizzle-kit**: Migration management and schema push utilities
+- Requires `DATABASE_URL` environment variable for connection
+
+### UI Component Libraries
+- **Radix UI**: Comprehensive collection of unstyled, accessible components (@radix-ui/react-*)
+- **Shadcn/ui**: Pre-styled component system built on Radix UI
+- **Tailwind CSS**: Utility-first CSS framework
+- **Lucide React**: Icon library for UI icons
+
+### Build & Development Tools
+- **Vite**: Frontend build tool and dev server
+- **esbuild**: Backend bundler for production builds
+- **tsx**: TypeScript execution for development server
+- **PostCSS & Autoprefixer**: CSS processing pipeline
+
+### State & Data Fetching
+- **TanStack Query**: Async state management and caching
+- **React Hook Form**: Form state management with Zod validation
+- **Zod**: Schema validation for forms and API data
+
+### Supporting Libraries
+- **wouter**: Lightweight routing library
+- **date-fns**: Date manipulation and formatting
+- **clsx & tailwind-merge**: Conditional class name utilities
+- **cmdk**: Command palette component
+- **embla-carousel-react**: Carousel/slider functionality
