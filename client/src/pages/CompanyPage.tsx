@@ -43,12 +43,16 @@ export default function CompanyPage() {
     );
   }
 
+  const latestTranscript = overview.transcripts.sort((a, b) => 
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0];
+
   return (
     <div className="p-6 space-y-6">
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
+            <div className="flex-1">
               <CardTitle className="text-3xl">{overview.company.name}</CardTitle>
               {overview.company.notes && (
                 <CardDescription className="mt-2">{overview.company.notes}</CardDescription>
@@ -67,6 +71,22 @@ export default function CompanyPage() {
             </div>
           </div>
         </CardHeader>
+        {latestTranscript && (latestTranscript.companyDescription || latestTranscript.mainInterestAreas) && (
+          <CardContent className="space-y-4">
+            {latestTranscript.companyDescription && (
+              <div>
+                <h3 className="text-sm font-semibold mb-1">Company Description</h3>
+                <p className="text-sm text-muted-foreground">{latestTranscript.companyDescription}</p>
+              </div>
+            )}
+            {latestTranscript.mainInterestAreas && (
+              <div>
+                <h3 className="text-sm font-semibold mb-1">Main Interest Areas</h3>
+                <p className="text-sm text-muted-foreground">{latestTranscript.mainInterestAreas}</p>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       <Card>

@@ -490,6 +490,7 @@ export class MemStorage implements IStorage {
       qaCount: qaPairs.length,
       insights,
       qaPairs,
+      transcripts: companyTranscripts,
     };
   }
 
@@ -914,6 +915,7 @@ export class DbStorage implements IStorage {
         ...qa,
         categoryName: qa.categoryName || null,
       })),
+      transcripts: companyTranscripts,
     };
   }
 
