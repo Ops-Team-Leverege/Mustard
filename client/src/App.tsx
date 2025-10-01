@@ -11,6 +11,7 @@ import QADatabase from "@/pages/QADatabase";
 import Categories from "@/pages/Categories";
 import Companies from "@/pages/Companies";
 import CompanyPage from "@/pages/CompanyPage";
+import CategoryPage from "@/pages/CategoryPage";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
@@ -29,6 +30,7 @@ function Router() {
       <Route path="/companies" component={Companies} />
       <Route path="/companies/:slug" component={CompanyPage} />
       <Route path="/categories" component={Categories} />
+      <Route path="/categories/:id" component={CategoryPage} />
     </Switch>
   );
 }

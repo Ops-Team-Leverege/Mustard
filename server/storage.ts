@@ -12,6 +12,7 @@ import {
   type Company,
   type InsertCompany,
   type CompanyOverview,
+  type CategoryOverview,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -55,6 +56,7 @@ export interface IStorage {
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
+  getCategoryOverview(categoryId: string): Promise<CategoryOverview | null>;
 
   // Companies
   getCompanies(): Promise<Company[]>;
@@ -490,6 +492,29 @@ export class MemStorage implements IStorage {
       qaPairs,
     };
   }
+
+  async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
+    const category = this.categories.get(categoryId);
+    if (!category) return null;
+
+    // Get insights for this category
+    const insights = Array.from(this.productInsights.values())
+      .filter(i => i.categoryId === categoryId)
+      .map(i => this.enrichInsightWithCategory(i));
+
+    // Get Q&A pairs for this category
+    const qaPairs = Array.from(this.qaPairs.values())
+      .filter(qa => qa.categoryId === categoryId)
+      .map(qa => this.enrichQAPairWithCategory(qa));
+
+    return {
+      category,
+      insightCount: insights.length,
+      qaCount: qaPairs.length,
+      insights,
+      qaPairs,
+    };
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -879,6 +904,59 @@ export class DbStorage implements IStorage {
     return {
       company,
       transcriptCount: companyTranscripts.length,
+      insightCount: insights.length,
+      qaCount: qaPairs.length,
+      insights: insights.map(i => ({
+        ...i,
+        categoryName: i.categoryName || null,
+      })),
+      qaPairs: qaPairs.map(qa => ({
+        ...qa,
+        categoryName: qa.categoryName || null,
+      })),
+    };
+  }
+
+  async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
+    const category = await this.getCategory(categoryId);
+    if (!category) return null;
+
+    // Get insights for this category with category names
+    const insights = await this.db
+      .select({
+        id: productInsightsTable.id,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        companyId: productInsightsTable.companyId,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .where(eq(productInsightsTable.categoryId, categoryId));
+
+    // Get Q&A pairs for this category with category names
+    const qaPairs = await this.db
+      .select({
+        id: qaPairsTable.id,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .where(eq(qaPairsTable.categoryId, categoryId));
+
+    return {
+      category,
       insightCount: insights.length,
       qaCount: qaPairs.length,
       insights: insights.map(i => ({

@@ -241,13 +241,25 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={!qa.categoryName ? 'default' : 'outline'}
-                      className={!qa.categoryName ? 'bg-chart-4 hover:bg-chart-4' : ''}
-                      data-testid={`badge-category-${qa.id}`}
-                    >
-                      {qa.categoryName || 'NEW'}
-                    </Badge>
+                    {qa.categoryId && qa.categoryName ? (
+                      <Link href={`/categories/${qa.categoryId}`}>
+                        <Badge
+                          variant="outline"
+                          className="font-normal cursor-pointer hover-elevate"
+                          data-testid={`badge-category-${qa.id}`}
+                        >
+                          {qa.categoryName}
+                        </Badge>
+                      </Link>
+                    ) : (
+                      <Badge
+                        variant="default"
+                        className="bg-chart-4 hover:bg-chart-4"
+                        data-testid={`badge-category-${qa.id}`}
+                      >
+                        NEW
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

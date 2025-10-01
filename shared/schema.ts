@@ -106,3 +106,12 @@ export type CompanyOverview = {
   insights: ProductInsightWithCategory[];
   qaPairs: QAPairWithCategory[];
 };
+
+// Category overview type for category pages
+export type CategoryOverview = {
+  category: Category;
+  insightCount: number;
+  qaCount: number;
+  insights: ProductInsightWithCategory[];
+  qaPairs: QAPairWithCategory[];
+};

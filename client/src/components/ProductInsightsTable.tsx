@@ -268,13 +268,25 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={insight.category === 'NEW' ? 'default' : 'outline'}
-                      className={insight.category === 'NEW' ? 'bg-chart-4 hover:bg-chart-4' : ''}
-                      data-testid={`badge-category-${insight.id}`}
-                    >
-                      {insight.category}
-                    </Badge>
+                    {insight.categoryId && insight.category !== 'NEW' ? (
+                      <Link href={`/categories/${insight.categoryId}`}>
+                        <Badge
+                          variant="outline"
+                          className="font-normal cursor-pointer hover-elevate"
+                          data-testid={`badge-category-${insight.id}`}
+                        >
+                          {insight.category}
+                        </Badge>
+                      </Link>
+                    ) : (
+                      <Badge
+                        variant={insight.category === 'NEW' ? 'default' : 'outline'}
+                        className={insight.category === 'NEW' ? 'bg-chart-4 hover:bg-chart-4' : ''}
+                        data-testid={`badge-category-${insight.id}`}
+                      >
+                        {insight.category}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

@@ -462,6 +462,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/categories/:id/overview", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const overview = await storage.getCategoryOverview(id);
+      
+      if (!overview) {
+        res.status(404).json({ error: "Category not found" });
+        return;
+      }
+      
+      res.json(overview);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   // Companies
   app.get("/api/companies", async (req, res) => {
     try {
