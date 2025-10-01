@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Pencil, Trash2 } from "lucide-react";
+import { Search, Pencil, Trash2, Plus } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -32,13 +32,16 @@ export interface Category {
 interface ProductInsightsTableProps {
   insights: ProductInsight[];
   categories?: Category[];
+  defaultCompany?: string;
 }
 
-export default function ProductInsightsTable({ insights, categories = [] }: ProductInsightsTableProps) {
+export default function ProductInsightsTable({ insights, categories = [], defaultCompany }: ProductInsightsTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingInsight, setEditingInsight] = useState<ProductInsight | null>(null);
   const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', categoryId: null as string | null });
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -49,6 +52,12 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
       toast({
         title: "Success",
         description: "Insight deleted successfully",
@@ -82,6 +91,12 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
       setEditingInsight(null);
       toast({
         title: "Success",
@@ -92,6 +107,36 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
       toast({
         title: "Error",
         description: "Failed to update insight",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async ({ feature, context, quote, company, categoryId }: { feature: string; context: string; quote: string; company: string; categoryId: string | null }) => {
+      const res = await apiRequest('POST', '/api/insights', { feature, context, quote, company, categoryId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
+      setIsAddDialogOpen(false);
+      setAddForm({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null });
+      toast({
+        title: "Success",
+        description: "Insight added successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add insight",
         variant: "destructive",
       });
     },
@@ -113,6 +158,23 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
     }
   };
 
+  const handleAdd = () => {
+    if (!addForm.feature || !addForm.context || !addForm.quote || !addForm.company) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createMutation.mutate(addForm);
+  };
+
+  const handleOpenAddDialog = () => {
+    setAddForm({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null });
+    setIsAddDialogOpen(true);
+  };
+
   const filteredInsights = insights.filter(insight => {
     const matchesSearch = 
       insight.feature.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -128,31 +190,37 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search features or companies..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-insights"
+      <div className="flex gap-4 flex-wrap items-center justify-between">
+        <div className="flex gap-4 flex-wrap flex-1">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search features or companies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-insights"
+            />
+          </div>
+          <Combobox
+            options={[
+              { value: 'all', label: 'All categories' },
+              ...categories.map(cat => ({ value: cat.id, label: cat.name })),
+              { value: 'NEW', label: 'NEW' }
+            ]}
+            value={categoryFilter}
+            onValueChange={setCategoryFilter}
+            placeholder="All categories"
+            searchPlaceholder="Search categories..."
+            emptyText="No category found."
+            className="w-[200px]"
+            testId="select-category-filter"
           />
         </div>
-        <Combobox
-          options={[
-            { value: 'all', label: 'All categories' },
-            ...categories.map(cat => ({ value: cat.id, label: cat.name })),
-            { value: 'NEW', label: 'NEW' }
-          ]}
-          value={categoryFilter}
-          onValueChange={setCategoryFilter}
-          placeholder="All categories"
-          searchPlaceholder="Search categories..."
-          emptyText="No category found."
-          className="w-[200px]"
-          testId="select-category-filter"
-        />
+        <Button onClick={handleOpenAddDialog} data-testid="button-add-insight" className="gap-2">
+          <Plus className="w-4 h-4" />
+          Add Insight
+        </Button>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -295,6 +363,83 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
               data-testid="button-save-edit"
             >
               {editMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Product Insight</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="add-feature">Feature</Label>
+              <Input
+                id="add-feature"
+                value={addForm.feature}
+                onChange={(e) => setAddForm({ ...addForm, feature: e.target.value })}
+                placeholder="E.g., Advanced Analytics Dashboard"
+                data-testid="input-add-feature"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-context">Context</Label>
+              <Textarea
+                id="add-context"
+                value={addForm.context}
+                onChange={(e) => setAddForm({ ...addForm, context: e.target.value })}
+                placeholder="Why this feature is valuable to the customer..."
+                data-testid="textarea-add-context"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-quote">Quote</Label>
+              <Textarea
+                id="add-quote"
+                value={addForm.quote}
+                onChange={(e) => setAddForm({ ...addForm, quote: e.target.value })}
+                placeholder="Customer's quote about this feature..."
+                data-testid="textarea-add-quote"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-company">Company</Label>
+              <Input
+                id="add-company"
+                value={addForm.company}
+                onChange={(e) => setAddForm({ ...addForm, company: e.target.value })}
+                placeholder="Company name"
+                data-testid="input-add-company"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-category">Category</Label>
+              <Combobox
+                options={[
+                  { value: 'none', label: 'No category' },
+                  ...categories.map(cat => ({ value: cat.id, label: cat.name }))
+                ]}
+                value={addForm.categoryId || 'none'}
+                onValueChange={(value) => setAddForm({ ...addForm, categoryId: value === 'none' ? null : value })}
+                placeholder="Select category"
+                searchPlaceholder="Search categories..."
+                emptyText="No category found."
+                testId="select-add-category"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAdd} 
+              disabled={createMutation.isPending}
+              data-testid="button-save-add"
+            >
+              {createMutation.isPending ? "Adding..." : "Add Insight"}
             </Button>
           </DialogFooter>
         </DialogContent>

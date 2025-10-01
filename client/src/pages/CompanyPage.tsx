@@ -16,6 +16,10 @@ export default function CompanyPage() {
     enabled: !!companySlug,
   });
 
+  const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description?: string }>>({
+    queryKey: ['/api/categories'],
+  });
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-6">
@@ -77,7 +81,9 @@ export default function CompanyPage() {
             insights={overview.insights.map(i => ({
               ...i,
               category: i.categoryName || '',
-            }))} 
+            }))}
+            categories={categories}
+            defaultCompany={overview.company.name}
           />
         </CardContent>
       </Card>
@@ -94,7 +100,9 @@ export default function CompanyPage() {
             qaPairs={overview.qaPairs.map(qa => ({
               ...qa,
               category: qa.categoryName || '',
-            }))} 
+            }))}
+            categories={categories}
+            defaultCompany={overview.company.name}
           />
         </CardContent>
       </Card>

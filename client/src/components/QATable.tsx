@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { Search, Pencil, Trash2 } from "lucide-react";
+import { Search, Pencil, Trash2, Plus } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -32,12 +32,15 @@ export interface Category {
 interface QATableProps {
   qaPairs: QAPair[];
   categories?: Category[];
+  defaultCompany?: string;
 }
 
-export default function QATable({ qaPairs, categories = [] }: QATableProps) {
+export default function QATable({ qaPairs, categories = [], defaultCompany }: QATableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
   const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null });
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null });
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -47,6 +50,12 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
       toast({
         title: "Success",
         description: "Q&A pair deleted successfully",
@@ -80,6 +89,12 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
       setEditingQA(null);
       toast({
         title: "Success",
@@ -90,6 +105,36 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
       toast({
         title: "Error",
         description: "Failed to update Q&A pair",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async ({ question, answer, asker, company, categoryId }: { question: string; answer: string; asker: string; company: string; categoryId: string | null }) => {
+      const res = await apiRequest('POST', '/api/qa-pairs', { question, answer, asker, company, categoryId });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
+      setIsAddDialogOpen(false);
+      setAddForm({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null });
+      toast({
+        title: "Success",
+        description: "Q&A pair added successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to add Q&A pair",
         variant: "destructive",
       });
     },
@@ -106,6 +151,23 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
     }
   };
 
+  const handleAdd = () => {
+    if (!addForm.question || !addForm.answer || !addForm.asker || !addForm.company) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createMutation.mutate(addForm);
+  };
+
+  const handleOpenAddDialog = () => {
+    setAddForm({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null });
+    setIsAddDialogOpen(true);
+  };
+
   const filteredQAPairs = qaPairs.filter(qa => {
     return (
       qa.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -117,15 +179,21 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search questions or answers..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-          data-testid="input-search-qa"
-        />
+      <div className="flex gap-4 items-center justify-between flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search questions or answers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-qa"
+          />
+        </div>
+        <Button onClick={handleOpenAddDialog} data-testid="button-add-qa" className="gap-2">
+          <Plus className="w-4 h-4" />
+          Add Q&A Pair
+        </Button>
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -268,6 +336,83 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
               data-testid="button-save-edit"
             >
               {editMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Q&A Pair</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="add-question">Question</Label>
+              <Textarea
+                id="add-question"
+                value={addForm.question}
+                onChange={(e) => setAddForm({ ...addForm, question: e.target.value })}
+                placeholder="What was the question asked?"
+                data-testid="textarea-add-question"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-answer">Answer</Label>
+              <Textarea
+                id="add-answer"
+                value={addForm.answer}
+                onChange={(e) => setAddForm({ ...addForm, answer: e.target.value })}
+                placeholder="What was the answer provided?"
+                data-testid="textarea-add-answer"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-asker">Asked By</Label>
+              <Input
+                id="add-asker"
+                value={addForm.asker}
+                onChange={(e) => setAddForm({ ...addForm, asker: e.target.value })}
+                placeholder="Person who asked the question"
+                data-testid="input-add-asker"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-company">Company</Label>
+              <Input
+                id="add-company"
+                value={addForm.company}
+                onChange={(e) => setAddForm({ ...addForm, company: e.target.value })}
+                placeholder="Company name"
+                data-testid="input-add-company"
+              />
+            </div>
+            <div>
+              <Label htmlFor="add-category">Category</Label>
+              <Combobox
+                options={[
+                  { value: 'none', label: 'No category' },
+                  ...categories.map(cat => ({ value: cat.id, label: cat.name }))
+                ]}
+                value={addForm.categoryId || 'none'}
+                onValueChange={(value) => setAddForm({ ...addForm, categoryId: value === 'none' ? null : value })}
+                placeholder="Select category"
+                searchPlaceholder="Search categories..."
+                emptyText="No category found."
+                testId="select-add-category-qa"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAdd} 
+              disabled={createMutation.isPending}
+              data-testid="button-save-add"
+            >
+              {createMutation.isPending ? "Adding..." : "Add Q&A Pair"}
             </Button>
           </DialogFooter>
         </DialogContent>
