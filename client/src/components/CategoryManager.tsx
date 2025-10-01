@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,7 @@ interface CategoryManagerProps {
 }
 
 export default function CategoryManager({ categories, onAdd, onEdit, onDelete }: CategoryManagerProps) {
+  const [, setLocation] = useLocation();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [newCategoryDescription, setNewCategoryDescription] = useState('');
@@ -131,7 +133,12 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
           </Card>
         ) : (
           categories.map((category) => (
-            <Card key={category.id} data-testid={`card-category-${category.id}`} className="hover-elevate">
+            <Card 
+              key={category.id} 
+              data-testid={`card-category-${category.id}`} 
+              className="hover-elevate cursor-pointer"
+              onClick={() => setLocation(`/categories/${category.id}`)}
+            >
               <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
                 <div className="flex-1 min-w-0">
                   <CardTitle className="text-base truncate">{category.name}</CardTitle>
@@ -158,6 +165,7 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                       <Button
                         variant="ghost"
                         size="icon"
+                        onClick={(e) => e.stopPropagation()}
                         data-testid={`button-edit-${category.id}`}
                       >
                         <Pencil className="w-4 h-4" />
@@ -206,7 +214,10 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDelete(category.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(category.id);
+                    }}
                     data-testid={`button-delete-${category.id}`}
                   >
                     <Trash2 className="w-4 h-4" />
