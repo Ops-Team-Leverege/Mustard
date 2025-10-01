@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import CategoryManager, { Category } from "@/components/CategoryManager";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 export default function Categories() {
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
 
   const { data: categories = [], isLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -94,10 +98,27 @@ export default function Categories() {
     );
   }
 
+  const filteredCategories = categories.filter(cat =>
+    cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
     <div className="container mx-auto py-8 px-6">
+      <div className="mb-6">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search categories by name or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-categories"
+          />
+        </div>
+      </div>
       <CategoryManager
-        categories={categories}
+        categories={filteredCategories}
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}
