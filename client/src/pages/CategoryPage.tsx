@@ -77,7 +77,7 @@ export default function CategoryPage() {
           <ProductInsightsTable 
             insights={overview.insights.map(i => ({
               ...i,
-              category: i.categoryName || '',
+              category: i.categoryName || 'NEW',
             }))}
             categories={categories}
           />
@@ -95,7 +95,7 @@ export default function CategoryPage() {
           <QATable 
             qaPairs={overview.qaPairs.map(qa => ({
               ...qa,
-              category: qa.categoryName || '',
+              category: qa.categoryName || 'NEW',
             }))}
             categories={categories}
           />
