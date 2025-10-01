@@ -64,9 +64,9 @@ Preferred communication style: Simple, everyday language.
 
 **Database Schema**
 - `transcripts`: Stores raw call transcripts with company and participant metadata
-- `categories`: User-defined categories for organizing product insights
+- `categories`: User-defined categories for organizing product insights and Q&A pairs
 - `product_insights`: Feature requests extracted from transcripts with category assignment
-- `qa_pairs`: Question-answer pairs from BD calls
+- `qa_pairs`: Question-answer pairs from BD calls with category assignment
 
 ### Key Architectural Decisions
 
@@ -79,6 +79,7 @@ Preferred communication style: Simple, everyday language.
 - Transcript analysis happens before database persistence to fail fast
 - Analysis results determine what gets saved (no partial data on AI failure)
 - Categories pre-fetched and sent to AI for intelligent auto-categorization
+- Both product insights and Q&A pairs support category assignment (nullable for manual entries)
 
 **Type Safety Across Stack**
 - Shared schema definitions in `shared/schema.ts` used by both client and server
