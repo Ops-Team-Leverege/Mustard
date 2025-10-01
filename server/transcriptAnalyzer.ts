@@ -50,17 +50,34 @@ CONTEXT:
 AVAILABLE CATEGORIES:
 ${categoryList}
 
-TASK 1 - Extract Product Insights:
-Identify any features or capabilities the customer asked about or expressed interest in. For each:
+TASK 1 - Extract Product Insights (LEARNINGS ONLY):
+Focus on meaningful learnings, NOT simple confirmations or explanations. Extract insights ONLY if they meet one of these criteria:
+
+A) Customer comments on EXISTING features that reveal VALUE/USEFULNESS:
+   - How useful/important a feature is to them
+   - Their specific use case that shows why they need it
+   - Pain points the feature would solve
+
+B) Customer asks about or expresses interest in NEW features we DON'T currently have:
+   - Requests for capabilities we don't offer
+   - Questions about features we're missing
+   - Suggestions for improvements
+
+DO NOT include:
+- Simple confirmations of how a feature works
+- BD team explaining features (unless customer responds with value/need)
+- Administrative or scheduling topics
+
+For each insight:
 - feature: The specific feature or capability name
-- context: Why this feature is important to the customer (their use case/need)
-- quote: A direct quote from the customer about this feature (verbatim from transcript)
+- context: Why this feature is important/valuable to the customer (their use case/need)
+- quote: Customer quote - lightly paraphrased for readability while preserving exact intent and meaning
 - categoryId: Match to one of the category IDs above, or null if no good match (will be marked as NEW)
 
 TASK 2 - Extract Q&A Pairs:
 Identify product-specific questions asked during the call. For each:
-- question: The question that was asked (product-related only, not scheduling/admin)
-- answer: The answer that was provided
+- question: The question that was asked (product-related only, not scheduling/admin) - lightly paraphrased for clarity
+- answer: The answer that was provided - lightly paraphrased for clarity
 - asker: The name of the person who asked (from customer names list)
 
 OUTPUT FORMAT:
@@ -69,26 +86,26 @@ Respond with valid JSON in this exact structure:
   "insights": [
     {
       "feature": "feature name",
-      "context": "why important to customer",
-      "quote": "exact customer quote",
+      "context": "why valuable to customer",
+      "quote": "paraphrased customer quote (readable, intent preserved)",
       "categoryId": "category-id-or-null"
     }
   ],
   "qaPairs": [
     {
-      "question": "the question asked",
-      "answer": "the answer provided",
+      "question": "paraphrased question (clear and readable)",
+      "answer": "paraphrased answer (clear and readable)",
       "asker": "person name"
     }
   ]
 }
 
 IMPORTANT:
-- Only include actual product features discussed, not general conversation
-- Quotes must be verbatim from the transcript
+- Be SELECTIVE - only include real learnings, not confirmations
+- Paraphrase quotes lightly for readability without changing meaning
+- Focus on VALUE and NEW capabilities
 - categoryId must be one of the IDs listed above or null
-- Only include product-specific questions, not logistics/scheduling
-- Be thorough but accurate`;
+- Only include product-specific Q&A, not logistics/scheduling`;
 
   try {
     const response = await openai.chat.completions.create({
