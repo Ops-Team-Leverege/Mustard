@@ -171,7 +171,7 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                         <Pencil className="w-4 h-4" />
                       </Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent onClick={(e) => e.stopPropagation()}>
                       <DialogHeader>
                         <DialogTitle>Edit Category</DialogTitle>
                         <DialogDescription>
