@@ -2,7 +2,7 @@ import { useState } from "react";
 import TranscriptForm, { TranscriptData } from "@/components/TranscriptForm";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function TranscriptInput() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -15,6 +15,13 @@ export default function TranscriptInput() {
     try {
       const response = await apiRequest('POST', '/api/transcripts', data);
       const result = await response.json();
+      
+      // Invalidate all relevant caches to ensure fresh data
+      await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/transcripts'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/qa'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/companies', result.company.slug, 'overview'] });
       
       toast({
         title: "Analysis Complete",
