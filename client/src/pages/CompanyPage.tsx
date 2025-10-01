@@ -43,9 +43,11 @@ export default function CompanyPage() {
     );
   }
 
-  const latestTranscript = overview.transcripts.sort((a, b) => 
-    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )[0];
+  const latestTranscript = overview.transcripts?.length > 0 
+    ? overview.transcripts.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )[0]
+    : null;
 
   return (
     <div className="p-6 space-y-6">

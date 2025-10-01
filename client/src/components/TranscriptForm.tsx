@@ -106,6 +106,17 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="contactJobTitle" data-testid="label-customer-job-title">Customer Job Title</Label>
+            <Input
+              id="contactJobTitle"
+              data-testid="input-customer-job-title"
+              placeholder="e.g., VP of Operations, CTO"
+              value={formData.contactJobTitle}
+              onChange={(e) => setFormData({ ...formData, contactJobTitle: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="companyDescription" data-testid="label-company-description">Company Description</Label>
             <Textarea
               id="companyDescription"
@@ -125,17 +136,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               placeholder="e.g., 150 or Not applicable"
               value={formData.numberOfStores}
               onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="contactJobTitle" data-testid="label-contact-job-title">Contact Job Title</Label>
-            <Input
-              id="contactJobTitle"
-              data-testid="input-contact-job-title"
-              placeholder="e.g., VP of Operations, CTO"
-              value={formData.contactJobTitle}
-              onChange={(e) => setFormData({ ...formData, contactJobTitle: e.target.value })}
             />
           </div>
 
