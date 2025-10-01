@@ -23,10 +23,14 @@ export default function ProductInsights() {
     quote: insight.quote,
     company: insight.company,
     category: insight.categoryName || 'NEW',
+    categoryId: insight.categoryId || null,
   }));
 
-  // Note: categoryNames are used for filtering in the table
-  const categoryNames = (categories as any[]).map((cat: any) => cat.name);
+  // Pass full category objects with id and name
+  const categoryObjects = (categories as any[]).map((cat: any) => ({
+    id: cat.id,
+    name: cat.name,
+  }));
 
   return (
     <div className="container mx-auto py-8 px-6">
@@ -46,7 +50,7 @@ export default function ProductInsights() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading insights...</div>
       ) : (
-        <ProductInsightsTable insights={tableInsights} categories={categoryNames} />
+        <ProductInsightsTable insights={tableInsights} categories={categoryObjects} />
       )}
     </div>
   );

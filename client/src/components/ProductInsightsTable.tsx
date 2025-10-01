@@ -20,18 +20,24 @@ export interface ProductInsight {
   quote: string;
   company: string;
   category: string;
+  categoryId?: string | null;
+}
+
+export interface Category {
+  id: string;
+  name: string;
 }
 
 interface ProductInsightsTableProps {
   insights: ProductInsight[];
-  categories?: string[];
+  categories?: Category[];
 }
 
 export default function ProductInsightsTable({ insights, categories = [] }: ProductInsightsTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingInsight, setEditingInsight] = useState<ProductInsight | null>(null);
-  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '' });
+  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', categoryId: null as string | null });
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -57,12 +63,18 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, feature, context, quote }: { id: string; feature: string; context: string; quote: string }) => {
+    mutationFn: async ({ id, feature, context, quote, categoryId }: { id: string; feature: string; context: string; quote: string; categoryId: string | null }) => {
+      // Update the insight
       const res = await apiRequest('PATCH', `/api/insights/${id}`, { feature, context, quote });
+      
+      // Update category separately
+      await apiRequest('PATCH', `/api/insights/${id}/category`, { categoryId });
+      
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
       setEditingInsight(null);
       toast({
         title: "Success",
@@ -80,7 +92,12 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
 
   const handleEdit = (insight: ProductInsight) => {
     setEditingInsight(insight);
-    setEditForm({ feature: insight.feature, context: insight.context, quote: insight.quote });
+    setEditForm({ 
+      feature: insight.feature, 
+      context: insight.context, 
+      quote: insight.quote,
+      categoryId: insight.categoryId || null
+    });
   };
 
   const handleSaveEdit = () => {
@@ -95,7 +112,9 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
       insight.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
       insight.context.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesCategory = categoryFilter === 'all' || insight.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'all' || 
+      (categoryFilter === 'NEW' && (!insight.categoryId || insight.category === 'NEW')) ||
+      insight.categoryId === categoryFilter;
     
     return matchesSearch && matchesCategory;
   });
@@ -120,7 +139,7 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
             {categories.map(cat => (
-              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
             ))}
             <SelectItem value="NEW">NEW</SelectItem>
           </SelectContent>
@@ -234,6 +253,23 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
                 onChange={(e) => setEditForm({ ...editForm, quote: e.target.value })}
                 data-testid="textarea-edit-quote"
               />
+            </div>
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Select 
+                value={editForm.categoryId || 'none'} 
+                onValueChange={(value) => setEditForm({ ...editForm, categoryId: value === 'none' ? null : value })}
+              >
+                <SelectTrigger id="category" data-testid="select-edit-category">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
