@@ -21,7 +21,7 @@ export const categories = pgTable("categories", {
 
 export const productInsights = pgTable("product_insights", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  transcriptId: varchar("transcript_id").notNull(),
+  transcriptId: varchar("transcript_id"),
   feature: text("feature").notNull(),
   context: text("context").notNull(),
   quote: text("quote").notNull(),
@@ -31,7 +31,7 @@ export const productInsights = pgTable("product_insights", {
 
 export const qaPairs = pgTable("qa_pairs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  transcriptId: varchar("transcript_id").notNull(),
+  transcriptId: varchar("transcript_id"),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
   asker: text("asker").notNull(),

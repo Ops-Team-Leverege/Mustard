@@ -129,8 +129,8 @@ export class MemStorage implements IStorage {
   }
 
   async createProductInsight(insertInsight: InsertProductInsight): Promise<ProductInsight> {
-    // Validate transcript exists
-    if (!this.transcripts.has(insertInsight.transcriptId)) {
+    // Validate transcript exists (only if transcriptId is provided)
+    if (insertInsight.transcriptId && !this.transcripts.has(insertInsight.transcriptId)) {
       throw new Error(`Transcript ${insertInsight.transcriptId} not found`);
     }
     
@@ -142,6 +142,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const insight: ProductInsight = {
       ...insertInsight,
+      transcriptId: insertInsight.transcriptId ?? null,
       categoryId: insertInsight.categoryId ?? null,
       id,
     };
@@ -152,7 +153,7 @@ export class MemStorage implements IStorage {
   async createProductInsights(insertInsights: InsertProductInsight[]): Promise<ProductInsight[]> {
     // Validate all first (atomicity)
     for (const insertInsight of insertInsights) {
-      if (!this.transcripts.has(insertInsight.transcriptId)) {
+      if (insertInsight.transcriptId && !this.transcripts.has(insertInsight.transcriptId)) {
         throw new Error(`Transcript ${insertInsight.transcriptId} not found`);
       }
       if (insertInsight.categoryId && !this.categories.has(insertInsight.categoryId)) {
@@ -165,6 +166,7 @@ export class MemStorage implements IStorage {
       const id = randomUUID();
       const insight: ProductInsight = {
         ...insertInsight,
+        transcriptId: insertInsight.transcriptId ?? null,
         categoryId: insertInsight.categoryId ?? null,
         id,
       };
@@ -236,14 +238,15 @@ export class MemStorage implements IStorage {
   }
 
   async createQAPair(insertQAPair: InsertQAPair): Promise<QAPair> {
-    // Validate transcript exists
-    if (!this.transcripts.has(insertQAPair.transcriptId)) {
+    // Validate transcript exists (only if transcriptId is provided)
+    if (insertQAPair.transcriptId && !this.transcripts.has(insertQAPair.transcriptId)) {
       throw new Error(`Transcript ${insertQAPair.transcriptId} not found`);
     }
     
     const id = randomUUID();
     const qaPair: QAPair = {
       ...insertQAPair,
+      transcriptId: insertQAPair.transcriptId ?? null,
       id,
     };
     this.qaPairs.set(id, qaPair);
@@ -253,7 +256,7 @@ export class MemStorage implements IStorage {
   async createQAPairs(insertQAPairs: InsertQAPair[]): Promise<QAPair[]> {
     // Validate all first (atomicity)
     for (const insertQAPair of insertQAPairs) {
-      if (!this.transcripts.has(insertQAPair.transcriptId)) {
+      if (insertQAPair.transcriptId && !this.transcripts.has(insertQAPair.transcriptId)) {
         throw new Error(`Transcript ${insertQAPair.transcriptId} not found`);
       }
     }
@@ -263,6 +266,7 @@ export class MemStorage implements IStorage {
       const id = randomUUID();
       const qaPair: QAPair = {
         ...insertQAPair,
+        transcriptId: insertQAPair.transcriptId ?? null,
         id,
       };
       this.qaPairs.set(id, qaPair);

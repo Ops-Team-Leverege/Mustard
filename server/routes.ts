@@ -179,6 +179,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/insights", async (req, res) => {
+    try {
+      const { feature, context, quote, company, categoryId } = req.body;
+      
+      if (!feature || !context || !quote || !company) {
+        res.status(400).json({ error: "Feature, context, quote, and company are required" });
+        return;
+      }
+      
+      const insight = await storage.createProductInsight({
+        transcriptId: null,
+        feature,
+        context,
+        quote,
+        company,
+        categoryId: categoryId || null,
+      });
+      
+      res.json(insight);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   // Q&A Pairs
   app.get("/api/qa-pairs", async (_req, res) => {
     try {
@@ -223,6 +247,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/qa-pairs", async (req, res) => {
+    try {
+      const { question, answer, asker, company } = req.body;
+      
+      if (!question || !answer || !asker || !company) {
+        res.status(400).json({ error: "Question, answer, asker, and company are required" });
+        return;
+      }
+      
+      const qaPair = await storage.createQAPair({
+        transcriptId: null,
+        question,
+        answer,
+        asker,
+        company,
+      });
+      
+      res.json(qaPair);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
