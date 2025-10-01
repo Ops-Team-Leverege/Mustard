@@ -1,28 +1,11 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import QATable from "@/components/QATable";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useLocation } from "wouter";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 
 export default function QADatabase() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const [isAddingQA, setIsAddingQA] = useState(false);
-  const [newQAForm, setNewQAForm] = useState({
-    question: '',
-    answer: '',
-    asker: '',
-    company: '',
-    categoryId: null as string | null,
-  });
 
   const { data: qaPairs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/qa-pairs'],
@@ -31,42 +14,6 @@ export default function QADatabase() {
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ['/api/categories'],
   });
-
-  const addQAMutation = useMutation({
-    mutationFn: async (data: { question: string; answer: string; asker: string; company: string; categoryId: string | null }) => {
-      const res = await apiRequest('POST', '/api/qa-pairs', data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
-      setIsAddingQA(false);
-      setNewQAForm({ question: '', answer: '', asker: '', company: '', categoryId: null });
-      toast({
-        title: "Success",
-        description: "Q&A pair added successfully",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to add Q&A pair",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAddQA = () => {
-    if (!newQAForm.question || !newQAForm.answer || !newQAForm.asker || !newQAForm.company) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-    addQAMutation.mutate(newQAForm);
-  };
 
   // Transform categories
   const categoryObjects = (categories as any[]).map((cat: any) => ({
@@ -83,16 +30,10 @@ export default function QADatabase() {
             Product-specific questions and BD answers
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsAddingQA(true)} data-testid="button-add-qa">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Q&A
-          </Button>
-          <Button onClick={() => setLocation('/')} data-testid="button-add-transcript">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Transcript
-          </Button>
-        </div>
+        <Button onClick={() => setLocation('/')} data-testid="button-add-transcript">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Transcript
+        </Button>
       </div>
 
       {isLoading ? (
@@ -100,85 +41,6 @@ export default function QADatabase() {
       ) : (
         <QATable qaPairs={qaPairs as any[]} categories={categoryObjects} />
       )}
-
-      <Dialog open={isAddingQA} onOpenChange={setIsAddingQA}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Q&A Pair</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="question">Question *</Label>
-              <Textarea
-                id="question"
-                value={newQAForm.question}
-                onChange={(e) => setNewQAForm({ ...newQAForm, question: e.target.value })}
-                placeholder="What question was asked?"
-                data-testid="textarea-add-question"
-              />
-            </div>
-            <div>
-              <Label htmlFor="answer">Answer *</Label>
-              <Textarea
-                id="answer"
-                value={newQAForm.answer}
-                onChange={(e) => setNewQAForm({ ...newQAForm, answer: e.target.value })}
-                placeholder="What answer was provided?"
-                data-testid="textarea-add-answer"
-              />
-            </div>
-            <div>
-              <Label htmlFor="asker">Asked By *</Label>
-              <Input
-                id="asker"
-                value={newQAForm.asker}
-                onChange={(e) => setNewQAForm({ ...newQAForm, asker: e.target.value })}
-                placeholder="Customer name"
-                data-testid="input-add-asker"
-              />
-            </div>
-            <div>
-              <Label htmlFor="company">Company *</Label>
-              <Input
-                id="company"
-                value={newQAForm.company}
-                onChange={(e) => setNewQAForm({ ...newQAForm, company: e.target.value })}
-                placeholder="Company name"
-                data-testid="input-add-company-qa"
-              />
-            </div>
-            <div>
-              <Label htmlFor="category">Category</Label>
-              <Select 
-                value={newQAForm.categoryId || 'none'} 
-                onValueChange={(value) => setNewQAForm({ ...newQAForm, categoryId: value === 'none' ? null : value })}
-              >
-                <SelectTrigger id="category" data-testid="select-add-category-qa">
-                  <SelectValue placeholder="Select category (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categoryObjects.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddingQA(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleAddQA} 
-              disabled={addQAMutation.isPending}
-              data-testid="button-save-add-qa"
-            >
-              {addQAMutation.isPending ? "Adding..." : "Add Q&A"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
