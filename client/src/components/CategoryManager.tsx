@@ -22,6 +22,7 @@ export interface Category {
   name: string;
   description?: string | null;
   usageCount: number;
+  qaCount: number;
 }
 
 interface CategoryManagerProps {
@@ -224,9 +225,12 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0">
-                <Badge variant="secondary" className="font-normal text-xs">
+              <CardContent className="pt-0 flex gap-2">
+                <Badge variant="secondary" className="font-normal text-xs" data-testid={`badge-insight-count-${category.id}`}>
                   {category.usageCount} {category.usageCount === 1 ? 'insight' : 'insights'}
+                </Badge>
+                <Badge variant="secondary" className="font-normal text-xs" data-testid={`badge-qa-count-${category.id}`}>
+                  {category.qaCount} {category.qaCount === 1 ? 'Q&A' : 'Q&As'}
                 </Badge>
               </CardContent>
             </Card>
