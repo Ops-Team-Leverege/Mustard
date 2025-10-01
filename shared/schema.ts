@@ -22,6 +22,9 @@ export const companies = pgTable("companies", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   notes: text("notes"),
+  companyDescription: text("company_description"),
+  mainInterestAreas: text("main_interest_areas"),
+  numberOfStores: text("number_of_stores"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
