@@ -1,23 +1,38 @@
 import { useState } from "react";
 import TranscriptForm, { TranscriptData } from "@/components/TranscriptForm";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function TranscriptInput() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const handleSubmit = async (data: TranscriptData) => {
     setIsAnalyzing(true);
-    console.log('Analyzing transcript:', data);
     
-    // Simulate AI analysis
-    setTimeout(() => {
-      setIsAnalyzing(false);
+    try {
+      await apiRequest('POST', '/api/transcripts', data);
+      
       toast({
         title: "Analysis Complete",
         description: "Product insights and Q&A pairs have been extracted successfully.",
       });
-    }, 2000);
+      
+      // Navigate to insights page
+      setTimeout(() => {
+        setLocation('/insights');
+      }, 1000);
+    } catch (error) {
+      toast({
+        title: "Analysis Failed",
+        description: error instanceof Error ? error.message : "Failed to analyze transcript",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   return (

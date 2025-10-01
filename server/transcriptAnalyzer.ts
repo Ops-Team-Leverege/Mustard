@@ -33,7 +33,9 @@ export interface AnalysisResult {
 export async function analyzeTranscript(
   input: TranscriptAnalysisInput
 ): Promise<AnalysisResult> {
-  const categoryList = input.categories.map(c => `- ${c.name} (ID: ${c.id})`).join('\n');
+  const categoryList = input.categories.map(c => 
+    `- ${c.name} (ID: ${c.id})${c.description ? `: ${c.description}` : ''}`
+  ).join('\n');
   
   const prompt = `You are analyzing a BD (Business Development) call transcript to extract product insights and Q&A pairs.
 

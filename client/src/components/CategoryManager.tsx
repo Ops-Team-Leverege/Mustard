@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import {
@@ -18,37 +19,42 @@ import { Label } from "@/components/ui/label";
 export interface Category {
   id: string;
   name: string;
+  description?: string | null;
   usageCount: number;
 }
 
 interface CategoryManagerProps {
   categories: Category[];
-  onAdd?: (name: string) => void;
-  onEdit?: (id: string, name: string) => void;
+  onAdd?: (name: string, description?: string) => void;
+  onEdit?: (id: string, name: string, description?: string) => void;
   onDelete?: (id: string) => void;
 }
 
 export default function CategoryManager({ categories, onAdd, onEdit, onDelete }: CategoryManagerProps) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryDescription, setNewCategoryDescription] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   const handleAdd = () => {
     if (newCategoryName.trim()) {
-      console.log('Adding category:', newCategoryName);
-      onAdd?.(newCategoryName);
+      console.log('Adding category:', newCategoryName, newCategoryDescription);
+      onAdd?.(newCategoryName, newCategoryDescription || undefined);
       setNewCategoryName('');
+      setNewCategoryDescription('');
       setIsAddOpen(false);
     }
   };
 
   const handleEdit = () => {
     if (editingId && editName.trim()) {
-      console.log('Editing category:', editingId, editName);
-      onEdit?.(editingId, editName);
+      console.log('Editing category:', editingId, editName, editDescription);
+      onEdit?.(editingId, editName, editDescription || undefined);
       setEditingId(null);
       setEditName('');
+      setEditDescription('');
     }
   };
 
@@ -89,7 +95,18 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                   placeholder="e.g., Analytics, Mobile, Integration"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleAdd()}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="categoryDescription">Description (Optional)</Label>
+                <Textarea
+                  id="categoryDescription"
+                  data-testid="input-category-description"
+                  placeholder="Describe what features belong in this category to help with AI matching..."
+                  value={newCategoryDescription}
+                  onChange={(e) => setNewCategoryDescription(e.target.value)}
+                  rows={3}
                 />
               </div>
             </div>
@@ -118,10 +135,8 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div className="flex-1">
                   <CardTitle className="text-lg">{category.name}</CardTitle>
-                  <CardDescription>
-                    <Badge variant="secondary" className="mt-2">
-                      {category.usageCount} {category.usageCount === 1 ? 'insight' : 'insights'}
-                    </Badge>
+                  <CardDescription className="mt-1">
+                    {category.description || 'No description'}
                   </CardDescription>
                 </div>
                 <div className="flex gap-1">
@@ -131,9 +146,11 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                       if (open) {
                         setEditingId(category.id);
                         setEditName(category.name);
+                        setEditDescription(category.description || '');
                       } else {
                         setEditingId(null);
                         setEditName('');
+                        setEditDescription('');
                       }
                     }}
                   >
@@ -150,7 +167,7 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                       <DialogHeader>
                         <DialogTitle>Edit Category</DialogTitle>
                         <DialogDescription>
-                          Update the category name
+                          Update the category name and description
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
@@ -161,7 +178,18 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                             data-testid="input-edit-category-name"
                             value={editName}
                             onChange={(e) => setEditName(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleEdit()}
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleEdit()}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="editCategoryDescription">Description (Optional)</Label>
+                          <Textarea
+                            id="editCategoryDescription"
+                            data-testid="input-edit-category-description"
+                            placeholder="Describe what features belong in this category..."
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            rows={3}
                           />
                         </div>
                       </div>
@@ -185,6 +213,11 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                   </Button>
                 </div>
               </CardHeader>
+              <CardContent className="pt-2">
+                <Badge variant="secondary" className="font-normal">
+                  {category.usageCount} {category.usageCount === 1 ? 'insight' : 'insights'}
+                </Badge>
+              </CardContent>
             </Card>
           ))
         )}

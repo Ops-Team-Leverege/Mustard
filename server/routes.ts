@@ -15,13 +15,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const data = insertTranscriptSchema.parse(req.body);
       
-      // Create transcript
-      const transcript = await storage.createTranscript(data);
-      
-      // Analyze with AI
+      // Analyze with AI first (before persisting transcript)
       const categories = await storage.getCategories();
-      const leverageTeam = data.leverageTeam.split(',').map(s => s.trim());
-      const customerNames = data.customerNames.split(',').map(s => s.trim());
+      const leverageTeam = data.leverageTeam.split(',').map(s => s.trim()).filter(s => s);
+      const customerNames = data.customerNames.split(',').map(s => s.trim()).filter(s => s);
       
       const analysis = await analyzeTranscript({
         transcript: data.transcript,
@@ -30,6 +27,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerNames,
         categories,
       });
+      
+      // Only create transcript after successful analysis
+      const transcript = await storage.createTranscript(data);
       
       // Save insights
       const insights = await storage.createProductInsights(
@@ -113,6 +113,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { categoryId } = req.body;
       
+      // Validate categoryId if provided
+      if (categoryId !== null && typeof categoryId !== 'string') {
+        res.status(400).json({ error: "Invalid categoryId" });
+        return;
+      }
+      
+      if (categoryId) {
+        const category = await storage.getCategory(categoryId);
+        if (!category) {
+          res.status(400).json({ error: "Category not found" });
+          return;
+        }
+      }
+      
       const success = await storage.assignCategoryToInsight(id, categoryId);
       
       if (!success) {
@@ -184,14 +198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/categories/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { name } = req.body;
+      const { name, description } = req.body;
       
       if (!name || typeof name !== 'string') {
         res.status(400).json({ error: "Name is required" });
         return;
       }
       
-      const category = await storage.updateCategory(id, name);
+      const category = await storage.updateCategory(id, name, description);
       
       if (!category) {
         res.status(404).json({ error: "Category not found" });

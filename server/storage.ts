@@ -36,7 +36,7 @@ export interface IStorage {
   getCategories(): Promise<Category[]>;
   getCategory(id: string): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
-  updateCategory(id: string, name: string): Promise<Category | undefined>;
+  updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
 }
 
@@ -53,12 +53,18 @@ export class MemStorage implements IStorage {
     this.categories = new Map();
 
     // Initialize with default categories
-    const defaultCategories = ['Analytics', 'Mobile', 'Integration', 'Security'];
-    defaultCategories.forEach(name => {
+    const defaultCategories = [
+      { name: 'Analytics', description: 'Reporting, dashboards, data visualization, and business intelligence features' },
+      { name: 'Mobile', description: 'Mobile app features, offline mode, and mobile-specific functionality' },
+      { name: 'Integration', description: 'Third-party integrations, APIs, webhooks, and data sync capabilities' },
+      { name: 'Security', description: 'Authentication, authorization, data encryption, and security compliance features' },
+    ];
+    defaultCategories.forEach(({ name, description }) => {
       const id = randomUUID();
       this.categories.set(id, {
         id,
         name,
+        description,
         createdAt: new Date(),
       });
     });
@@ -259,6 +265,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const category: Category = {
       ...insertCategory,
+      description: insertCategory.description ?? null,
       id,
       createdAt: new Date(),
     };
@@ -266,7 +273,7 @@ export class MemStorage implements IStorage {
     return category;
   }
 
-  async updateCategory(id: string, name: string): Promise<Category | undefined> {
+  async updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined> {
     const category = this.categories.get(id);
     if (!category) return undefined;
     
@@ -281,6 +288,7 @@ export class MemStorage implements IStorage {
     const updated: Category = {
       ...category,
       name,
+      description: description !== undefined ? (description ?? null) : category.description,
     };
     this.categories.set(id, updated);
     return updated;

@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
@@ -6,35 +7,26 @@ import { useLocation } from "wouter";
 export default function ProductInsights() {
   const [, setLocation] = useLocation();
 
-  // Mock data - will be replaced with real data
-  const insights = [
-    {
-      id: '1',
-      feature: 'Real-time Analytics Dashboard',
-      context: 'Need to monitor fleet performance in real-time for operational efficiency',
-      quote: 'We absolutely need to see our vehicles in real-time, not 5 minutes delayed. Every second counts in our logistics.',
-      company: 'LogiTech Solutions',
-      category: 'Analytics'
-    },
-    {
-      id: '2',
-      feature: 'Mobile App Offline Mode',
-      context: 'Drivers work in areas with poor connectivity and need offline functionality',
-      quote: 'Our drivers are often in remote areas with no signal. They need to be able to log deliveries offline.',
-      company: 'TransGlobal',
-      category: 'Mobile'
-    },
-    {
-      id: '3',
-      feature: 'Custom Alert Rules',
-      context: 'Want to define custom thresholds for temperature monitoring per product line',
-      quote: 'Each product line has different temperature requirements. We need customizable alerts for each SKU.',
-      company: 'FreshFoods Inc',
-      category: 'NEW'
-    },
-  ];
+  const { data: insights = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/insights'],
+  });
 
-  const categories = ['Analytics', 'Mobile', 'Integration', 'Security'];
+  const { data: categories = [] } = useQuery<any[]>({
+    queryKey: ['/api/categories'],
+  });
+
+  // Transform data to match component interface
+  const tableInsights = (insights as any[]).map((insight: any) => ({
+    id: insight.id,
+    feature: insight.feature,
+    context: insight.context,
+    quote: insight.quote,
+    company: insight.company,
+    category: insight.categoryName || 'NEW',
+  }));
+
+  // Note: categoryNames are used for filtering in the table
+  const categoryNames = (categories as any[]).map((cat: any) => cat.name);
 
   return (
     <div className="container mx-auto py-8 px-6">
@@ -51,7 +43,11 @@ export default function ProductInsights() {
         </Button>
       </div>
 
-      <ProductInsightsTable insights={insights} categories={categories} />
+      {isLoading ? (
+        <div className="text-center py-12 text-muted-foreground">Loading insights...</div>
+      ) : (
+        <ProductInsightsTable insights={tableInsights} categories={categoryNames} />
+      )}
     </div>
   );
 }
