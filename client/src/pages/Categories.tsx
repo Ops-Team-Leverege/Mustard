@@ -93,7 +93,7 @@ export default function Categories() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-6">
+      <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
         <div className="text-center py-12 text-muted-foreground">Loading categories...</div>
       </div>
     );
@@ -105,10 +105,10 @@ export default function Categories() {
   );
 
   return (
-    <div className="container mx-auto py-8 px-6">
+    <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
       <CategoryAnalytics categories={categories} />
       
-      <div className="mb-6">
+      <div className="mb-4 sm:mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input

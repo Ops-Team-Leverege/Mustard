@@ -27,18 +27,18 @@ export default function Companies() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-8 px-6">
+      <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
         <div className="text-center py-12 text-muted-foreground">Loading companies...</div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-8 px-6">
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
+      <div className="mb-4 sm:mb-6">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
           <div>
-            <h2 className="text-2xl font-semibold">Companies</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold">Companies</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Browse all companies with BD call transcripts
             </p>
