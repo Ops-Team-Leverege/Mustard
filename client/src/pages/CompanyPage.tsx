@@ -50,12 +50,12 @@ export default function CompanyPage() {
     : null;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex-1">
-              <CardTitle className="text-3xl">{overview.company.name}</CardTitle>
+          <div className="space-y-4">
+            <div>
+              <CardTitle className="text-2xl sm:text-3xl">{overview.company.name}</CardTitle>
               {overview.company.notes && (
                 <CardDescription className="mt-2">{overview.company.notes}</CardDescription>
               )}

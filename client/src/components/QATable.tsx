@@ -218,16 +218,16 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
         </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[300px]">Question</TableHead>
-              <TableHead>Answer</TableHead>
-              <TableHead className="w-[150px]">Asked By</TableHead>
-              <TableHead className="w-[150px]">Company</TableHead>
-              <TableHead className="w-[120px]">Category</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="min-w-[250px]">Question</TableHead>
+              <TableHead className="min-w-[250px]">Answer</TableHead>
+              <TableHead className="min-w-[150px]">Asked By</TableHead>
+              <TableHead className="min-w-[150px]">Company</TableHead>
+              <TableHead className="min-w-[120px]">Category</TableHead>
+              <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

@@ -223,16 +223,16 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
         </Button>
       </div>
 
-      <div className="border rounded-lg overflow-hidden">
+      <div className="border rounded-lg overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[180px]">Feature</TableHead>
-              <TableHead className="w-[200px]">Context</TableHead>
-              <TableHead>Customer Quote</TableHead>
-              <TableHead className="w-[150px]">Company</TableHead>
-              <TableHead className="w-[120px]">Category</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
+              <TableHead className="min-w-[180px]">Feature</TableHead>
+              <TableHead className="min-w-[200px]">Context</TableHead>
+              <TableHead className="min-w-[250px]">Customer Quote</TableHead>
+              <TableHead className="min-w-[150px]">Company</TableHead>
+              <TableHead className="min-w-[120px]">Category</TableHead>
+              <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
