@@ -44,12 +44,12 @@ export default function CategoryPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+    <div className="p-6 space-y-6">
       <Card>
         <CardHeader>
-          <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <CardTitle className="text-2xl sm:text-3xl">{overview.category.name}</CardTitle>
+              <CardTitle className="text-3xl">{overview.category.name}</CardTitle>
               {overview.category.description && (
                 <CardDescription className="mt-2">{overview.category.description}</CardDescription>
               )}
