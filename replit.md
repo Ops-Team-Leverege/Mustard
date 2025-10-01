@@ -133,6 +133,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Updates (October 2025)
 
+### Category Pages & Navigation
+- **Category Pages**: Dedicated pages for viewing category-specific data
+  - ID-based routing (`/categories/:id`) for direct category access
+  - Clickable category badges in both insights and Q&A tables (except "NEW")
+  - Overview shows category name, description, insight count, and Q&A count
+  - Filtered views displaying all insights and Q&A pairs for the selected category
+  - Consistent navigation pattern matching company pages
+  
 ### Category Analytics Dashboard
 - **CategoryAnalytics Component**: Comprehensive analytics view showing category usage statistics
   - Summary cards for total categories, total insights, and most popular category
@@ -152,6 +160,7 @@ Preferred communication style: Simple, everyday language.
   - Replaces basic Select in ProductInsightsTable and QATable edit dialogs
   - Maintains selection state when re-selecting current option
   - Search functionality for quick category lookup
+  - "NEW" filter option moved to top of category filter dropdown for visibility
   
 ### Company-Based Navigation
 - **Company Pages**: Dedicated pages for viewing company-specific data
@@ -159,3 +168,9 @@ Preferred communication style: Simple, everyday language.
   - Clickable company badges in both insights and Q&A tables
   - Filtered views showing only relevant insights and Q&A pairs per company
   - Company normalization with companyId foreign keys and backwards compatibility
+
+### Add Functionality on Filtered Pages
+- **Add Buttons**: Both company and category pages now have "Add Insight" and "Add Q&A Pair" buttons
+  - Pre-fills company name when adding from company pages
+  - Forms include category selection via searchable combobox
+  - Immediate cache invalidation ensures new items appear without page refresh
