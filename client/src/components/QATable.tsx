@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Search, Pencil, Trash2 } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 export interface QAPair {
   id: string;
@@ -161,9 +162,15 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className="font-normal" data-testid={`badge-company-${qa.id}`}>
-                      {qa.company}
-                    </Badge>
+                    <Link href={`/companies/${qa.company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`}>
+                      <Badge 
+                        variant="outline" 
+                        className="font-normal cursor-pointer hover-elevate" 
+                        data-testid={`badge-company-${qa.id}`}
+                      >
+                        {qa.company}
+                      </Badge>
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -237,20 +244,18 @@ export default function QATable({ qaPairs, categories = [] }: QATableProps) {
             </div>
             <div>
               <Label htmlFor="category">Category</Label>
-              <Select 
-                value={editForm.categoryId || 'none'} 
+              <Combobox
+                options={[
+                  { value: 'none', label: 'No category' },
+                  ...categories.map(cat => ({ value: cat.id, label: cat.name }))
+                ]}
+                value={editForm.categoryId || 'none'}
                 onValueChange={(value) => setEditForm({ ...editForm, categoryId: value === 'none' ? null : value })}
-              >
-                <SelectTrigger id="category" data-testid="select-edit-category-qa">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select category"
+                searchPlaceholder="Search categories..."
+                emptyText="No category found."
+                testId="select-edit-category-qa"
+              />
             </div>
           </div>
           <DialogFooter>

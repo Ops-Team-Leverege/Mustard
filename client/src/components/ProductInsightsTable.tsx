@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/ui/combobox";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +12,7 @@ import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "wouter";
 
 export interface ProductInsight {
   id: string;
@@ -138,18 +139,20 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
             data-testid="input-search-insights"
           />
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]" data-testid="select-category-filter">
-            <SelectValue placeholder="All categories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {categories.map(cat => (
-              <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-            ))}
-            <SelectItem value="NEW">NEW</SelectItem>
-          </SelectContent>
-        </Select>
+        <Combobox
+          options={[
+            { value: 'all', label: 'All categories' },
+            ...categories.map(cat => ({ value: cat.id, label: cat.name })),
+            { value: 'NEW', label: 'NEW' }
+          ]}
+          value={categoryFilter}
+          onValueChange={setCategoryFilter}
+          placeholder="All categories"
+          searchPlaceholder="Search categories..."
+          emptyText="No category found."
+          className="w-[200px]"
+          testId="select-category-filter"
+        />
       </div>
 
       <div className="border rounded-lg overflow-hidden">
@@ -186,9 +189,15 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="font-normal" data-testid={`badge-company-${insight.id}`}>
-                      {insight.company}
-                    </Badge>
+                    <Link href={`/companies/${insight.company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`}>
+                      <Badge 
+                        variant="secondary" 
+                        className="font-normal cursor-pointer hover-elevate" 
+                        data-testid={`badge-company-${insight.id}`}
+                      >
+                        {insight.company}
+                      </Badge>
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -262,20 +271,18 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
             </div>
             <div>
               <Label htmlFor="category">Category</Label>
-              <Select 
-                value={editForm.categoryId || 'none'} 
+              <Combobox
+                options={[
+                  { value: 'none', label: 'No category' },
+                  ...categories.map(cat => ({ value: cat.id, label: cat.name }))
+                ]}
+                value={editForm.categoryId || 'none'}
                 onValueChange={(value) => setEditForm({ ...editForm, categoryId: value === 'none' ? null : value })}
-              >
-                <SelectTrigger id="category" data-testid="select-edit-category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No category</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select category"
+                searchPlaceholder="Search categories..."
+                emptyText="No category found."
+                testId="select-edit-category"
+              />
             </div>
           </div>
           <DialogFooter>
