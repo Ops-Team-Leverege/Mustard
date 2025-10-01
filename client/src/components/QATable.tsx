@@ -37,6 +37,7 @@ interface QATableProps {
 
 export default function QATable({ qaPairs, categories = [], defaultCompany }: QATableProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
   const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -169,25 +170,46 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   };
 
   const filteredQAPairs = qaPairs.filter(qa => {
-    return (
+    const matchesSearch = 
       qa.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
       qa.answer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       qa.asker.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      qa.company.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+      qa.company.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesCategory = categoryFilter === 'all' || 
+      (categoryFilter === 'NEW' && !qa.categoryId) ||
+      qa.categoryId === categoryFilter;
+    
+    return matchesSearch && matchesCategory;
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-4 items-center justify-between flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search questions or answers..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-testid="input-search-qa"
+      <div className="flex gap-4 flex-wrap items-center justify-between">
+        <div className="flex gap-4 flex-wrap flex-1">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search questions or answers..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-qa"
+            />
+          </div>
+          <Combobox
+            options={[
+              { value: 'all', label: 'All categories' },
+              { value: 'NEW', label: 'NEW' },
+              ...categories.map(cat => ({ value: cat.id, label: cat.name }))
+            ]}
+            value={categoryFilter}
+            onValueChange={setCategoryFilter}
+            placeholder="All categories"
+            searchPlaceholder="Search categories..."
+            emptyText="No category found."
+            className="w-[200px]"
+            testId="select-category-filter-qa"
           />
         </div>
         <Button onClick={handleOpenAddDialog} data-testid="button-add-qa" className="gap-2">
