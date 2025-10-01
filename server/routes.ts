@@ -207,7 +207,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/qa-pairs", async (_req, res) => {
     try {
       const qaPairs = await storage.getQAPairs();
+      
+      // Add usage count for each category (for consistency with insights)
+      const categories = await storage.getCategories();
+      const categoryUsage = new Map<string, number>();
+      
+      qaPairs.forEach(qa => {
+        if (qa.categoryId) {
+          categoryUsage.set(
+            qa.categoryId,
+            (categoryUsage.get(qa.categoryId) || 0) + 1
+          );
+        }
+      });
+      
       res.json(qaPairs);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.patch("/api/qa-pairs/:id/category", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { categoryId } = req.body;
+      
+      // Validate categoryId if provided
+      if (categoryId !== null && typeof categoryId !== 'string') {
+        res.status(400).json({ error: "Invalid categoryId" });
+        return;
+      }
+      
+      if (categoryId) {
+        const category = await storage.getCategory(categoryId);
+        if (!category) {
+          res.status(400).json({ error: "Category not found" });
+          return;
+        }
+      }
+      
+      const success = await storage.assignCategoryToQAPair(id, categoryId);
+      
+      if (!success) {
+        res.status(404).json({ error: "Q&A pair not found" });
+        return;
+      }
+      
+      res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
@@ -254,7 +300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/qa-pairs", async (req, res) => {
     try {
-      const { question, answer, asker, company } = req.body;
+      const { question, answer, asker, company, categoryId } = req.body;
       
       if (!question || !answer || !asker || !company) {
         res.status(400).json({ error: "Question, answer, asker, and company are required" });
@@ -267,6 +313,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         answer,
         asker,
         company,
+        categoryId: categoryId || null,
       });
       
       res.json(qaPair);

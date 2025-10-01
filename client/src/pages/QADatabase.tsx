@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus } from "lucide-react";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -20,21 +21,27 @@ export default function QADatabase() {
     answer: '',
     asker: '',
     company: '',
+    categoryId: null as string | null,
   });
 
   const { data: qaPairs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/qa-pairs'],
   });
 
+  const { data: categories = [] } = useQuery<any[]>({
+    queryKey: ['/api/categories'],
+  });
+
   const addQAMutation = useMutation({
-    mutationFn: async (data: { question: string; answer: string; asker: string; company: string }) => {
+    mutationFn: async (data: { question: string; answer: string; asker: string; company: string; categoryId: string | null }) => {
       const res = await apiRequest('POST', '/api/qa-pairs', data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
       setIsAddingQA(false);
-      setNewQAForm({ question: '', answer: '', asker: '', company: '' });
+      setNewQAForm({ question: '', answer: '', asker: '', company: '', categoryId: null });
       toast({
         title: "Success",
         description: "Q&A pair added successfully",
@@ -61,6 +68,12 @@ export default function QADatabase() {
     addQAMutation.mutate(newQAForm);
   };
 
+  // Transform categories
+  const categoryObjects = (categories as any[]).map((cat: any) => ({
+    id: cat.id,
+    name: cat.name,
+  }));
+
   return (
     <div className="container mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-6">
@@ -85,7 +98,7 @@ export default function QADatabase() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading Q&A pairs...</div>
       ) : (
-        <QATable qaPairs={qaPairs as any[]} />
+        <QATable qaPairs={qaPairs as any[]} categories={categoryObjects} />
       )}
 
       <Dialog open={isAddingQA} onOpenChange={setIsAddingQA}>
@@ -133,6 +146,23 @@ export default function QADatabase() {
                 placeholder="Company name"
                 data-testid="input-add-company-qa"
               />
+            </div>
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Select 
+                value={newQAForm.categoryId || 'none'} 
+                onValueChange={(value) => setNewQAForm({ ...newQAForm, categoryId: value === 'none' ? null : value })}
+              >
+                <SelectTrigger id="category" data-testid="select-add-category-qa">
+                  <SelectValue placeholder="Select category (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categoryObjects.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

@@ -36,12 +36,13 @@ export interface IStorage {
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
 
   // Q&A Pairs
-  getQAPairs(): Promise<QAPair[]>;
+  getQAPairs(): Promise<QAPairWithCategory[]>;
   getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
   updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
+  assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
 
   // Categories
   getCategories(): Promise<Category[]>;
@@ -226,9 +227,17 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  // Q&A Pairs
-  async getQAPairs(): Promise<QAPair[]> {
-    return Array.from(this.qaPairs.values());
+  // Q&A Pairs - with category name enrichment
+  private enrichQAPairWithCategory(qaPair: QAPair): QAPairWithCategory {
+    const category = qaPair.categoryId ? this.categories.get(qaPair.categoryId) : null;
+    return {
+      ...qaPair,
+      categoryName: category?.name || null,
+    };
+  }
+
+  async getQAPairs(): Promise<QAPairWithCategory[]> {
+    return Array.from(this.qaPairs.values()).map(qa => this.enrichQAPairWithCategory(qa));
   }
 
   async getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]> {
@@ -291,6 +300,21 @@ export class MemStorage implements IStorage {
 
   async deleteQAPair(id: string): Promise<boolean> {
     return this.qaPairs.delete(id);
+  }
+
+  async assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean> {
+    const qaPair = this.qaPairs.get(qaPairId);
+    if (!qaPair) return false;
+    
+    if (categoryId && !this.categories.has(categoryId)) {
+      throw new Error(`Category ${categoryId} not found`);
+    }
+    
+    this.qaPairs.set(qaPairId, {
+      ...qaPair,
+      categoryId,
+    });
+    return true;
   }
 
   // Categories
@@ -522,8 +546,25 @@ export class DbStorage implements IStorage {
   }
 
   // Q&A Pairs
-  async getQAPairs(): Promise<QAPair[]> {
-    return await this.db.select().from(qaPairsTable);
+  async getQAPairs(): Promise<QAPairWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: qaPairsTable.id,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        company: qaPairsTable.company,
+        categoryId: qaPairsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+    }));
   }
 
   async getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]> {
@@ -563,6 +604,15 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .delete(qaPairsTable)
       .where(eq(qaPairsTable.id, id))
+      .returning();
+    return results.length > 0;
+  }
+
+  async assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean> {
+    const results = await this.db
+      .update(qaPairsTable)
+      .set({ categoryId })
+      .where(eq(qaPairsTable.id, qaPairId))
       .returning();
     return results.length > 0;
   }

@@ -18,16 +18,24 @@ export interface QAPair {
   answer: string;
   asker: string;
   company: string;
+  categoryId?: string | null;
+  categoryName?: string | null;
+}
+
+export interface Category {
+  id: string;
+  name: string;
 }
 
 interface QATableProps {
   qaPairs: QAPair[];
+  categories?: Category[];
 }
 
-export default function QATable({ qaPairs }: QATableProps) {
+export default function QATable({ qaPairs, categories = [] }: QATableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
-  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '' });
+  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null });
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -52,12 +60,24 @@ export default function QATable({ qaPairs }: QATableProps) {
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, question, answer, asker }: { id: string; question: string; answer: string; asker: string }) => {
+    mutationFn: async ({ id, question, answer, asker, categoryId }: { id: string; question: string; answer: string; asker: string; categoryId: string | null }) => {
+      // Update the Q&A pair
       const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, { question, answer, asker });
+      if (!res.ok) {
+        throw new Error('Failed to update Q&A pair');
+      }
+      
+      // Update category separately
+      const catRes = await apiRequest('PATCH', `/api/qa-pairs/${id}/category`, { categoryId });
+      if (!catRes.ok) {
+        throw new Error('Failed to update category');
+      }
+      
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
       setEditingQA(null);
       toast({
         title: "Success",
@@ -75,7 +95,7 @@ export default function QATable({ qaPairs }: QATableProps) {
 
   const handleEdit = (qa: QAPair) => {
     setEditingQA(qa);
-    setEditForm({ question: qa.question, answer: qa.answer, asker: qa.asker });
+    setEditForm({ question: qa.question, answer: qa.answer, asker: qa.asker, categoryId: qa.categoryId || null });
   };
 
   const handleSaveEdit = () => {
@@ -114,13 +134,14 @@ export default function QATable({ qaPairs }: QATableProps) {
               <TableHead>Answer</TableHead>
               <TableHead className="w-[150px]">Asked By</TableHead>
               <TableHead className="w-[150px]">Company</TableHead>
+              <TableHead className="w-[120px]">Category</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredQAPairs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No Q&A pairs found
                 </TableCell>
               </TableRow>
@@ -141,6 +162,15 @@ export default function QATable({ qaPairs }: QATableProps) {
                   <TableCell>
                     <Badge variant="outline" className="font-normal" data-testid={`badge-company-${qa.id}`}>
                       {qa.company}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={!qa.categoryName ? 'default' : 'outline'}
+                      className={!qa.categoryName ? 'bg-chart-4 hover:bg-chart-4' : ''}
+                      data-testid={`badge-category-${qa.id}`}
+                    >
+                      {qa.categoryName || 'NEW'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -203,6 +233,23 @@ export default function QATable({ qaPairs }: QATableProps) {
                 onChange={(e) => setEditForm({ ...editForm, asker: e.target.value })}
                 data-testid="input-edit-asker"
               />
+            </div>
+            <div>
+              <Label htmlFor="category">Category</Label>
+              <Select 
+                value={editForm.categoryId || 'none'} 
+                onValueChange={(value) => setEditForm({ ...editForm, categoryId: value === 'none' ? null : value })}
+              >
+                <SelectTrigger id="category" data-testid="select-edit-category-qa">
+                  <SelectValue placeholder="Select category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No category</SelectItem>
+                  {categories.map(cat => (
+                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>

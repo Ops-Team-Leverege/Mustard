@@ -36,6 +36,7 @@ export const qaPairs = pgTable("qa_pairs", {
   answer: text("answer").notNull(),
   asker: text("asker").notNull(),
   company: text("company").notNull(),
+  categoryId: varchar("category_id"),
 });
 
 export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
@@ -70,5 +71,9 @@ export type Category = typeof categories.$inferSelect;
 
 // Extended type for UI with category name
 export type ProductInsightWithCategory = ProductInsight & {
+  categoryName: string | null;
+};
+
+export type QAPairWithCategory = QAPair & {
   categoryName: string | null;
 };

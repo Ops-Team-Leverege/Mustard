@@ -66,9 +66,15 @@ export default function ProductInsightsTable({ insights, categories = [] }: Prod
     mutationFn: async ({ id, feature, context, quote, categoryId }: { id: string; feature: string; context: string; quote: string; categoryId: string | null }) => {
       // Update the insight
       const res = await apiRequest('PATCH', `/api/insights/${id}`, { feature, context, quote });
+      if (!res.ok) {
+        throw new Error('Failed to update insight');
+      }
       
       // Update category separately
-      await apiRequest('PATCH', `/api/insights/${id}/category`, { categoryId });
+      const catRes = await apiRequest('PATCH', `/api/insights/${id}/category`, { categoryId });
+      if (!catRes.ok) {
+        throw new Error('Failed to update category');
+      }
       
       return res.json();
     },
