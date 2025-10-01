@@ -1,13 +1,224 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { analyzeTranscript } from "./transcriptAnalyzer";
+import {
+  insertTranscriptSchema,
+  insertCategorySchema,
+  type ProductInsightWithCategory,
+} from "@shared/schema";
+import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
+  // Transcripts
+  app.post("/api/transcripts", async (req, res) => {
+    try {
+      const data = insertTranscriptSchema.parse(req.body);
+      
+      // Create transcript
+      const transcript = await storage.createTranscript(data);
+      
+      // Analyze with AI
+      const categories = await storage.getCategories();
+      const leverageTeam = data.leverageTeam.split(',').map(s => s.trim());
+      const customerNames = data.customerNames.split(',').map(s => s.trim());
+      
+      const analysis = await analyzeTranscript({
+        transcript: data.transcript,
+        companyName: data.companyName,
+        leverageTeam,
+        customerNames,
+        categories,
+      });
+      
+      // Save insights
+      const insights = await storage.createProductInsights(
+        analysis.insights.map(insight => ({
+          transcriptId: transcript.id,
+          feature: insight.feature,
+          context: insight.context,
+          quote: insight.quote,
+          company: data.companyName,
+          categoryId: insight.categoryId,
+        }))
+      );
+      
+      // Save Q&A pairs
+      const qaPairs = await storage.createQAPairs(
+        analysis.qaPairs.map(qa => ({
+          transcriptId: transcript.id,
+          question: qa.question,
+          answer: qa.answer,
+          asker: qa.asker,
+          company: data.companyName,
+        }))
+      );
+      
+      res.json({
+        transcript,
+        insights,
+        qaPairs,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Unknown error occurred" });
+      }
+    }
+  });
 
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
+  app.get("/api/transcripts", async (_req, res) => {
+    try {
+      const transcripts = await storage.getTranscripts();
+      res.json(transcripts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Product Insights
+  app.get("/api/insights", async (_req, res) => {
+    try {
+      const insights = await storage.getProductInsights();
+      
+      // Add usage count for each category
+      const categories = await storage.getCategories();
+      const categoryUsage = new Map<string, number>();
+      
+      insights.forEach(insight => {
+        if (insight.categoryId) {
+          categoryUsage.set(
+            insight.categoryId,
+            (categoryUsage.get(insight.categoryId) || 0) + 1
+          );
+        }
+      });
+      
+      const enrichedInsights: Array<ProductInsightWithCategory & { categoryUsageCount?: number }> = insights.map(insight => ({
+        ...insight,
+        categoryUsageCount: insight.categoryId ? categoryUsage.get(insight.categoryId) : undefined,
+      }));
+      
+      res.json(enrichedInsights);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.patch("/api/insights/:id/category", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { categoryId } = req.body;
+      
+      const success = await storage.assignCategoryToInsight(id, categoryId);
+      
+      if (!success) {
+        res.status(404).json({ error: "Insight not found" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Q&A Pairs
+  app.get("/api/qa-pairs", async (_req, res) => {
+    try {
+      const qaPairs = await storage.getQAPairs();
+      res.json(qaPairs);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Categories
+  app.get("/api/categories", async (_req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      
+      // Add usage count for each category
+      const insights = await storage.getProductInsights();
+      const categoryUsage = new Map<string, number>();
+      
+      insights.forEach(insight => {
+        if (insight.categoryId) {
+          categoryUsage.set(
+            insight.categoryId,
+            (categoryUsage.get(insight.categoryId) || 0) + 1
+          );
+        }
+      });
+      
+      const categoriesWithCount = categories.map(cat => ({
+        ...cat,
+        usageCount: categoryUsage.get(cat.id) || 0,
+      }));
+      
+      res.json(categoriesWithCount);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/categories", async (req, res) => {
+    try {
+      const data = insertCategorySchema.parse(req.body);
+      const category = await storage.createCategory(data);
+      res.json(category);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Unknown error occurred" });
+      }
+    }
+  });
+
+  app.patch("/api/categories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name } = req.body;
+      
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: "Name is required" });
+        return;
+      }
+      
+      const category = await storage.updateCategory(id, name);
+      
+      if (!category) {
+        res.status(404).json({ error: "Category not found" });
+        return;
+      }
+      
+      res.json(category);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/categories/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteCategory(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "Category not found" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
 
   const httpServer = createServer(app);
 
