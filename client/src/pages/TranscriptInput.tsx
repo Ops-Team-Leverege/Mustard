@@ -13,16 +13,17 @@ export default function TranscriptInput() {
     setIsAnalyzing(true);
     
     try {
-      await apiRequest('POST', '/api/transcripts', data);
+      const response = await apiRequest('POST', '/api/transcripts', data);
+      const result = await response.json();
       
       toast({
         title: "Analysis Complete",
-        description: "Product insights and Q&A pairs have been extracted successfully.",
+        description: `Product insights and Q&A pairs have been extracted. Taking you to ${data.companyName}'s page...`,
       });
       
-      // Navigate to insights page
+      // Navigate to company page using the slug from the server response
       setTimeout(() => {
-        setLocation('/insights');
+        setLocation(`/companies/${result.company.slug}`);
       }, 1000);
     } catch (error) {
       toast({

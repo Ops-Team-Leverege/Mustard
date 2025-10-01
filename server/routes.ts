@@ -83,6 +83,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transcript,
         insights,
         qaPairs,
+        company: {
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
+        },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
