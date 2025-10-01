@@ -140,11 +140,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/insights/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { feature, context, quote } = req.body;
+      
+      if (!feature || !context || !quote) {
+        res.status(400).json({ error: "Feature, context, and quote are required" });
+        return;
+      }
+      
+      const insight = await storage.updateProductInsight(id, feature, context, quote);
+      
+      if (!insight) {
+        res.status(404).json({ error: "Insight not found" });
+        return;
+      }
+      
+      res.json(insight);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/insights/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteProductInsight(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "Insight not found" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   // Q&A Pairs
   app.get("/api/qa-pairs", async (_req, res) => {
     try {
       const qaPairs = await storage.getQAPairs();
       res.json(qaPairs);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.patch("/api/qa-pairs/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { question, answer, asker } = req.body;
+      
+      if (!question || !answer || !asker) {
+        res.status(400).json({ error: "Question, answer, and asker are required" });
+        return;
+      }
+      
+      const qaPair = await storage.updateQAPair(id, question, answer, asker);
+      
+      if (!qaPair) {
+        res.status(404).json({ error: "Q&A pair not found" });
+        return;
+      }
+      
+      res.json(qaPair);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/qa-pairs/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteQAPair(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "Q&A pair not found" });
+        return;
+      }
+      
+      res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }

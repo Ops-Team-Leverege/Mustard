@@ -8,8 +8,15 @@ import {
   type InsertQAPair,
   type Category,
   type InsertCategory,
+  transcripts as transcriptsTable,
+  productInsights as productInsightsTable,
+  qaPairs as qaPairsTable,
+  categories as categoriesTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import { neon } from "@neondatabase/serverless";
+import { eq, sql as drizzleSql } from "drizzle-orm";
 
 export interface IStorage {
   // Transcripts
@@ -23,6 +30,8 @@ export interface IStorage {
   getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]>;
   createProductInsight(insight: InsertProductInsight): Promise<ProductInsight>;
   createProductInsights(insights: InsertProductInsight[]): Promise<ProductInsight[]>;
+  updateProductInsight(id: string, feature: string, context: string, quote: string): Promise<ProductInsight | undefined>;
+  deleteProductInsight(id: string): Promise<boolean>;
   assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
 
@@ -31,6 +40,8 @@ export interface IStorage {
   getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
+  updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined>;
+  deleteQAPair(id: string): Promise<boolean>;
 
   // Categories
   getCategories(): Promise<Category[]>;
@@ -163,6 +174,24 @@ export class MemStorage implements IStorage {
     return insights;
   }
 
+  async updateProductInsight(id: string, feature: string, context: string, quote: string): Promise<ProductInsight | undefined> {
+    const insight = this.productInsights.get(id);
+    if (!insight) return undefined;
+    
+    const updated: ProductInsight = {
+      ...insight,
+      feature,
+      context,
+      quote,
+    };
+    this.productInsights.set(id, updated);
+    return updated;
+  }
+
+  async deleteProductInsight(id: string): Promise<boolean> {
+    return this.productInsights.delete(id);
+  }
+
   async assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean> {
     const insight = this.productInsights.get(insightId);
     if (!insight) return false;
@@ -242,6 +271,24 @@ export class MemStorage implements IStorage {
     return qaPairs;
   }
 
+  async updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined> {
+    const qaPair = this.qaPairs.get(id);
+    if (!qaPair) return undefined;
+    
+    const updated: QAPair = {
+      ...qaPair,
+      question,
+      answer,
+      asker,
+    };
+    this.qaPairs.set(id, updated);
+    return updated;
+  }
+
+  async deleteQAPair(id: string): Promise<boolean> {
+    return this.qaPairs.delete(id);
+  }
+
   // Categories
   async getCategories(): Promise<Category[]> {
     return Array.from(this.categories.values()).sort((a, b) => 
@@ -314,4 +361,259 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DbStorage implements IStorage {
+  private db;
+
+  constructor() {
+    if (!process.env.DATABASE_URL) {
+      throw new Error("DATABASE_URL is not set");
+    }
+    const sql = neon(process.env.DATABASE_URL);
+    this.db = drizzle(sql);
+  }
+
+  // Transcripts
+  async getTranscripts(): Promise<Transcript[]> {
+    const results = await this.db
+      .select()
+      .from(transcriptsTable)
+      .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`);
+    return results;
+  }
+
+  async getTranscript(id: string): Promise<Transcript | undefined> {
+    const results = await this.db
+      .select()
+      .from(transcriptsTable)
+      .where(eq(transcriptsTable.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
+    const results = await this.db
+      .insert(transcriptsTable)
+      .values(insertTranscript)
+      .returning();
+    return results[0];
+  }
+
+  // Product Insights
+  async getProductInsights(): Promise<ProductInsightWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: productInsightsTable.id,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+    }));
+  }
+
+  async getProductInsightsByTranscript(transcriptId: string): Promise<ProductInsightWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: productInsightsTable.id,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .where(eq(productInsightsTable.transcriptId, transcriptId));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+    }));
+  }
+
+  async getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: productInsightsTable.id,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .where(eq(productInsightsTable.categoryId, categoryId));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+    }));
+  }
+
+  async createProductInsight(insertInsight: InsertProductInsight): Promise<ProductInsight> {
+    const results = await this.db
+      .insert(productInsightsTable)
+      .values(insertInsight)
+      .returning();
+    return results[0];
+  }
+
+  async createProductInsights(insertInsights: InsertProductInsight[]): Promise<ProductInsight[]> {
+    if (insertInsights.length === 0) return [];
+    const results = await this.db
+      .insert(productInsightsTable)
+      .values(insertInsights)
+      .returning();
+    return results;
+  }
+
+  async updateProductInsight(id: string, feature: string, context: string, quote: string): Promise<ProductInsight | undefined> {
+    const results = await this.db
+      .update(productInsightsTable)
+      .set({ feature, context, quote })
+      .where(eq(productInsightsTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteProductInsight(id: string): Promise<boolean> {
+    const results = await this.db
+      .delete(productInsightsTable)
+      .where(eq(productInsightsTable.id, id))
+      .returning();
+    return results.length > 0;
+  }
+
+  async assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean> {
+    const results = await this.db
+      .update(productInsightsTable)
+      .set({ categoryId })
+      .where(eq(productInsightsTable.id, insightId))
+      .returning();
+    return results.length > 0;
+  }
+
+  async assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean> {
+    if (insightIds.length === 0) return true;
+    const results = await this.db
+      .update(productInsightsTable)
+      .set({ categoryId })
+      .where(drizzleSql`${productInsightsTable.id} = ANY(${insightIds})`)
+      .returning();
+    return results.length > 0;
+  }
+
+  // Q&A Pairs
+  async getQAPairs(): Promise<QAPair[]> {
+    return await this.db.select().from(qaPairsTable);
+  }
+
+  async getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]> {
+    return await this.db
+      .select()
+      .from(qaPairsTable)
+      .where(eq(qaPairsTable.transcriptId, transcriptId));
+  }
+
+  async createQAPair(insertQAPair: InsertQAPair): Promise<QAPair> {
+    const results = await this.db
+      .insert(qaPairsTable)
+      .values(insertQAPair)
+      .returning();
+    return results[0];
+  }
+
+  async createQAPairs(insertQAPairs: InsertQAPair[]): Promise<QAPair[]> {
+    if (insertQAPairs.length === 0) return [];
+    const results = await this.db
+      .insert(qaPairsTable)
+      .values(insertQAPairs)
+      .returning();
+    return results;
+  }
+
+  async updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined> {
+    const results = await this.db
+      .update(qaPairsTable)
+      .set({ question, answer, asker })
+      .where(eq(qaPairsTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteQAPair(id: string): Promise<boolean> {
+    const results = await this.db
+      .delete(qaPairsTable)
+      .where(eq(qaPairsTable.id, id))
+      .returning();
+    return results.length > 0;
+  }
+
+  // Categories
+  async getCategories(): Promise<Category[]> {
+    return await this.db
+      .select()
+      .from(categoriesTable)
+      .orderBy(categoriesTable.name);
+  }
+
+  async getCategory(id: string): Promise<Category | undefined> {
+    const results = await this.db
+      .select()
+      .from(categoriesTable)
+      .where(eq(categoriesTable.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createCategory(insertCategory: InsertCategory): Promise<Category> {
+    const results = await this.db
+      .insert(categoriesTable)
+      .values(insertCategory)
+      .returning();
+    return results[0];
+  }
+
+  async updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined> {
+    const results = await this.db
+      .update(categoriesTable)
+      .set({ 
+        name, 
+        description: description !== undefined ? (description ?? null) : undefined 
+      })
+      .where(eq(categoriesTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteCategory(id: string): Promise<boolean> {
+    // First, null out categoryId for all insights that reference this category
+    await this.db
+      .update(productInsightsTable)
+      .set({ categoryId: null })
+      .where(eq(productInsightsTable.categoryId, id));
+    
+    // Then delete the category
+    const results = await this.db
+      .delete(categoriesTable)
+      .where(eq(categoriesTable.id, id))
+      .returning();
+    return results.length > 0;
+  }
+}
+
+export const storage = new DbStorage();
