@@ -64,9 +64,10 @@ Preferred communication style: Simple, everyday language.
 
 **Database Schema**
 - `transcripts`: Stores raw call transcripts with company and participant metadata
-- `categories`: User-defined categories for organizing product insights and Q&A pairs
+- `categories`: User-defined categories for organizing product insights and Q&A pairs (includes usage count aggregation)
 - `product_insights`: Feature requests extracted from transcripts with category assignment
 - `qa_pairs`: Question-answer pairs from BD calls with category assignment
+- `companies`: Normalized company records with slug for routing
 
 ### Key Architectural Decisions
 
@@ -129,3 +130,32 @@ Preferred communication style: Simple, everyday language.
 - **clsx & tailwind-merge**: Conditional class name utilities
 - **cmdk**: Command palette component
 - **embla-carousel-react**: Carousel/slider functionality
+
+## Recent Updates (October 2025)
+
+### Category Analytics Dashboard
+- **CategoryAnalytics Component**: Comprehensive analytics view showing category usage statistics
+  - Summary cards for total categories, total insights, and most popular category
+  - Top 5 categories visualization with usage bars and percentage distribution
+  - Real-time updates as insights are added or categories are modified
+  - Graceful empty state handling
+
+### Improved Category Management UI
+- **Compact Card Layout**: Category cards redesigned for better space utilization
+  - Responsive grid: 1 column (mobile), 2 columns (medium), 3 columns (large screens)
+  - Reduced card padding and font sizes for denser information display
+  - 2-line description limit with text truncation
+  - Added hover-elevate interaction for better visual feedback
+  
+### Searchable Category Selectors
+- **Combobox Component**: Implemented searchable dropdown for category selection
+  - Replaces basic Select in ProductInsightsTable and QATable edit dialogs
+  - Maintains selection state when re-selecting current option
+  - Search functionality for quick category lookup
+  
+### Company-Based Navigation
+- **Company Pages**: Dedicated pages for viewing company-specific data
+  - Slug-based routing (`/companies/:companySlug`) for shareable URLs
+  - Clickable company badges in both insights and Q&A tables
+  - Filtered views showing only relevant insights and Q&A pairs per company
+  - Company normalization with companyId foreign keys and backwards compatibility
