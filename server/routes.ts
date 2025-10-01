@@ -383,22 +383,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const categories = await storage.getCategories();
       
-      // Add usage count for each category
+      // Add usage count for insights in each category
       const insights = await storage.getProductInsights();
-      const categoryUsage = new Map<string, number>();
+      const insightUsage = new Map<string, number>();
       
       insights.forEach(insight => {
         if (insight.categoryId) {
-          categoryUsage.set(
+          insightUsage.set(
             insight.categoryId,
-            (categoryUsage.get(insight.categoryId) || 0) + 1
+            (insightUsage.get(insight.categoryId) || 0) + 1
+          );
+        }
+      });
+      
+      // Add Q&A pair count for each category
+      const qaPairs = await storage.getQAPairs();
+      const qaUsage = new Map<string, number>();
+      
+      qaPairs.forEach(qa => {
+        if (qa.categoryId) {
+          qaUsage.set(
+            qa.categoryId,
+            (qaUsage.get(qa.categoryId) || 0) + 1
           );
         }
       });
       
       const categoriesWithCount = categories.map(cat => ({
         ...cat,
-        usageCount: categoryUsage.get(cat.id) || 0,
+        usageCount: insightUsage.get(cat.id) || 0,
+        qaCount: qaUsage.get(cat.id) || 0,
       }));
       
       res.json(categoriesWithCount);
