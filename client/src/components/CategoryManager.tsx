@@ -122,24 +122,24 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {categories.length === 0 ? (
-          <Card className="col-span-2">
+          <Card className="col-span-full">
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground">No categories yet. Add your first category to get started.</p>
             </CardContent>
           </Card>
         ) : (
           categories.map((category) => (
-            <Card key={category.id} data-testid={`card-category-${category.id}`}>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{category.name}</CardTitle>
-                  <CardDescription className="mt-1">
+            <Card key={category.id} data-testid={`card-category-${category.id}`} className="hover-elevate">
+              <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-base truncate">{category.name}</CardTitle>
+                  <CardDescription className="text-xs mt-1 line-clamp-2">
                     {category.description || 'No description'}
                   </CardDescription>
                 </div>
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-shrink-0">
                   <Dialog
                     open={editingId === category.id}
                     onOpenChange={(open) => {
@@ -213,8 +213,8 @@ export default function CategoryManager({ categories, onAdd, onEdit, onDelete }:
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="pt-2">
-                <Badge variant="secondary" className="font-normal">
+              <CardContent className="pt-0">
+                <Badge variant="secondary" className="font-normal text-xs">
                   {category.usageCount} {category.usageCount === 1 ? 'insight' : 'insights'}
                 </Badge>
               </CardContent>

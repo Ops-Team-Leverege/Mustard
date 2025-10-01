@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import CategoryManager, { Category } from "@/components/CategoryManager";
+import CategoryAnalytics from "@/components/CategoryAnalytics";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -105,6 +106,8 @@ export default function Categories() {
 
   return (
     <div className="container mx-auto py-8 px-6">
+      <CategoryAnalytics categories={categories} />
+      
       <div className="mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
