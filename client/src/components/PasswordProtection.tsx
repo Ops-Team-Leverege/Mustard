@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 
-const CORRECT_PASSWORD = "G@m3ch@ng3r";
+const CORRECT_PASSWORD = "HG935ujjeotII5!";
 const AUTH_KEY = "bd_transcript_auth";
 
 interface PasswordProtectionProps {
