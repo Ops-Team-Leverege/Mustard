@@ -44,7 +44,7 @@ export default function TranscriptInput() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-6">
+    <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
       <TranscriptForm onSubmit={handleSubmit} isAnalyzing={isAnalyzing} />
     </div>
   );
