@@ -11,6 +11,8 @@ import {
   type InsertCategory,
   type Company,
   type InsertCompany,
+  type Contact,
+  type InsertContact,
   type CompanyOverview,
   type CategoryOverview,
   transcripts as transcriptsTable,
@@ -18,6 +20,7 @@ import {
   qaPairs as qaPairsTable,
   categories as categoriesTable,
   companies as companiesTable,
+  contacts as contactsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -66,6 +69,12 @@ export interface IStorage {
   updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<boolean>;
   getCompanyOverview(slug: string): Promise<CompanyOverview | null>;
+
+  // Contacts
+  getContactsByCompany(companyId: string): Promise<Contact[]>;
+  createContact(contact: InsertContact): Promise<Contact>;
+  updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined>;
+  deleteContact(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -74,6 +83,7 @@ export class MemStorage implements IStorage {
   private qaPairs: Map<string, QAPair>;
   private categories: Map<string, Category>;
   private companies: Map<string, Company>;
+  private contacts: Map<string, Contact>;
 
   constructor() {
     this.transcripts = new Map();
@@ -81,6 +91,7 @@ export class MemStorage implements IStorage {
     this.qaPairs = new Map();
     this.categories = new Map();
     this.companies = new Map();
+    this.contacts = new Map();
 
     // Initialize with default categories
     const defaultCategories = [
@@ -486,6 +497,11 @@ export class MemStorage implements IStorage {
       )
       .map(qa => this.enrichQAPairWithCategory(qa));
 
+    // Get contacts for this company
+    const contacts = Array.from(this.contacts.values()).filter(
+      c => c.companyId === company.id
+    );
+
     return {
       company,
       transcriptCount: companyTranscripts.length,
@@ -494,7 +510,38 @@ export class MemStorage implements IStorage {
       insights,
       qaPairs,
       transcripts: companyTranscripts,
+      contacts,
     };
+  }
+
+  // Contacts
+  async getContactsByCompany(companyId: string): Promise<Contact[]> {
+    return Array.from(this.contacts.values()).filter(c => c.companyId === companyId);
+  }
+
+  async createContact(insertContact: InsertContact): Promise<Contact> {
+    const id = randomUUID();
+    const contact: Contact = {
+      ...insertContact,
+      jobTitle: insertContact.jobTitle ?? null,
+      id,
+      createdAt: new Date(),
+    };
+    this.contacts.set(id, contact);
+    return contact;
+  }
+
+  async updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined> {
+    const contact = this.contacts.get(id);
+    if (!contact) return undefined;
+
+    const updated = { ...contact, name, jobTitle: jobTitle ?? null };
+    this.contacts.set(id, updated);
+    return updated;
+  }
+
+  async deleteContact(id: string): Promise<boolean> {
+    return this.contacts.delete(id);
   }
 
   async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
@@ -908,6 +955,12 @@ export class DbStorage implements IStorage {
         drizzleSql`${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name})`
       );
 
+    // Get contacts for this company
+    const contacts = await this.db
+      .select()
+      .from(contactsTable)
+      .where(eq(contactsTable.companyId, company.id));
+
     return {
       company,
       transcriptCount: companyTranscripts.length,
@@ -922,7 +975,41 @@ export class DbStorage implements IStorage {
         categoryName: qa.categoryName || null,
       })),
       transcripts: companyTranscripts,
+      contacts,
     };
+  }
+
+  // Contacts
+  async getContactsByCompany(companyId: string): Promise<Contact[]> {
+    return await this.db
+      .select()
+      .from(contactsTable)
+      .where(eq(contactsTable.companyId, companyId));
+  }
+
+  async createContact(insertContact: InsertContact): Promise<Contact> {
+    const results = await this.db
+      .insert(contactsTable)
+      .values(insertContact)
+      .returning();
+    return results[0];
+  }
+
+  async updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined> {
+    const results = await this.db
+      .update(contactsTable)
+      .set({ name, jobTitle: jobTitle ?? null })
+      .where(eq(contactsTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteContact(id: string): Promise<boolean> {
+    const results = await this.db
+      .delete(contactsTable)
+      .where(eq(contactsTable.id, id))
+      .returning();
+    return results.length > 0;
   }
 
   async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
