@@ -18,6 +18,8 @@ import Landing from "@/pages/Landing";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import pitcrewLogo from "@assets/pitcrew_1759419966878.png";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useRef } from "react";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
@@ -50,7 +52,28 @@ function Router() {
 }
 
 function AuthenticatedApp() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, error } = useAuth();
+  const { toast } = useToast();
+  const hasShownError = useRef(false);
+
+  useEffect(() => {
+    if (error && !hasShownError.current) {
+      const errorMessage = (error as any)?.message || String(error);
+      
+      if (errorMessage.includes('403') || errorMessage.includes('DOMAIN_RESTRICTED')) {
+        hasShownError.current = true;
+        toast({
+          title: "Access Denied",
+          description: "Only leverege.com email addresses are allowed to access this application.",
+          variant: "destructive",
+        });
+        
+        setTimeout(() => {
+          window.location.href = '/api/logout';
+        }, 2000);
+      }
+    }
+  }, [error, toast]);
 
   return (
     <div className="min-h-screen bg-background">
