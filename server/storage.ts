@@ -992,7 +992,7 @@ export class DbStorage implements IStorage {
         drizzleSql`${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name})`
       );
 
-    // Get Q&A pairs with category names - match by both companyId and legacy company field
+    // Get Q&A pairs with category and contact info - match by both companyId and legacy company field
     const qaPairs = await this.db
       .select({
         id: qaPairsTable.id,
@@ -1000,13 +1000,17 @@ export class DbStorage implements IStorage {
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
         asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
         categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .where(
         drizzleSql`${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name})`
       );
@@ -1029,6 +1033,8 @@ export class DbStorage implements IStorage {
       qaPairs: qaPairs.map(qa => ({
         ...qa,
         categoryName: qa.categoryName || null,
+        contactName: qa.contactName || null,
+        contactJobTitle: qa.contactJobTitle || null,
       })),
       transcripts: companyTranscripts,
       contacts,
@@ -1089,7 +1095,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .where(eq(productInsightsTable.categoryId, categoryId));
 
-    // Get Q&A pairs for this category with category names
+    // Get Q&A pairs for this category with category and contact info
     const qaPairs = await this.db
       .select({
         id: qaPairsTable.id,
@@ -1097,13 +1103,17 @@ export class DbStorage implements IStorage {
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
         asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
         categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .where(eq(qaPairsTable.categoryId, categoryId));
 
     return {
@@ -1117,6 +1127,8 @@ export class DbStorage implements IStorage {
       qaPairs: qaPairs.map(qa => ({
         ...qa,
         categoryName: qa.categoryName || null,
+        contactName: qa.contactName || null,
+        contactJobTitle: qa.contactJobTitle || null,
       })),
     };
   }
