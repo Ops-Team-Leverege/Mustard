@@ -110,6 +110,12 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                     placeholder="Search or type new company..." 
                     value={formData.companyName}
                     onValueChange={(value) => setFormData({ ...formData, companyName: value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setCompanySearchOpen(false);
+                      }
+                    }}
                     data-testid="input-company-search"
                   />
                   <CommandList>
