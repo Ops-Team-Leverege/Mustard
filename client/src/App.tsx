@@ -23,10 +23,10 @@ import { useEffect, useRef } from "react";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
-  { id: 'insights', label: 'Product Insights', path: '/insights' },
-  { id: 'qa', label: 'Q&A Database', path: '/qa' },
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
+  { id: 'insights', label: 'Product Insights', path: '/insights' },
+  { id: 'qa', label: 'Q&A Database', path: '/qa' },
 ];
 
 function Router() {
