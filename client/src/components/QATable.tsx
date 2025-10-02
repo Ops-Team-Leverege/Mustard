@@ -168,13 +168,19 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
 
   const handleEdit = (qa: QAPair) => {
     setEditingQA(qa);
-    setEditForm({ question: qa.question, answer: qa.answer, asker: qa.asker, categoryId: qa.categoryId || null, contactId: qa.contactId || null });
+    setEditForm({ 
+      question: qa.question, 
+      answer: qa.answer, 
+      asker: qa.asker, 
+      categoryId: qa.categoryId ?? null, 
+      contactId: qa.contactId ?? null 
+    });
   };
 
   const handleSaveEdit = () => {
     if (editingQA) {
       const selectedContact = contacts.find(c => c.id === editForm.contactId);
-      const asker = selectedContact ? selectedContact.name : '';
+      const asker = selectedContact ? selectedContact.name : (editingQA.asker || 'Unknown');
       editMutation.mutate({ 
         id: editingQA.id, 
         question: editForm.question,
@@ -462,7 +468,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                     label: contact.jobTitle ? `${contact.name} (${contact.jobTitle})` : contact.name 
                   }))
                 ]}
-                value={editForm.contactId || 'none'}
+                value={editForm.contactId ?? 'none'}
                 onValueChange={(value) => setEditForm({ ...editForm, contactId: value === 'none' ? null : value })}
                 placeholder="Select contact"
                 searchPlaceholder="Search contacts..."
