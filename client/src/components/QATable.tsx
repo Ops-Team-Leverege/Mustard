@@ -7,12 +7,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { Search, Pencil, Trash2, Plus } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface QAPair {
   id: string;
@@ -42,6 +49,8 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -183,6 +192,26 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
     return matchesSearch && matchesCategory;
   });
 
+  const totalPages = Math.ceil(filteredQAPairs.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedQAPairs = filteredQAPairs.slice(startIndex, endIndex);
+
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(Number(value));
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryFilterChange = (value: string) => {
+    setCategoryFilter(value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex gap-4 flex-wrap items-center justify-between">
@@ -192,7 +221,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
             <Input
               placeholder="Search questions or answers..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-9"
               data-testid="input-search-qa"
             />
@@ -204,7 +233,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               ...categories.map(cat => ({ value: cat.id, label: cat.name }))
             ]}
             value={categoryFilter}
-            onValueChange={setCategoryFilter}
+            onValueChange={handleCategoryFilterChange}
             placeholder="All categories"
             searchPlaceholder="Search categories..."
             emptyText="No category found."
@@ -231,14 +260,14 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredQAPairs.length === 0 ? (
+            {paginatedQAPairs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No Q&A pairs found
+                  {filteredQAPairs.length === 0 ? 'No Q&A pairs found' : 'No Q&A pairs on this page'}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredQAPairs.map((qa) => (
+              paginatedQAPairs.map((qa) => (
                 <TableRow key={qa.id} data-testid={`row-qa-${qa.id}`}>
                   <TableCell className="font-medium" data-testid={`text-question-${qa.id}`}>
                     {qa.question}
@@ -310,6 +339,55 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
           </TableBody>
         </Table>
       </div>
+
+      {filteredQAPairs.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, filteredQAPairs.length)} of {filteredQAPairs.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="w-[70px]" data-testid="select-page-size-qa">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                data-testid="button-previous-page-qa"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                data-testid="button-next-page-qa"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!editingQA} onOpenChange={() => setEditingQA(null)}>
         <DialogContent>
