@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,10 +49,28 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', nameInTranscript: '', jobTitle: '' });
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
 
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
   });
+
+  const { data: companyContacts = [] } = useQuery<any[]>({
+    queryKey: ['/api/contacts/company', selectedCompanyId],
+    enabled: !!selectedCompanyId,
+  });
+
+  // Load contacts when a company is selected
+  useEffect(() => {
+    if (companyContacts.length > 0) {
+      const contactsAsCustomers = companyContacts.map(contact => ({
+        name: contact.name,
+        nameInTranscript: contact.nameInTranscript || '',
+        jobTitle: contact.jobTitle || '',
+      }));
+      setCustomers(contactsAsCustomers);
+    }
+  }, [companyContacts]);
 
   const handleAddCustomer = () => {
     if (!newCustomer.name.trim()) return;
@@ -152,6 +170,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                               mainInterestAreas: company.mainInterestAreas || '',
                               numberOfStores: company.numberOfStores || ''
                             });
+                            setSelectedCompanyId(company.id);
                             setCompanySearchOpen(false);
                           }}
                           data-testid={`option-company-${company.id}`}
