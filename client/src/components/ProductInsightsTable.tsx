@@ -200,6 +200,31 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     return matchesSearch && matchesCategory;
   });
 
+  const handleSort = (column: 'category' | 'createdAt') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedInsights = [...filteredInsights].sort((a, b) => {
+    let comparison = 0;
+    
+    if (sortColumn === 'category') {
+      const aVal = (a.category || '').toLowerCase();
+      const bVal = (b.category || '').toLowerCase();
+      comparison = aVal.localeCompare(bVal);
+    } else if (sortColumn === 'createdAt') {
+      const aTime = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : a.createdAt.getTime()) : 0;
+      const bTime = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : b.createdAt.getTime()) : 0;
+      comparison = aTime - bTime;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
   const totalPages = Math.max(1, Math.ceil(sortedInsights.length / pageSize));
   
   useEffect(() => {
@@ -226,29 +251,6 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     setCategoryFilter(value);
     setCurrentPage(1);
   };
-
-  const handleSort = (column: 'category' | 'createdAt') => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('desc');
-    }
-  };
-
-  const sortedInsights = [...filteredInsights].sort((a, b) => {
-    if (sortColumn === 'category') {
-      const aVal = a.category || '';
-      const bVal = b.category || '';
-      const comparison = aVal.localeCompare(bVal);
-      return sortDirection === 'asc' ? comparison : -comparison;
-    } else if (sortColumn === 'createdAt') {
-      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
-    }
-    return 0;
-  });
 
   return (
     <div className="space-y-4">
