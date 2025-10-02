@@ -28,6 +28,14 @@ export const companies = pgTable("companies", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const contacts = pgTable("contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull(),
+  name: text("name").notNull(),
+  jobTitle: text("job_title"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull().unique(),
@@ -80,6 +88,11 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
   createdAt: true,
 });
 
+export const insertContactSchema = createInsertSchema(contacts).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertTranscript = z.infer<typeof insertTranscriptSchema>;
 export type Transcript = typeof transcripts.$inferSelect;
 
@@ -94,6 +107,9 @@ export type QAPair = typeof qaPairs.$inferSelect;
 
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
+
+export type InsertContact = z.infer<typeof insertContactSchema>;
+export type Contact = typeof contacts.$inferSelect;
 
 // Extended type for UI with category name
 export type ProductInsightWithCategory = ProductInsight & {
@@ -113,6 +129,7 @@ export type CompanyOverview = {
   insights: ProductInsightWithCategory[];
   qaPairs: QAPairWithCategory[];
   transcripts: Transcript[];
+  contacts: Contact[];
 };
 
 // Category overview type for category pages
