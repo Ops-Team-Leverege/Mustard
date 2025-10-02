@@ -59,7 +59,8 @@ export const qaPairs = pgTable("qa_pairs", {
   transcriptId: varchar("transcript_id"),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
-  asker: text("asker").notNull(),
+  asker: text("asker").notNull(), // Legacy field, kept for backward compatibility
+  contactId: varchar("contact_id"), // New normalized field - links to contacts table
   company: text("company").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
@@ -127,6 +128,8 @@ export type ProductInsightWithCategory = ProductInsight & {
 
 export type QAPairWithCategory = QAPair & {
   categoryName: string | null;
+  contactName?: string | null;
+  contactJobTitle?: string | null;
 };
 
 // Company overview type for dashboard

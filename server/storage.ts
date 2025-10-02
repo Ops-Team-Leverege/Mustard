@@ -49,9 +49,10 @@ export interface IStorage {
   getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
-  updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined>;
+  updateQAPair(id: string, question: string, answer: string, asker: string, contactId?: string | null): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
+  getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
 
   // Categories
   getCategories(): Promise<Category[]>;
@@ -256,12 +257,15 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  // Q&A Pairs - with category name enrichment
+  // Q&A Pairs - with category and contact enrichment
   private enrichQAPairWithCategory(qaPair: QAPair): QAPairWithCategory {
     const category = qaPair.categoryId ? this.categories.get(qaPair.categoryId) : null;
+    const contact = qaPair.contactId ? this.contacts.get(qaPair.contactId) : null;
     return {
       ...qaPair,
       categoryName: category?.name || null,
+      contactName: contact?.name || null,
+      contactJobTitle: contact?.jobTitle || null,
     };
   }
 
@@ -313,7 +317,7 @@ export class MemStorage implements IStorage {
     return qaPairs;
   }
 
-  async updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined> {
+  async updateQAPair(id: string, question: string, answer: string, asker: string, contactId?: string | null): Promise<QAPair | undefined> {
     const qaPair = this.qaPairs.get(id);
     if (!qaPair) return undefined;
     
@@ -322,6 +326,7 @@ export class MemStorage implements IStorage {
       question,
       answer,
       asker,
+      contactId: contactId !== undefined ? contactId : qaPair.contactId,
     };
     this.qaPairs.set(id, updated);
     return updated;
@@ -344,6 +349,22 @@ export class MemStorage implements IStorage {
       categoryId,
     });
     return true;
+  }
+
+  async getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]> {
+    const qaPairs = Array.from(this.qaPairs.values())
+      .filter(qa => qa.companyId === companyId);
+    
+    return qaPairs.map(qa => {
+      const category = qa.categoryId ? this.categories.get(qa.categoryId) : null;
+      const contact = qa.contactId ? this.contacts.get(qa.contactId) : null;
+      return {
+        ...qa,
+        categoryName: category?.name ?? null,
+        contactName: contact?.name ?? null,
+        contactJobTitle: contact?.jobTitle ?? null,
+      };
+    });
   }
 
   // Categories
@@ -733,16 +754,23 @@ export class DbStorage implements IStorage {
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
         asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
         company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
         categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
       })
       .from(qaPairsTable)
-      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id));
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id));
     
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
+      contactName: r.contactName || null,
+      contactJobTitle: r.contactJobTitle || null,
     }));
   }
 
@@ -770,10 +798,14 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateQAPair(id: string, question: string, answer: string, asker: string): Promise<QAPair | undefined> {
+  async updateQAPair(id: string, question: string, answer: string, asker: string, contactId?: string | null): Promise<QAPair | undefined> {
+    const updateData: Partial<QAPair> = { question, answer, asker };
+    if (contactId !== undefined) {
+      updateData.contactId = contactId;
+    }
     const results = await this.db
       .update(qaPairsTable)
-      .set({ question, answer, asker })
+      .set(updateData)
       .where(eq(qaPairsTable.id, id))
       .returning();
     return results[0];
@@ -794,6 +826,30 @@ export class DbStorage implements IStorage {
       .where(eq(qaPairsTable.id, qaPairId))
       .returning();
     return results.length > 0;
+  }
+
+  async getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: qaPairsTable.id,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .where(eq(qaPairsTable.companyId, companyId));
+    
+    return results;
   }
 
   // Categories
