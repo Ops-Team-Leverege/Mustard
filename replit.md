@@ -69,6 +69,16 @@ Preferred communication style: Simple, everyday language.
 - `qa_pairs`: Question-answer pairs from BD calls with category assignment
 - `companies`: Normalized company records with slug for routing
 - `contacts`: Customer contacts with name, job title, and company association
+- `users`: User authentication records (from Replit Auth integration)
+- `sessions`: Session storage for authenticated users (from Replit Auth integration)
+
+**Authentication System**
+- Replit Auth (OpenID Connect) for user authentication
+- Supports multiple login methods: Google, GitHub, X (Twitter), Apple, and email/password
+- Session-based authentication with PostgreSQL session store
+- All API routes protected with authentication middleware
+- Landing page for unauthenticated users showcasing app features
+- Logout functionality with proper session cleanup
 
 ### Key Architectural Decisions
 
@@ -223,3 +233,16 @@ Preferred communication style: Simple, everyday language.
   - Frontend: New "Created On" column displays timestamps in browser's local timezone
   - Backend: All database queries updated to select and return createdAt field
   - Format: Timestamps displayed using browser's toLocaleString() for automatic timezone conversion
+
+### Replit Auth Integration (October 2, 2025)
+- **Authentication System**: Replaced password protection with Replit Auth (OpenID Connect)
+  - Database: Added `users` and `sessions` tables for authentication
+  - Authentication Methods: Supports Google, GitHub, X (Twitter), Apple, and email/password login
+  - Session Management: PostgreSQL-based session storage with 7-day TTL
+  - Protected Routes: All API endpoints require authentication via `isAuthenticated` middleware
+  - Frontend Components: 
+    - `useAuth` hook for checking authentication status
+    - `Landing` page for unauthenticated users with feature showcase
+    - Logout button in main header for authenticated users
+  - User Management: Auto-upsert user records on login with profile data (email, name, profile image)
+  - Architecture: Session-based auth with automatic token refresh for seamless experience

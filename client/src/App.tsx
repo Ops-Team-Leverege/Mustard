@@ -48,48 +48,54 @@ function Router() {
   );
 }
 
-function App() {
+function AuthenticatedApp() {
   const { isAuthenticated, isLoading } = useAuth();
 
   return (
+    <div className="min-h-screen bg-background">
+      {!isLoading && isAuthenticated && (
+        <>
+          <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
+                  <span className="text-primary-foreground font-semibold text-sm">L</span>
+                </div>
+                <div>
+                  <h1 className="font-semibold text-lg">BD Transcript Analyzer</h1>
+                  <p className="text-xs text-muted-foreground">Leverege</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => window.location.href = '/api/logout'}
+                  data-testid="button-logout"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </header>
+          
+          <TabNavigation tabs={tabs} />
+        </>
+      )}
+      
+      <main className="pb-12">
+        <Router />
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-background">
-          {!isLoading && isAuthenticated && (
-            <>
-              <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-                <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center">
-                      <span className="text-primary-foreground font-semibold text-sm">L</span>
-                    </div>
-                    <div>
-                      <h1 className="font-semibold text-lg">BD Transcript Analyzer</h1>
-                      <p className="text-xs text-muted-foreground">Leverege</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <ThemeToggle />
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => window.location.href = '/api/logout'}
-                      data-testid="button-logout"
-                    >
-                      <LogOut className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </header>
-              
-              <TabNavigation tabs={tabs} />
-            </>
-          )}
-          
-          <main className="pb-12">
-            <Router />
-          </main>
-        </div>
+        <AuthenticatedApp />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
