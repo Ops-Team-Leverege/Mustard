@@ -7,12 +7,19 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Pencil, Trash2, Plus } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "wouter";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export interface ProductInsight {
   id: string;
@@ -42,6 +49,8 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', categoryId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -188,6 +197,26 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     return matchesSearch && matchesCategory;
   });
 
+  const totalPages = Math.ceil(filteredInsights.length / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedInsights = filteredInsights.slice(startIndex, endIndex);
+
+  const handlePageSizeChange = (value: string) => {
+    setPageSize(Number(value));
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryFilterChange = (value: string) => {
+    setCategoryFilter(value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex gap-4 flex-wrap items-center justify-between">
@@ -197,7 +226,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
             <Input
               placeholder="Search features or companies..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-9"
               data-testid="input-search-insights"
             />
@@ -209,7 +238,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
               ...categories.map(cat => ({ value: cat.id, label: cat.name }))
             ]}
             value={categoryFilter}
-            onValueChange={setCategoryFilter}
+            onValueChange={handleCategoryFilterChange}
             placeholder="All categories"
             searchPlaceholder="Search categories..."
             emptyText="No category found."
@@ -236,14 +265,14 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredInsights.length === 0 ? (
+            {paginatedInsights.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No insights found
+                  {filteredInsights.length === 0 ? 'No insights found' : 'No insights on this page'}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInsights.map((insight) => (
+              paginatedInsights.map((insight) => (
                 <TableRow key={insight.id} data-testid={`row-insight-${insight.id}`}>
                   <TableCell className="font-medium" data-testid={`text-feature-${insight.id}`}>
                     {insight.feature}
@@ -315,6 +344,55 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
           </TableBody>
         </Table>
       </div>
+
+      {filteredInsights.length > 0 && (
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, filteredInsights.length)} of {filteredInsights.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Rows per page:</span>
+              <Select value={String(pageSize)} onValueChange={handlePageSizeChange}>
+                <SelectTrigger className="w-[70px]" data-testid="select-page-size">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                data-testid="button-previous-page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setCurrentPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                data-testid="button-next-page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!editingInsight} onOpenChange={() => setEditingInsight(null)}>
         <DialogContent>
