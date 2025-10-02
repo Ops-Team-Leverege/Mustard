@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, ExternalLink } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -29,7 +29,6 @@ export interface ProductInsight {
   company: string;
   category: string;
   categoryId?: string | null;
-  jiraTicketKey?: string | null;
   createdAt?: Date | string | null;
 }
 
@@ -57,9 +56,6 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', company: '', categoryId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
-  const [jiraDialogOpen, setJiraDialogOpen] = useState(false);
-  const [jiraTicketKey, setJiraTicketKey] = useState('');
-  const [selectedInsightForJira, setSelectedInsightForJira] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sortColumn, setSortColumn] = useState<'category' | 'createdAt'>('createdAt');
@@ -167,47 +163,6 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
       });
     },
   });
-
-  const jiraMutation = useMutation({
-    mutationFn: async ({ insightId, jiraTicketKey }: { insightId: string; jiraTicketKey: string }) => {
-      const res = await apiRequest('POST', `/api/insights/${insightId}/jira`, { jiraTicketKey });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
-      queryClient.invalidateQueries({ 
-        predicate: (query) => {
-          const key = query.queryKey[0];
-          return typeof key === 'string' && key.startsWith('/api/companies');
-        }
-      });
-      setJiraDialogOpen(false);
-      setJiraTicketKey('');
-      setSelectedInsightForJira(null);
-      toast({
-        title: "Success",
-        description: "Insight linked to Jira ticket successfully",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to link insight to Jira",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleLinkToJira = (insightId: string, currentTicketKey?: string | null) => {
-    setSelectedInsightForJira(insightId);
-    setJiraTicketKey(currentTicketKey || '');
-    setJiraDialogOpen(true);
-  };
-
-  const handleJiraSubmit = () => {
-    if (!selectedInsightForJira || !jiraTicketKey.trim()) return;
-    jiraMutation.mutate({ insightId: selectedInsightForJira, jiraTicketKey: jiraTicketKey.trim() });
-  };
 
   const handleEdit = (insight: ProductInsight) => {
     setEditingInsight(insight);
@@ -457,15 +412,6 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant={insight.jiraTicketKey ? 'default' : 'ghost'}
-                        onClick={() => handleLinkToJira(insight.id, insight.jiraTicketKey)}
-                        data-testid={`button-jira-${insight.id}`}
-                        title={insight.jiraTicketKey ? `Linked to ${insight.jiraTicketKey}` : 'Link to Jira ticket'}
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -674,41 +620,6 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
               data-testid="button-save-add"
             >
               {createMutation.isPending ? "Adding..." : "Add Insight"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={jiraDialogOpen} onOpenChange={setJiraDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Link to Jira Ticket</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="jira-ticket-key">Jira Ticket Key</Label>
-              <Input
-                id="jira-ticket-key"
-                value={jiraTicketKey}
-                onChange={(e) => setJiraTicketKey(e.target.value.toUpperCase())}
-                placeholder="e.g., PROJ-123"
-                data-testid="input-jira-ticket-key"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Enter the Jira ticket key (e.g., PROJ-123). The insight will be posted as a comment on this ticket.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setJiraDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleJiraSubmit} 
-              disabled={jiraMutation.isPending || !jiraTicketKey.trim()}
-              data-testid="button-submit-jira"
-            >
-              {jiraMutation.isPending ? "Linking..." : "Link to Jira"}
             </Button>
           </DialogFooter>
         </DialogContent>

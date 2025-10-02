@@ -53,7 +53,6 @@ export const productInsights = pgTable("product_insights", {
   company: text("company").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
-  jiraTicketKey: text("jira_ticket_key"), // Jira ticket key (e.g., "PROJ-123")
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
