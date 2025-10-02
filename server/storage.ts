@@ -46,6 +46,7 @@ export interface IStorage {
   deleteProductInsight(id: string): Promise<boolean>;
   assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
+  linkInsightToJira(insightId: string, jiraTicketKey: string): Promise<boolean>;
 
   // Q&A Pairs
   getQAPairs(): Promise<QAPairWithCategory[]>;
@@ -275,6 +276,18 @@ export class MemStorage implements IStorage {
         });
       }
     }
+    return true;
+  }
+
+  async linkInsightToJira(insightId: string, jiraTicketKey: string): Promise<boolean> {
+    const insight = this.productInsights.get(insightId);
+    if (!insight) {
+      return false;
+    }
+    this.productInsights.set(insightId, {
+      ...insight,
+      jiraTicketKey,
+    });
     return true;
   }
 
