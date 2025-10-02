@@ -68,6 +68,7 @@ Preferred communication style: Simple, everyday language.
 - `product_insights`: Feature requests extracted from transcripts with category assignment
 - `qa_pairs`: Question-answer pairs from BD calls with category assignment
 - `companies`: Normalized company records with slug for routing
+- `contacts`: Customer contacts with name, job title, and company association
 
 ### Key Architectural Decisions
 
@@ -174,3 +175,24 @@ Preferred communication style: Simple, everyday language.
   - Pre-fills company name when adding from company pages
   - Forms include category selection via searchable combobox
   - Immediate cache invalidation ensures new items appear without page refresh
+
+### Contact Management System
+- **Contacts Table**: New database table for tracking customer contacts per company
+  - Schema: id (UUID), name (text), jobTitle (text, nullable), companyId (foreign key), createdAt (timestamp)
+  - Full CRUD API endpoints: GET, POST, PATCH, DELETE
+  - Storage interface methods in both MemStorage and DbStorage implementations
+  
+- **Company Page Contacts Section**: Comprehensive UI for managing company contacts
+  - Displays all contacts for the company with name and job title
+  - Add new contacts with inline form (name and job title fields)
+  - Edit existing contacts with inline editing mode
+  - Delete contacts with confirmation dialog
+  - Empty state when no contacts exist
+  - Avatar icon for visual representation
+  - Responsive design for mobile and desktop
+  - All interactive elements include data-testid attributes for testing
+  
+- **Integration with CompanyOverview**: Contacts included in company overview response
+  - CompanyOverview type extended with contacts array
+  - Fetched and displayed alongside company details, insights, and Q&A pairs
+  - Real-time cache invalidation after contact mutations
