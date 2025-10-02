@@ -10,7 +10,7 @@ export default function Landing() {
         <div className="max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-4">
             <h1 className="text-4xl font-bold tracking-tight" data-testid="heading-title">
-              BD Transcript Analyzer
+              PitCrew Customer Transcript Analyzer
             </h1>
             <p className="text-xl text-muted-foreground" data-testid="text-subtitle">
               Transform business development call transcripts into actionable product insights
@@ -82,19 +82,6 @@ export default function Landing() {
                 </CardDescription>
               </CardContent>
             </Card>
-          </div>
-
-          <div className="text-center space-y-4 pt-8">
-            <h2 className="text-2xl font-semibold" data-testid="heading-cta">
-              Ready to streamline your BD insights?
-            </h2>
-            <Button 
-              size="lg" 
-              onClick={() => window.location.href = '/api/login'}
-              data-testid="button-login-bottom"
-            >
-              Log In Now
-            </Button>
           </div>
         </div>
       </div>
