@@ -28,9 +28,9 @@ export default function CompanyPage() {
   });
 
   const [isAddingContact, setIsAddingContact] = useState(false);
-  const [newContact, setNewContact] = useState({ name: '', jobTitle: '' });
+  const [newContact, setNewContact] = useState({ name: '', nameInTranscript: '', jobTitle: '' });
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
-  const [editContactForm, setEditContactForm] = useState({ name: '', jobTitle: '' });
+  const [editContactForm, setEditContactForm] = useState({ name: '', nameInTranscript: '', jobTitle: '' });
 
   const { data: overview, isLoading } = useQuery<CompanyOverview>({
     queryKey: [`/api/companies/${companySlug}/overview`],
@@ -76,10 +76,11 @@ export default function CompanyPage() {
   });
 
   const createContactMutation = useMutation({
-    mutationFn: async (data: { name: string; jobTitle: string }) => {
+    mutationFn: async (data: { name: string; nameInTranscript: string; jobTitle: string }) => {
       if (!overview?.company.id) throw new Error("Company not found");
       const res = await apiRequest('POST', '/api/contacts', {
         name: data.name,
+        nameInTranscript: data.nameInTranscript || null,
         jobTitle: data.jobTitle || null,
         companyId: overview.company.id,
       });
@@ -93,7 +94,7 @@ export default function CompanyPage() {
         }
       });
       setIsAddingContact(false);
-      setNewContact({ name: '', jobTitle: '' });
+      setNewContact({ name: '', nameInTranscript: '', jobTitle: '' });
       toast({
         title: "Success",
         description: "Contact added successfully",
@@ -109,9 +110,10 @@ export default function CompanyPage() {
   });
 
   const updateContactMutation = useMutation({
-    mutationFn: async ({ id, name, jobTitle }: { id: string; name: string; jobTitle: string }) => {
+    mutationFn: async ({ id, name, nameInTranscript, jobTitle }: { id: string; name: string; nameInTranscript: string; jobTitle: string }) => {
       const res = await apiRequest('PATCH', `/api/contacts/${id}`, {
         name,
+        nameInTranscript: nameInTranscript || null,
         jobTitle: jobTitle || null,
       });
       return res.json();
@@ -124,7 +126,7 @@ export default function CompanyPage() {
         }
       });
       setEditingContactId(null);
-      setEditContactForm({ name: '', jobTitle: '' });
+      setEditContactForm({ name: '', nameInTranscript: '', jobTitle: '' });
       toast({
         title: "Success",
         description: "Contact updated successfully",
@@ -241,7 +243,7 @@ export default function CompanyPage() {
 
   const handleStartEditContact = (contact: Contact) => {
     setEditingContactId(contact.id);
-    setEditContactForm({ name: contact.name, jobTitle: contact.jobTitle || '' });
+    setEditContactForm({ name: contact.name, nameInTranscript: contact.nameInTranscript || '', jobTitle: contact.jobTitle || '' });
   };
 
   const handleSaveContact = () => {
@@ -249,13 +251,14 @@ export default function CompanyPage() {
     updateContactMutation.mutate({
       id: editingContactId,
       name: editContactForm.name,
+      nameInTranscript: editContactForm.nameInTranscript,
       jobTitle: editContactForm.jobTitle,
     });
   };
 
   const handleCancelEditContact = () => {
     setEditingContactId(null);
-    setEditContactForm({ name: '', jobTitle: '' });
+    setEditContactForm({ name: '', nameInTranscript: '', jobTitle: '' });
   };
 
   const handleDeleteContact = (id: string) => {
@@ -452,7 +455,7 @@ export default function CompanyPage() {
           <div className="space-y-3">
             {isAddingContact && (
               <div className="border rounded-md p-4 space-y-3 bg-muted/30">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="text-sm font-medium mb-1 block">Name</label>
                     <Input
@@ -460,6 +463,15 @@ export default function CompanyPage() {
                       onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
                       placeholder="Contact name"
                       data-testid="input-contact-name"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">Name in Transcript</label>
+                    <Input
+                      value={newContact.nameInTranscript}
+                      onChange={(e) => setNewContact({ ...newContact, nameInTranscript: e.target.value })}
+                      placeholder="Name as appears in transcript"
+                      data-testid="input-contact-name-in-transcript"
                     />
                   </div>
                   <div>
@@ -487,7 +499,7 @@ export default function CompanyPage() {
                     variant="ghost"
                     onClick={() => {
                       setIsAddingContact(false);
-                      setNewContact({ name: '', jobTitle: '' });
+                      setNewContact({ name: '', nameInTranscript: '', jobTitle: '' });
                     }}
                     disabled={createContactMutation.isPending}
                     data-testid="button-cancel-add-contact"
@@ -508,12 +520,18 @@ export default function CompanyPage() {
                     data-testid={`contact-${contact.id}`}
                   >
                     {editingContactId === contact.id ? (
-                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <Input
                           value={editContactForm.name}
                           onChange={(e) => setEditContactForm({ ...editContactForm, name: e.target.value })}
                           placeholder="Contact name"
                           data-testid={`input-edit-contact-name-${contact.id}`}
+                        />
+                        <Input
+                          value={editContactForm.nameInTranscript}
+                          onChange={(e) => setEditContactForm({ ...editContactForm, nameInTranscript: e.target.value })}
+                          placeholder="Name in transcript"
+                          data-testid={`input-edit-contact-name-in-transcript-${contact.id}`}
                         />
                         <Input
                           value={editContactForm.jobTitle}
