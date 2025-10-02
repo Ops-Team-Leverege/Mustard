@@ -66,6 +66,10 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.companyName.trim()) {
+      return;
+    }
+    
     // Convert customers array to comma-separated names for backward compatibility
     const customerNames = customers.map(c => c.name).join(', ');
     
@@ -90,7 +94,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label data-testid="label-company-name">Company Name</Label>
+            <Label data-testid="label-company-name">Company Name <span className="text-destructive">*</span></Label>
             <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -314,7 +318,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           <Button
             type="submit"
             className="w-full"
-            disabled={isAnalyzing || customers.length === 0}
+            disabled={isAnalyzing || customers.length === 0 || !formData.companyName.trim()}
             data-testid="button-analyze-transcript"
           >
             {isAnalyzing ? (

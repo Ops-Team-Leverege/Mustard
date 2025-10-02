@@ -42,7 +42,7 @@ export interface IStorage {
   getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]>;
   createProductInsight(insight: InsertProductInsight): Promise<ProductInsight>;
   createProductInsights(insights: InsertProductInsight[]): Promise<ProductInsight[]>;
-  updateProductInsight(id: string, feature: string, context: string, quote: string, company: string): Promise<ProductInsight | undefined>;
+  updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined>;
   deleteProductInsight(id: string): Promise<boolean>;
   assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
@@ -52,7 +52,6 @@ export interface IStorage {
   getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
-  updateQAPair(id: string, question: string, answer: string, asker: string, company: string, contactId?: string | null): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
   getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
@@ -225,7 +224,7 @@ export class MemStorage implements IStorage {
     return insights;
   }
 
-  async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string): Promise<ProductInsight | undefined> {
+  async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined> {
     const insight = this.productInsights.get(id);
     if (!insight) return undefined;
     
@@ -235,6 +234,7 @@ export class MemStorage implements IStorage {
       context,
       quote,
       company,
+      companyId,
     };
     this.productInsights.set(id, updated);
     return updated;
@@ -781,10 +781,10 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string): Promise<ProductInsight | undefined> {
+  async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined> {
     const results = await this.db
       .update(productInsightsTable)
-      .set({ feature, context, quote, company })
+      .set({ feature, context, quote, company, companyId })
       .where(eq(productInsightsTable.id, id))
       .returning();
     return results[0];

@@ -241,7 +241,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      const insight = await storage.updateProductInsight(id, feature, context, quote, company);
+      // Find or create company to get companyId
+      const slug = generateSlug(company);
+      let companyRecord = await storage.getCompanyBySlug(slug);
+      
+      if (!companyRecord) {
+        companyRecord = await storage.createCompany({
+          name: company,
+          slug,
+          notes: null,
+        });
+      }
+      
+      const insight = await storage.updateProductInsight(id, feature, context, quote, company, companyRecord.id);
       
       if (!insight) {
         res.status(404).json({ error: "Insight not found" });
