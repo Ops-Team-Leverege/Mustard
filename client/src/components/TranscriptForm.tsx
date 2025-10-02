@@ -128,7 +128,13 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                           key={company.id}
                           value={company.name}
                           onSelect={() => {
-                            setFormData({ ...formData, companyName: company.name });
+                            setFormData({ 
+                              ...formData, 
+                              companyName: company.name,
+                              companyDescription: company.companyDescription || '',
+                              mainInterestAreas: company.mainInterestAreas || '',
+                              numberOfStores: company.numberOfStores || ''
+                            });
                             setCompanySearchOpen(false);
                           }}
                           data-testid={`option-company-${company.id}`}
