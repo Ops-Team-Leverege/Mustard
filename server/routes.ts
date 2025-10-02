@@ -11,6 +11,8 @@ import {
 } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+// From Replit Auth integration (blueprint:javascript_log_in_with_replit)
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 function generateSlug(companyName: string): string {
   const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -19,8 +21,23 @@ function generateSlug(companyName: string): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Transcripts
-  app.post("/api/transcripts", async (req, res) => {
+  // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
+  await setupAuth(app);
+
+  // Auth routes (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Transcripts (protected routes)
+  app.post("/api/transcripts", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertTranscriptSchema.parse(req.body);
       const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; jobTitle?: string }> };
@@ -127,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/transcripts", async (_req, res) => {
+  app.get("/api/transcripts", isAuthenticated, async (_req, res) => {
     try {
       const transcripts = await storage.getTranscripts();
       res.json(transcripts);
@@ -137,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product Insights
-  app.get("/api/insights", async (_req, res) => {
+  app.get("/api/insights", isAuthenticated, async (_req, res) => {
     try {
       const insights = await storage.getProductInsights();
       
@@ -165,7 +182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/insights/:id/category", async (req, res) => {
+  app.patch("/api/insights/:id/category", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { categoryId } = req.body;
@@ -197,7 +214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/insights/:id", async (req, res) => {
+  app.patch("/api/insights/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { feature, context, quote } = req.body;
@@ -220,7 +237,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/insights/:id", async (req, res) => {
+  app.delete("/api/insights/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteProductInsight(id);
@@ -236,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/insights", async (req, res) => {
+  app.post("/api/insights", isAuthenticated, async (req, res) => {
     try {
       const { feature, context, quote, company, categoryId } = req.body;
       
@@ -274,7 +291,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Q&A Pairs
-  app.get("/api/qa-pairs", async (_req, res) => {
+  app.get("/api/qa-pairs", isAuthenticated, async (_req, res) => {
     try {
       const qaPairs = await storage.getQAPairs();
       
@@ -297,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/qa-pairs/:id/category", async (req, res) => {
+  app.patch("/api/qa-pairs/:id/category", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { categoryId } = req.body;
@@ -329,7 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/qa-pairs/:id", async (req, res) => {
+  app.patch("/api/qa-pairs/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { question, answer, asker, contactId } = req.body;
@@ -352,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/qa-pairs/:id", async (req, res) => {
+  app.delete("/api/qa-pairs/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteQAPair(id);
@@ -368,7 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/qa-pairs", async (req, res) => {
+  app.post("/api/qa-pairs", isAuthenticated, async (req, res) => {
     try {
       const { question, answer, asker, company, categoryId, contactId } = req.body;
       
@@ -407,7 +424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Categories
-  app.get("/api/categories", async (_req, res) => {
+  app.get("/api/categories", isAuthenticated, async (_req, res) => {
     try {
       const categories = await storage.getCategories();
       
@@ -449,7 +466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/categories", async (req, res) => {
+  app.post("/api/categories", isAuthenticated, async (req, res) => {
     try {
       const data = insertCategorySchema.parse(req.body);
       const category = await storage.createCategory(data);
@@ -465,7 +482,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/categories/:id", async (req, res) => {
+  app.patch("/api/categories/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description } = req.body;
@@ -488,7 +505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/categories/:id", async (req, res) => {
+  app.delete("/api/categories/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteCategory(id);
@@ -504,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/categories/:id/overview", async (req, res) => {
+  app.get("/api/categories/:id/overview", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const overview = await storage.getCategoryOverview(id);
@@ -521,7 +538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Companies
-  app.get("/api/companies", async (req, res) => {
+  app.get("/api/companies", isAuthenticated, async (req, res) => {
     try {
       const companies = await storage.getCompanies();
       res.json(companies);
@@ -530,7 +547,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:slug", async (req, res) => {
+  app.get("/api/companies/:slug", isAuthenticated, async (req, res) => {
     try {
       const { slug } = req.params;
       const company = await storage.getCompanyBySlug(slug);
@@ -546,7 +563,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:slug/overview", async (req, res) => {
+  app.get("/api/companies/:slug/overview", isAuthenticated, async (req, res) => {
     try {
       const { slug } = req.params;
       const overview = await storage.getCompanyOverview(slug);
@@ -562,7 +579,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies", async (req, res) => {
+  app.post("/api/companies", isAuthenticated, async (req, res) => {
     try {
       const data = insertCompanySchema.parse(req.body);
       const company = await storage.createCompany(data);
@@ -578,7 +595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/companies/:id", async (req, res) => {
+  app.patch("/api/companies/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { name, notes, companyDescription, mainInterestAreas, numberOfStores } = req.body;
@@ -601,7 +618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/companies/:id", async (req, res) => {
+  app.delete("/api/companies/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteCompany(id);
@@ -618,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contacts
-  app.get("/api/contacts/company/:companyId", async (req, res) => {
+  app.get("/api/contacts/company/:companyId", isAuthenticated, async (req, res) => {
     try {
       const { companyId } = req.params;
       const contacts = await storage.getContactsByCompany(companyId);
@@ -628,7 +645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contacts", async (req, res) => {
+  app.post("/api/contacts", isAuthenticated, async (req, res) => {
     try {
       const data = insertContactSchema.parse(req.body);
       const contact = await storage.createContact(data);
@@ -644,7 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/contacts/:id", async (req, res) => {
+  app.patch("/api/contacts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const { name, jobTitle } = req.body;
@@ -667,7 +684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/contacts/:id", async (req, res) => {
+  app.delete("/api/contacts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
       const success = await storage.deleteContact(id);

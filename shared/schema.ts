@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -66,6 +66,29 @@ export const qaPairs = pgTable("qa_pairs", {
   companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// From Replit Auth integration (blueprint:javascript_log_in_with_replit)
+// Session storage table - mandatory for Replit Auth
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table - mandatory for Replit Auth
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 const customerSchema = z.object({
@@ -156,3 +179,8 @@ export type CategoryOverview = {
   insights: ProductInsightWithCategory[];
   qaPairs: QAPairWithCategory[];
 };
+
+// From Replit Auth integration (blueprint:javascript_log_in_with_replit)
+// User types for authentication
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;

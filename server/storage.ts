@@ -15,12 +15,15 @@ import {
   type InsertContact,
   type CompanyOverview,
   type CategoryOverview,
+  type User,
+  type UpsertUser,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
   categories as categoriesTable,
   companies as companiesTable,
   contacts as contactsTable,
+  users as usersTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -76,6 +79,10 @@ export interface IStorage {
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<boolean>;
+
+  // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
 }
 
 export class MemStorage implements IStorage {
@@ -85,6 +92,7 @@ export class MemStorage implements IStorage {
   private categories: Map<string, Category>;
   private companies: Map<string, Company>;
   private contacts: Map<string, Contact>;
+  private users: Map<string, User>;
 
   constructor() {
     this.transcripts = new Map();
@@ -93,6 +101,7 @@ export class MemStorage implements IStorage {
     this.categories = new Map();
     this.companies = new Map();
     this.contacts = new Map();
+    this.users = new Map();
 
     // Initialize with default categories
     const defaultCategories = [
@@ -583,6 +592,29 @@ export class MemStorage implements IStorage {
 
   async deleteContact(id: string): Promise<boolean> {
     return this.contacts.delete(id);
+  }
+
+  // User operations (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
+  async getUser(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const now = new Date();
+    const existingUser = this.users.get(userData.id!);
+    
+    const user: User = {
+      id: userData.id || randomUUID(),
+      email: userData.email || null,
+      firstName: userData.firstName || null,
+      lastName: userData.lastName || null,
+      profileImageUrl: userData.profileImageUrl || null,
+      createdAt: existingUser?.createdAt || now,
+      updatedAt: now,
+    };
+    
+    this.users.set(user.id, user);
+    return user;
   }
 
   async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
@@ -1102,6 +1134,27 @@ export class DbStorage implements IStorage {
       .where(eq(contactsTable.id, id))
       .returning();
     return results.length > 0;
+  }
+
+  // User operations (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await this.db.select().from(usersTable).where(eq(usersTable.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await this.db
+      .insert(usersTable)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: usersTable.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
   }
 
   async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
