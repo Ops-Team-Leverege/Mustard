@@ -528,13 +528,13 @@ export class MemStorage implements IStorage {
   }
 
   async updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void> {
-    for (const insight of this.productInsights.values()) {
+    for (const insight of Array.from(this.productInsights.values())) {
       if (insight.companyId === companyId) {
         this.productInsights.set(insight.id, { ...insight, company: newName });
       }
     }
     
-    for (const qaPair of this.qaPairs.values()) {
+    for (const qaPair of Array.from(this.qaPairs.values())) {
       if (qaPair.companyId === companyId) {
         this.qaPairs.set(qaPair.id, { ...qaPair, company: newName });
       }

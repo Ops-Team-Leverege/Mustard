@@ -653,6 +653,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      await storage.updateCompanyNameInRelatedRecords(id, name);
+      
       res.json(company);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
