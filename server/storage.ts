@@ -73,6 +73,7 @@ export interface IStorage {
   updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<boolean>;
   getCompanyOverview(slug: string): Promise<CompanyOverview | null>;
+  updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void>;
 
   // Contacts
   getContactsByCompany(companyId: string): Promise<Contact[]>;
@@ -524,6 +525,20 @@ export class MemStorage implements IStorage {
 
   async deleteCompany(id: string): Promise<boolean> {
     return this.companies.delete(id);
+  }
+
+  async updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void> {
+    for (const insight of this.productInsights.values()) {
+      if (insight.companyId === companyId) {
+        this.productInsights.set(insight.id, { ...insight, company: newName });
+      }
+    }
+    
+    for (const qaPair of this.qaPairs.values()) {
+      if (qaPair.companyId === companyId) {
+        this.qaPairs.set(qaPair.id, { ...qaPair, company: newName });
+      }
+    }
   }
 
   async getCompanyOverview(slug: string): Promise<CompanyOverview | null> {
@@ -1035,6 +1050,18 @@ export class DbStorage implements IStorage {
       .where(eq(companiesTable.id, id))
       .returning();
     return results.length > 0;
+  }
+
+  async updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void> {
+    await this.db
+      .update(productInsightsTable)
+      .set({ company: newName })
+      .where(eq(productInsightsTable.companyId, companyId));
+    
+    await this.db
+      .update(qaPairsTable)
+      .set({ company: newName })
+      .where(eq(qaPairsTable.companyId, companyId));
   }
 
   async getCompanyOverview(slug: string): Promise<CompanyOverview | null> {
