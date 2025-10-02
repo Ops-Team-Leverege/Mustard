@@ -26,6 +26,9 @@ export interface QAPair {
   question: string;
   answer: string;
   asker: string;
+  contactId?: string | null;
+  contactName?: string | null;
+  contactJobTitle?: string | null;
   company: string;
   categoryId?: string | null;
   categoryName?: string | null;
@@ -283,9 +286,16 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                     {qa.answer}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="font-normal" data-testid={`badge-asker-${qa.id}`}>
-                      {qa.asker}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant="secondary" className="font-normal w-fit" data-testid={`badge-asker-${qa.id}`}>
+                        {qa.contactName || qa.asker}
+                      </Badge>
+                      {qa.contactJobTitle && (
+                        <span className="text-xs text-muted-foreground" data-testid={`text-job-title-${qa.id}`}>
+                          {qa.contactJobTitle}
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Link href={`/companies/${qa.company.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`}>
