@@ -46,6 +46,7 @@ export interface IStorage {
   deleteProductInsight(id: string): Promise<boolean>;
   assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
+  linkInsightToJira(insightId: string, jiraTicketKey: string): Promise<boolean>;
 
   // Q&A Pairs
   getQAPairs(): Promise<QAPairWithCategory[]>;
@@ -191,6 +192,7 @@ export class MemStorage implements IStorage {
       transcriptId: insertInsight.transcriptId ?? null,
       categoryId: insertInsight.categoryId ?? null,
       companyId: insertInsight.companyId ?? null,
+      jiraTicketKey: insertInsight.jiraTicketKey ?? null,
       createdAt: new Date(),
       id,
     };
@@ -217,6 +219,7 @@ export class MemStorage implements IStorage {
         transcriptId: insertInsight.transcriptId ?? null,
         categoryId: insertInsight.categoryId ?? null,
         companyId: insertInsight.companyId ?? null,
+        jiraTicketKey: insertInsight.jiraTicketKey ?? null,
         createdAt: new Date(),
         id,
       };
@@ -257,6 +260,17 @@ export class MemStorage implements IStorage {
     this.productInsights.set(insightId, {
       ...insight,
       categoryId,
+    });
+    return true;
+  }
+
+  async linkInsightToJira(insightId: string, jiraTicketKey: string): Promise<boolean> {
+    const insight = this.productInsights.get(insightId);
+    if (!insight) return false;
+    
+    this.productInsights.set(insightId, {
+      ...insight,
+      jiraTicketKey,
     });
     return true;
   }
@@ -728,6 +742,7 @@ export class DbStorage implements IStorage {
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
         companyId: productInsightsTable.companyId,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
@@ -751,6 +766,7 @@ export class DbStorage implements IStorage {
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
         companyId: productInsightsTable.companyId,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
@@ -775,6 +791,7 @@ export class DbStorage implements IStorage {
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
         companyId: productInsightsTable.companyId,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
@@ -825,6 +842,15 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .update(productInsightsTable)
       .set({ categoryId })
+      .where(eq(productInsightsTable.id, insightId))
+      .returning();
+    return results.length > 0;
+  }
+
+  async linkInsightToJira(insightId: string, jiraTicketKey: string): Promise<boolean> {
+    const results = await this.db
+      .update(productInsightsTable)
+      .set({ jiraTicketKey })
       .where(eq(productInsightsTable.id, insightId))
       .returning();
     return results.length > 0;
@@ -1094,6 +1120,7 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
@@ -1228,6 +1255,7 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)

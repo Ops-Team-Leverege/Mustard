@@ -289,6 +289,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/insights/:id/jira", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { jiraTicketKey } = req.body;
+      
+      if (!jiraTicketKey) {
+        res.status(400).json({ error: "Jira ticket key is required" });
+        return;
+      }
+      
+      // Validate ticket key format (PROJECT-NUMBER)
+      if (!/^[A-Z]+-\d+$/.test(jiraTicketKey)) {
+        res.status(400).json({ error: "Invalid Jira ticket key format. Expected format: PROJECT-123" });
+        return;
+      }
+      
+      // Get the insight
+      const insights = await storage.getProductInsights();
+      const insight = insights.find((i) => i.id === id);
+      
+      if (!insight) {
+        res.status(404).json({ error: "Insight not found" });
+        return;
+      }
+      
+      // Format insight as Jira comment
+      const commentBody = {
+        body: {
+          type: "doc",
+          version: 1,
+          content: [
+            {
+              type: "heading",
+              attrs: { level: 3 },
+              content: [{ type: "text", text: "Product Insight from PitCrew" }]
+            },
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "Feature: ", marks: [{ type: "strong" }] },
+                { type: "text", text: insight.feature }
+              ]
+            },
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "Context: ", marks: [{ type: "strong" }] },
+                { type: "text", text: insight.context }
+              ]
+            },
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "Customer Quote: ", marks: [{ type: "strong" }] },
+                { type: "text", text: `"${insight.quote}"`, marks: [{ type: "em" }] }
+              ]
+            },
+            {
+              type: "paragraph",
+              content: [
+                { type: "text", text: "Company: ", marks: [{ type: "strong" }] },
+                { type: "text", text: insight.company }
+              ]
+            }
+          ]
+        }
+      };
+      
+      // Post to Jira
+      const jiraAuth = Buffer.from(
+        `${process.env.JIRA_EMAIL}:${process.env.JIRA_API_TOKEN}`
+      ).toString('base64');
+      
+      const jiraResponse = await fetch(
+        `https://${process.env.JIRA_DOMAIN}/rest/api/3/issue/${jiraTicketKey}/comment`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${jiraAuth}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(commentBody),
+        }
+      );
+      
+      if (!jiraResponse.ok) {
+        const errorText = await jiraResponse.text();
+        console.error('Jira API error:', errorText);
+        res.status(jiraResponse.status).json({ 
+          error: `Failed to post to Jira: ${jiraResponse.statusText}`,
+          details: errorText
+        });
+        return;
+      }
+      
+      // Update insight with Jira ticket key
+      const success = await storage.linkInsightToJira(id, jiraTicketKey);
+      
+      if (!success) {
+        res.status(500).json({ error: "Failed to update insight with Jira ticket key" });
+        return;
+      }
+      
+      res.json({ success: true, jiraTicketKey });
+    } catch (error) {
+      console.error('Error posting to Jira:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.post("/api/insights", isAuthenticated, async (req, res) => {
     try {
       const { feature, context, quote, company, categoryId } = req.body;
