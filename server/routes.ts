@@ -385,7 +385,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      const qaPair = await storage.updateQAPair(id, question, answer, asker, company, contactId);
+      // Find or create company to get companyId
+      const slug = generateSlug(company);
+      let companyRecord = await storage.getCompanyBySlug(slug);
+      
+      if (!companyRecord) {
+        companyRecord = await storage.createCompany({
+          name: company,
+          slug,
+          notes: null,
+        });
+      }
+      
+      const qaPair = await storage.updateQAPair(id, question, answer, asker, company, companyRecord.id, contactId);
       
       if (!qaPair) {
         res.status(404).json({ error: "Q&A pair not found" });

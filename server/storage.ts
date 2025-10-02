@@ -52,6 +52,7 @@ export interface IStorage {
   getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
+  updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
   getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
@@ -344,7 +345,7 @@ export class MemStorage implements IStorage {
     return qaPairs;
   }
 
-  async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, contactId?: string | null): Promise<QAPair | undefined> {
+  async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined> {
     const qaPair = this.qaPairs.get(id);
     if (!qaPair) return undefined;
     
@@ -354,6 +355,7 @@ export class MemStorage implements IStorage {
       answer,
       asker,
       company,
+      companyId,
       contactId: contactId !== undefined ? contactId : qaPair.contactId,
     };
     this.qaPairs.set(id, updated);
@@ -871,8 +873,8 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, contactId?: string | null): Promise<QAPair | undefined> {
-    const updateData: Partial<QAPair> = { question, answer, asker, company };
+  async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined> {
+    const updateData: Partial<QAPair> = { question, answer, asker, company, companyId };
     if (contactId !== undefined) {
       updateData.contactId = contactId;
     }
