@@ -88,7 +88,7 @@ export default function CompanyPage() {
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
-          return typeof key === 'string' && key.startsWith('/api/companies');
+          return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
         }
       });
       setIsAddingContact(false);
@@ -119,7 +119,7 @@ export default function CompanyPage() {
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
-          return typeof key === 'string' && key.startsWith('/api/companies');
+          return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
         }
       });
       setEditingContactId(null);
@@ -147,7 +147,7 @@ export default function CompanyPage() {
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
-          return typeof key === 'string' && key.startsWith('/api/companies');
+          return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
         }
       });
       toast({
@@ -261,6 +261,14 @@ export default function CompanyPage() {
     }
   };
 
+  const handleDeleteCompany = () => {
+    if (confirm(`Are you sure you want to delete "${overview?.company.name}"? This will delete all associated transcripts, insights, Q&A pairs, and contacts. This action cannot be undone.`)) {
+      if (overview?.company.id) {
+        deleteCompanyMutation.mutate(overview.company.id);
+      }
+    }
+  };
+
   return (
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <Card>
@@ -274,14 +282,25 @@ export default function CompanyPage() {
                 )}
               </div>
               {!isEditing ? (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  onClick={handleStartEdit}
-                  data-testid="button-edit-company"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleStartEdit}
+                    data-testid="button-edit-company"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={handleDeleteCompany}
+                    disabled={deleteCompanyMutation.isPending}
+                    data-testid="button-delete-company"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               ) : (
                 <div className="flex gap-2">
                   <Button
