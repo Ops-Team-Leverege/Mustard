@@ -82,6 +82,12 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     setCustomers(customers.filter((_, i) => i !== index));
   };
 
+  const handleUpdateCustomer = (index: number, field: keyof Customer, value: string) => {
+    const updatedCustomers = [...customers];
+    updatedCustomers[index] = { ...updatedCustomers[index], [field]: value };
+    setCustomers(updatedCustomers);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -286,42 +292,51 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             </div>
 
             {customers.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {customers.map((customer, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between gap-3 p-3 border rounded-md bg-background"
+                    className="border rounded-md p-3 bg-background space-y-3"
                     data-testid={`customer-item-${index}`}
                   >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <User className="h-4 w-4 text-primary" />
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,1fr,auto] gap-3 items-end">
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Name</label>
+                        <Input
+                          value={customer.name}
+                          onChange={(e) => handleUpdateCustomer(index, 'name', e.target.value)}
+                          placeholder="e.g., Mike Chen"
+                          data-testid={`input-customer-name-${index}`}
+                        />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate" data-testid={`customer-name-${index}`}>
-                          {customer.name}
-                        </p>
-                        {customer.nameInTranscript && (
-                          <p className="text-sm text-muted-foreground truncate" data-testid={`customer-name-in-transcript-${index}`}>
-                            In transcript: {customer.nameInTranscript}
-                          </p>
-                        )}
-                        {customer.jobTitle && (
-                          <p className="text-sm text-muted-foreground truncate" data-testid={`customer-job-title-${index}`}>
-                            {customer.jobTitle}
-                          </p>
-                        )}
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Name in Transcript (optional)</label>
+                        <Input
+                          value={customer.nameInTranscript || ''}
+                          onChange={(e) => handleUpdateCustomer(index, 'nameInTranscript', e.target.value)}
+                          placeholder="e.g., Mike"
+                          data-testid={`input-customer-name-in-transcript-${index}`}
+                        />
                       </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Job Title (optional)</label>
+                        <Input
+                          value={customer.jobTitle || ''}
+                          onChange={(e) => handleUpdateCustomer(index, 'jobTitle', e.target.value)}
+                          placeholder="e.g., VP of Operations"
+                          data-testid={`input-customer-job-title-${index}`}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleRemoveCustomer(index)}
+                        data-testid={`button-remove-customer-${index}`}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleRemoveCustomer(index)}
-                      data-testid={`button-remove-customer-${index}`}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
                   </div>
                 ))}
               </div>
