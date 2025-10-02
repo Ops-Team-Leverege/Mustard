@@ -6,6 +6,7 @@ import {
   insertTranscriptSchema,
   insertCategorySchema,
   insertCompanySchema,
+  insertContactSchema,
   type ProductInsightWithCategory,
 } from "@shared/schema";
 import { z } from "zod";
@@ -580,6 +581,72 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!success) {
         res.status(404).json({ error: "Company not found" });
+        return;
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Contacts
+  app.get("/api/contacts/company/:companyId", async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const contacts = await storage.getContactsByCompany(companyId);
+      res.json(contacts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/contacts", async (req, res) => {
+    try {
+      const data = insertContactSchema.parse(req.body);
+      const contact = await storage.createContact(data);
+      res.json(contact);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Unknown error occurred" });
+      }
+    }
+  });
+
+  app.patch("/api/contacts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, jobTitle } = req.body;
+      
+      if (!name) {
+        res.status(400).json({ error: "Name is required" });
+        return;
+      }
+      
+      const contact = await storage.updateContact(id, name, jobTitle);
+      
+      if (!contact) {
+        res.status(404).json({ error: "Contact not found" });
+        return;
+      }
+      
+      res.json(contact);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/contacts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteContact(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "Contact not found" });
         return;
       }
       
