@@ -26,7 +26,7 @@ const tabs = [
   { id: 'insights', label: 'Product Insights', path: '/insights' },
   { id: 'qa', label: 'Q&A Database', path: '/qa' },
   { id: 'companies', label: 'Companies', path: '/companies' },
-  { id: 'categories', label: 'Manage Categories', path: '/categories' },
+  { id: 'categories', label: 'Categories', path: '/categories' },
 ];
 
 function Router() {
