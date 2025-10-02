@@ -27,6 +27,9 @@ export default function CategoryAnalytics({ categories }: CategoryAnalyticsProps
     .sort((a, b) => b.qaCount - a.qaCount)
     .slice(0, 5);
   
+  const mostPopularCategory = [...categories]
+    .sort((a, b) => (b.usageCount + b.qaCount) - (a.usageCount + a.qaCount))[0];
+  
   const maxInsightUsage = topCategoriesByInsight[0]?.usageCount || 1;
   const maxQAUsage = topCategoriesByQA[0]?.qaCount || 1;
 
@@ -66,10 +69,10 @@ export default function CategoryAnalytics({ categories }: CategoryAnalyticsProps
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold truncate" data-testid="text-top-category">
-              {topCategoriesByInsight[0]?.name || 'N/A'}
+              {mostPopularCategory?.name || 'N/A'}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {topCategoriesByInsight[0]?.usageCount || 0} insights
+              {mostPopularCategory ? `${mostPopularCategory.usageCount + mostPopularCategory.qaCount} total (${mostPopularCategory.usageCount} insights, ${mostPopularCategory.qaCount} Q&As)` : '0 total'}
             </p>
           </CardContent>
         </Card>
