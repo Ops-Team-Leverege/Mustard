@@ -65,9 +65,18 @@ export const qaPairs = pgTable("qa_pairs", {
   categoryId: varchar("category_id"),
 });
 
+const customerSchema = z.object({
+  name: z.string().min(1, "Customer name is required"),
+  jobTitle: z.string().optional(),
+});
+
 export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
   createdAt: true,
+  customerNames: true,
+}).extend({
+  customerNames: z.string().min(1, "At least one customer is required"),
+  customers: z.array(customerSchema).min(1, "At least one customer is required"),
 });
 
 export const insertProductInsightSchema = createInsertSchema(productInsights).omit({

@@ -22,7 +22,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transcripts
   app.post("/api/transcripts", async (req, res) => {
     try {
-      const data = insertTranscriptSchema.parse(req.body);
+      const validatedData = insertTranscriptSchema.parse(req.body);
+      const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; jobTitle?: string }> };
       
       // Find or create company
       const slug = generateSlug(data.companyName);
@@ -79,11 +80,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           companyId: company.id,
         }))
       );
+
+      // Create contact records from validated customers array if provided
+      const contacts = [];
+      if (data.customers && Array.isArray(data.customers)) {
+        for (const customer of data.customers) {
+          const contact = await storage.createContact({
+            name: customer.name,
+            jobTitle: customer.jobTitle || null,
+            companyId: company.id,
+          });
+          contacts.push(contact);
+        }
+      }
       
       res.json({
         transcript,
         insights,
         qaPairs,
+        contacts,
         company: {
           id: company.id,
           name: company.name,

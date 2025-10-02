@@ -196,3 +196,14 @@ Preferred communication style: Simple, everyday language.
   - CompanyOverview type extended with contacts array
   - Fetched and displayed alongside company details, insights, and Q&A pairs
   - Real-time cache invalidation after contact mutations
+
+### Improved Transcript Form - Customer Input
+- **Dynamic Customer List**: Redesigned customer input in Add Transcript form
+  - Add customers one by one with name and job title together (no more comma-separated lists)
+  - Name and job title fields side by side with "Add" button
+  - Press Enter in either field to add customer quickly
+  - Visual list shows all added customers with avatar icons
+  - Remove button for each customer
+  - Job title is optional per customer
+  - Backend automatically creates contact records for each customer when transcript is submitted
+  - Maintains backward compatibility by generating comma-separated customerNames string

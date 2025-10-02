@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Plus, X, User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface TranscriptFormProps {
@@ -11,11 +11,17 @@ interface TranscriptFormProps {
   isAnalyzing?: boolean;
 }
 
+export interface Customer {
+  name: string;
+  jobTitle: string;
+}
+
 export interface TranscriptData {
   companyName: string;
   transcript: string;
   leverageTeam: string;
   customerNames: string;
+  customers?: Customer[];
   companyDescription?: string;
   numberOfStores?: string;
   contactJobTitle?: string;
@@ -34,10 +40,33 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     mainInterestAreas: '',
   });
 
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', jobTitle: '' });
+
+  const handleAddCustomer = () => {
+    if (!newCustomer.name.trim()) return;
+    setCustomers([...customers, newCustomer]);
+    setNewCustomer({ name: '', jobTitle: '' });
+  };
+
+  const handleRemoveCustomer = (index: number) => {
+    setCustomers(customers.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Transcript submitted:', formData);
-    onSubmit?.(formData);
+    
+    // Convert customers array to comma-separated names for backward compatibility
+    const customerNames = customers.map(c => c.name).join(', ');
+    
+    const submissionData = {
+      ...formData,
+      customerNames,
+      customers,
+    };
+    
+    console.log('Transcript submitted:', submissionData);
+    onSubmit?.(submissionData);
   };
 
   return (
@@ -90,30 +119,94 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="customerNames" data-testid="label-customer-names">Customer Names</Label>
-            <Input
-              id="customerNames"
-              data-testid="input-customer-names"
-              placeholder="e.g., Mike Chen, Lisa Anderson"
-              value={formData.customerNames}
-              onChange={(e) => setFormData({ ...formData, customerNames: e.target.value })}
-              required
-            />
-            <p className="text-xs text-muted-foreground">
-              Comma-separated list of customer attendees
-            </p>
-          </div>
+          <div className="space-y-3">
+            <Label data-testid="label-customers">Customer Attendees</Label>
+            
+            <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,auto] gap-3 items-end">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Name</label>
+                  <Input
+                    value={newCustomer.name}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                    placeholder="e.g., Mike Chen"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomer();
+                      }
+                    }}
+                    data-testid="input-new-customer-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Job Title (optional)</label>
+                  <Input
+                    value={newCustomer.jobTitle}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, jobTitle: e.target.value })}
+                    placeholder="e.g., VP of Operations"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomer();
+                      }
+                    }}
+                    data-testid="input-new-customer-job-title"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddCustomer}
+                  disabled={!newCustomer.name.trim()}
+                  data-testid="button-add-customer"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add
+                </Button>
+              </div>
+            </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contactJobTitle" data-testid="label-customer-job-title">Customer Job Title</Label>
-            <Input
-              id="contactJobTitle"
-              data-testid="input-customer-job-title"
-              placeholder="e.g., VP of Operations, CTO"
-              value={formData.contactJobTitle}
-              onChange={(e) => setFormData({ ...formData, contactJobTitle: e.target.value })}
-            />
+            {customers.length > 0 ? (
+              <div className="space-y-2">
+                {customers.map((customer, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between gap-3 p-3 border rounded-md bg-background"
+                    data-testid={`customer-item-${index}`}
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <User className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate" data-testid={`customer-name-${index}`}>
+                          {customer.name}
+                        </p>
+                        {customer.jobTitle && (
+                          <p className="text-sm text-muted-foreground truncate" data-testid={`customer-job-title-${index}`}>
+                            {customer.jobTitle}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleRemoveCustomer(index)}
+                      data-testid={`button-remove-customer-${index}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Add customers who attended this call
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -154,7 +247,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           <Button
             type="submit"
             className="w-full"
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || customers.length === 0}
             data-testid="button-analyze-transcript"
           >
             {isAnalyzing ? (
