@@ -56,6 +56,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: company.id,
       });
       
+      // Create contact records first from validated customers array
+      const contacts = [];
+      if (data.customers && Array.isArray(data.customers)) {
+        for (const customer of data.customers) {
+          const contact = await storage.createContact({
+            name: customer.name,
+            jobTitle: customer.jobTitle || null,
+            companyId: company.id,
+          });
+          contacts.push(contact);
+        }
+      }
+
+      // Get all existing contacts for this company to match with Q&A askers
+      const allContacts = await storage.getContactsByCompany(company.id);
+      
       // Save insights with companyId
       const insights = await storage.createProductInsights(
         analysis.insights.map(insight => ({
@@ -69,30 +85,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }))
       );
       
-      // Save Q&A pairs with companyId
+      // Save Q&A pairs with companyId and matched contactId
       const qaPairs = await storage.createQAPairs(
-        analysis.qaPairs.map(qa => ({
-          transcriptId: transcript.id,
-          question: qa.question,
-          answer: qa.answer,
-          asker: qa.asker,
-          company: data.companyName,
-          companyId: company.id,
-        }))
-      );
-
-      // Create contact records from validated customers array if provided
-      const contacts = [];
-      if (data.customers && Array.isArray(data.customers)) {
-        for (const customer of data.customers) {
-          const contact = await storage.createContact({
-            name: customer.name,
-            jobTitle: customer.jobTitle || null,
+        analysis.qaPairs.map(qa => {
+          // Try to match asker name to a contact (case-insensitive)
+          const matchedContact = allContacts.find(
+            contact => contact.name.toLowerCase().trim() === qa.asker.toLowerCase().trim()
+          );
+          
+          return {
+            transcriptId: transcript.id,
+            question: qa.question,
+            answer: qa.answer,
+            asker: qa.asker,
+            contactId: matchedContact?.id || null,
+            company: data.companyName,
             companyId: company.id,
-          });
-          contacts.push(contact);
-        }
-      }
+          };
+        })
+      );
       
       res.json({
         transcript,
