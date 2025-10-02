@@ -1,8 +1,8 @@
-# BD Transcript Analyzer
+# PitCrew Customer Transcript Analyzer
 
 ## Overview
 
-BD Transcript Analyzer is a SaaS application for analyzing Business Development call transcripts using AI. The application extracts product insights and customer Q&A pairs from transcripts, organizing them into searchable, categorized tables. Built with a modern tech stack, it features AI-powered analysis via OpenAI's GPT-5, real-time categorization, and a polished dark-mode-first interface.
+PitCrew Customer Transcript Analyzer is a SaaS application for analyzing Business Development call transcripts using AI. The application extracts product insights and customer Q&A pairs from transcripts, organizing them into searchable, categorized tables. Built with a modern tech stack, it features AI-powered analysis via OpenAI's GPT-5, real-time categorization, and a polished dark-mode-first interface.
 
 ## User Preferences
 

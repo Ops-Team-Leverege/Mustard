@@ -16,7 +16,7 @@ export default function TabNavigation({ tabs }: TabNavigationProps) {
 
   return (
     <div className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="flex items-center h-14 px-6">
+      <div className="flex items-center justify-center h-14 px-6">
         <nav className="flex gap-1">
           {tabs.map((tab) => {
             const isActive = location === tab.path;
