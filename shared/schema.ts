@@ -32,6 +32,7 @@ export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id").notNull(),
   name: text("name").notNull(),
+  nameInTranscript: text("name_in_transcript"),
   jobTitle: text("job_title"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

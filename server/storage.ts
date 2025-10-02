@@ -78,7 +78,7 @@ export interface IStorage {
   // Contacts
   getContactsByCompany(companyId: string): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
-  updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined>;
+  updateContact(id: string, name: string, nameInTranscript?: string | null, jobTitle?: string | null): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<boolean>;
 
   // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
@@ -604,6 +604,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const contact: Contact = {
       ...insertContact,
+      nameInTranscript: insertContact.nameInTranscript ?? null,
       jobTitle: insertContact.jobTitle ?? null,
       id,
       createdAt: new Date(),
@@ -612,11 +613,16 @@ export class MemStorage implements IStorage {
     return contact;
   }
 
-  async updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined> {
+  async updateContact(id: string, name: string, nameInTranscript?: string | null, jobTitle?: string | null): Promise<Contact | undefined> {
     const contact = this.contacts.get(id);
     if (!contact) return undefined;
 
-    const updated = { ...contact, name, jobTitle: jobTitle ?? null };
+    const updated = { 
+      ...contact, 
+      name, 
+      nameInTranscript: nameInTranscript !== undefined ? (nameInTranscript ?? null) : contact.nameInTranscript,
+      jobTitle: jobTitle !== undefined ? (jobTitle ?? null) : contact.jobTitle
+    };
     this.contacts.set(id, updated);
     return updated;
   }
@@ -1164,10 +1170,14 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateContact(id: string, name: string, jobTitle?: string | null): Promise<Contact | undefined> {
+  async updateContact(id: string, name: string, nameInTranscript?: string | null, jobTitle?: string | null): Promise<Contact | undefined> {
     const results = await this.db
       .update(contactsTable)
-      .set({ name, jobTitle: jobTitle ?? null })
+      .set({ 
+        name, 
+        nameInTranscript: nameInTranscript !== undefined ? (nameInTranscript ?? null) : undefined,
+        jobTitle: jobTitle !== undefined ? (jobTitle ?? null) : undefined
+      })
       .where(eq(contactsTable.id, id))
       .returning();
     return results[0];
