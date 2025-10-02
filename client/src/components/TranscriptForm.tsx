@@ -3,8 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Sparkles, Loader2, Plus, X, User } from "lucide-react";
+import { Sparkles, Loader2, Plus, X, User, Check, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { Company } from "@shared/schema";
+import { cn } from "@/lib/utils";
 
 interface TranscriptFormProps {
   onSubmit?: (data: TranscriptData) => void;
@@ -42,6 +47,11 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
 
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', jobTitle: '' });
+  const [companySearchOpen, setCompanySearchOpen] = useState(false);
+
+  const { data: companies = [] } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+  });
 
   const handleAddCustomer = () => {
     if (!newCustomer.name.trim()) return;
@@ -80,15 +90,60 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="companyName" data-testid="label-company-name">Company Name</Label>
-            <Input
-              id="companyName"
-              data-testid="input-company-name"
-              placeholder="e.g., Acme Corporation"
-              value={formData.companyName}
-              onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-              required
-            />
+            <Label data-testid="label-company-name">Company Name</Label>
+            <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={companySearchOpen}
+                  className="w-full justify-between"
+                  data-testid="button-company-selector"
+                >
+                  {formData.companyName || "Select or enter company name..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search or type new company..." 
+                    value={formData.companyName}
+                    onValueChange={(value) => setFormData({ ...formData, companyName: value })}
+                    data-testid="input-company-search"
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      Press Enter to use "{formData.companyName}"
+                    </CommandEmpty>
+                    <CommandGroup>
+                      {companies.map((company) => (
+                        <CommandItem
+                          key={company.id}
+                          value={company.name}
+                          onSelect={() => {
+                            setFormData({ ...formData, companyName: company.name });
+                            setCompanySearchOpen(false);
+                          }}
+                          data-testid={`option-company-${company.id}`}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.companyName === company.name ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {company.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <p className="text-xs text-muted-foreground">
+              Select an existing company or type a new one
+            </p>
           </div>
 
           <div className="space-y-2">
