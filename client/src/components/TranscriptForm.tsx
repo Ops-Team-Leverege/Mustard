@@ -18,6 +18,7 @@ interface TranscriptFormProps {
 
 export interface Customer {
   name: string;
+  nameInTranscript?: string;
   jobTitle: string;
 }
 
@@ -46,7 +47,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   });
 
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', jobTitle: '' });
+  const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', nameInTranscript: '', jobTitle: '' });
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
 
   const { data: companies = [] } = useQuery<Company[]>({
@@ -56,7 +57,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const handleAddCustomer = () => {
     if (!newCustomer.name.trim()) return;
     setCustomers([...customers, newCustomer]);
-    setNewCustomer({ name: '', jobTitle: '' });
+    setNewCustomer({ name: '', nameInTranscript: '', jobTitle: '' });
   };
 
   const handleRemoveCustomer = (index: number) => {
@@ -194,7 +195,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             <Label data-testid="label-customers">Customer Attendees</Label>
             
             <div className="border rounded-md p-4 space-y-3 bg-muted/30">
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,auto] gap-3 items-end">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,1fr,auto] gap-3 items-end">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Name</label>
                   <Input
@@ -208,6 +209,21 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                       }
                     }}
                     data-testid="input-new-customer-name"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Name in Transcript (optional)</label>
+                  <Input
+                    value={newCustomer.nameInTranscript}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, nameInTranscript: e.target.value })}
+                    placeholder="e.g., Mike"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddCustomer();
+                      }
+                    }}
+                    data-testid="input-new-customer-name-in-transcript"
                   />
                 </div>
                 <div>
@@ -254,6 +270,11 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                         <p className="font-medium truncate" data-testid={`customer-name-${index}`}>
                           {customer.name}
                         </p>
+                        {customer.nameInTranscript && (
+                          <p className="text-sm text-muted-foreground truncate" data-testid={`customer-name-in-transcript-${index}`}>
+                            In transcript: {customer.nameInTranscript}
+                          </p>
+                        )}
                         {customer.jobTitle && (
                           <p className="text-sm text-muted-foreground truncate" data-testid={`customer-job-title-${index}`}>
                             {customer.jobTitle}

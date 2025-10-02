@@ -209,13 +209,14 @@ Preferred communication style: Simple, everyday language.
 
 ### Improved Transcript Form - Customer Input
 - **Dynamic Customer List**: Redesigned customer input in Add Transcript form
-  - Add customers one by one with name and job title together (no more comma-separated lists)
-  - Name and job title fields side by side with "Add" button
-  - Press Enter in either field to add customer quickly
+  - Add customers one by one with name, name in transcript, and job title (no more comma-separated lists)
+  - Three fields in grid layout: Name, Name in Transcript (optional), and Job Title (optional)
+  - Name in Transcript field allows specifying how customer appears in transcript (e.g., "Mike" for "Michael Chen")
+  - Press Enter in any field to add customer quickly
   - Visual list shows all added customers with avatar icons
+  - Customer list displays nameInTranscript when provided: "In transcript: {nameInTranscript}"
   - Remove button for each customer
-  - Job title is optional per customer
-  - Backend automatically creates contact records for each customer when transcript is submitted
+  - Backend automatically creates contact records with nameInTranscript for each customer when transcript is submitted
   - Maintains backward compatibility by generating comma-separated customerNames string
 
 ### Q&A Pairs Contact Linkage

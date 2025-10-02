@@ -57,7 +57,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/transcripts", isAuthenticated, async (req, res) => {
     try {
       const validatedData = insertTranscriptSchema.parse(req.body);
-      const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; jobTitle?: string }> };
+      const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; nameInTranscript?: string; jobTitle?: string }> };
       
       // Find or create company
       const slug = generateSlug(data.companyName);
@@ -96,6 +96,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         for (const customer of data.customers) {
           const contact = await storage.createContact({
             name: customer.name,
+            nameInTranscript: customer.nameInTranscript || null,
             jobTitle: customer.jobTitle || null,
             companyId: company.id,
           });
