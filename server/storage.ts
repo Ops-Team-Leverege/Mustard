@@ -127,6 +127,11 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const transcript: Transcript = {
       ...insertTranscript,
+      companyId: insertTranscript.companyId ?? null,
+      companyDescription: insertTranscript.companyDescription ?? null,
+      numberOfStores: insertTranscript.numberOfStores ?? null,
+      contactJobTitle: insertTranscript.contactJobTitle ?? null,
+      mainInterestAreas: insertTranscript.mainInterestAreas ?? null,
       id,
       createdAt: new Date(),
     };
@@ -175,6 +180,8 @@ export class MemStorage implements IStorage {
       ...insertInsight,
       transcriptId: insertInsight.transcriptId ?? null,
       categoryId: insertInsight.categoryId ?? null,
+      companyId: insertInsight.companyId ?? null,
+      createdAt: new Date(),
       id,
     };
     this.productInsights.set(id, insight);
@@ -199,6 +206,8 @@ export class MemStorage implements IStorage {
         ...insertInsight,
         transcriptId: insertInsight.transcriptId ?? null,
         categoryId: insertInsight.categoryId ?? null,
+        companyId: insertInsight.companyId ?? null,
+        createdAt: new Date(),
         id,
       };
       this.productInsights.set(id, insight);
@@ -289,6 +298,10 @@ export class MemStorage implements IStorage {
     const qaPair: QAPair = {
       ...insertQAPair,
       transcriptId: insertQAPair.transcriptId ?? null,
+      companyId: insertQAPair.companyId ?? null,
+      categoryId: insertQAPair.categoryId ?? null,
+      contactId: insertQAPair.contactId ?? null,
+      createdAt: new Date(),
       id,
     };
     this.qaPairs.set(id, qaPair);
@@ -309,6 +322,10 @@ export class MemStorage implements IStorage {
       const qaPair: QAPair = {
         ...insertQAPair,
         transcriptId: insertQAPair.transcriptId ?? null,
+        companyId: insertQAPair.companyId ?? null,
+        categoryId: insertQAPair.categoryId ?? null,
+        contactId: insertQAPair.contactId ?? null,
+        createdAt: new Date(),
         id,
       };
       this.qaPairs.set(id, qaPair);
@@ -466,6 +483,9 @@ export class MemStorage implements IStorage {
     const company: Company = {
       ...insertCompany,
       notes: insertCompany.notes ?? null,
+      companyDescription: insertCompany.companyDescription ?? null,
+      mainInterestAreas: insertCompany.mainInterestAreas ?? null,
+      numberOfStores: insertCompany.numberOfStores ?? null,
       id,
       createdAt: new Date(),
     };
@@ -638,6 +658,8 @@ export class DbStorage implements IStorage {
         company: productInsightsTable.company,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        companyId: productInsightsTable.companyId,
+        createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id));
@@ -659,6 +681,8 @@ export class DbStorage implements IStorage {
         company: productInsightsTable.company,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        companyId: productInsightsTable.companyId,
+        createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
@@ -681,6 +705,8 @@ export class DbStorage implements IStorage {
         company: productInsightsTable.company,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        companyId: productInsightsTable.companyId,
+        createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
@@ -761,6 +787,7 @@ export class DbStorage implements IStorage {
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
@@ -843,6 +870,7 @@ export class DbStorage implements IStorage {
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
@@ -985,6 +1013,7 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
@@ -1007,6 +1036,7 @@ export class DbStorage implements IStorage {
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
@@ -1090,6 +1120,7 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         categoryId: productInsightsTable.categoryId,
         categoryName: categoriesTable.name,
+        createdAt: productInsightsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
@@ -1110,6 +1141,7 @@ export class DbStorage implements IStorage {
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))

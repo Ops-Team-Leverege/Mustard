@@ -33,6 +33,7 @@ export interface QAPair {
   companyId: string;
   categoryId?: string | null;
   categoryName?: string | null;
+  createdAt?: Date | string | null;
 }
 
 export interface Category {
@@ -294,13 +295,14 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               <TableHead className="min-w-[150px]">Asked By</TableHead>
               <TableHead className="min-w-[150px]">Company</TableHead>
               <TableHead className="min-w-[120px]">Category</TableHead>
+              <TableHead className="min-w-[150px]">Created On</TableHead>
               <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedQAPairs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {filteredQAPairs.length === 0 ? 'No Q&A pairs found' : 'No Q&A pairs on this page'}
                 </TableCell>
               </TableRow>
@@ -356,6 +358,9 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                         NEW
                       </Badge>
                     )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${qa.id}`}>
+                    {qa.createdAt ? new Date(qa.createdAt).toLocaleString() : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

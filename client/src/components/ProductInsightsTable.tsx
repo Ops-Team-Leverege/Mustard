@@ -29,6 +29,7 @@ export interface ProductInsight {
   company: string;
   category: string;
   categoryId?: string | null;
+  createdAt?: Date | string | null;
 }
 
 export interface Category {
@@ -268,13 +269,14 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
               <TableHead className="min-w-[250px]">Customer Quote</TableHead>
               <TableHead className="min-w-[150px]">Company</TableHead>
               <TableHead className="min-w-[120px]">Category</TableHead>
+              <TableHead className="min-w-[150px]">Created On</TableHead>
               <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedInsights.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {filteredInsights.length === 0 ? 'No insights found' : 'No insights on this page'}
                 </TableCell>
               </TableRow>
@@ -323,6 +325,9 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                         {insight.category}
                       </Badge>
                     )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${insight.id}`}>
+                    {insight.createdAt ? new Date(insight.createdAt).toLocaleString() : '-'}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

@@ -216,3 +216,10 @@ Preferred communication style: Simple, everyday language.
   - Backward Compatibility: asker field retained as fallback when no contact match exists
   - API Support: POST and PATCH endpoints accept optional contactId parameter
   - Smart Workflow: Contacts created first from transcript customers, then matched to Q&A askers
+
+### Timestamp Tracking
+- **Created On Column**: Both product insights and Q&A pairs tables now display creation timestamps
+  - Database: Added createdAt timestamp fields to productInsights and qaPairs tables with defaultNow()
+  - Frontend: New "Created On" column displays timestamps in browser's local timezone
+  - Backend: All database queries updated to select and return createdAt field
+  - Format: Timestamps displayed using browser's toLocaleString() for automatic timezone conversion
