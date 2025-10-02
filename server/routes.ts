@@ -332,14 +332,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/qa-pairs/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { question, answer, asker } = req.body;
+      const { question, answer, asker, contactId } = req.body;
       
       if (!question || !answer || !asker) {
         res.status(400).json({ error: "Question, answer, and asker are required" });
         return;
       }
       
-      const qaPair = await storage.updateQAPair(id, question, answer, asker);
+      const qaPair = await storage.updateQAPair(id, question, answer, asker, contactId);
       
       if (!qaPair) {
         res.status(404).json({ error: "Q&A pair not found" });
@@ -370,7 +370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/qa-pairs", async (req, res) => {
     try {
-      const { question, answer, asker, company, categoryId } = req.body;
+      const { question, answer, asker, company, categoryId, contactId } = req.body;
       
       if (!question || !answer || !asker || !company) {
         res.status(400).json({ error: "Question, answer, asker, and company are required" });
@@ -394,6 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         question,
         answer,
         asker,
+        contactId: contactId || null,
         company,
         companyId: companyRecord.id,
         categoryId: categoryId || null,
