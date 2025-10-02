@@ -30,11 +30,14 @@ const tabs = [
 ];
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, error } = useAuth();
+  
+  const isDomainRestricted = error && 
+    (String(error).includes('403') || String(error).includes('DOMAIN_RESTRICTED'));
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated ? (
+      {isLoading || !isAuthenticated || isDomainRestricted ? (
         <Route path="/" component={Landing} />
       ) : (
         <>
@@ -62,6 +65,9 @@ function AuthenticatedApp() {
       
       if (errorMessage.includes('403') || errorMessage.includes('DOMAIN_RESTRICTED')) {
         hasShownError.current = true;
+        
+        queryClient.clear();
+        
         toast({
           title: "Access Denied",
           description: "Only leverege.com email addresses are allowed to access this application.",
