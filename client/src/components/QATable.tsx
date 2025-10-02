@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -63,6 +63,8 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [sortColumn, setSortColumn] = useState<'category' | 'createdAt'>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
 
   const { data: contacts = [] } = useQuery<Contact[]>({
@@ -224,7 +226,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
     return matchesSearch && matchesCategory;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredQAPairs.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sortedQAPairs.length / pageSize));
   
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -234,7 +236,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
 
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedQAPairs = filteredQAPairs.slice(startIndex, endIndex);
+  const paginatedQAPairs = sortedQAPairs.slice(startIndex, endIndex);
 
   const handlePageSizeChange = (value: string) => {
     setPageSize(Number(value));
@@ -250,6 +252,29 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
     setCategoryFilter(value);
     setCurrentPage(1);
   };
+
+  const handleSort = (column: 'category' | 'createdAt') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedQAPairs = [...filteredQAPairs].sort((a, b) => {
+    if (sortColumn === 'category') {
+      const aVal = a.categoryName || '';
+      const bVal = b.categoryName || '';
+      const comparison = aVal.localeCompare(bVal);
+      return sortDirection === 'asc' ? comparison : -comparison;
+    } else if (sortColumn === 'createdAt') {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+    }
+    return 0;
+  });
 
   return (
     <div className="space-y-4">
@@ -294,8 +319,34 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               <TableHead className="min-w-[250px]">Answer</TableHead>
               <TableHead className="min-w-[150px]">Asked By</TableHead>
               <TableHead className="min-w-[150px]">Company</TableHead>
-              <TableHead className="min-w-[120px]">Category</TableHead>
-              <TableHead className="min-w-[150px]">Created On</TableHead>
+              <TableHead className="min-w-[120px]">
+                <button 
+                  onClick={() => handleSort('category')} 
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  data-testid="button-sort-category-qa"
+                >
+                  Category
+                  {sortColumn === 'category' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50" />
+                  )}
+                </button>
+              </TableHead>
+              <TableHead className="min-w-[150px]">
+                <button 
+                  onClick={() => handleSort('createdAt')} 
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  data-testid="button-sort-created-qa"
+                >
+                  Created On
+                  {sortColumn === 'createdAt' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50" />
+                  )}
+                </button>
+              </TableHead>
               <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
