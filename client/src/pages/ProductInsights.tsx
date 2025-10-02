@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
+import KeywordBubble from "@/components/KeywordBubble";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { useLocation } from "wouter";
@@ -46,6 +47,10 @@ export default function ProductInsights() {
           <Plus className="w-4 h-4 mr-2" />
           Add Transcript
         </Button>
+      </div>
+
+      <div className="mb-6">
+        <KeywordBubble />
       </div>
 
       {isLoading ? (
