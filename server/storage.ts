@@ -42,7 +42,7 @@ export interface IStorage {
   getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]>;
   createProductInsight(insight: InsertProductInsight): Promise<ProductInsight>;
   createProductInsights(insights: InsertProductInsight[]): Promise<ProductInsight[]>;
-  updateProductInsight(id: string, feature: string, context: string, quote: string): Promise<ProductInsight | undefined>;
+  updateProductInsight(id: string, feature: string, context: string, quote: string, company: string): Promise<ProductInsight | undefined>;
   deleteProductInsight(id: string): Promise<boolean>;
   assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
@@ -52,7 +52,7 @@ export interface IStorage {
   getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
-  updateQAPair(id: string, question: string, answer: string, asker: string, contactId?: string | null): Promise<QAPair | undefined>;
+  updateQAPair(id: string, question: string, answer: string, asker: string, company: string, contactId?: string | null): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
   getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
@@ -225,7 +225,7 @@ export class MemStorage implements IStorage {
     return insights;
   }
 
-  async updateProductInsight(id: string, feature: string, context: string, quote: string): Promise<ProductInsight | undefined> {
+  async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string): Promise<ProductInsight | undefined> {
     const insight = this.productInsights.get(id);
     if (!insight) return undefined;
     
@@ -234,6 +234,7 @@ export class MemStorage implements IStorage {
       feature,
       context,
       quote,
+      company,
     };
     this.productInsights.set(id, updated);
     return updated;
@@ -343,7 +344,7 @@ export class MemStorage implements IStorage {
     return qaPairs;
   }
 
-  async updateQAPair(id: string, question: string, answer: string, asker: string, contactId?: string | null): Promise<QAPair | undefined> {
+  async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, contactId?: string | null): Promise<QAPair | undefined> {
     const qaPair = this.qaPairs.get(id);
     if (!qaPair) return undefined;
     
@@ -352,6 +353,7 @@ export class MemStorage implements IStorage {
       question,
       answer,
       asker,
+      company,
       contactId: contactId !== undefined ? contactId : qaPair.contactId,
     };
     this.qaPairs.set(id, updated);
@@ -541,7 +543,7 @@ export class MemStorage implements IStorage {
         const enriched = this.enrichInsightWithCategory(i);
         return {
           ...enriched,
-          company: enriched.company || company.name,
+          company: enriched.company?.trim() || company.name,
         };
       });
 
@@ -555,7 +557,7 @@ export class MemStorage implements IStorage {
         const enriched = this.enrichQAPairWithCategory(qa);
         return {
           ...enriched,
-          company: enriched.company || company.name,
+          company: enriched.company?.trim() || company.name,
         };
       });
 
@@ -779,10 +781,10 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateProductInsight(id: string, feature: string, context: string, quote: string): Promise<ProductInsight | undefined> {
+  async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string): Promise<ProductInsight | undefined> {
     const results = await this.db
       .update(productInsightsTable)
-      .set({ feature, context, quote })
+      .set({ feature, context, quote, company })
       .where(eq(productInsightsTable.id, id))
       .returning();
     return results[0];
@@ -869,8 +871,8 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateQAPair(id: string, question: string, answer: string, asker: string, contactId?: string | null): Promise<QAPair | undefined> {
-    const updateData: Partial<QAPair> = { question, answer, asker };
+  async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, contactId?: string | null): Promise<QAPair | undefined> {
+    const updateData: Partial<QAPair> = { question, answer, asker, company };
     if (contactId !== undefined) {
       updateData.contactId = contactId;
     }
@@ -1102,12 +1104,12 @@ export class DbStorage implements IStorage {
       qaCount: qaPairs.length,
       insights: insights.map(i => ({
         ...i,
-        company: i.company || company.name,
+        company: i.company?.trim() || company.name,
         categoryName: i.categoryName || null,
       })),
       qaPairs: qaPairs.map(qa => ({
         ...qa,
-        company: qa.company || company.name,
+        company: qa.company?.trim() || company.name,
         categoryName: qa.categoryName || null,
         contactName: qa.contactName || null,
         contactJobTitle: qa.contactJobTitle || null,

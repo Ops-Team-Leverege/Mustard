@@ -48,6 +48,12 @@ export interface Contact {
   companyId: string;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface QATableProps {
   qaPairs: QAPair[];
   categories?: Category[];
@@ -58,7 +64,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
-  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null, contactId: null as string | null });
+  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', company: '', categoryId: null as string | null, contactId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null });
   const [currentPage, setCurrentPage] = useState(1);
@@ -66,6 +72,10 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   const [sortColumn, setSortColumn] = useState<'category' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
+
+  const { data: companies = [] } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+  });
 
   const { data: contacts = [] } = useQuery<Contact[]>({
     queryKey: ['/api/contacts/company', editingQA?.companyId],
@@ -100,9 +110,9 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, question, answer, asker, categoryId, contactId }: { id: string; question: string; answer: string; asker: string; categoryId: string | null; contactId?: string | null }) => {
+    mutationFn: async ({ id, question, answer, asker, company, categoryId, contactId }: { id: string; question: string; answer: string; asker: string; company: string; categoryId: string | null; contactId?: string | null }) => {
       // Update the Q&A pair
-      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, { question, answer, asker, contactId });
+      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, { question, answer, asker, company, contactId });
       if (!res.ok) {
         throw new Error('Failed to update Q&A pair');
       }
@@ -174,7 +184,8 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
     setEditForm({ 
       question: qa.question, 
       answer: qa.answer, 
-      asker: qa.asker, 
+      asker: qa.asker,
+      company: qa.company,
       categoryId: qa.categoryId ?? null, 
       contactId: qa.contactId ?? null 
     });
@@ -189,6 +200,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
         question: editForm.question,
         answer: editForm.answer,
         asker,
+        company: editForm.company,
         categoryId: editForm.categoryId,
         contactId: editForm.contactId
       });
@@ -535,6 +547,18 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               />
             </div>
             <div>
+              <Label htmlFor="edit-company-qa">Company</Label>
+              <Combobox
+                options={companies.map(comp => ({ value: comp.name, label: comp.name }))}
+                value={editForm.company}
+                onValueChange={(value) => setEditForm({ ...editForm, company: value })}
+                placeholder="Select company"
+                searchPlaceholder="Search companies..."
+                emptyText="No company found."
+                testId="select-edit-company-qa"
+              />
+            </div>
+            <div>
               <Label htmlFor="category">Category</Label>
               <Combobox
                 options={[
@@ -602,13 +626,15 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               />
             </div>
             <div>
-              <Label htmlFor="add-company">Company</Label>
-              <Input
-                id="add-company"
+              <Label htmlFor="add-company-qa">Company</Label>
+              <Combobox
+                options={companies.map(comp => ({ value: comp.name, label: comp.name }))}
                 value={addForm.company}
-                onChange={(e) => setAddForm({ ...addForm, company: e.target.value })}
-                placeholder="Company name"
-                data-testid="input-add-company"
+                onValueChange={(value) => setAddForm({ ...addForm, company: value })}
+                placeholder="Select company"
+                searchPlaceholder="Search companies..."
+                emptyText="No company found."
+                testId="select-add-company-qa"
               />
             </div>
             <div>

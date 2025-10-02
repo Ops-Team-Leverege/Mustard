@@ -234,14 +234,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/insights/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { feature, context, quote } = req.body;
+      const { feature, context, quote, company } = req.body;
       
-      if (!feature || !context || !quote) {
-        res.status(400).json({ error: "Feature, context, and quote are required" });
+      if (!feature || !context || !quote || !company) {
+        res.status(400).json({ error: "Feature, context, quote, and company are required" });
         return;
       }
       
-      const insight = await storage.updateProductInsight(id, feature, context, quote);
+      const insight = await storage.updateProductInsight(id, feature, context, quote, company);
       
       if (!insight) {
         res.status(404).json({ error: "Insight not found" });
@@ -366,14 +366,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/qa-pairs/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { question, answer, asker, contactId } = req.body;
+      const { question, answer, asker, company, contactId } = req.body;
       
-      if (!question || !answer || !asker) {
-        res.status(400).json({ error: "Question, answer, and asker are required" });
+      if (!question || !answer || !asker || !company) {
+        res.status(400).json({ error: "Question, answer, asker, and company are required" });
         return;
       }
       
-      const qaPair = await storage.updateQAPair(id, question, answer, asker, contactId);
+      const qaPair = await storage.updateQAPair(id, question, answer, asker, company, contactId);
       
       if (!qaPair) {
         res.status(404).json({ error: "Q&A pair not found" });

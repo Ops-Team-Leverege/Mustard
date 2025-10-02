@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,12 @@ export interface Category {
   name: string;
 }
 
+export interface Company {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 interface ProductInsightsTableProps {
   insights: ProductInsight[];
   categories?: Category[];
@@ -47,7 +53,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingInsight, setEditingInsight] = useState<ProductInsight | null>(null);
-  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', categoryId: null as string | null });
+  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', company: '', categoryId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,6 +61,10 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   const [sortColumn, setSortColumn] = useState<'category' | 'createdAt'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
+
+  const { data: companies = [] } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -85,9 +95,9 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, feature, context, quote, categoryId }: { id: string; feature: string; context: string; quote: string; categoryId: string | null }) => {
+    mutationFn: async ({ id, feature, context, quote, company, categoryId }: { id: string; feature: string; context: string; quote: string; company: string; categoryId: string | null }) => {
       // Update the insight
-      const res = await apiRequest('PATCH', `/api/insights/${id}`, { feature, context, quote });
+      const res = await apiRequest('PATCH', `/api/insights/${id}`, { feature, context, quote, company });
       if (!res.ok) {
         throw new Error('Failed to update insight');
       }
@@ -160,6 +170,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
       feature: insight.feature, 
       context: insight.context, 
       quote: insight.quote,
+      company: insight.company,
       categoryId: insight.categoryId || null
     });
   };
@@ -493,6 +504,18 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
               />
             </div>
             <div>
+              <Label htmlFor="edit-company">Company</Label>
+              <Combobox
+                options={companies.map(comp => ({ value: comp.name, label: comp.name }))}
+                value={editForm.company}
+                onValueChange={(value) => setEditForm({ ...editForm, company: value })}
+                placeholder="Select company"
+                searchPlaceholder="Search companies..."
+                emptyText="No company found."
+                testId="select-edit-company"
+              />
+            </div>
+            <div>
               <Label htmlFor="category">Category</Label>
               <Combobox
                 options={[
@@ -561,12 +584,14 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
             </div>
             <div>
               <Label htmlFor="add-company">Company</Label>
-              <Input
-                id="add-company"
+              <Combobox
+                options={companies.map(comp => ({ value: comp.name, label: comp.name }))}
                 value={addForm.company}
-                onChange={(e) => setAddForm({ ...addForm, company: e.target.value })}
-                placeholder="Company name"
-                data-testid="input-add-company"
+                onValueChange={(value) => setAddForm({ ...addForm, company: value })}
+                placeholder="Select company"
+                searchPlaceholder="Search companies..."
+                emptyText="No company found."
+                testId="select-add-company"
               />
             </div>
             <div>
