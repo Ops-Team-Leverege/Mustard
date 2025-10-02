@@ -52,6 +52,7 @@ export const productInsights = pgTable("product_insights", {
   company: text("company").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const qaPairs = pgTable("qa_pairs", {
@@ -64,6 +65,7 @@ export const qaPairs = pgTable("qa_pairs", {
   company: text("company").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 const customerSchema = z.object({
@@ -82,10 +84,12 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
 
 export const insertProductInsightSchema = createInsertSchema(productInsights).omit({
   id: true,
+  createdAt: true,
 });
 
 export const insertQAPairSchema = createInsertSchema(qaPairs).omit({
   id: true,
+  createdAt: true,
 });
 
 export const insertCategorySchema = createInsertSchema(categories).omit({
