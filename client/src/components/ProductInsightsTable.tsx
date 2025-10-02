@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -52,6 +52,8 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [sortColumn, setSortColumn] = useState<'category' | 'createdAt'>('createdAt');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
 
   const deleteMutation = useMutation({
@@ -198,7 +200,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     return matchesSearch && matchesCategory;
   });
 
-  const totalPages = Math.max(1, Math.ceil(filteredInsights.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sortedInsights.length / pageSize));
   
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -208,7 +210,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
 
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedInsights = filteredInsights.slice(startIndex, endIndex);
+  const paginatedInsights = sortedInsights.slice(startIndex, endIndex);
 
   const handlePageSizeChange = (value: string) => {
     setPageSize(Number(value));
@@ -224,6 +226,29 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     setCategoryFilter(value);
     setCurrentPage(1);
   };
+
+  const handleSort = (column: 'category' | 'createdAt') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedInsights = [...filteredInsights].sort((a, b) => {
+    if (sortColumn === 'category') {
+      const aVal = a.category || '';
+      const bVal = b.category || '';
+      const comparison = aVal.localeCompare(bVal);
+      return sortDirection === 'asc' ? comparison : -comparison;
+    } else if (sortColumn === 'createdAt') {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return sortDirection === 'asc' ? aDate - bDate : bDate - aDate;
+    }
+    return 0;
+  });
 
   return (
     <div className="space-y-4">
@@ -268,8 +293,34 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
               <TableHead className="min-w-[200px]">Context</TableHead>
               <TableHead className="min-w-[250px]">Customer Quote</TableHead>
               <TableHead className="min-w-[150px]">Company</TableHead>
-              <TableHead className="min-w-[120px]">Category</TableHead>
-              <TableHead className="min-w-[150px]">Created On</TableHead>
+              <TableHead className="min-w-[120px]">
+                <button 
+                  onClick={() => handleSort('category')} 
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  data-testid="button-sort-category"
+                >
+                  Category
+                  {sortColumn === 'category' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50" />
+                  )}
+                </button>
+              </TableHead>
+              <TableHead className="min-w-[150px]">
+                <button 
+                  onClick={() => handleSort('createdAt')} 
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  data-testid="button-sort-created"
+                >
+                  Created On
+                  {sortColumn === 'createdAt' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50" />
+                  )}
+                </button>
+              </TableHead>
               <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
