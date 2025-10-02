@@ -537,7 +537,13 @@ export class MemStorage implements IStorage {
         i.companyId === company.id || 
         i.company.toLowerCase() === company.name.toLowerCase()
       )
-      .map(i => this.enrichInsightWithCategory(i));
+      .map(i => {
+        const enriched = this.enrichInsightWithCategory(i);
+        return {
+          ...enriched,
+          company: enriched.company || company.name,
+        };
+      });
 
     // Get Q&A pairs - both by legacy company field and new companyId
     const qaPairs = Array.from(this.qaPairs.values())
@@ -545,7 +551,13 @@ export class MemStorage implements IStorage {
         qa.companyId === company.id || 
         qa.company.toLowerCase() === company.name.toLowerCase()
       )
-      .map(qa => this.enrichQAPairWithCategory(qa));
+      .map(qa => {
+        const enriched = this.enrichQAPairWithCategory(qa);
+        return {
+          ...enriched,
+          company: enriched.company || company.name,
+        };
+      });
 
     // Get contacts for this company
     const contacts = Array.from(this.contacts.values()).filter(
@@ -1090,10 +1102,12 @@ export class DbStorage implements IStorage {
       qaCount: qaPairs.length,
       insights: insights.map(i => ({
         ...i,
+        company: i.company || company.name,
         categoryName: i.categoryName || null,
       })),
       qaPairs: qaPairs.map(qa => ({
         ...qa,
+        company: qa.company || company.name,
         categoryName: qa.categoryName || null,
         contactName: qa.contactName || null,
         contactJobTitle: qa.contactJobTitle || null,

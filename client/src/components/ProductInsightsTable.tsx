@@ -225,6 +225,10 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedInsights = sortedInsights.slice(startIndex, endIndex);
+  
   const totalPages = Math.max(1, Math.ceil(sortedInsights.length / pageSize));
   
   useEffect(() => {
@@ -232,10 +236,6 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
-
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedInsights = sortedInsights.slice(startIndex, endIndex);
 
   const handlePageSizeChange = (value: string) => {
     setPageSize(Number(value));
