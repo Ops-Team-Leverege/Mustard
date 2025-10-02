@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -197,7 +197,14 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     return matchesSearch && matchesCategory;
   });
 
-  const totalPages = Math.ceil(filteredInsights.length / pageSize);
+  const totalPages = Math.max(1, Math.ceil(filteredInsights.length / pageSize));
+  
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
   const paginatedInsights = filteredInsights.slice(startIndex, endIndex);
