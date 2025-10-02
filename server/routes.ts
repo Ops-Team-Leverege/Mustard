@@ -199,29 +199,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/insights/keywords", isAuthenticated, async (_req, res) => {
-    try {
-      const insights = await storage.getProductInsights();
-      
-      const keywordFrequency = new Map<string, number>();
-      
-      insights.forEach(insight => {
-        const feature = insight.feature.trim();
-        if (feature) {
-          keywordFrequency.set(feature, (keywordFrequency.get(feature) || 0) + 1);
-        }
-      });
-      
-      const keywords = Array.from(keywordFrequency.entries())
-        .map(([text, count]) => ({ text, count }))
-        .sort((a, b) => b.count - a.count);
-      
-      res.json(keywords);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
   app.patch("/api/insights/:id/category", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
