@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
 import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,6 +30,7 @@ export interface QAPair {
   contactName?: string | null;
   contactJobTitle?: string | null;
   company: string;
+  companyId: string;
   categoryId?: string | null;
   categoryName?: string | null;
 }
@@ -37,6 +38,13 @@ export interface QAPair {
 export interface Category {
   id: string;
   name: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  jobTitle: string | null;
+  companyId: string;
 }
 
 interface QATableProps {
@@ -55,6 +63,11 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const { toast } = useToast();
+
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/contacts/company', editingQA?.companyId],
+    enabled: !!editingQA?.companyId,
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -160,7 +173,16 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
 
   const handleSaveEdit = () => {
     if (editingQA) {
-      editMutation.mutate({ id: editingQA.id, ...editForm });
+      const selectedContact = contacts.find(c => c.id === editForm.contactId);
+      const asker = selectedContact ? selectedContact.name : '';
+      editMutation.mutate({ 
+        id: editingQA.id, 
+        question: editForm.question,
+        answer: editForm.answer,
+        asker,
+        categoryId: editForm.categoryId,
+        contactId: editForm.contactId
+      });
     }
   };
 
@@ -431,12 +453,21 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               />
             </div>
             <div>
-              <Label htmlFor="asker">Asked By</Label>
-              <Input
-                id="asker"
-                value={editForm.asker}
-                onChange={(e) => setEditForm({ ...editForm, asker: e.target.value })}
-                data-testid="input-edit-asker"
+              <Label htmlFor="contact">Asked By</Label>
+              <Combobox
+                options={[
+                  { value: 'none', label: 'No contact' },
+                  ...contacts.map(contact => ({ 
+                    value: contact.id, 
+                    label: contact.jobTitle ? `${contact.name} (${contact.jobTitle})` : contact.name 
+                  }))
+                ]}
+                value={editForm.contactId || 'none'}
+                onValueChange={(value) => setEditForm({ ...editForm, contactId: value === 'none' ? null : value })}
+                placeholder="Select contact"
+                searchPlaceholder="Search contacts..."
+                emptyText="No contact found."
+                testId="select-edit-contact-qa"
               />
             </div>
             <div>
