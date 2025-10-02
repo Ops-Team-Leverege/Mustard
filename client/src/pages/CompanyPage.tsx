@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
@@ -17,6 +17,7 @@ import type { CompanyOverview, Contact } from "@shared/schema";
 export default function CompanyPage() {
   const params = useParams();
   const companySlug = params.slug;
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -158,6 +159,28 @@ export default function CompanyPage() {
       toast({
         title: "Error",
         description: "Failed to delete contact",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteCompanyMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/companies/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      toast({
+        title: "Success",
+        description: "Company deleted successfully",
+      });
+      navigate('/companies');
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete company",
         variant: "destructive",
       });
     },
