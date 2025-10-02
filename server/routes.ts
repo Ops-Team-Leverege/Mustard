@@ -123,9 +123,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qaPairs = await storage.createQAPairs(
         analysis.qaPairs.map(qa => {
           // Try to match asker name to a contact (case-insensitive)
-          const matchedContact = allContacts.find(
-            contact => contact.name.toLowerCase().trim() === qa.asker.toLowerCase().trim()
-          );
+          // Use nameInTranscript if available, otherwise use name
+          const matchedContact = allContacts.find(contact => {
+            const askerName = qa.asker.toLowerCase().trim();
+            const nameInTranscript = contact.nameInTranscript?.toLowerCase().trim();
+            const contactName = contact.name.toLowerCase().trim();
+            
+            // If nameInTranscript is provided, match against it; otherwise match against name
+            return nameInTranscript ? nameInTranscript === askerName : contactName === askerName;
+          });
           
           return {
             transcriptId: transcript.id,
@@ -707,14 +713,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/contacts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, jobTitle } = req.body;
+      const { name, nameInTranscript, jobTitle } = req.body;
       
       if (!name) {
         res.status(400).json({ error: "Name is required" });
         return;
       }
       
-      const contact = await storage.updateContact(id, name, jobTitle);
+      const contact = await storage.updateContact(id, name, nameInTranscript, jobTitle);
       
       if (!contact) {
         res.status(404).json({ error: "Contact not found" });
