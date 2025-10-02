@@ -29,30 +29,91 @@ const tabs = [
   { id: 'qa', label: 'Q&A Database', path: '/qa' },
 ];
 
+function ProtectedRoute({ 
+  component: Component, 
+  isAuthenticated, 
+  isLoading, 
+  isDomainRestricted 
+}: { 
+  component: any; 
+  isAuthenticated: boolean | null; 
+  isLoading: boolean; 
+  isDomainRestricted: boolean; 
+}) {
+  if (isLoading || !isAuthenticated || isDomainRestricted) {
+    return <Landing />;
+  }
+
+  return <Component />;
+}
+
 function Router() {
   const { isAuthenticated, isLoading, error } = useAuth();
   
-  const isDomainRestricted = error && 
-    (String(error).includes('403') || String(error).includes('DOMAIN_RESTRICTED'));
+  const isDomainRestricted = Boolean(error && 
+    (String(error).includes('403') || String(error).includes('DOMAIN_RESTRICTED')));
 
   return (
     <Switch>
-      {isLoading || !isAuthenticated || isDomainRestricted ? (
-        <>
-          <Route path="/" component={Landing} />
-          <Route path="/:rest*" component={Landing} />
-        </>
-      ) : (
-        <>
-          <Route path="/" component={TranscriptInput} />
-          <Route path="/insights" component={ProductInsights} />
-          <Route path="/qa" component={QADatabase} />
-          <Route path="/companies" component={Companies} />
-          <Route path="/companies/:slug" component={CompanyPage} />
-          <Route path="/categories" component={Categories} />
-          <Route path="/categories/:id" component={CategoryPage} />
-        </>
-      )}
+      <Route path="/">
+        <ProtectedRoute 
+          component={TranscriptInput} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/insights">
+        <ProtectedRoute 
+          component={ProductInsights} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/qa">
+        <ProtectedRoute 
+          component={QADatabase} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/companies">
+        <ProtectedRoute 
+          component={Companies} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/companies/:slug">
+        <ProtectedRoute 
+          component={CompanyPage} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/categories">
+        <ProtectedRoute 
+          component={Categories} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/categories/:id">
+        <ProtectedRoute 
+          component={CategoryPage} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route>
+        <Landing />
+      </Route>
     </Switch>
   );
 }
