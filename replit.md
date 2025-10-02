@@ -207,3 +207,12 @@ Preferred communication style: Simple, everyday language.
   - Job title is optional per customer
   - Backend automatically creates contact records for each customer when transcript is submitted
   - Maintains backward compatibility by generating comma-separated customerNames string
+
+### Q&A Pairs Contact Linkage
+- **Contact Integration**: Q&A pairs now linked to contacts table for richer customer data
+  - Schema: qaPairs table includes contactId foreign key to contacts
+  - Automatic Contact Matching: AI-extracted Q&A pairs automatically matched to contacts by name (case-insensitive)
+  - Display Enhancement: Q&A table shows contact name and job title when available
+  - Backward Compatibility: asker field retained as fallback when no contact match exists
+  - API Support: POST and PATCH endpoints accept optional contactId parameter
+  - Smart Workflow: Contacts created first from transcript customers, then matched to Q&A askers

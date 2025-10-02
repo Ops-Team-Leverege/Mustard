@@ -49,7 +49,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
-  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null });
+  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', categoryId: null as string | null, contactId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null });
   const [currentPage, setCurrentPage] = useState(1);
@@ -84,9 +84,9 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, question, answer, asker, categoryId }: { id: string; question: string; answer: string; asker: string; categoryId: string | null }) => {
+    mutationFn: async ({ id, question, answer, asker, categoryId, contactId }: { id: string; question: string; answer: string; asker: string; categoryId: string | null; contactId?: string | null }) => {
       // Update the Q&A pair
-      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, { question, answer, asker });
+      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, { question, answer, asker, contactId });
       if (!res.ok) {
         throw new Error('Failed to update Q&A pair');
       }
@@ -155,7 +155,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
 
   const handleEdit = (qa: QAPair) => {
     setEditingQA(qa);
-    setEditForm({ question: qa.question, answer: qa.answer, asker: qa.asker, categoryId: qa.categoryId || null });
+    setEditForm({ question: qa.question, answer: qa.answer, asker: qa.asker, categoryId: qa.categoryId || null, contactId: qa.contactId || null });
   };
 
   const handleSaveEdit = () => {
