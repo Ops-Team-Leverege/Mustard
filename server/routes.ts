@@ -29,6 +29,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      
+      // Email domain restriction: only allow leverege.com
+      if (!user?.email) {
+        return res.status(403).json({ 
+          message: "Email required. Only leverege.com email addresses are allowed.",
+          code: "DOMAIN_RESTRICTED"
+        });
+      }
+      
+      const emailDomain = user.email.split('@')[1]?.toLowerCase();
+      if (emailDomain !== 'leverege.com') {
+        return res.status(403).json({ 
+          message: "Access denied. Only leverege.com email addresses are allowed.",
+          code: "DOMAIN_RESTRICTED"
+        });
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
