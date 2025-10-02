@@ -38,7 +38,10 @@ function Router() {
   return (
     <Switch>
       {isLoading || !isAuthenticated || isDomainRestricted ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/:rest*" component={Landing} />
+        </>
       ) : (
         <>
           <Route path="/" component={TranscriptInput} />
