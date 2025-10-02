@@ -21,6 +21,7 @@ export default function CompanyPage() {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
+    name: '',
     companyDescription: '',
     mainInterestAreas: '',
     numberOfStores: '',
@@ -41,10 +42,10 @@ export default function CompanyPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { companyDescription: string; mainInterestAreas: string; numberOfStores: string }) => {
+    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string }) => {
       if (!overview?.company.id) throw new Error("Company not found");
       const res = await apiRequest('PATCH', `/api/companies/${overview.company.id}`, {
-        name: overview.company.name,
+        name: data.name,
         notes: overview.company.notes,
         companyDescription: data.companyDescription,
         mainInterestAreas: data.mainInterestAreas,
@@ -211,6 +212,7 @@ export default function CompanyPage() {
 
   const handleStartEdit = () => {
     setEditForm({
+      name: overview?.company.name || '',
       companyDescription: overview?.company.companyDescription || '',
       mainInterestAreas: overview?.company.mainInterestAreas || '',
       numberOfStores: overview?.company.numberOfStores || '',
@@ -225,6 +227,7 @@ export default function CompanyPage() {
   const handleCancel = () => {
     setIsEditing(false);
     setEditForm({
+      name: '',
       companyDescription: '',
       mainInterestAreas: '',
       numberOfStores: '',
@@ -276,9 +279,29 @@ export default function CompanyPage() {
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <CardTitle className="text-2xl sm:text-3xl">{overview.company.name}</CardTitle>
-                {overview.company.notes && (
-                  <CardDescription className="mt-2">{overview.company.notes}</CardDescription>
+                {!isEditing ? (
+                  <>
+                    <CardTitle className="text-2xl sm:text-3xl">{overview.company.name}</CardTitle>
+                    {overview.company.notes && (
+                      <CardDescription className="mt-2">{overview.company.notes}</CardDescription>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <div>
+                      <h3 className="text-sm font-semibold mb-1">Company Name</h3>
+                      <Input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                        placeholder="Company name"
+                        data-testid="input-company-name"
+                        className="text-xl font-bold"
+                      />
+                    </div>
+                    {overview.company.notes && (
+                      <CardDescription>{overview.company.notes}</CardDescription>
+                    )}
+                  </div>
                 )}
               </div>
               {!isEditing ? (
@@ -606,6 +629,7 @@ export default function CompanyPage() {
           <QATable 
             qaPairs={overview.qaPairs.map(qa => ({
               ...qa,
+              companyId: qa.companyId || overview.company.id,
               category: qa.categoryName || 'NEW',
             }))}
             categories={categories}
