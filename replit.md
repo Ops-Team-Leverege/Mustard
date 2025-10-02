@@ -246,3 +246,9 @@ Preferred communication style: Simple, everyday language.
     - Logout button in main header for authenticated users
   - User Management: Auto-upsert user records on login with profile data (email, name, profile image)
   - Architecture: Session-based auth with automatic token refresh for seamless experience
+  - **Email Domain Restriction**: Only leverege.com email addresses are allowed to access the application
+    - Backend validation in `/api/auth/user` endpoint returns 403 for invalid domains
+    - Frontend immediately shows Landing page for domain-restricted users (no blank screen)
+    - Toast notification informs users of access denial
+    - Automatic logout after 2 seconds with query cache cleanup
+    - Handles edge cases: missing email, invalid domain, valid domain
