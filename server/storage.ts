@@ -853,6 +853,15 @@ export class DbStorage implements IStorage {
     return results.length > 0;
   }
 
+  async linkInsightToJira(insightId: string, jiraTicketKey: string): Promise<boolean> {
+    const results = await this.db
+      .update(productInsightsTable)
+      .set({ jiraTicketKey })
+      .where(eq(productInsightsTable.id, insightId))
+      .returning();
+    return results.length > 0;
+  }
+
   // Q&A Pairs
   async getQAPairs(): Promise<QAPairWithCategory[]> {
     const results = await this.db
