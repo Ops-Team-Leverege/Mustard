@@ -71,6 +71,18 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       return;
     }
     
+    if (customers.length === 0) {
+      return;
+    }
+    
+    if (!formData.transcript.trim()) {
+      return;
+    }
+    
+    if (!formData.leverageTeam.trim()) {
+      return;
+    }
+    
     // Convert customers array to comma-separated names for backward compatibility
     const customerNames = customers.map(c => c.name).join(', ');
     
@@ -164,7 +176,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="transcript" data-testid="label-transcript">Transcript</Label>
+            <Label htmlFor="transcript" data-testid="label-transcript">Transcript <span className="text-destructive">*</span></Label>
             <Textarea
               id="transcript"
               data-testid="input-transcript"
@@ -177,7 +189,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="leverageTeam" data-testid="label-leverage-team">Leverege Team Members</Label>
+            <Label htmlFor="leverageTeam" data-testid="label-leverage-team">Leverege Team Members <span className="text-destructive">*</span></Label>
             <Input
               id="leverageTeam"
               data-testid="input-leverage-team"
@@ -192,7 +204,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           </div>
 
           <div className="space-y-3">
-            <Label data-testid="label-customers">Customer Attendees</Label>
+            <Label data-testid="label-customers">Customer Attendees <span className="text-destructive">*</span></Label>
             
             <div className="border rounded-md p-4 space-y-3 bg-muted/30">
               <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,1fr,auto] gap-3 items-end">
@@ -296,7 +308,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">
-                Add customers who attended this call
+                Add at least one customer who attended this call
               </p>
             )}
           </div>
@@ -339,7 +351,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           <Button
             type="submit"
             className="w-full"
-            disabled={isAnalyzing || customers.length === 0 || !formData.companyName.trim()}
+            disabled={isAnalyzing || customers.length === 0 || !formData.companyName.trim() || !formData.transcript.trim() || !formData.leverageTeam.trim()}
             data-testid="button-analyze-transcript"
           >
             {isAnalyzing ? (
