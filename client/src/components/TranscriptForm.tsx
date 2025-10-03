@@ -24,6 +24,7 @@ export interface Customer {
 
 export interface TranscriptData {
   companyName: string;
+  name?: string;
   transcript: string;
   leverageTeam: string;
   customerNames: string;
@@ -37,6 +38,7 @@ export interface TranscriptData {
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
   const [formData, setFormData] = useState<TranscriptData>({
     companyName: '',
+    name: '',
     transcript: '',
     leverageTeam: '',
     customerNames: '',
@@ -197,6 +199,20 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             </Popover>
             <p className="text-xs text-muted-foreground">
               Select an existing company or type a new one
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="meetingName" data-testid="label-meeting-name">Meeting Name</Label>
+            <Input
+              id="meetingName"
+              data-testid="input-meeting-name"
+              placeholder="e.g., Discovery Call, Product Demo, Q2 Planning"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional name to identify this transcript
             </p>
           </div>
 
