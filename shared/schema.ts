@@ -48,6 +48,16 @@ export const categories = pgTable("categories", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const features = pgTable("features", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  videoLink: text("video_link"),
+  helpGuideLink: text("help_guide_link"),
+  categoryId: varchar("category_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const productInsights = pgTable("product_insights", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   transcriptId: varchar("transcript_id"),
@@ -126,6 +136,11 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
   createdAt: true,
 });
 
+export const insertFeatureSchema = createInsertSchema(features).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   createdAt: true,
@@ -157,6 +172,9 @@ export type Category = typeof categories.$inferSelect;
 export type InsertContact = z.infer<typeof insertContactSchema>;
 export type Contact = typeof contacts.$inferSelect;
 
+export type InsertFeature = z.infer<typeof insertFeatureSchema>;
+export type Feature = typeof features.$inferSelect;
+
 // Extended type for UI with category name
 export type ProductInsightWithCategory = ProductInsight & {
   categoryName: string | null;
@@ -168,6 +186,10 @@ export type QAPairWithCategory = QAPair & {
   contactName?: string | null;
   contactJobTitle?: string | null;
   transcriptDate?: Date | null;
+};
+
+export type FeatureWithCategory = Feature & {
+  categoryName: string | null;
 };
 
 // Company overview type for dashboard
