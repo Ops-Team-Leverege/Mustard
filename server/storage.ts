@@ -9,6 +9,9 @@ import {
   type InsertQAPair,
   type Category,
   type InsertCategory,
+  type Feature,
+  type FeatureWithCategory,
+  type InsertFeature,
   type Company,
   type InsertCompany,
   type Contact,
@@ -21,6 +24,7 @@ import {
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
   categories as categoriesTable,
+  features as featuresTable,
   companies as companiesTable,
   contacts as contactsTable,
   users as usersTable,
@@ -68,6 +72,13 @@ export interface IStorage {
   deleteCategory(id: string): Promise<boolean>;
   getCategoryOverview(categoryId: string): Promise<CategoryOverview | null>;
 
+  // Features
+  getFeatures(): Promise<FeatureWithCategory[]>;
+  getFeature(id: string): Promise<Feature | undefined>;
+  createFeature(feature: InsertFeature): Promise<Feature>;
+  updateFeature(id: string, name: string, description?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined>;
+  deleteFeature(id: string): Promise<boolean>;
+
   // Companies
   getCompanies(): Promise<Company[]>;
   getCompany(id: string): Promise<Company | undefined>;
@@ -95,6 +106,7 @@ export class MemStorage implements IStorage {
   private productInsights: Map<string, ProductInsight>;
   private qaPairs: Map<string, QAPair>;
   private categories: Map<string, Category>;
+  private features: Map<string, Feature>;
   private companies: Map<string, Company>;
   private contacts: Map<string, Contact>;
   private users: Map<string, User>;
@@ -104,6 +116,7 @@ export class MemStorage implements IStorage {
     this.productInsights = new Map();
     this.qaPairs = new Map();
     this.categories = new Map();
+    this.features = new Map();
     this.companies = new Map();
     this.contacts = new Map();
     this.users = new Map();
@@ -517,9 +530,71 @@ export class MemStorage implements IStorage {
           });
         }
       }
+      
+      // Null out categoryId for all features that reference this category
+      const featureEntries = Array.from(this.features.entries());
+      for (const [featureId, feature] of featureEntries) {
+        if (feature.categoryId === id) {
+          this.features.set(featureId, {
+            ...feature,
+            categoryId: null,
+          });
+        }
+      }
     }
     
     return deleted;
+  }
+
+  // Features
+  async getFeatures(): Promise<FeatureWithCategory[]> {
+    const features = Array.from(this.features.values());
+    return features.map(feature => {
+      const category = feature.categoryId ? this.categories.get(feature.categoryId) : null;
+      return {
+        ...feature,
+        categoryName: category?.name ?? null,
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getFeature(id: string): Promise<Feature | undefined> {
+    return this.features.get(id);
+  }
+
+  async createFeature(insertFeature: InsertFeature): Promise<Feature> {
+    const id = randomUUID();
+    const feature: Feature = {
+      ...insertFeature,
+      description: insertFeature.description ?? null,
+      videoLink: insertFeature.videoLink ?? null,
+      helpGuideLink: insertFeature.helpGuideLink ?? null,
+      categoryId: insertFeature.categoryId ?? null,
+      id,
+      createdAt: new Date(),
+    };
+    this.features.set(id, feature);
+    return feature;
+  }
+
+  async updateFeature(id: string, name: string, description?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined> {
+    const feature = this.features.get(id);
+    if (!feature) return undefined;
+    
+    const updated: Feature = {
+      ...feature,
+      name,
+      description: description !== undefined ? (description ?? null) : feature.description,
+      videoLink: videoLink !== undefined ? (videoLink ?? null) : feature.videoLink,
+      helpGuideLink: helpGuideLink !== undefined ? (helpGuideLink ?? null) : feature.helpGuideLink,
+      categoryId: categoryId !== undefined ? (categoryId ?? null) : feature.categoryId,
+    };
+    this.features.set(id, updated);
+    return updated;
+  }
+
+  async deleteFeature(id: string): Promise<boolean> {
+    return this.features.delete(id);
   }
 
   // Companies
@@ -1208,10 +1283,79 @@ export class DbStorage implements IStorage {
       .set({ categoryId: null })
       .where(eq(productInsightsTable.categoryId, id));
     
+    // Null out categoryId for all features that reference this category
+    await this.db
+      .update(featuresTable)
+      .set({ categoryId: null })
+      .where(eq(featuresTable.categoryId, id));
+    
     // Then delete the category
     const results = await this.db
       .delete(categoriesTable)
       .where(eq(categoriesTable.id, id))
+      .returning();
+    return results.length > 0;
+  }
+
+  // Features
+  async getFeatures(): Promise<FeatureWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: featuresTable.id,
+        name: featuresTable.name,
+        description: featuresTable.description,
+        videoLink: featuresTable.videoLink,
+        helpGuideLink: featuresTable.helpGuideLink,
+        categoryId: featuresTable.categoryId,
+        categoryName: categoriesTable.name,
+        createdAt: featuresTable.createdAt,
+      })
+      .from(featuresTable)
+      .leftJoin(categoriesTable, eq(featuresTable.categoryId, categoriesTable.id))
+      .orderBy(featuresTable.name);
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+    }));
+  }
+
+  async getFeature(id: string): Promise<Feature | undefined> {
+    const results = await this.db
+      .select()
+      .from(featuresTable)
+      .where(eq(featuresTable.id, id))
+      .limit(1);
+    return results[0];
+  }
+
+  async createFeature(insertFeature: InsertFeature): Promise<Feature> {
+    const results = await this.db
+      .insert(featuresTable)
+      .values(insertFeature)
+      .returning();
+    return results[0];
+  }
+
+  async updateFeature(id: string, name: string, description?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined> {
+    const updateData: any = { name };
+    if (description !== undefined) updateData.description = description;
+    if (videoLink !== undefined) updateData.videoLink = videoLink;
+    if (helpGuideLink !== undefined) updateData.helpGuideLink = helpGuideLink;
+    if (categoryId !== undefined) updateData.categoryId = categoryId;
+    
+    const results = await this.db
+      .update(featuresTable)
+      .set(updateData)
+      .where(eq(featuresTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteFeature(id: string): Promise<boolean> {
+    const results = await this.db
+      .delete(featuresTable)
+      .where(eq(featuresTable.id, id))
       .returning();
     return results.length > 0;
   }
