@@ -37,6 +37,7 @@ Preferred communication style: Simple, everyday language.
 - **Contact Management**: Smart duplicate prevention when adding transcripts (checks existing contacts by name and nameInTranscript); dedicated "Merge Duplicates" feature on company pages to consolidate duplicate contacts while preserving the newest non-null metadata (job titles, transcript aliases) and maintaining Q&A pair references.
 - **Transcript Management**: Dedicated Transcripts page (`/transcripts`) with full list view, search by name/company, edit/delete capabilities with confirmation dialogs, and cascade deletion of associated insights and Q&A pairs.
 - **Service Tagging**: Companies can be tagged with service categories ("tire services", "oil & express services", "commercial truck services", "full services") via checkbox selection in edit mode; tags displayed as badges in view mode for quick service identification.
+- **Temporal Context**: Product insights and Q&A tables include "Transcript Date" column showing when the associated meeting occurred, enabling users to identify when insights were spoken and track conversation timelines.
 
 ## External Dependencies
 
