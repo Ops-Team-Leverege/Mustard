@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Calendar, Building2, Pencil, Check, X } from "lucide-react";
 import { format } from "date-fns";
@@ -31,6 +32,7 @@ export default function TranscriptDetailPage() {
   const [editForm, setEditForm] = useState({
     name: '',
     createdAt: '',
+    mainMeetingTakeaways: '',
   });
 
   const { data, isLoading } = useQuery<TranscriptDetails>({
@@ -43,7 +45,7 @@ export default function TranscriptDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; createdAt: string }) => {
+    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string }) => {
       if (!transcriptId) throw new Error("Transcript not found");
       
       let createdAtISO = data.createdAt;
@@ -56,6 +58,7 @@ export default function TranscriptDetailPage() {
       const res = await apiRequest('PATCH', `/api/transcripts/${transcriptId}`, {
         name: data.name || null,
         createdAt: createdAtISO,
+        mainMeetingTakeaways: data.mainMeetingTakeaways || null,
       });
       return res.json();
     },
@@ -93,6 +96,7 @@ export default function TranscriptDetailPage() {
     setEditForm({
       name: data.transcript.name || '',
       createdAt: createdAtString,
+      mainMeetingTakeaways: data.transcript.mainMeetingTakeaways || '',
     });
     setIsEditing(true);
   };
@@ -106,6 +110,7 @@ export default function TranscriptDetailPage() {
     setEditForm({
       name: '',
       createdAt: '',
+      mainMeetingTakeaways: '',
     });
   };
 
@@ -167,6 +172,16 @@ export default function TranscriptDetailPage() {
                       <span>{format(new Date(transcript.createdAt), "MMMM d, yyyy")}</span>
                     </div>
                   </div>
+                  {transcript.mainMeetingTakeaways && (
+                    <div className="mt-3">
+                      <h3 className="text-sm font-medium mb-1">Main Meeting Takeaways</h3>
+                      <div className="bg-muted/50 rounded-md p-3">
+                        <p className="text-sm whitespace-pre-wrap" data-testid="main-meeting-takeaways">
+                          {transcript.mainMeetingTakeaways}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="space-y-3">
@@ -187,6 +202,16 @@ export default function TranscriptDetailPage() {
                       value={editForm.createdAt}
                       onChange={(e) => setEditForm({ ...editForm, createdAt: e.target.value })}
                       data-testid="input-transcript-date"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1">Main Meeting Takeaways</h3>
+                    <Textarea
+                      value={editForm.mainMeetingTakeaways}
+                      onChange={(e) => setEditForm({ ...editForm, mainMeetingTakeaways: e.target.value })}
+                      placeholder="Summarize the key takeaways from this meeting..."
+                      className="min-h-[100px]"
+                      data-testid="input-main-meeting-takeaways"
                     />
                   </div>
                   {company && (
@@ -243,16 +268,6 @@ export default function TranscriptDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {transcript.mainMeetingTakeaways && (
-              <div>
-                <h3 className="text-sm font-medium mb-2">Main Meeting Takeaways</h3>
-                <div className="bg-muted/50 rounded-md p-4">
-                  <p className="text-sm whitespace-pre-wrap" data-testid="main-meeting-takeaways">
-                    {transcript.mainMeetingTakeaways}
-                  </p>
-                </div>
-              </div>
-            )}
             <div>
               <h3 className="text-sm font-medium mb-2">Transcript Content</h3>
               <div className="bg-muted/50 rounded-md p-4 max-h-60 overflow-y-auto">

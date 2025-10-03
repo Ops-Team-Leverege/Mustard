@@ -216,10 +216,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/transcripts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, createdAt } = req.body;
+      const { name, createdAt, mainMeetingTakeaways } = req.body;
       const transcript = await storage.updateTranscript(id, { 
         name: name !== undefined ? (name || null) : undefined,
         createdAt: createdAt !== undefined ? new Date(createdAt) : undefined,
+        mainMeetingTakeaways: mainMeetingTakeaways !== undefined ? (mainMeetingTakeaways || null) : undefined,
       });
       if (!transcript) {
         return res.status(404).json({ error: "Transcript not found" });
