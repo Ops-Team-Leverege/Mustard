@@ -30,7 +30,6 @@ export default function CompanyPage() {
   const [editForm, setEditForm] = useState({
     name: '',
     companyDescription: '',
-    mainInterestAreas: '',
     numberOfStores: '',
     stage: '',
     pilotStartDate: '',
@@ -58,7 +57,7 @@ export default function CompanyPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string; pilotStartDate: string; serviceTags: string[] }) => {
+    mutationFn: async (data: { name: string; companyDescription: string; numberOfStores: string; stage: string; pilotStartDate: string; serviceTags: string[] }) => {
       if (!overview?.company.id) throw new Error("Company not found");
       
       let pilotStartDateISO = null;
@@ -72,7 +71,6 @@ export default function CompanyPage() {
         name: data.name,
         notes: overview.company.notes,
         companyDescription: data.companyDescription,
-        mainInterestAreas: data.mainInterestAreas,
         numberOfStores: data.numberOfStores,
         stage: data.stage || null,
         pilotStartDate: pilotStartDateISO,
@@ -329,7 +327,6 @@ export default function CompanyPage() {
     setEditForm({
       name: overview?.company.name || '',
       companyDescription: overview?.company.companyDescription || '',
-      mainInterestAreas: overview?.company.mainInterestAreas || '',
       numberOfStores: overview?.company.numberOfStores || '',
       stage: overview?.company.stage || '',
       pilotStartDate: pilotStartDateString,
@@ -347,7 +344,6 @@ export default function CompanyPage() {
     setEditForm({
       name: '',
       companyDescription: '',
-      mainInterestAreas: '',
       numberOfStores: '',
       stage: '',
       pilotStartDate: '',
@@ -546,14 +542,6 @@ export default function CompanyPage() {
                       </p>
                     </div>
                   )}
-                  {overview.company.mainInterestAreas && (
-                    <div>
-                      <h3 className="text-sm font-semibold mb-1">Main Interest Areas</h3>
-                      <p className="text-sm text-muted-foreground" data-testid="text-main-interest-areas">
-                        {overview.company.mainInterestAreas}
-                      </p>
-                    </div>
-                  )}
                   {overview.company.numberOfStores && (
                     <div>
                       <h3 className="text-sm font-semibold mb-1">Number of Stores</h3>
@@ -611,16 +599,6 @@ export default function CompanyPage() {
                       placeholder="Describe the company..."
                       className="min-h-[80px]"
                       data-testid="input-company-description"
-                    />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold mb-1">Main Interest Areas</h3>
-                    <Textarea
-                      value={editForm.mainInterestAreas}
-                      onChange={(e) => setEditForm({ ...editForm, mainInterestAreas: e.target.value })}
-                      placeholder="Main product features or areas of interest..."
-                      className="min-h-[80px]"
-                      data-testid="input-main-interest-areas"
                     />
                   </div>
                   <div>
