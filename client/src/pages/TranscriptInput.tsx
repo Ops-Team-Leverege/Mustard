@@ -29,12 +29,12 @@ export default function TranscriptInput() {
       
       toast({
         title: "Analysis Complete",
-        description: `Product insights and Q&A pairs have been extracted. Taking you to ${data.companyName}'s page...`,
+        description: `Product insights and Q&A pairs have been extracted. Taking you to the transcript...`,
       });
       
-      // Navigate to company page using the slug from the server response
+      // Navigate to transcript detail page
       setTimeout(() => {
-        setLocation(`/companies/${result.company.slug}`);
+        setLocation(`/transcripts/${result.transcript.id}`);
       }, 1000);
     } catch (error) {
       toast({
