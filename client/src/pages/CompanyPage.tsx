@@ -32,6 +32,7 @@ export default function CompanyPage() {
     numberOfStores: '',
     stage: '',
     pilotStartDate: '',
+    serviceTags: [] as string[],
   });
 
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -55,7 +56,7 @@ export default function CompanyPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string; pilotStartDate: string }) => {
+    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string; pilotStartDate: string; serviceTags: string[] }) => {
       if (!overview?.company.id) throw new Error("Company not found");
       
       let pilotStartDateISO = null;
@@ -73,6 +74,7 @@ export default function CompanyPage() {
         numberOfStores: data.numberOfStores,
         stage: data.stage || null,
         pilotStartDate: pilotStartDateISO,
+        serviceTags: data.serviceTags.length > 0 ? data.serviceTags : null,
       });
       return res.json();
     },
@@ -329,6 +331,7 @@ export default function CompanyPage() {
       numberOfStores: overview?.company.numberOfStores || '',
       stage: overview?.company.stage || '',
       pilotStartDate: pilotStartDateString,
+      serviceTags: overview?.company.serviceTags || [],
     });
     setIsEditing(true);
   };
@@ -346,6 +349,7 @@ export default function CompanyPage() {
       numberOfStores: '',
       stage: '',
       pilotStartDate: '',
+      serviceTags: [],
     });
   };
 
