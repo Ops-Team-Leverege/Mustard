@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pencil, Check, X, Plus, Trash2, User } from "lucide-react";
 import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -25,6 +26,7 @@ export default function CompanyPage() {
     companyDescription: '',
     mainInterestAreas: '',
     numberOfStores: '',
+    stage: '',
   });
 
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -42,7 +44,7 @@ export default function CompanyPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string }) => {
+    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string }) => {
       if (!overview?.company.id) throw new Error("Company not found");
       const res = await apiRequest('PATCH', `/api/companies/${overview.company.id}`, {
         name: data.name,
@@ -50,6 +52,7 @@ export default function CompanyPage() {
         companyDescription: data.companyDescription,
         mainInterestAreas: data.mainInterestAreas,
         numberOfStores: data.numberOfStores,
+        stage: data.stage || null,
       });
       return res.json();
     },
@@ -218,6 +221,7 @@ export default function CompanyPage() {
       companyDescription: overview?.company.companyDescription || '',
       mainInterestAreas: overview?.company.mainInterestAreas || '',
       numberOfStores: overview?.company.numberOfStores || '',
+      stage: overview?.company.stage || '',
     });
     setIsEditing(true);
   };
@@ -233,6 +237,7 @@ export default function CompanyPage() {
       companyDescription: '',
       mainInterestAreas: '',
       numberOfStores: '',
+      stage: '',
     });
   };
 
@@ -366,6 +371,14 @@ export default function CompanyPage() {
             <div className="space-y-4">
               {!isEditing ? (
                 <>
+                  {overview.company.stage && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-1">Stage</h3>
+                      <Badge variant="outline" data-testid="badge-stage">
+                        {overview.company.stage}
+                      </Badge>
+                    </div>
+                  )}
                   {overview.company.companyDescription && (
                     <div>
                       <h3 className="text-sm font-semibold mb-1">Company Description</h3>
@@ -393,6 +406,23 @@ export default function CompanyPage() {
                 </>
               ) : (
                 <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1">Stage</h3>
+                    <Select
+                      value={editForm.stage}
+                      onValueChange={(value) => setEditForm({ ...editForm, stage: value })}
+                    >
+                      <SelectTrigger data-testid="select-stage">
+                        <SelectValue placeholder="Select stage" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Prospect">Prospect</SelectItem>
+                        <SelectItem value="Pilot">Pilot</SelectItem>
+                        <SelectItem value="Rollout">Rollout</SelectItem>
+                        <SelectItem value="Scale">Scale</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div>
                     <h3 className="text-sm font-semibold mb-1">Company Description</h3>
                     <Textarea

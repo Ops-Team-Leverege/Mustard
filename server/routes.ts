@@ -646,14 +646,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/companies/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, notes, companyDescription, mainInterestAreas, numberOfStores } = req.body;
+      const { name, notes, companyDescription, mainInterestAreas, numberOfStores, stage } = req.body;
       
       if (!name || typeof name !== 'string') {
         res.status(400).json({ error: "Name is required" });
         return;
       }
       
-      const company = await storage.updateCompany(id, name, notes, companyDescription, mainInterestAreas, numberOfStores);
+      const company = await storage.updateCompany(id, name, notes, companyDescription, mainInterestAreas, numberOfStores, stage);
       
       if (!company) {
         res.status(404).json({ error: "Company not found" });
