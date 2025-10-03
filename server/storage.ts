@@ -160,6 +160,7 @@ export class MemStorage implements IStorage {
       numberOfStores: insertTranscript.numberOfStores ?? null,
       contactJobTitle: insertTranscript.contactJobTitle ?? null,
       mainInterestAreas: insertTranscript.mainInterestAreas ?? null,
+      mainMeetingTakeaways: insertTranscript.mainMeetingTakeaways ?? null,
       id,
       createdAt: new Date(),
     };
