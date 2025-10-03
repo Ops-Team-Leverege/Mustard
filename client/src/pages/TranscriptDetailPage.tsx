@@ -243,6 +243,16 @@ export default function TranscriptDetailPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {transcript.mainMeetingTakeaways && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Main Meeting Takeaways</h3>
+                <div className="bg-muted/50 rounded-md p-4">
+                  <p className="text-sm whitespace-pre-wrap" data-testid="main-meeting-takeaways">
+                    {transcript.mainMeetingTakeaways}
+                  </p>
+                </div>
+              </div>
+            )}
             <div>
               <h3 className="text-sm font-medium mb-2">Transcript Content</h3>
               <div className="bg-muted/50 rounded-md p-4 max-h-60 overflow-y-auto">
