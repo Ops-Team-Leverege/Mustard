@@ -57,6 +57,14 @@ export default function CompanyPage() {
   const updateMutation = useMutation({
     mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string; pilotStartDate: string }) => {
       if (!overview?.company.id) throw new Error("Company not found");
+      
+      let pilotStartDateISO = null;
+      if (data.pilotStartDate) {
+        const date = new Date(data.pilotStartDate);
+        date.setUTCHours(0, 0, 0, 0);
+        pilotStartDateISO = date.toISOString();
+      }
+      
       const res = await apiRequest('PATCH', `/api/companies/${overview.company.id}`, {
         name: data.name,
         notes: overview.company.notes,
@@ -64,7 +72,7 @@ export default function CompanyPage() {
         mainInterestAreas: data.mainInterestAreas,
         numberOfStores: data.numberOfStores,
         stage: data.stage || null,
-        pilotStartDate: data.pilotStartDate ? new Date(data.pilotStartDate).toISOString() : null,
+        pilotStartDate: pilotStartDateISO,
       });
       return res.json();
     },
@@ -273,13 +281,19 @@ export default function CompanyPage() {
   }
 
   const handleStartEdit = () => {
+    let pilotStartDateString = '';
+    if (overview?.company.pilotStartDate) {
+      const date = new Date(overview.company.pilotStartDate);
+      pilotStartDateString = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+    }
+    
     setEditForm({
       name: overview?.company.name || '',
       companyDescription: overview?.company.companyDescription || '',
       mainInterestAreas: overview?.company.mainInterestAreas || '',
       numberOfStores: overview?.company.numberOfStores || '',
       stage: overview?.company.stage || '',
-      pilotStartDate: overview?.company.pilotStartDate ? format(new Date(overview.company.pilotStartDate), 'yyyy-MM-dd') : '',
+      pilotStartDate: pilotStartDateString,
     });
     setIsEditing(true);
   };
@@ -471,7 +485,15 @@ export default function CompanyPage() {
                     <div>
                       <h3 className="text-sm font-semibold mb-1">Pilot Start Date</h3>
                       <p className="text-sm text-muted-foreground" data-testid="text-pilot-start-date">
-                        {format(new Date(overview.company.pilotStartDate), 'MMMM d, yyyy')}
+                        {(() => {
+                          const isoString = typeof overview.company.pilotStartDate === 'string' 
+                            ? overview.company.pilotStartDate 
+                            : overview.company.pilotStartDate.toISOString();
+                          const datePart = isoString.split('T')[0];
+                          const [year, month, day] = datePart.split('-').map(Number);
+                          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                          return `${monthNames[month - 1]} ${day}, ${year}`;
+                        })()}
                       </p>
                     </div>
                   )}
