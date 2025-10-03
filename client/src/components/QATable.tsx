@@ -34,6 +34,7 @@ export interface QAPair {
   categoryId?: string | null;
   categoryName?: string | null;
   createdAt?: Date | string | null;
+  transcriptDate?: Date | string | null;
 }
 
 export interface Category {
@@ -347,6 +348,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                   )}
                 </button>
               </TableHead>
+              <TableHead className="min-w-[150px]">Transcript Date</TableHead>
               <TableHead className="min-w-[150px]">
                 <button 
                   onClick={() => handleSort('createdAt')} 
@@ -367,7 +369,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
           <TableBody>
             {paginatedQAPairs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   {filteredQAPairs.length === 0 ? 'No Q&A pairs found' : 'No Q&A pairs on this page'}
                 </TableCell>
               </TableRow>
@@ -423,6 +425,9 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                         NEW
                       </Badge>
                     )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-transcript-date-${qa.id}`}>
+                    {qa.transcriptDate ? new Date(qa.transcriptDate).toLocaleDateString() : '-'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${qa.id}`}>
                     {qa.createdAt ? new Date(qa.createdAt).toLocaleString() : '-'}
