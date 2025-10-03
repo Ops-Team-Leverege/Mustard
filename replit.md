@@ -29,8 +29,9 @@ Preferred communication style: Simple, everyday language.
 - **Type Safety**: Shared schema definitions (`shared/schema.ts`) and Zod for end-to-end type safety.
 - **Session Management**: Express sessions with PostgreSQL store.
 - **Development Experience**: Replit-specific plugins, HMR, separate dev/prod configs.
-- **Data Linkage**: Q&A pairs linked to contacts for richer customer data.
+- **Data Linkage**: Q&A pairs linked to contacts for richer customer data; product insights and Q&A pairs linked to transcripts via `transcriptId`.
 - **Timestamp Tracking**: `createdAt` timestamps for product insights and Q&A pairs.
+- **Transcript Detail View**: Dedicated page (`/transcripts/:id`) shows individual transcript with filtered insights/Q&A from that specific call, accessible by clicking transcript rows on company pages.
 
 ## External Dependencies
 
