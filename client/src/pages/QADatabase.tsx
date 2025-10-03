@@ -1,11 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import QATable from "@/components/QATable";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { useLocation } from "wouter";
 
 export default function QADatabase() {
-  const [, setLocation] = useLocation();
 
   const { data: qaPairs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/qa-pairs'],
@@ -23,17 +19,11 @@ export default function QADatabase() {
 
   return (
     <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
-      <div className="flex items-center justify-between mb-4 sm:mb-6 gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold">Customer Q&A Database</h1>
-          <p className="text-muted-foreground mt-1">
-            Product-specific questions and BD answers
-          </p>
-        </div>
-        <Button onClick={() => setLocation('/')} data-testid="button-add-transcript">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Transcript
-        </Button>
+      <div className="mb-4 sm:mb-6">
+        <h1 className="text-2xl sm:text-3xl font-semibold">Customer Q&A Database</h1>
+        <p className="text-muted-foreground mt-1">
+          Product-specific questions and BD answers
+        </p>
       </div>
 
       {isLoading ? (

@@ -1,11 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
-import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
-import { useLocation } from "wouter";
 
 export default function ProductInsights() {
-  const [, setLocation] = useLocation();
 
   const { data: insights = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/insights'],
@@ -36,17 +32,11 @@ export default function ProductInsights() {
 
   return (
     <div className="container mx-auto py-8 px-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-semibold">Product Insights & Feature Demand</h1>
-          <p className="text-muted-foreground mt-1">
-            Feature requests and context from BD calls
-          </p>
-        </div>
-        <Button onClick={() => setLocation('/')} data-testid="button-add-transcript">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Transcript
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-3xl font-semibold">Product Insights & Feature Demand</h1>
+        <p className="text-muted-foreground mt-1">
+          Feature requests and context from BD calls
+        </p>
       </div>
 
       {isLoading ? (
