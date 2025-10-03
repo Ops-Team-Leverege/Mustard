@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
 - **Transcript Management**: Dedicated Transcripts page (`/transcripts`) with full list view, search by name/company, edit/delete capabilities with confirmation dialogs, and cascade deletion of associated insights and Q&A pairs.
 - **Service Tagging**: Companies can be tagged with service categories ("tire services", "oil & express services", "commercial truck services", "full services") via checkbox selection in edit mode; tags displayed as badges in view mode for quick service identification.
 - **Temporal Context**: Product insights and Q&A tables include "Transcript Date" column showing when the associated meeting occurred, enabling users to identify when insights were spoken and track conversation timelines.
-- **Features Management**: Dedicated Features page (`/features`) allows tracking existing product features with demo video links and help guide links. Features can optionally be linked to categories for organization. All CRUD operations (create, read, update, delete) are supported with proper form validation using react-hook-form and zodResolver.
+- **Features Management**: Dedicated Features page (`/features`) allows tracking existing product features with demo video links and help guide links. Features can optionally be linked to categories for organization. All CRUD operations (create, read, update, delete) are supported with proper form validation using react-hook-form and zodResolver. Feature detail page (`/features/:id`) displays individual feature information with description supporting multi-line text and bullet points, plus related product insights from the linked category for deeper context.
 
 ## External Dependencies
 
