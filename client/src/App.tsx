@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import TabNavigation from "@/components/TabNavigation";
 import ThemeToggle from "@/components/ThemeToggle";
 import TranscriptInput from "@/pages/TranscriptInput";
+import Transcripts from "@/pages/Transcripts";
 import ProductInsights from "@/pages/ProductInsights";
 import QADatabase from "@/pages/QADatabase";
 import Categories from "@/pages/Categories";
@@ -24,6 +25,7 @@ import { useEffect, useRef } from "react";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
+  { id: 'transcripts', label: 'Transcripts', path: '/transcripts' },
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
   { id: 'insights', label: 'Product Insights', path: '/insights' },
@@ -59,6 +61,14 @@ function Router() {
       <Route path="/">
         <ProtectedRoute 
           component={TranscriptInput} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/transcripts">
+        <ProtectedRoute 
+          component={Transcripts} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
