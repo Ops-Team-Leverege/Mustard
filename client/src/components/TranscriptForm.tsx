@@ -503,7 +503,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             <Textarea
               id="companyDescription"
               data-testid="input-company-description"
-              placeholder="Describe the company, their business model, and key details..."
+              placeholder="Include what services they provide, any operational differences than what we normally see, whether it's corporate or franchise owned, and anything else that would be hard to discover online"
               className="min-h-[100px]"
               value={formData.companyDescription}
               onChange={(e) => setFormData({ ...formData, companyDescription: e.target.value })}
