@@ -51,7 +51,7 @@ export interface IStorage {
 
   // Q&A Pairs
   getQAPairs(): Promise<QAPairWithCategory[]>;
-  getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]>;
+  getQAPairsByTranscript(transcriptId: string): Promise<QAPairWithCategory[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
   updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined>;
@@ -316,10 +316,10 @@ export class MemStorage implements IStorage {
     return Array.from(this.qaPairs.values()).map(qa => this.enrichQAPairWithCategory(qa));
   }
 
-  async getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]> {
-    return Array.from(this.qaPairs.values()).filter(
-      qa => qa.transcriptId === transcriptId
-    );
+  async getQAPairsByTranscript(transcriptId: string): Promise<QAPairWithCategory[]> {
+    return Array.from(this.qaPairs.values())
+      .filter(qa => qa.transcriptId === transcriptId)
+      .map(qa => this.enrichQAPairWithCategory(qa));
   }
 
   async createQAPair(insertQAPair: InsertQAPair): Promise<QAPair> {
@@ -919,11 +919,34 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getQAPairsByTranscript(transcriptId: string): Promise<QAPair[]> {
-    return await this.db
-      .select()
+  async getQAPairsByTranscript(transcriptId: string): Promise<QAPairWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: qaPairsTable.id,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
+      })
       .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .where(eq(qaPairsTable.transcriptId, transcriptId));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      contactName: r.contactName || null,
+      contactJobTitle: r.contactJobTitle || null,
+    }));
   }
 
   async createQAPair(insertQAPair: InsertQAPair): Promise<QAPair> {
