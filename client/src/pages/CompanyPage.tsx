@@ -31,6 +31,7 @@ export default function CompanyPage() {
     mainInterestAreas: '',
     numberOfStores: '',
     stage: '',
+    pilotStartDate: '',
   });
 
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -54,7 +55,7 @@ export default function CompanyPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string }) => {
+    mutationFn: async (data: { name: string; companyDescription: string; mainInterestAreas: string; numberOfStores: string; stage: string; pilotStartDate: string }) => {
       if (!overview?.company.id) throw new Error("Company not found");
       const res = await apiRequest('PATCH', `/api/companies/${overview.company.id}`, {
         name: data.name,
@@ -63,6 +64,7 @@ export default function CompanyPage() {
         mainInterestAreas: data.mainInterestAreas,
         numberOfStores: data.numberOfStores,
         stage: data.stage || null,
+        pilotStartDate: data.pilotStartDate ? new Date(data.pilotStartDate).toISOString() : null,
       });
       return res.json();
     },
@@ -277,6 +279,7 @@ export default function CompanyPage() {
       mainInterestAreas: overview?.company.mainInterestAreas || '',
       numberOfStores: overview?.company.numberOfStores || '',
       stage: overview?.company.stage || '',
+      pilotStartDate: overview?.company.pilotStartDate ? format(new Date(overview.company.pilotStartDate), 'yyyy-MM-dd') : '',
     });
     setIsEditing(true);
   };
@@ -293,6 +296,7 @@ export default function CompanyPage() {
       mainInterestAreas: '',
       numberOfStores: '',
       stage: '',
+      pilotStartDate: '',
     });
   };
 
@@ -463,6 +467,14 @@ export default function CompanyPage() {
                       </Badge>
                     </div>
                   )}
+                  {overview.company.pilotStartDate && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-1">Pilot Start Date</h3>
+                      <p className="text-sm text-muted-foreground" data-testid="text-pilot-start-date">
+                        {format(new Date(overview.company.pilotStartDate), 'MMMM d, yyyy')}
+                      </p>
+                    </div>
+                  )}
                   {overview.company.companyDescription && (
                     <div>
                       <h3 className="text-sm font-semibold mb-1">Company Description</h3>
@@ -506,6 +518,15 @@ export default function CompanyPage() {
                         <SelectItem value="Scale">Scale</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1">Pilot Start Date</h3>
+                    <Input
+                      type="date"
+                      value={editForm.pilotStartDate}
+                      onChange={(e) => setEditForm({ ...editForm, pilotStartDate: e.target.value })}
+                      data-testid="input-pilot-start-date"
+                    />
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold mb-1">Company Description</h3>
