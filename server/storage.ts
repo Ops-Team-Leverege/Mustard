@@ -37,6 +37,7 @@ export interface IStorage {
   getTranscriptsByCompany(companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
   updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date }): Promise<Transcript | undefined>;
+  deleteTranscript(id: string): Promise<boolean>;
 
   // Product Insights
   getProductInsights(): Promise<ProductInsightWithCategory[]>;
@@ -167,6 +168,29 @@ export class MemStorage implements IStorage {
     };
     this.transcripts.set(id, updated);
     return updated;
+  }
+
+  async deleteTranscript(id: string): Promise<boolean> {
+    const deleted = this.transcripts.delete(id);
+    
+    if (deleted) {
+      // Cascade delete: remove all insights and Q&A pairs linked to this transcript
+      const insightEntries = Array.from(this.productInsights.entries());
+      for (const [insightId, insight] of insightEntries) {
+        if (insight.transcriptId === id) {
+          this.productInsights.delete(insightId);
+        }
+      }
+      
+      const qaPairEntries = Array.from(this.qaPairs.entries());
+      for (const [qaPairId, qaPair] of qaPairEntries) {
+        if (qaPair.transcriptId === id) {
+          this.qaPairs.delete(qaPairId);
+        }
+      }
+    }
+    
+    return deleted;
   }
 
   // Product Insights - with category name enrichment
@@ -759,6 +783,24 @@ export class DbStorage implements IStorage {
       .where(eq(transcriptsTable.id, id))
       .returning();
     return results[0];
+  }
+
+  async deleteTranscript(id: string): Promise<boolean> {
+    // Cascade delete: first remove all insights and Q&A pairs linked to this transcript
+    await this.db
+      .delete(productInsightsTable)
+      .where(eq(productInsightsTable.transcriptId, id));
+    
+    await this.db
+      .delete(qaPairsTable)
+      .where(eq(qaPairsTable.transcriptId, id));
+    
+    // Then delete the transcript itself
+    const results = await this.db
+      .delete(transcriptsTable)
+      .where(eq(transcriptsTable.id, id))
+      .returning();
+    return results.length > 0;
   }
 
   // Product Insights
