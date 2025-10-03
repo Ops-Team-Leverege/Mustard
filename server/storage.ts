@@ -440,11 +440,13 @@ export class MemStorage implements IStorage {
     return qaPairs.map(qa => {
       const category = qa.categoryId ? this.categories.get(qa.categoryId) : null;
       const contact = qa.contactId ? this.contacts.get(qa.contactId) : null;
+      const transcript = qa.transcriptId ? this.transcripts.get(qa.transcriptId) : null;
       return {
         ...qa,
         categoryName: category?.name ?? null,
         contactName: contact?.name ?? null,
         contactJobTitle: contact?.jobTitle ?? null,
+        transcriptDate: transcript?.createdAt ?? null,
       };
     });
   }
@@ -894,13 +896,16 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(productInsightsTable)
-      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id));
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id));
     
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
+      transcriptDate: r.transcriptDate || null,
     }));
   }
 
@@ -918,14 +923,17 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(eq(productInsightsTable.transcriptId, transcriptId));
     
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
+      transcriptDate: r.transcriptDate || null,
     }));
   }
 
@@ -943,14 +951,17 @@ export class DbStorage implements IStorage {
         companyId: productInsightsTable.companyId,
         jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(eq(productInsightsTable.categoryId, categoryId));
     
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
+      transcriptDate: r.transcriptDate || null,
     }));
   }
 
@@ -1024,16 +1035,19 @@ export class DbStorage implements IStorage {
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
         createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
-      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id));
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id));
     
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
       contactName: r.contactName || null,
       contactJobTitle: r.contactJobTitle || null,
+      transcriptDate: r.transcriptDate || null,
     }));
   }
 
@@ -1053,10 +1067,12 @@ export class DbStorage implements IStorage {
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
         createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(eq(qaPairsTable.transcriptId, transcriptId));
     
     return results.map(r => ({
@@ -1064,6 +1080,7 @@ export class DbStorage implements IStorage {
       categoryName: r.categoryName || null,
       contactName: r.contactName || null,
       contactJobTitle: r.contactJobTitle || null,
+      transcriptDate: r.transcriptDate || null,
     }));
   }
 
@@ -1130,13 +1147,21 @@ export class DbStorage implements IStorage {
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
         createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(eq(qaPairsTable.companyId, companyId));
     
-    return results;
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      contactName: r.contactName || null,
+      contactJobTitle: r.contactJobTitle || null,
+      transcriptDate: r.transcriptDate || null,
+    }));
   }
 
   // Categories
