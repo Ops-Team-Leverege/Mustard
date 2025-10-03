@@ -207,7 +207,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             <Input
               id="meetingName"
               data-testid="input-meeting-name"
-              placeholder="e.g., Discovery Call, Product Demo, Q2 Planning"
+              placeholder="e.g., BD Intro Call, Weekly Customer Meeting, User Interview"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             />
