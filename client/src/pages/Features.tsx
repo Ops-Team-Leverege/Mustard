@@ -258,7 +258,7 @@ export default function Features() {
                 <TableRow key={feature.id} data-testid={`row-feature-${feature.id}`}>
                   <TableCell className="font-medium">{feature.name}</TableCell>
                   <TableCell className="max-w-md">
-                    <div className="line-clamp-2">{feature.description || "—"}</div>
+                    <div className="whitespace-pre-wrap line-clamp-3">{feature.description || "—"}</div>
                   </TableCell>
                   <TableCell>
                     {feature.categoryName ? (
@@ -362,8 +362,8 @@ export default function Features() {
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Brief description"
-                        rows={3}
+                        placeholder="Brief description (supports bullet points and multiple lines)"
+                        rows={4}
                         {...field}
                         value={field.value || ""}
                         data-testid="input-feature-description"
@@ -495,8 +495,8 @@ export default function Features() {
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Brief description"
-                        rows={3}
+                        placeholder="Brief description (supports bullet points and multiple lines)"
+                        rows={4}
                         {...field}
                         value={field.value || ""}
                         data-testid="input-edit-description"
