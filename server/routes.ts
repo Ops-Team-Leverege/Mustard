@@ -181,6 +181,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/companies/:companyId/transcripts", isAuthenticated, async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      const transcripts = await storage.getTranscriptsByCompany(companyId);
+      res.json(transcripts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.patch("/api/transcripts/:id/name", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name } = req.body;
+      const transcript = await storage.updateTranscriptName(id, name || null);
+      if (!transcript) {
+        return res.status(404).json({ error: "Transcript not found" });
+      }
+      res.json(transcript);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   // Product Insights
   app.get("/api/insights", isAuthenticated, async (_req, res) => {
     try {
