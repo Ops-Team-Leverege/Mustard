@@ -160,12 +160,14 @@ export type Contact = typeof contacts.$inferSelect;
 // Extended type for UI with category name
 export type ProductInsightWithCategory = ProductInsight & {
   categoryName: string | null;
+  transcriptDate?: Date | null;
 };
 
 export type QAPairWithCategory = QAPair & {
   categoryName: string | null;
   contactName?: string | null;
   contactJobTitle?: string | null;
+  transcriptDate?: Date | null;
 };
 
 // Company overview type for dashboard

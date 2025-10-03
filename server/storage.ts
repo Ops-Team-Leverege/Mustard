@@ -194,12 +194,14 @@ export class MemStorage implements IStorage {
     return deleted;
   }
 
-  // Product Insights - with category name enrichment
+  // Product Insights - with category name and transcript date enrichment
   private enrichInsightWithCategory(insight: ProductInsight): ProductInsightWithCategory {
     const category = insight.categoryId ? this.categories.get(insight.categoryId) : null;
+    const transcript = insight.transcriptId ? this.transcripts.get(insight.transcriptId) : null;
     return {
       ...insight,
       categoryName: category?.name || null,
+      transcriptDate: transcript?.createdAt || null,
     };
   }
 
@@ -325,15 +327,17 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  // Q&A Pairs - with category and contact enrichment
+  // Q&A Pairs - with category, contact, and transcript date enrichment
   private enrichQAPairWithCategory(qaPair: QAPair): QAPairWithCategory {
     const category = qaPair.categoryId ? this.categories.get(qaPair.categoryId) : null;
     const contact = qaPair.contactId ? this.contacts.get(qaPair.contactId) : null;
+    const transcript = qaPair.transcriptId ? this.transcripts.get(qaPair.transcriptId) : null;
     return {
       ...qaPair,
       categoryName: category?.name || null,
       contactName: contact?.name || null,
       contactJobTitle: contact?.jobTitle || null,
+      transcriptDate: transcript?.createdAt || null,
     };
   }
 
