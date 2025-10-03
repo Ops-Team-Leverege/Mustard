@@ -24,7 +24,6 @@ export const companies = pgTable("companies", {
   slug: text("slug").notNull().unique(),
   notes: text("notes"),
   companyDescription: text("company_description"),
-  mainInterestAreas: text("main_interest_areas"),
   numberOfStores: text("number_of_stores"),
   stage: text("stage"),
   pilotStartDate: timestamp("pilot_start_date"),
