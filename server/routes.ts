@@ -609,6 +609,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/categories/company-stats", isAuthenticated, async (_req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      const insights = await storage.getProductInsights();
+      const qaPairs = await storage.getQAPairs();
+      
+      // Count unique companies per category for insights
+      const insightCompanyCount = new Map<string, Set<string>>();
+      insights.forEach(insight => {
+        if (insight.categoryId && insight.companyId) {
+          if (!insightCompanyCount.has(insight.categoryId)) {
+            insightCompanyCount.set(insight.categoryId, new Set());
+          }
+          insightCompanyCount.get(insight.categoryId)!.add(insight.companyId);
+        }
+      });
+      
+      // Count unique companies per category for Q&A pairs
+      const qaCompanyCount = new Map<string, Set<string>>();
+      qaPairs.forEach(qa => {
+        if (qa.categoryId && qa.companyId) {
+          if (!qaCompanyCount.has(qa.categoryId)) {
+            qaCompanyCount.set(qa.categoryId, new Set());
+          }
+          qaCompanyCount.get(qa.categoryId)!.add(qa.companyId);
+        }
+      });
+      
+      const categoryStats = categories.map(cat => ({
+        id: cat.id,
+        name: cat.name,
+        insightCompanyCount: insightCompanyCount.get(cat.id)?.size || 0,
+        qaCompanyCount: qaCompanyCount.get(cat.id)?.size || 0,
+      }));
+      
+      res.json(categoryStats);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.post("/api/categories", isAuthenticated, async (req, res) => {
     try {
       const data = insertCategorySchema.parse(req.body);
