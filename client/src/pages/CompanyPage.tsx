@@ -36,6 +36,8 @@ export default function CompanyPage() {
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editContactForm, setEditContactForm] = useState({ name: '', nameInTranscript: '', jobTitle: '' });
   const [activeTab, setActiveTab] = useState("insights");
+  const [editingTranscriptId, setEditingTranscriptId] = useState<string | null>(null);
+  const [editTranscriptName, setEditTranscriptName] = useState('');
 
   const { data: overview, isLoading } = useQuery<CompanyOverview>({
     queryKey: [`/api/companies/${companySlug}/overview`],
@@ -173,6 +175,29 @@ export default function CompanyPage() {
     },
   });
 
+  const updateTranscriptNameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await apiRequest('PATCH', `/api/transcripts/${id}/name`, { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companySlug}/overview`] });
+      setEditingTranscriptId(null);
+      setEditTranscriptName('');
+      toast({
+        title: "Success",
+        description: "Transcript name updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update transcript name",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteCompanyMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest('DELETE', `/api/companies/${id}`, {});
@@ -281,6 +306,21 @@ export default function CompanyPage() {
         deleteCompanyMutation.mutate(overview.company.id);
       }
     }
+  };
+
+  const handleStartEditTranscript = (transcript: any) => {
+    setEditingTranscriptId(transcript.id);
+    setEditTranscriptName(transcript.name || '');
+  };
+
+  const handleSaveTranscriptName = () => {
+    if (!editingTranscriptId || !editTranscriptName.trim()) return;
+    updateTranscriptNameMutation.mutate({ id: editingTranscriptId, name: editTranscriptName.trim() });
+  };
+
+  const handleCancelEditTranscript = () => {
+    setEditingTranscriptId(null);
+    setEditTranscriptName('');
   };
 
   return (
@@ -715,7 +755,84 @@ export default function CompanyPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground text-center py-8">Transcripts list coming soon...</p>
+              <div className="space-y-3">
+                {overview.transcripts && overview.transcripts.length > 0 ? (
+                  <div className="space-y-2">
+                    {overview.transcripts.map((transcript) => (
+                      <div
+                        key={transcript.id}
+                        className="flex items-center justify-between gap-4 p-3 border rounded-md hover-elevate"
+                        data-testid={`transcript-${transcript.id}`}
+                      >
+                        {editingTranscriptId === transcript.id ? (
+                          <div className="flex-1 flex items-center gap-3">
+                            <Input
+                              value={editTranscriptName}
+                              onChange={(e) => setEditTranscriptName(e.target.value)}
+                              placeholder="Transcript name"
+                              data-testid={`input-edit-transcript-name-${transcript.id}`}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <FileText className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate" data-testid={`text-transcript-name-${transcript.id}`}>
+                                {transcript.name || 'Untitled Transcript'}
+                              </p>
+                              <p className="text-sm text-muted-foreground truncate" data-testid={`text-transcript-date-${transcript.id}`}>
+                                <Calendar className="h-3 w-3 inline mr-1" />
+                                {format(new Date(transcript.createdAt), 'MMM d, yyyy')}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {editingTranscriptId === transcript.id ? (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleSaveTranscriptName}
+                                disabled={updateTranscriptNameMutation.isPending || !editTranscriptName.trim()}
+                                data-testid={`button-save-transcript-${transcript.id}`}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleCancelEditTranscript}
+                                disabled={updateTranscriptNameMutation.isPending}
+                                data-testid={`button-cancel-edit-transcript-${transcript.id}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleStartEditTranscript(transcript)}
+                              data-testid={`button-edit-transcript-${transcript.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No transcripts yet</p>
+                    <p className="text-sm mt-1">Upload transcripts to see them here</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
