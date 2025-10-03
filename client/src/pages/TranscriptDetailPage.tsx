@@ -28,6 +28,11 @@ export default function TranscriptDetailPage() {
     enabled: !!transcriptId,
   });
 
+  // Debug: Log Q&A pairs to check category data
+  if (data?.qaPairs) {
+    console.log('Q&A Pairs from API:', data.qaPairs);
+  }
+
   const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description?: string }>>({
     queryKey: ['/api/categories'],
   });
