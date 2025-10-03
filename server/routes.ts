@@ -93,22 +93,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: company.id,
       });
       
-      // Create contact records first from validated customers array
+      // Get all existing contacts for this company first
+      const existingContacts = await storage.getContactsByCompany(company.id);
+      
+      // Create or reuse contact records from validated customers array
       const contacts = [];
       if (data.customers && Array.isArray(data.customers)) {
         for (const customer of data.customers) {
-          const contact = await storage.createContact({
-            name: customer.name,
-            nameInTranscript: customer.nameInTranscript || null,
-            jobTitle: customer.jobTitle || null,
-            companyId: company.id,
+          const customerNameLower = customer.name.toLowerCase().trim();
+          
+          // Check if contact already exists by matching against both name and nameInTranscript (case-insensitive)
+          const existingContact = existingContacts.find(c => {
+            const contactNameLower = c.name.toLowerCase().trim();
+            const nameInTranscriptLower = c.nameInTranscript?.toLowerCase().trim();
+            
+            // Match if customer name matches either the contact's name or nameInTranscript
+            return contactNameLower === customerNameLower || 
+                   (nameInTranscriptLower && nameInTranscriptLower === customerNameLower);
           });
-          contacts.push(contact);
+          
+          if (existingContact) {
+            // Reuse existing contact
+            contacts.push(existingContact);
+          } else {
+            // Create new contact only if it doesn't exist
+            const contact = await storage.createContact({
+              name: customer.name,
+              nameInTranscript: customer.nameInTranscript || null,
+              jobTitle: customer.jobTitle || null,
+              companyId: company.id,
+            });
+            contacts.push(contact);
+            existingContacts.push(contact); // Add to list for Q&A matching below
+          }
         }
       }
 
-      // Get all existing contacts for this company to match with Q&A askers
-      const allContacts = await storage.getContactsByCompany(company.id);
+      // Use all contacts (existing + newly created) for Q&A matching
+      const allContacts = existingContacts;
       
       // Save insights with companyId
       const insights = await storage.createProductInsights(
