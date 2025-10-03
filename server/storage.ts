@@ -547,6 +547,7 @@ export class MemStorage implements IStorage {
       mainInterestAreas: insertCompany.mainInterestAreas ?? null,
       numberOfStores: insertCompany.numberOfStores ?? null,
       stage: insertCompany.stage ?? null,
+      pilotStartDate: insertCompany.pilotStartDate ?? null,
       id,
       createdAt: new Date(),
     };
