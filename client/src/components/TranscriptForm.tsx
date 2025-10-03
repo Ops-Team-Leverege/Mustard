@@ -35,6 +35,7 @@ export interface TranscriptData {
   numberOfStores?: string;
   contactJobTitle?: string;
   mainInterestAreas?: string;
+  mainMeetingTakeaways?: string;
 }
 
 const LEVEREGE_TEAM_OPTIONS = [
@@ -60,6 +61,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     numberOfStores: '',
     contactJobTitle: '',
     mainInterestAreas: '',
+    mainMeetingTakeaways: '',
   });
 
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -530,6 +532,18 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               className="min-h-[100px]"
               value={formData.mainInterestAreas}
               onChange={(e) => setFormData({ ...formData, mainInterestAreas: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="mainMeetingTakeaways" data-testid="label-main-meeting-takeaways">Main Meeting Takeaways</Label>
+            <Textarea
+              id="mainMeetingTakeaways"
+              data-testid="input-main-meeting-takeaways"
+              placeholder="Summarize the key takeaways from this meeting..."
+              className="min-h-[100px]"
+              value={formData.mainMeetingTakeaways}
+              onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
             />
           </div>
 
