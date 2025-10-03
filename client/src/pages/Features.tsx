@@ -2,9 +2,20 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertFeatureSchema, type InsertFeature } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   Table,
   TableBody,
@@ -62,13 +73,27 @@ export default function Features() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
-  
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    videoLink: "",
-    helpGuideLink: "",
-    categoryId: "",
+
+  const addForm = useForm<InsertFeature>({
+    resolver: zodResolver(insertFeatureSchema),
+    defaultValues: {
+      name: "",
+      description: null,
+      videoLink: null,
+      helpGuideLink: null,
+      categoryId: null,
+    },
+  });
+
+  const editForm = useForm<InsertFeature>({
+    resolver: zodResolver(insertFeatureSchema),
+    defaultValues: {
+      name: "",
+      description: null,
+      videoLink: null,
+      helpGuideLink: null,
+      categoryId: null,
+    },
   });
 
   const { data: features = [], isLoading } = useQuery<Feature[]>({
@@ -80,14 +105,8 @@ export default function Features() {
   });
 
   const addMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const res = await apiRequest('POST', '/api/features', {
-        name: data.name,
-        description: data.description || null,
-        videoLink: data.videoLink || null,
-        helpGuideLink: data.helpGuideLink || null,
-        categoryId: data.categoryId || null,
-      });
+    mutationFn: async (data: InsertFeature) => {
+      const res = await apiRequest('POST', '/api/features', data);
       return res.json();
     },
     onSuccess: () => {
@@ -97,7 +116,7 @@ export default function Features() {
         description: "The feature has been created successfully.",
       });
       setIsAddDialogOpen(false);
-      resetForm();
+      addForm.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -109,14 +128,9 @@ export default function Features() {
   });
 
   const editMutation = useMutation({
-    mutationFn: async (data: { id: string } & typeof formData) => {
-      const res = await apiRequest('PATCH', `/api/features/${data.id}`, {
-        name: data.name,
-        description: data.description || null,
-        videoLink: data.videoLink || null,
-        helpGuideLink: data.helpGuideLink || null,
-        categoryId: data.categoryId || null,
-      });
+    mutationFn: async (data: { id: string } & InsertFeature) => {
+      const { id, ...updateData } = data;
+      const res = await apiRequest('PATCH', `/api/features/${id}`, updateData);
       return res.json();
     },
     onSuccess: () => {
@@ -127,7 +141,7 @@ export default function Features() {
       });
       setIsEditDialogOpen(false);
       setSelectedFeature(null);
-      resetForm();
+      editForm.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -161,29 +175,25 @@ export default function Features() {
     },
   });
 
-  const resetForm = () => {
-    setFormData({
-      name: "",
-      description: "",
-      videoLink: "",
-      helpGuideLink: "",
-      categoryId: "",
-    });
-  };
-
   const handleAdd = () => {
-    resetForm();
+    addForm.reset({
+      name: "",
+      description: null,
+      videoLink: null,
+      helpGuideLink: null,
+      categoryId: null,
+    });
     setIsAddDialogOpen(true);
   };
 
   const handleEdit = (feature: Feature) => {
     setSelectedFeature(feature);
-    setFormData({
+    editForm.reset({
       name: feature.name,
-      description: feature.description || "",
-      videoLink: feature.videoLink || "",
-      helpGuideLink: feature.helpGuideLink || "",
-      categoryId: feature.categoryId || "",
+      description: feature.description,
+      videoLink: feature.videoLink,
+      helpGuideLink: feature.helpGuideLink,
+      categoryId: feature.categoryId,
     });
     setIsEditDialogOpen(true);
   };
@@ -193,28 +203,14 @@ export default function Features() {
     setIsDeleteDialogOpen(true);
   };
 
-  const handleSubmitAdd = () => {
-    if (!formData.name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Feature name is required.",
-        variant: "destructive",
-      });
-      return;
-    }
-    addMutation.mutate(formData);
+  const onAddSubmit = (data: InsertFeature) => {
+    addMutation.mutate(data);
   };
 
-  const handleSubmitEdit = () => {
-    if (!formData.name.trim() || !selectedFeature) {
-      toast({
-        title: "Validation Error",
-        description: "Feature name is required.",
-        variant: "destructive",
-      });
-      return;
+  const onEditSubmit = (data: InsertFeature) => {
+    if (selectedFeature) {
+      editMutation.mutate({ id: selectedFeature.id, ...data });
     }
-    editMutation.mutate({ id: selectedFeature.id, ...formData });
   };
 
   const handleConfirmDelete = () => {
@@ -339,72 +335,127 @@ export default function Features() {
               Add details about an existing product feature.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name *</label>
-              <Input
-                placeholder="Feature name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                data-testid="input-feature-name"
+          <Form {...addForm}>
+            <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={addForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Feature name" 
+                        {...field} 
+                        data-testid="input-feature-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                placeholder="Brief description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                data-testid="input-feature-description"
+              <FormField
+                control={addForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Brief description"
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-feature-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Video Link (Demo)</label>
-              <Input
-                placeholder="https://..."
-                value={formData.videoLink}
-                onChange={(e) => setFormData({ ...formData, videoLink: e.target.value })}
-                data-testid="input-feature-videolink"
+              <FormField
+                control={addForm.control}
+                name="videoLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Video Link (Demo)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://..."
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-feature-videolink"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Help Guide Link</label>
-              <Input
-                placeholder="https://..."
-                value={formData.helpGuideLink}
-                onChange={(e) => setFormData({ ...formData, helpGuideLink: e.target.value })}
-                data-testid="input-feature-helpguidelink"
+              <FormField
+                control={addForm.control}
+                name="helpGuideLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Help Guide Link</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://..."
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-feature-helpguidelink"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-              >
-                <SelectTrigger data-testid="select-feature-category">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} data-testid="button-cancel-add">
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitAdd} disabled={addMutation.isPending} data-testid="button-submit-add">
-              {addMutation.isPending ? "Adding..." : "Add Feature"}
-            </Button>
-          </DialogFooter>
+              <FormField
+                control={addForm.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                      value={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-feature-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddDialogOpen(false)} 
+                  data-testid="button-cancel-add"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={addMutation.isPending} 
+                  data-testid="button-submit-add"
+                >
+                  {addMutation.isPending ? "Adding..." : "Add Feature"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
@@ -417,72 +468,127 @@ export default function Features() {
               Update feature details.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Name *</label>
-              <Input
-                placeholder="Feature name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                data-testid="input-edit-name"
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 py-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Feature name" 
+                        {...field} 
+                        data-testid="input-edit-name"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                placeholder="Brief description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
-                data-testid="input-edit-description"
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Brief description"
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Video Link (Demo)</label>
-              <Input
-                placeholder="https://..."
-                value={formData.videoLink}
-                onChange={(e) => setFormData({ ...formData, videoLink: e.target.value })}
-                data-testid="input-edit-videolink"
+              <FormField
+                control={editForm.control}
+                name="videoLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Video Link (Demo)</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://..."
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-videolink"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Help Guide Link</label>
-              <Input
-                placeholder="https://..."
-                value={formData.helpGuideLink}
-                onChange={(e) => setFormData({ ...formData, helpGuideLink: e.target.value })}
-                data-testid="input-edit-helpguidelink"
+              <FormField
+                control={editForm.control}
+                name="helpGuideLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Help Guide Link</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://..."
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-helpguidelink"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select
-                value={formData.categoryId}
-                onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
-              >
-                <SelectTrigger data-testid="select-edit-category">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} data-testid="button-cancel-edit">
-              Cancel
-            </Button>
-            <Button onClick={handleSubmitEdit} disabled={editMutation.isPending} data-testid="button-submit-edit">
-              {editMutation.isPending ? "Updating..." : "Update Feature"}
-            </Button>
-          </DialogFooter>
+              <FormField
+                control={editForm.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "none" ? null : value)}
+                      value={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-category">
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsEditDialogOpen(false)} 
+                  data-testid="button-cancel-edit"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={editMutation.isPending} 
+                  data-testid="button-submit-edit"
+                >
+                  {editMutation.isPending ? "Updating..." : "Update Feature"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
