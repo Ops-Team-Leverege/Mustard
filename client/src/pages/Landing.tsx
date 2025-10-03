@@ -10,7 +10,7 @@ export default function Landing() {
         <div className="max-w-4xl mx-auto space-y-12">
           <div className="text-center space-y-4">
             <h1 className="text-4xl font-bold tracking-tight" data-testid="heading-title">
-              PitCrew Customer Transcript Analyzer
+              Mustard for PitCrew
             </h1>
             <p className="text-xl text-muted-foreground" data-testid="text-subtitle">
               Transform business development call transcripts into actionable product insights

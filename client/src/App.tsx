@@ -173,7 +173,7 @@ function AuthenticatedApp() {
               <div className="flex items-center gap-3">
                 <img src={pitcrewLogo} alt="PitCrew Logo" className="h-8 w-8 rounded-md" />
                 <div>
-                  <h1 className="font-semibold text-lg">PitCrew Customer Transcript Analyzer</h1>
+                  <h1 className="font-semibold text-lg">Mustard for PitCrew</h1>
                 </div>
               </div>
               <div className="flex items-center gap-2">
