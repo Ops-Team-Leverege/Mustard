@@ -15,6 +15,21 @@ interface Company {
   createdAt: Date;
 }
 
+function getStageStyles(stage: string) {
+  switch (stage) {
+    case 'Prospect':
+      return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800';
+    case 'Pilot':
+      return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900';
+    case 'Rollout':
+      return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-900';
+    case 'Scale':
+      return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900';
+    default:
+      return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800';
+  }
+}
+
 export default function Companies() {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -82,7 +97,11 @@ export default function Companies() {
                       <CardTitle className="text-base truncate">{company.name}</CardTitle>
                     </div>
                     {company.stage && (
-                      <Badge variant="outline" className="text-xs flex-shrink-0" data-testid={`badge-stage-${company.id}`}>
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs flex-shrink-0 ${getStageStyles(company.stage)}`}
+                        data-testid={`badge-stage-${company.id}`}
+                      >
                         {company.stage}
                       </Badge>
                     )}
