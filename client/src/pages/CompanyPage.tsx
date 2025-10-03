@@ -791,7 +791,11 @@ export default function CompanyPage() {
                             />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div 
+                            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
+                            onClick={() => navigate(`/transcripts/${transcript.id}`)}
+                            data-testid={`button-navigate-transcript-${transcript.id}`}
+                          >
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                               <FileText className="h-4 w-4 text-primary" />
                             </div>
