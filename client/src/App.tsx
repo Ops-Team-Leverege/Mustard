@@ -10,6 +10,7 @@ import Transcripts from "@/pages/Transcripts";
 import ProductInsights from "@/pages/ProductInsights";
 import QADatabase from "@/pages/QADatabase";
 import Categories from "@/pages/Categories";
+import Features from "@/pages/Features";
 import Companies from "@/pages/Companies";
 import CompanyPage from "@/pages/CompanyPage";
 import CategoryPage from "@/pages/CategoryPage";
@@ -27,6 +28,7 @@ const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
+  { id: 'features', label: 'Features', path: '/features' },
   { id: 'insights', label: 'Product Insights', path: '/insights' },
   { id: 'qa', label: 'Q&A Database', path: '/qa' },
   { id: 'transcripts', label: 'Transcripts', path: '/transcripts' },
@@ -117,6 +119,14 @@ function Router() {
       <Route path="/categories/:id">
         <ProtectedRoute 
           component={CategoryPage} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/features">
+        <ProtectedRoute 
+          component={Features} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
