@@ -11,6 +11,7 @@ interface Company {
   name: string;
   slug: string;
   notes?: string | null;
+  stage?: string | null;
   createdAt: Date;
 }
 
@@ -80,6 +81,11 @@ export default function Companies() {
                       <Building2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       <CardTitle className="text-base truncate">{company.name}</CardTitle>
                     </div>
+                    {company.stage && (
+                      <Badge variant="outline" className="text-xs flex-shrink-0" data-testid={`badge-stage-${company.id}`}>
+                        {company.stage}
+                      </Badge>
+                    )}
                   </div>
                   {company.notes && (
                     <CardDescription className="text-xs mt-2 line-clamp-2">
