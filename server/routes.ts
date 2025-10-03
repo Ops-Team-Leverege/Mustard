@@ -667,6 +667,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/dashboard/stats", isAuthenticated, async (_req, res) => {
+    try {
+      const companies = await storage.getCompanies();
+      const stageStats = companies.reduce((acc, company) => {
+        const stage = company.stage || 'Unknown';
+        acc[stage] = (acc[stage] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      res.json({ stageStats });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/dashboard/recent-transcripts", isAuthenticated, async (_req, res) => {
+    try {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const allTranscripts = await storage.getTranscripts();
+      const recentTranscripts = allTranscripts
+        .filter(t => new Date(t.createdAt) >= sevenDaysAgo)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 10);
+
+      res.json(recentTranscripts);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.get("/api/companies/:slug", isAuthenticated, async (req, res) => {
     try {
       const { slug } = req.params;
