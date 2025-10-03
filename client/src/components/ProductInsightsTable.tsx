@@ -30,6 +30,7 @@ export interface ProductInsight {
   category: string;
   categoryId?: string | null;
   createdAt?: Date | string | null;
+  transcriptDate?: Date | string | null;
 }
 
 export interface Category {
@@ -320,6 +321,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                   )}
                 </button>
               </TableHead>
+              <TableHead className="min-w-[150px]">Transcript Date</TableHead>
               <TableHead className="min-w-[150px]">
                 <button 
                   onClick={() => handleSort('createdAt')} 
@@ -340,7 +342,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
           <TableBody>
             {paginatedInsights.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   {filteredInsights.length === 0 ? 'No insights found' : 'No insights on this page'}
                 </TableCell>
               </TableRow>
@@ -389,6 +391,9 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                         {insight.category}
                       </Badge>
                     )}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-transcript-date-${insight.id}`}>
+                    {insight.transcriptDate ? new Date(insight.transcriptDate).toLocaleDateString() : '-'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${insight.id}`}>
                     {insight.createdAt ? new Date(insight.createdAt).toLocaleString() : '-'}
