@@ -786,20 +786,26 @@ export class DbStorage implements IStorage {
   }
 
   async deleteTranscript(id: string): Promise<boolean> {
-    // Cascade delete: first remove all insights and Q&A pairs linked to this transcript
-    await this.db
-      .delete(productInsightsTable)
-      .where(eq(productInsightsTable.transcriptId, id));
+    // Use transaction to ensure atomic cascade deletion
+    const results = await this.db.transaction(async (tx) => {
+      // Cascade delete: first remove all insights and Q&A pairs linked to this transcript
+      await tx
+        .delete(productInsightsTable)
+        .where(eq(productInsightsTable.transcriptId, id));
+      
+      await tx
+        .delete(qaPairsTable)
+        .where(eq(qaPairsTable.transcriptId, id));
+      
+      // Then delete the transcript itself
+      const transcriptResults = await tx
+        .delete(transcriptsTable)
+        .where(eq(transcriptsTable.id, id))
+        .returning();
+      
+      return transcriptResults;
+    });
     
-    await this.db
-      .delete(qaPairsTable)
-      .where(eq(qaPairsTable.transcriptId, id));
-    
-    // Then delete the transcript itself
-    const results = await this.db
-      .delete(transcriptsTable)
-      .where(eq(transcriptsTable.id, id))
-      .returning();
     return results.length > 0;
   }
 

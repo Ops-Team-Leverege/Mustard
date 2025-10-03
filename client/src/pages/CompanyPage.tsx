@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar, Eye } from "lucide-react";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
@@ -41,6 +42,7 @@ export default function CompanyPage() {
   const [editTranscriptName, setEditTranscriptName] = useState('');
   const [editTranscriptDate, setEditTranscriptDate] = useState('');
   const [viewingTranscript, setViewingTranscript] = useState<any | null>(null);
+  const [transcriptToDelete, setTranscriptToDelete] = useState<any | null>(null);
 
   const { data: overview, isLoading } = useQuery<CompanyOverview>({
     queryKey: [`/api/companies/${companySlug}/overview`],
@@ -353,6 +355,13 @@ export default function CompanyPage() {
     setEditingTranscriptId(null);
     setEditTranscriptName('');
     setEditTranscriptDate('');
+  };
+
+  const handleConfirmDeleteTranscript = () => {
+    if (transcriptToDelete) {
+      deleteTranscriptMutation.mutate(transcriptToDelete.id);
+      setTranscriptToDelete(null);
+    }
   };
 
   return (
@@ -874,8 +883,7 @@ export default function CompanyPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                onClick={() => deleteTranscriptMutation.mutate(transcript.id)}
-                                disabled={deleteTranscriptMutation.isPending}
+                                onClick={() => setTranscriptToDelete(transcript)}
                                 data-testid={`button-delete-transcript-${transcript.id}`}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -914,6 +922,29 @@ export default function CompanyPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!transcriptToDelete} onOpenChange={(open) => !open && setTranscriptToDelete(null)}>
+        <AlertDialogContent data-testid="alert-delete-transcript">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Transcript</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{transcriptToDelete?.name || 'Untitled Transcript'}"? 
+              This will also permanently delete all product insights and Q&A pairs extracted from this transcript. 
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteTranscript}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
