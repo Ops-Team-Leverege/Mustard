@@ -1,7 +1,9 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BarChart3, TrendingUp } from "lucide-react";
+import { BarChart3, TrendingUp, Building2 } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 export interface Category {
   id: string;
@@ -11,11 +13,22 @@ export interface Category {
   qaCount: number;
 }
 
+interface CategoryCompanyStat {
+  id: string;
+  name: string;
+  insightCompanyCount: number;
+  qaCompanyCount: number;
+}
+
 interface CategoryAnalyticsProps {
   categories: Category[];
 }
 
 export default function CategoryAnalytics({ categories }: CategoryAnalyticsProps) {
+  const { data: companyStats = [] } = useQuery<CategoryCompanyStat[]>({
+    queryKey: ['/api/categories/company-stats'],
+  });
+
   const totalInsights = categories.reduce((sum, cat) => sum + cat.usageCount, 0);
   const totalQAs = categories.reduce((sum, cat) => sum + cat.qaCount, 0);
   
@@ -32,6 +45,23 @@ export default function CategoryAnalytics({ categories }: CategoryAnalyticsProps
   
   const maxInsightUsage = topCategoriesByInsight[0]?.usageCount || 1;
   const maxQAUsage = topCategoriesByQA[0]?.qaCount || 1;
+
+  // Prepare data for Recharts bar graphs (top 5 by company count)
+  const topCategoriesByInsightCompanies = [...companyStats]
+    .sort((a, b) => b.insightCompanyCount - a.insightCompanyCount)
+    .slice(0, 5)
+    .map(stat => ({
+      name: stat.name,
+      companies: stat.insightCompanyCount,
+    }));
+
+  const topCategoriesByQACompanies = [...companyStats]
+    .sort((a, b) => b.qaCompanyCount - a.qaCompanyCount)
+    .slice(0, 5)
+    .map(stat => ({
+      name: stat.name,
+      companies: stat.qaCompanyCount,
+    }));
 
   return (
     <div className="space-y-4 mb-6">
@@ -175,6 +205,106 @@ export default function CategoryAnalytics({ categories }: CategoryAnalyticsProps
                   );
                 })}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Insights by Unique Companies
+            </CardTitle>
+            <CardDescription>Categories with the most company mentions in insights</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {topCategoriesByInsightCompanies.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No data available</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={topCategoriesByInsightCompanies}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="name" 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      color: 'hsl(var(--foreground))'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Bar 
+                    dataKey="companies" 
+                    fill="hsl(var(--primary))" 
+                    name="Companies"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Q&A Pairs by Unique Companies
+            </CardTitle>
+            <CardDescription>Categories with the most company mentions in Q&A pairs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {topCategoriesByQACompanies.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">No data available</p>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={topCategoriesByQACompanies}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="name" 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    angle={-45}
+                    textAnchor="end"
+                    height={80}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      color: 'hsl(var(--foreground))'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Bar 
+                    dataKey="companies" 
+                    fill="hsl(var(--primary))" 
+                    name="Companies"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </CardContent>
         </Card>
