@@ -5,6 +5,7 @@ import { analyzeTranscript } from "./transcriptAnalyzer";
 import {
   insertTranscriptSchema,
   insertCategorySchema,
+  insertFeatureSchema,
   insertCompanySchema,
   insertContactSchema,
   type ProductInsightWithCategory,
@@ -716,6 +717,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       res.json(overview);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // Features
+  app.get("/api/features", isAuthenticated, async (_req, res) => {
+    try {
+      const features = await storage.getFeatures();
+      res.json(features);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/features/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const feature = await storage.getFeature(id);
+      
+      if (!feature) {
+        res.status(404).json({ error: "Feature not found" });
+        return;
+      }
+      
+      res.json(feature);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/features", isAuthenticated, async (req, res) => {
+    try {
+      const data = insertFeatureSchema.parse(req.body);
+      const feature = await storage.createFeature(data);
+      res.json(feature);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else if (error instanceof Error) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Unknown error occurred" });
+      }
+    }
+  });
+
+  app.patch("/api/features/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, description, videoLink, helpGuideLink, categoryId } = req.body;
+      
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({ error: "Name is required" });
+        return;
+      }
+      
+      const feature = await storage.updateFeature(id, name, description, videoLink, helpGuideLink, categoryId);
+      
+      if (!feature) {
+        res.status(404).json({ error: "Feature not found" });
+        return;
+      }
+      
+      res.json(feature);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/features/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteFeature(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "Feature not found" });
+        return;
+      }
+      
+      res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
