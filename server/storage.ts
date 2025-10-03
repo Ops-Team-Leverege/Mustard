@@ -856,25 +856,20 @@ export class DbStorage implements IStorage {
   }
 
   async deleteTranscript(id: string): Promise<boolean> {
-    // Use transaction to ensure atomic cascade deletion
-    const results = await this.db.transaction(async (tx) => {
-      // Cascade delete: first remove all insights and Q&A pairs linked to this transcript
-      await tx
-        .delete(productInsightsTable)
-        .where(eq(productInsightsTable.transcriptId, id));
-      
-      await tx
-        .delete(qaPairsTable)
-        .where(eq(qaPairsTable.transcriptId, id));
-      
-      // Then delete the transcript itself
-      const transcriptResults = await tx
-        .delete(transcriptsTable)
-        .where(eq(transcriptsTable.id, id))
-        .returning();
-      
-      return transcriptResults;
-    });
+    // Cascade delete: first remove all insights and Q&A pairs linked to this transcript
+    await this.db
+      .delete(productInsightsTable)
+      .where(eq(productInsightsTable.transcriptId, id));
+    
+    await this.db
+      .delete(qaPairsTable)
+      .where(eq(qaPairsTable.transcriptId, id));
+    
+    // Then delete the transcript itself
+    const results = await this.db
+      .delete(transcriptsTable)
+      .where(eq(transcriptsTable.id, id))
+      .returning();
     
     return results.length > 0;
   }
@@ -1385,80 +1380,78 @@ export class DbStorage implements IStorage {
   }
 
   async mergeDuplicateContacts(companyId: string): Promise<{ merged: number; kept: number }> {
-    return await this.db.transaction(async (tx) => {
-      const contacts = await tx
-        .select()
-        .from(contactsTable)
-        .where(eq(contactsTable.companyId, companyId))
-        .orderBy(contactsTable.createdAt);
-      
-      // Group contacts by normalized name (case-insensitive)
-      const contactGroups = new Map<string, typeof contacts>();
-      contacts.forEach(contact => {
-        const normalizedName = contact.name.toLowerCase().trim();
-        if (!contactGroups.has(normalizedName)) {
-          contactGroups.set(normalizedName, []);
-        }
-        contactGroups.get(normalizedName)!.push(contact);
-      });
-      
-      let mergedCount = 0;
-      let keptCount = 0;
-      
-      // For each group with duplicates, merge them
-      for (const [, group] of Array.from(contactGroups.entries())) {
-        if (group.length > 1) {
-          // Keep the oldest contact (first in sorted array) as base
-          const keepContact = group[0];
-          const duplicates = group.slice(1);
-          
-          // Reconcile metadata: prefer non-null values, with newer values taking precedence
-          let reconciledJobTitle = keepContact.jobTitle;
-          let reconciledNameInTranscript = keepContact.nameInTranscript;
-          
-          for (const duplicate of duplicates) {
-            // Prefer newer non-null values (duplicates are sorted oldest to newest)
-            if (duplicate.jobTitle) {
-              reconciledJobTitle = duplicate.jobTitle;
-            }
-            if (duplicate.nameInTranscript) {
-              reconciledNameInTranscript = duplicate.nameInTranscript;
-            }
-          }
-          
-          // Update the kept contact with reconciled metadata if anything changed
-          if (reconciledJobTitle !== keepContact.jobTitle || reconciledNameInTranscript !== keepContact.nameInTranscript) {
-            await tx
-              .update(contactsTable)
-              .set({
-                jobTitle: reconciledJobTitle,
-                nameInTranscript: reconciledNameInTranscript,
-              })
-              .where(eq(contactsTable.id, keepContact.id));
-          }
-          
-          // Update all Q&A pairs that reference duplicates to point to the kept contact
-          for (const duplicate of duplicates) {
-            await tx
-              .update(qaPairsTable)
-              .set({ contactId: keepContact.id })
-              .where(eq(qaPairsTable.contactId, duplicate.id));
-          }
-          
-          // Delete the duplicate contacts
-          for (const duplicate of duplicates) {
-            await tx
-              .delete(contactsTable)
-              .where(eq(contactsTable.id, duplicate.id));
-          }
-          
-          mergedCount += duplicates.length;
-          keptCount++;
-        }
+    const contacts = await this.db
+      .select()
+      .from(contactsTable)
+      .where(eq(contactsTable.companyId, companyId))
+      .orderBy(contactsTable.createdAt);
+    
+    // Group contacts by normalized name (case-insensitive)
+    const contactGroups = new Map<string, typeof contacts>();
+    contacts.forEach(contact => {
+      const normalizedName = contact.name.toLowerCase().trim();
+      if (!contactGroups.has(normalizedName)) {
+        contactGroups.set(normalizedName, []);
       }
-      
-      return { merged: mergedCount, kept: keptCount };
+      contactGroups.get(normalizedName)!.push(contact);
     });
+    
+    let mergedCount = 0;
+    let keptCount = 0;
+    
+    // For each group with duplicates, merge them
+    for (const [, group] of Array.from(contactGroups.entries())) {
+      if (group.length > 1) {
+        // Keep the oldest contact (first in sorted array) as base
+        const keepContact = group[0];
+        const duplicates = group.slice(1);
+        
+        // Reconcile metadata: prefer non-null values, with newer values taking precedence
+        let reconciledJobTitle = keepContact.jobTitle;
+        let reconciledNameInTranscript = keepContact.nameInTranscript;
+        
+        for (const duplicate of duplicates) {
+          // Prefer newer non-null values (duplicates are sorted oldest to newest)
+          if (duplicate.jobTitle) {
+            reconciledJobTitle = duplicate.jobTitle;
+          }
+          if (duplicate.nameInTranscript) {
+            reconciledNameInTranscript = duplicate.nameInTranscript;
+          }
+        }
+        
+        // Update the kept contact with reconciled metadata if anything changed
+        if (reconciledJobTitle !== keepContact.jobTitle || reconciledNameInTranscript !== keepContact.nameInTranscript) {
+          await this.db
+            .update(contactsTable)
+            .set({
+              jobTitle: reconciledJobTitle,
+              nameInTranscript: reconciledNameInTranscript,
+            })
+            .where(eq(contactsTable.id, keepContact.id));
+        }
+        
+        // Update all Q&A pairs that reference duplicates to point to the kept contact
+        for (const duplicate of duplicates) {
+          await this.db
+            .update(qaPairsTable)
+            .set({ contactId: keepContact.id })
+            .where(eq(qaPairsTable.contactId, duplicate.id));
+        }
+        
+        // Delete the duplicate contacts
+        for (const duplicate of duplicates) {
+          await this.db
+            .delete(contactsTable)
+            .where(eq(contactsTable.id, duplicate.id));
+        }
+        
+        mergedCount += duplicates.length;
+        keptCount++;
+      }
+    }
+    
+    return { merged: mergedCount, kept: keptCount };
   }
 
   // User operations (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
