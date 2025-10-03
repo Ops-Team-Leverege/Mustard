@@ -70,7 +70,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           slug,
           notes: null,
           companyDescription: data.companyDescription || null,
-          mainInterestAreas: data.mainInterestAreas || null,
           numberOfStores: data.numberOfStores || null,
         });
       }
@@ -896,7 +895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/companies/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, notes, companyDescription, mainInterestAreas, numberOfStores, stage, pilotStartDate, serviceTags } = req.body;
+      const { name, notes, companyDescription, numberOfStores, stage, pilotStartDate, serviceTags } = req.body;
       
       if (!name || typeof name !== 'string') {
         res.status(400).json({ error: "Name is required" });
@@ -905,7 +904,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const pilotStartDateValue = pilotStartDate ? new Date(pilotStartDate) : null;
       
-      const company = await storage.updateCompany(id, name, notes, companyDescription, mainInterestAreas, numberOfStores, stage, pilotStartDateValue, serviceTags);
+      const company = await storage.updateCompany(id, name, notes, companyDescription, numberOfStores, stage, pilotStartDateValue, serviceTags);
       
       if (!company) {
         res.status(404).json({ error: "Company not found" });
