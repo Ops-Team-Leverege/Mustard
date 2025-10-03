@@ -142,6 +142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             contactId: matchedContact?.id || null,
             company: data.companyName,
             companyId: company.id,
+            categoryId: qa.categoryId,
           };
         })
       );
