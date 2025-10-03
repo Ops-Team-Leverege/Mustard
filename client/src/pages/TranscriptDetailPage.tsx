@@ -162,10 +162,14 @@ export default function TranscriptDetailPage() {
             </CardHeader>
             <CardContent>
               <QATable
-                qaPairs={qaPairs.map(qa => ({
-                  ...qa,
-                  companyId: qa.companyId || '',
-                }))}
+                qaPairs={qaPairs.map(qa => {
+                  const mapped = {
+                    ...qa,
+                    companyId: qa.companyId || '',
+                  };
+                  console.log('Mapped Q&A for QATable:', qa.id, 'categoryId:', mapped.categoryId, 'categoryName:', mapped.categoryName);
+                  return mapped;
+                })}
                 categories={categories}
               />
             </CardContent>

@@ -223,6 +223,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transcript.companyId ? storage.getCompany(transcript.companyId) : Promise.resolve(undefined),
       ]);
 
+      // Debug: Log Q&A pairs data structure
+      console.log('Q&A Pairs returned from storage:', qaPairs.length, 'pairs');
+      if (qaPairs.length > 0) {
+        console.log('Sample Q&A:', JSON.stringify(qaPairs[0], null, 2));
+      }
+
       res.json({
         transcript,
         insights,
