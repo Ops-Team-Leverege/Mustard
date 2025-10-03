@@ -223,7 +223,7 @@ export default function Features() {
     <div className="container mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-semibold">Features</h1>
+          <h1 className="text-3xl font-semibold">Existing Features</h1>
           <p className="text-muted-foreground mt-1">
             Manage existing product features with demos and guides
           </p>
