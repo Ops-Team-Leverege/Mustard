@@ -5,6 +5,7 @@ import { z } from "zod";
 
 export const transcripts = pgTable("transcripts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name"), // Meeting/transcript name - user editable
   companyName: text("company_name").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
   transcript: text("transcript").notNull(),
