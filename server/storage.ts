@@ -36,7 +36,7 @@ export interface IStorage {
   getTranscript(id: string): Promise<Transcript | undefined>;
   getTranscriptsByCompany(companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
-  updateTranscriptName(id: string, name: string | null): Promise<Transcript | undefined>;
+  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date }): Promise<Transcript | undefined>;
 
   // Product Insights
   getProductInsights(): Promise<ProductInsightWithCategory[]>;
@@ -156,11 +156,15 @@ export class MemStorage implements IStorage {
     return Array.from(this.transcripts.values()).filter(t => t.companyId === companyId);
   }
 
-  async updateTranscriptName(id: string, name: string | null): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date }): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
     
-    const updated = { ...transcript, name };
+    const updated = { 
+      ...transcript, 
+      ...(updates.name !== undefined && { name: updates.name }),
+      ...(updates.createdAt !== undefined && { createdAt: updates.createdAt }),
+    };
     this.transcripts.set(id, updated);
     return updated;
   }
@@ -744,10 +748,14 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateTranscriptName(id: string, name: string | null): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date }): Promise<Transcript | undefined> {
+    const updateData: any = {};
+    if (updates.name !== undefined) updateData.name = updates.name;
+    if (updates.createdAt !== undefined) updateData.createdAt = updates.createdAt;
+    
     const results = await this.db
       .update(transcriptsTable)
-      .set({ name })
+      .set(updateData)
       .where(eq(transcriptsTable.id, id))
       .returning();
     return results[0];

@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar, Eye } from "lucide-react";
 import { useState } from "react";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CompanyOverview, Contact } from "@shared/schema";
@@ -38,6 +39,8 @@ export default function CompanyPage() {
   const [activeTab, setActiveTab] = useState("insights");
   const [editingTranscriptId, setEditingTranscriptId] = useState<string | null>(null);
   const [editTranscriptName, setEditTranscriptName] = useState('');
+  const [editTranscriptDate, setEditTranscriptDate] = useState('');
+  const [viewingTranscript, setViewingTranscript] = useState<any | null>(null);
 
   const { data: overview, isLoading } = useQuery<CompanyOverview>({
     queryKey: [`/api/companies/${companySlug}/overview`],
@@ -175,24 +178,25 @@ export default function CompanyPage() {
     },
   });
 
-  const updateTranscriptNameMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const res = await apiRequest('PATCH', `/api/transcripts/${id}/name`, { name });
+  const updateTranscriptMutation = useMutation({
+    mutationFn: async ({ id, name, createdAt }: { id: string; name?: string; createdAt?: string }) => {
+      const res = await apiRequest('PATCH', `/api/transcripts/${id}`, { name, createdAt });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companySlug}/overview`] });
       setEditingTranscriptId(null);
       setEditTranscriptName('');
+      setEditTranscriptDate('');
       toast({
         title: "Success",
-        description: "Transcript name updated successfully",
+        description: "Transcript updated successfully",
       });
     },
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to update transcript name",
+        description: "Failed to update transcript",
         variant: "destructive",
       });
     },
@@ -311,16 +315,23 @@ export default function CompanyPage() {
   const handleStartEditTranscript = (transcript: any) => {
     setEditingTranscriptId(transcript.id);
     setEditTranscriptName(transcript.name || '');
+    // Format date for input (YYYY-MM-DD)
+    setEditTranscriptDate(format(new Date(transcript.createdAt), 'yyyy-MM-dd'));
   };
 
-  const handleSaveTranscriptName = () => {
+  const handleSaveTranscript = () => {
     if (!editingTranscriptId || !editTranscriptName.trim()) return;
-    updateTranscriptNameMutation.mutate({ id: editingTranscriptId, name: editTranscriptName.trim() });
+    updateTranscriptMutation.mutate({ 
+      id: editingTranscriptId, 
+      name: editTranscriptName.trim(),
+      createdAt: editTranscriptDate ? new Date(editTranscriptDate).toISOString() : undefined,
+    });
   };
 
   const handleCancelEditTranscript = () => {
     setEditingTranscriptId(null);
     setEditTranscriptName('');
+    setEditTranscriptDate('');
   };
 
   return (
@@ -765,12 +776,18 @@ export default function CompanyPage() {
                         data-testid={`transcript-${transcript.id}`}
                       >
                         {editingTranscriptId === transcript.id ? (
-                          <div className="flex-1 flex items-center gap-3">
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <Input
                               value={editTranscriptName}
                               onChange={(e) => setEditTranscriptName(e.target.value)}
                               placeholder="Transcript name"
                               data-testid={`input-edit-transcript-name-${transcript.id}`}
+                            />
+                            <Input
+                              type="date"
+                              value={editTranscriptDate}
+                              onChange={(e) => setEditTranscriptDate(e.target.value)}
+                              data-testid={`input-edit-transcript-date-${transcript.id}`}
                             />
                           </div>
                         ) : (
@@ -795,8 +812,8 @@ export default function CompanyPage() {
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                onClick={handleSaveTranscriptName}
-                                disabled={updateTranscriptNameMutation.isPending || !editTranscriptName.trim()}
+                                onClick={handleSaveTranscript}
+                                disabled={updateTranscriptMutation.isPending || !editTranscriptName.trim()}
                                 data-testid={`button-save-transcript-${transcript.id}`}
                               >
                                 <Check className="h-4 w-4" />
@@ -805,21 +822,31 @@ export default function CompanyPage() {
                                 size="icon"
                                 variant="ghost"
                                 onClick={handleCancelEditTranscript}
-                                disabled={updateTranscriptNameMutation.isPending}
+                                disabled={updateTranscriptMutation.isPending}
                                 data-testid={`button-cancel-edit-transcript-${transcript.id}`}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
                             </>
                           ) : (
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleStartEditTranscript(transcript)}
-                              data-testid={`button-edit-transcript-${transcript.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => setViewingTranscript(transcript)}
+                                data-testid={`button-view-transcript-${transcript.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleStartEditTranscript(transcript)}
+                                data-testid={`button-edit-transcript-${transcript.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -837,6 +864,22 @@ export default function CompanyPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!viewingTranscript} onOpenChange={(open) => !open && setViewingTranscript(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{viewingTranscript?.name || 'Untitled Transcript'}</DialogTitle>
+            <DialogDescription>
+              {viewingTranscript && format(new Date(viewingTranscript.createdAt), 'MMMM d, yyyy')}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            <div className="whitespace-pre-wrap text-sm p-4 bg-muted rounded-md max-h-[50vh] overflow-y-auto" data-testid="transcript-content">
+              {viewingTranscript?.transcript}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
