@@ -28,6 +28,7 @@ export const companies = pgTable("companies", {
   numberOfStores: text("number_of_stores"),
   stage: text("stage"),
   pilotStartDate: timestamp("pilot_start_date"),
+  serviceTags: text("service_tags").array(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -130,6 +131,7 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
   createdAt: true,
 }).extend({
   stage: z.enum(["Prospect", "Pilot", "Rollout", "Scale"]).optional(),
+  serviceTags: z.array(z.enum(["tire services", "oil & express services", "commercial truck services", "full services"])).optional(),
 });
 
 export const insertContactSchema = createInsertSchema(contacts).omit({
