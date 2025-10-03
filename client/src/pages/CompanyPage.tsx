@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Check, X, Plus, Trash2, User } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar } from "lucide-react";
 import { useState } from "react";
+import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CompanyOverview, Contact } from "@shared/schema";
@@ -33,6 +35,7 @@ export default function CompanyPage() {
   const [newContact, setNewContact] = useState({ name: '', nameInTranscript: '', jobTitle: '' });
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editContactForm, setEditContactForm] = useState({ name: '', nameInTranscript: '', jobTitle: '' });
+  const [activeTab, setActiveTab] = useState("insights");
 
   const { data: overview, isLoading } = useQuery<CompanyOverview>({
     queryKey: [`/api/companies/${companySlug}/overview`],
@@ -459,15 +462,70 @@ export default function CompanyPage() {
         </CardHeader>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div>
-              <CardTitle>Contacts</CardTitle>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="insights" data-testid="tab-insights">
+            Insights & Q&A
+          </TabsTrigger>
+          <TabsTrigger value="contacts" data-testid="tab-contacts">
+            Contacts
+          </TabsTrigger>
+          <TabsTrigger value="transcripts" data-testid="tab-transcripts">
+            Transcripts
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="insights" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Insights</CardTitle>
               <CardDescription>
-                Customer contacts from {overview.company.name}
+                Feature requests and product feedback from {overview.company.name}
               </CardDescription>
-            </div>
+            </CardHeader>
+            <CardContent>
+              <ProductInsightsTable 
+                insights={overview.insights.map(i => ({
+                  ...i,
+                  category: i.categoryName || 'NEW',
+                }))}
+                categories={categories}
+                defaultCompany={overview.company.name}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Q&A Pairs</CardTitle>
+              <CardDescription>
+                Questions and answers from {overview.company.name} calls
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <QATable 
+                qaPairs={overview.qaPairs.map(qa => ({
+                  ...qa,
+                  companyId: qa.companyId || overview.company.id,
+                  category: qa.categoryName || 'NEW',
+                }))}
+                categories={categories}
+                defaultCompany={overview.company.name}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="contacts">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <CardTitle>Contacts</CardTitle>
+                  <CardDescription>
+                    Customer contacts from {overview.company.name}
+                  </CardDescription>
+                </div>
             {!isAddingContact && (
               <Button
                 size="sm"
@@ -646,45 +704,22 @@ export default function CompanyPage() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Product Insights</CardTitle>
-          <CardDescription>
-            Feature requests and product feedback from {overview.company.name}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <ProductInsightsTable 
-            insights={overview.insights.map(i => ({
-              ...i,
-              category: i.categoryName || 'NEW',
-            }))}
-            categories={categories}
-            defaultCompany={overview.company.name}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Q&A Pairs</CardTitle>
-          <CardDescription>
-            Questions and answers from {overview.company.name} calls
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <QATable 
-            qaPairs={overview.qaPairs.map(qa => ({
-              ...qa,
-              companyId: qa.companyId || overview.company.id,
-              category: qa.categoryName || 'NEW',
-            }))}
-            categories={categories}
-            defaultCompany={overview.company.name}
-          />
-        </CardContent>
-      </Card>
+        <TabsContent value="transcripts">
+          <Card>
+            <CardHeader>
+              <CardTitle>Transcripts</CardTitle>
+              <CardDescription>
+                Meeting transcripts from {overview.company.name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">Transcripts list coming soon...</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
