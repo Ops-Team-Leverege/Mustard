@@ -59,7 +59,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [sortColumn, setSortColumn] = useState<'category' | 'createdAt'>('createdAt');
+  const [sortColumn, setSortColumn] = useState<'category' | 'createdAt' | 'transcriptDate'>('createdAt');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const { toast } = useToast();
 
@@ -212,7 +212,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     return matchesSearch && matchesCategory;
   });
 
-  const handleSort = (column: 'category' | 'createdAt') => {
+  const handleSort = (column: 'category' | 'createdAt' | 'transcriptDate') => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
@@ -231,6 +231,10 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
     } else if (sortColumn === 'createdAt') {
       const aTime = a.createdAt ? (typeof a.createdAt === 'string' ? new Date(a.createdAt).getTime() : a.createdAt.getTime()) : 0;
       const bTime = b.createdAt ? (typeof b.createdAt === 'string' ? new Date(b.createdAt).getTime() : b.createdAt.getTime()) : 0;
+      comparison = aTime - bTime;
+    } else if (sortColumn === 'transcriptDate') {
+      const aTime = a.transcriptDate ? (typeof a.transcriptDate === 'string' ? new Date(a.transcriptDate).getTime() : a.transcriptDate.getTime()) : 0;
+      const bTime = b.transcriptDate ? (typeof b.transcriptDate === 'string' ? new Date(b.transcriptDate).getTime() : b.transcriptDate.getTime()) : 0;
       comparison = aTime - bTime;
     }
     
@@ -321,7 +325,20 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                   )}
                 </button>
               </TableHead>
-              <TableHead className="min-w-[150px]">Transcript Date</TableHead>
+              <TableHead className="min-w-[150px]">
+                <button 
+                  onClick={() => handleSort('transcriptDate')} 
+                  className="flex items-center gap-1 hover:text-foreground transition-colors"
+                  data-testid="button-sort-transcript-date"
+                >
+                  Transcript Date
+                  {sortColumn === 'transcriptDate' ? (
+                    sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                  ) : (
+                    <ArrowUpDown className="h-3 w-3 opacity-50" />
+                  )}
+                </button>
+              </TableHead>
               <TableHead className="min-w-[150px]">
                 <button 
                   onClick={() => handleSort('createdAt')} 
