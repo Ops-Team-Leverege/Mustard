@@ -36,6 +36,7 @@ Preferred communication style: Simple, everyday language.
 - **Dashboard Analytics**: Companies page features dashboard cards showing (1) Recent Meetings from last 7 days with clickable links to transcript details, and (2) Companies by Stage pie chart visualization using Recharts, with color-coded stages (Prospect: slate, Pilot: blue, Rollout: orange, Scale: green).
 - **Contact Management**: Smart duplicate prevention when adding transcripts (checks existing contacts by name and nameInTranscript); dedicated "Merge Duplicates" feature on company pages to consolidate duplicate contacts while preserving the newest non-null metadata (job titles, transcript aliases) and maintaining Q&A pair references.
 - **Transcript Management**: Dedicated Transcripts page (`/transcripts`) with full list view, search by name/company, edit/delete capabilities with confirmation dialogs, and cascade deletion of associated insights and Q&A pairs.
+- **Service Tagging**: Companies can be tagged with service categories ("tire services", "oil & express services", "commercial truck services", "full services") via checkbox selection in edit mode; tags displayed as badges in view mode for quick service identification.
 
 ## External Dependencies
 
