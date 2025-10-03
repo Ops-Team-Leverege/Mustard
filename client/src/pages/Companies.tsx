@@ -14,6 +14,7 @@ interface Company {
   slug: string;
   notes?: string | null;
   stage?: string | null;
+  serviceTags?: string[] | null;
   createdAt: Date;
 }
 
@@ -221,9 +222,19 @@ export default function Companies() {
                   )}
                 </CardHeader>
                 <CardContent className="pt-0">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>View insights & Q&A →</span>
-                  </div>
+                  {company.serviceTags && company.serviceTags.length > 0 ? (
+                    <div className="flex gap-2 flex-wrap">
+                      {company.serviceTags.map((tag) => (
+                        <Badge key={tag} variant="outline" className="text-xs" data-testid={`badge-service-tag-${company.id}-${tag}`}>
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground/50">
+                      No service tags
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </Link>
