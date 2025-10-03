@@ -1314,9 +1314,11 @@ export class DbStorage implements IStorage {
         categoryName: categoriesTable.name,
         jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(
         drizzleSql`${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name})`
       );
@@ -1337,10 +1339,12 @@ export class DbStorage implements IStorage {
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
         createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(
         drizzleSql`${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name})`
       );
@@ -1524,9 +1528,11 @@ export class DbStorage implements IStorage {
         categoryName: categoriesTable.name,
         jiraTicketKey: productInsightsTable.jiraTicketKey,
         createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(eq(productInsightsTable.categoryId, categoryId));
 
     // Get Q&A pairs for this category with category and contact info
@@ -1545,10 +1551,12 @@ export class DbStorage implements IStorage {
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
         createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
       })
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(eq(qaPairsTable.categoryId, categoryId));
 
     return {

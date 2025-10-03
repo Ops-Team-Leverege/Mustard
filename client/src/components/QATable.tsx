@@ -30,7 +30,7 @@ export interface QAPair {
   contactName?: string | null;
   contactJobTitle?: string | null;
   company: string;
-  companyId: string;
+  companyId: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
   createdAt?: Date | string | null;
