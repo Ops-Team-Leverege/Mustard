@@ -211,7 +211,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                               ...formData, 
                               companyName: company.name,
                               companyDescription: company.companyDescription || '',
-                              mainInterestAreas: company.mainInterestAreas || '',
                               numberOfStores: company.numberOfStores || ''
                             });
                             setSelectedCompanyId(company.id);
