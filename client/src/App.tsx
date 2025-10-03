@@ -11,6 +11,7 @@ import ProductInsights from "@/pages/ProductInsights";
 import QADatabase from "@/pages/QADatabase";
 import Categories from "@/pages/Categories";
 import Features from "@/pages/Features";
+import FeatureDetail from "@/pages/FeatureDetail";
 import Companies from "@/pages/Companies";
 import CompanyPage from "@/pages/CompanyPage";
 import CategoryPage from "@/pages/CategoryPage";
@@ -127,6 +128,14 @@ function Router() {
       <Route path="/features">
         <ProtectedRoute 
           component={Features} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/features/:id">
+        <ProtectedRoute 
+          component={FeatureDetail} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}

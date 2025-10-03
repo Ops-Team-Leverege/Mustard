@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -256,7 +257,13 @@ export default function Features() {
             <TableBody>
               {features.map((feature) => (
                 <TableRow key={feature.id} data-testid={`row-feature-${feature.id}`}>
-                  <TableCell className="font-medium">{feature.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <Link href={`/features/${feature.id}`}>
+                      <button className="text-primary hover:underline text-left" data-testid={`link-feature-${feature.id}`}>
+                        {feature.name}
+                      </button>
+                    </Link>
+                  </TableCell>
                   <TableCell className="max-w-md">
                     <div className="whitespace-pre-wrap line-clamp-3">{feature.description || "—"}</div>
                   </TableCell>
