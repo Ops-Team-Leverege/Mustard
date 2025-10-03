@@ -31,6 +31,10 @@ export default function TranscriptDetailPage() {
   // Debug: Log Q&A pairs to check category data
   if (data?.qaPairs) {
     console.log('Q&A Pairs from API:', data.qaPairs);
+    console.log('Sample Q&A Pair:', data.qaPairs[0]);
+    data.qaPairs.forEach((qa, index) => {
+      console.log(`QA ${index}: categoryId=${qa.categoryId}, categoryName=${qa.categoryName}`);
+    });
   }
 
   const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description?: string }>>({
