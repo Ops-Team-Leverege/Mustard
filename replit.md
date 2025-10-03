@@ -33,6 +33,7 @@ Preferred communication style: Simple, everyday language.
 - **Timestamp Tracking**: `createdAt` timestamps for product insights and Q&A pairs; transcripts support custom meeting dates via optional date input on upload form.
 - **Transcript Detail View**: Dedicated page (`/transcripts/:id`) shows individual transcript with filtered insights/Q&A from that specific call, accessible by clicking transcript rows on company pages.
 - **Meeting Date Support**: Transcript upload form includes optional meeting date field to set custom date for when meeting occurred; if not provided, defaults to current timestamp.
+- **Dashboard Analytics**: Companies page features dashboard cards showing (1) Recent Meetings from last 7 days with clickable links to transcript details, and (2) Companies by Stage pie chart visualization using Recharts, with color-coded stages (Prospect: slate, Pilot: blue, Rollout: orange, Scale: green).
 
 ## External Dependencies
 
@@ -66,6 +67,7 @@ Preferred communication style: Simple, everyday language.
 - **clsx & tailwind-merge**: CSS class utilities.
 - **cmdk**: Command palette component.
 - **embla-carousel-react**: Carousel functionality.
+- **Recharts**: Data visualization library for charts and graphs.
 
 ### Integrations
 - **Replit Auth**: User authentication system.
