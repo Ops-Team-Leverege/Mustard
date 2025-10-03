@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search, Building2 } from "lucide-react";
+import { Search, Building2, FileText, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { useState } from "react";
+import { format } from "date-fns";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
 interface Company {
   id: string;
@@ -12,6 +14,13 @@ interface Company {
   slug: string;
   notes?: string | null;
   stage?: string | null;
+  createdAt: Date;
+}
+
+interface RecentTranscript {
+  id: string;
+  name: string | null;
+  companyName: string;
   createdAt: Date;
 }
 
@@ -30,6 +39,14 @@ function getStageStyles(stage: string) {
   }
 }
 
+const STAGE_COLORS: Record<string, string> = {
+  'Prospect': '#64748b',
+  'Pilot': '#3b82f6',
+  'Rollout': '#f97316',
+  'Scale': '#10b981',
+  'Unknown': '#6b7280',
+};
+
 export default function Companies() {
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -37,9 +54,22 @@ export default function Companies() {
     queryKey: ['/api/companies'],
   });
 
+  const { data: recentTranscripts = [] } = useQuery<RecentTranscript[]>({
+    queryKey: ['/api/dashboard/recent-transcripts'],
+  });
+
+  const { data: dashboardStats } = useQuery<{ stageStats: Record<string, number> }>({
+    queryKey: ['/api/dashboard/stats'],
+  });
+
   const filteredCompanies = companies.filter(company =>
     company.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const pieData = dashboardStats?.stageStats ? Object.entries(dashboardStats.stageStats).map(([name, value]) => ({
+    name,
+    value,
+  })) : [];
 
   if (isLoading) {
     return (
@@ -62,6 +92,84 @@ export default function Companies() {
           <Badge variant="secondary" className="font-normal">
             {companies.length} {companies.length === 1 ? 'company' : 'companies'}
           </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Recent Meetings (Last 7 Days)
+              </CardTitle>
+              <CardDescription>Latest meeting transcripts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentTranscripts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No meetings in the last 7 days
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentTranscripts.map((transcript) => (
+                    <Link key={transcript.id} href={`/transcripts/${transcript.id}`}>
+                      <div className="flex items-start justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer border" data-testid={`recent-transcript-${transcript.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {transcript.name || 'Untitled Meeting'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {transcript.companyName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(transcript.createdAt), 'MMM d')}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                Companies by Stage
+              </CardTitle>
+              <CardDescription>Distribution across sales stages</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pieData.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No stage data available
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={70}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.name] || STAGE_COLORS['Unknown']} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
         </div>
         
         <div className="relative max-w-md">
