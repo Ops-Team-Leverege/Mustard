@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar, Eye, GitMerge } from "lucide-react";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
@@ -560,6 +562,18 @@ export default function CompanyPage() {
                       </p>
                     </div>
                   )}
+                  {overview.company.serviceTags && overview.company.serviceTags.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-1">Service Tags</h3>
+                      <div className="flex gap-2 flex-wrap">
+                        {overview.company.serviceTags.map((tag) => (
+                          <Badge key={tag} variant="outline" data-testid={`badge-service-tag-${tag}`}>
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="space-y-4">
@@ -617,6 +631,30 @@ export default function CompanyPage() {
                       placeholder="e.g., 50 stores"
                       data-testid="input-number-of-stores"
                     />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2">Service Tags</h3>
+                    <div className="space-y-2">
+                      {["tire services", "oil & express services", "commercial truck services", "full services"].map((tag) => (
+                        <div key={tag} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`service-tag-${tag}`}
+                            checked={editForm.serviceTags.includes(tag)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEditForm({ ...editForm, serviceTags: [...editForm.serviceTags, tag] });
+                              } else {
+                                setEditForm({ ...editForm, serviceTags: editForm.serviceTags.filter(t => t !== tag) });
+                              }
+                            }}
+                            data-testid={`checkbox-service-tag-${tag}`}
+                          />
+                          <Label htmlFor={`service-tag-${tag}`} className="text-sm font-normal cursor-pointer">
+                            {tag}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
