@@ -23,6 +23,7 @@ export interface QAPairResult {
   question: string;
   answer: string;
   asker: string;
+  categoryId: string | null;
 }
 
 export interface AnalysisResult {
@@ -79,6 +80,7 @@ Identify product-specific questions asked during the call. For each:
 - question: The question that was asked (product-related only, not scheduling/admin) - lightly paraphrased for clarity
 - answer: The answer that was provided - lightly paraphrased for clarity
 - asker: The name of the person who asked (from customer names list)
+- categoryId: Match to one of the category IDs above, or null if no good match (will be marked as NEW)
 
 OUTPUT FORMAT:
 Respond with valid JSON in this exact structure:
@@ -95,7 +97,8 @@ Respond with valid JSON in this exact structure:
     {
       "question": "paraphrased question (clear and readable)",
       "answer": "paraphrased answer (clear and readable)",
-      "asker": "person name"
+      "asker": "person name",
+      "categoryId": "category-id-or-null"
     }
   ]
 }
