@@ -25,6 +25,7 @@ export const companies = pgTable("companies", {
   companyDescription: text("company_description"),
   mainInterestAreas: text("main_interest_areas"),
   numberOfStores: text("number_of_stores"),
+  stage: text("stage"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -125,6 +126,8 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   createdAt: true,
+}).extend({
+  stage: z.enum(["Prospect", "Pilot", "Rollout", "Scale"]).optional(),
 });
 
 export const insertContactSchema = createInsertSchema(contacts).omit({
