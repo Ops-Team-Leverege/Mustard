@@ -73,7 +73,7 @@ export interface IStorage {
   getCompany(id: string): Promise<Company | undefined>;
   getCompanyBySlug(slug: string): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
-  updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null): Promise<Company | undefined>;
+  updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<boolean>;
   getCompanyOverview(slug: string): Promise<CompanyOverview | null>;
   updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void>;
@@ -556,7 +556,7 @@ export class MemStorage implements IStorage {
     return company;
   }
 
-  async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null): Promise<Company | undefined> {
+  async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined> {
     const company = this.companies.get(id);
     if (!company) return undefined;
     
@@ -569,6 +569,7 @@ export class MemStorage implements IStorage {
       numberOfStores: numberOfStores !== undefined ? (numberOfStores ?? null) : company.numberOfStores,
       stage: stage !== undefined ? (stage ?? null) : company.stage,
       pilotStartDate: pilotStartDate !== undefined ? (pilotStartDate ?? null) : company.pilotStartDate,
+      serviceTags: serviceTags !== undefined ? (serviceTags ?? null) : company.serviceTags,
     };
     this.companies.set(id, updated);
     return updated;
@@ -1220,7 +1221,7 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null): Promise<Company | undefined> {
+  async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, mainInterestAreas?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined> {
     const results = await this.db
       .update(companiesTable)
       .set({ 
@@ -1231,6 +1232,7 @@ export class DbStorage implements IStorage {
         numberOfStores: numberOfStores !== undefined ? (numberOfStores ?? null) : undefined,
         stage: stage !== undefined ? (stage ?? null) : undefined,
         pilotStartDate: pilotStartDate !== undefined ? (pilotStartDate ?? null) : undefined,
+        serviceTags: serviceTags !== undefined ? (serviceTags ?? null) : undefined,
       })
       .where(eq(companiesTable.id, id))
       .returning();
