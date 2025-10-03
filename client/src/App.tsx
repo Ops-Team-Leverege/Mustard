@@ -12,6 +12,7 @@ import Categories from "@/pages/Categories";
 import Companies from "@/pages/Companies";
 import CompanyPage from "@/pages/CompanyPage";
 import CategoryPage from "@/pages/CategoryPage";
+import TranscriptDetailPage from "@/pages/TranscriptDetailPage";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
@@ -106,6 +107,14 @@ function Router() {
       <Route path="/categories/:id">
         <ProtectedRoute 
           component={CategoryPage} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/transcripts/:id">
+        <ProtectedRoute 
+          component={TranscriptDetailPage} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
