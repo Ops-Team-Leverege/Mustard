@@ -27,6 +27,7 @@ export const companies = pgTable("companies", {
   mainInterestAreas: text("main_interest_areas"),
   numberOfStores: text("number_of_stores"),
   stage: text("stage"),
+  pilotStartDate: timestamp("pilot_start_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
