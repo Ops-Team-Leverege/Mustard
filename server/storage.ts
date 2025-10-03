@@ -34,7 +34,9 @@ export interface IStorage {
   // Transcripts
   getTranscripts(): Promise<Transcript[]>;
   getTranscript(id: string): Promise<Transcript | undefined>;
+  getTranscriptsByCompany(companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
+  updateTranscriptName(id: string, name: string | null): Promise<Transcript | undefined>;
 
   // Product Insights
   getProductInsights(): Promise<ProductInsightWithCategory[]>;
@@ -137,6 +139,7 @@ export class MemStorage implements IStorage {
     const id = randomUUID();
     const transcript: Transcript = {
       ...insertTranscript,
+      name: insertTranscript.name ?? null,
       companyId: insertTranscript.companyId ?? null,
       companyDescription: insertTranscript.companyDescription ?? null,
       numberOfStores: insertTranscript.numberOfStores ?? null,
@@ -147,6 +150,19 @@ export class MemStorage implements IStorage {
     };
     this.transcripts.set(id, transcript);
     return transcript;
+  }
+
+  async getTranscriptsByCompany(companyId: string): Promise<Transcript[]> {
+    return Array.from(this.transcripts.values()).filter(t => t.companyId === companyId);
+  }
+
+  async updateTranscriptName(id: string, name: string | null): Promise<Transcript | undefined> {
+    const transcript = this.transcripts.get(id);
+    if (!transcript) return undefined;
+    
+    const updated = { ...transcript, name };
+    this.transcripts.set(id, updated);
+    return updated;
   }
 
   // Product Insights - with category name enrichment
@@ -715,6 +731,24 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .insert(transcriptsTable)
       .values(insertTranscript)
+      .returning();
+    return results[0];
+  }
+
+  async getTranscriptsByCompany(companyId: string): Promise<Transcript[]> {
+    const results = await this.db
+      .select()
+      .from(transcriptsTable)
+      .where(eq(transcriptsTable.companyId, companyId))
+      .orderBy(transcriptsTable.createdAt);
+    return results;
+  }
+
+  async updateTranscriptName(id: string, name: string | null): Promise<Transcript | undefined> {
+    const results = await this.db
+      .update(transcriptsTable)
+      .set({ name })
+      .where(eq(transcriptsTable.id, id))
       .returning();
     return results[0];
   }
