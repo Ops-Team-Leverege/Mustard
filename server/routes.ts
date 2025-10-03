@@ -68,6 +68,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: data.companyName,
           slug,
           notes: null,
+          companyDescription: data.companyDescription || null,
+          mainInterestAreas: data.mainInterestAreas || null,
+          numberOfStores: data.numberOfStores || null,
         });
       }
       
