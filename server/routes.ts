@@ -208,6 +208,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/transcripts/:id/details", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const transcript = await storage.getTranscript(id);
+      
+      if (!transcript) {
+        return res.status(404).json({ error: "Transcript not found" });
+      }
+
+      const [insights, qaPairs, company] = await Promise.all([
+        storage.getProductInsightsByTranscript(id),
+        storage.getQAPairsByTranscript(id),
+        transcript.companyId ? storage.getCompany(transcript.companyId) : Promise.resolve(undefined),
+      ]);
+
+      res.json({
+        transcript,
+        insights,
+        qaPairs,
+        company,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   // Product Insights
   app.get("/api/insights", isAuthenticated, async (_req, res) => {
     try {
