@@ -25,6 +25,7 @@ export default function ProductInsights() {
     category: insight.categoryName || 'NEW',
     categoryId: insight.categoryId || null,
     createdAt: insight.createdAt,
+    transcriptDate: insight.transcriptDate,
   }));
 
   // Pass full category objects with id and name
