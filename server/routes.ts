@@ -208,6 +208,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/transcripts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deleteTranscript(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Transcript not found" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.get("/api/transcripts/:id/details", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
