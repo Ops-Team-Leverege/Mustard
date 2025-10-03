@@ -15,6 +15,7 @@ export const transcripts = pgTable("transcripts", {
   numberOfStores: text("number_of_stores"),
   contactJobTitle: text("contact_job_title"),
   mainInterestAreas: text("main_interest_areas"),
+  mainMeetingTakeaways: text("main_meeting_takeaways"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
