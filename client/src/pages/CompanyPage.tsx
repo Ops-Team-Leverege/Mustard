@@ -202,6 +202,27 @@ export default function CompanyPage() {
     },
   });
 
+  const deleteTranscriptMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/transcripts/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companySlug}/overview`] });
+      toast({
+        title: "Success",
+        description: "Transcript deleted successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete transcript",
+        variant: "destructive",
+      });
+    },
+  });
+
   const deleteCompanyMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await apiRequest('DELETE', `/api/companies/${id}`, {});
@@ -849,6 +870,15 @@ export default function CompanyPage() {
                                 data-testid={`button-edit-transcript-${transcript.id}`}
                               >
                                 <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => deleteTranscriptMutation.mutate(transcript.id)}
+                                disabled={deleteTranscriptMutation.isPending}
+                                data-testid={`button-delete-transcript-${transcript.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </>
                           )}
