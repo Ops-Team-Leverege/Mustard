@@ -22,7 +22,7 @@ export default function FeatureDetail() {
   const featureId = params.id;
 
   const { data: feature, isLoading: isLoadingFeature } = useQuery<Feature>({
-    queryKey: ['/api/features', featureId],
+    queryKey: [`/api/features/${featureId}`],
     enabled: !!featureId,
   });
 
