@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Sparkles, Loader2, Plus, X, User, Check, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -36,6 +37,17 @@ export interface TranscriptData {
   mainInterestAreas?: string;
 }
 
+const LEVEREGE_TEAM_OPTIONS = [
+  "Calum McClelland",
+  "Hannah White",
+  "Steven Lee",
+  "Corey Redd",
+  "Julia Conn",
+  "Eric Conn",
+  "Ryan Chacon",
+  "Kevin Moran"
+];
+
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
   const [formData, setFormData] = useState<TranscriptData>({
     companyName: '',
@@ -54,6 +66,9 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', nameInTranscript: '', jobTitle: '' });
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
   const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [teamSearchOpen, setTeamSearchOpen] = useState(false);
+  const [teamSearchValue, setTeamSearchValue] = useState('');
 
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
@@ -92,6 +107,21 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     setCustomers(updatedCustomers);
   };
 
+  const handleAddTeamMember = (name: string) => {
+    if (name.trim() && !teamMembers.includes(name.trim())) {
+      setTeamMembers([...teamMembers, name.trim()]);
+      setTeamSearchValue('');
+    }
+  };
+
+  const handleRemoveTeamMember = (name: string) => {
+    setTeamMembers(teamMembers.filter(m => m !== name));
+  };
+
+  const availableTeamOptions = LEVEREGE_TEAM_OPTIONS.filter(
+    option => !teamMembers.includes(option)
+  );
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -107,15 +137,17 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       return;
     }
     
-    if (!formData.leverageTeam.trim()) {
+    if (teamMembers.length === 0) {
       return;
     }
     
     // Convert customers array to comma-separated names for backward compatibility
     const customerNames = customers.map(c => c.name).join(', ');
+    const leverageTeamString = teamMembers.join(', ');
     
     const submissionData = {
       ...formData,
+      leverageTeam: leverageTeamString,
       customerNames,
       customers,
     };
@@ -246,17 +278,104 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="leverageTeam" data-testid="label-leverage-team">Leverege Team Members <span className="text-destructive">*</span></Label>
-            <Input
-              id="leverageTeam"
-              data-testid="input-leverage-team"
-              placeholder="e.g., John Smith, Sarah Johnson"
-              value={formData.leverageTeam}
-              onChange={(e) => setFormData({ ...formData, leverageTeam: e.target.value })}
-              required
-            />
+            <Label data-testid="label-leverage-team">Leverege Team Members <span className="text-destructive">*</span></Label>
+            
+            <Popover open={teamSearchOpen} onOpenChange={setTeamSearchOpen}>
+              <PopoverTrigger asChild>
+                <div 
+                  className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover-elevate"
+                  data-testid="button-team-selector"
+                >
+                  {teamMembers.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {teamMembers.map((member) => (
+                        <Badge 
+                          key={member} 
+                          variant="secondary" 
+                          className="gap-1"
+                          data-testid={`badge-team-${member.replace(/\s+/g, '-').toLowerCase()}`}
+                        >
+                          {member}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveTeamMember(member);
+                            }}
+                            className="ml-1 hover:text-destructive"
+                            data-testid={`button-remove-team-${member.replace(/\s+/g, '-').toLowerCase()}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Select team members...</span>
+                  )}
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command>
+                  <CommandInput 
+                    placeholder="Search or type name..." 
+                    value={teamSearchValue}
+                    onValueChange={setTeamSearchValue}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && teamSearchValue.trim()) {
+                        e.preventDefault();
+                        handleAddTeamMember(teamSearchValue);
+                        setTeamSearchOpen(false);
+                      }
+                    }}
+                    data-testid="input-team-search"
+                  />
+                  <CommandList>
+                    {availableTeamOptions.length === 0 && !teamSearchValue.trim() ? (
+                      <CommandEmpty>All team members selected</CommandEmpty>
+                    ) : (
+                      <>
+                        {teamSearchValue.trim() && !LEVEREGE_TEAM_OPTIONS.includes(teamSearchValue.trim()) && (
+                          <CommandGroup heading="Custom">
+                            <CommandItem
+                              onSelect={() => {
+                                handleAddTeamMember(teamSearchValue);
+                                setTeamSearchOpen(false);
+                              }}
+                              data-testid="option-team-custom"
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Add "{teamSearchValue}"
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
+                        {availableTeamOptions.length > 0 && (
+                          <CommandGroup heading="Team Members">
+                            {availableTeamOptions.map((member) => (
+                              <CommandItem
+                                key={member}
+                                value={member}
+                                onSelect={() => {
+                                  handleAddTeamMember(member);
+                                  setTeamSearchOpen(false);
+                                }}
+                                data-testid={`option-team-${member.replace(/\s+/g, '-').toLowerCase()}`}
+                              >
+                                <User className="mr-2 h-4 w-4" />
+                                {member}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )}
+                      </>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            
             <p className="text-xs text-muted-foreground">
-              Comma-separated list of Leverege team members on the call
+              Select from the list or type a custom name
             </p>
           </div>
 
@@ -417,7 +536,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           <Button
             type="submit"
             className="w-full"
-            disabled={isAnalyzing || customers.length === 0 || !formData.companyName.trim() || !formData.transcript.trim() || !formData.leverageTeam.trim()}
+            disabled={isAnalyzing || customers.length === 0 || !formData.companyName.trim() || !formData.transcript.trim() || teamMembers.length === 0}
             data-testid="button-analyze-transcript"
           >
             {isAnalyzing ? (
