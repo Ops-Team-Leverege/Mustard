@@ -28,15 +28,6 @@ export default function TranscriptDetailPage() {
     enabled: !!transcriptId,
   });
 
-  // Debug: Log Q&A pairs to check category data
-  if (data?.qaPairs) {
-    console.log('Q&A Pairs from API:', data.qaPairs);
-    console.log('Sample Q&A Pair:', data.qaPairs[0]);
-    data.qaPairs.forEach((qa, index) => {
-      console.log(`QA ${index}: categoryId=${qa.categoryId}, categoryName=${qa.categoryName}`);
-    });
-  }
-
   const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description?: string }>>({
     queryKey: ['/api/categories'],
   });
@@ -162,14 +153,10 @@ export default function TranscriptDetailPage() {
             </CardHeader>
             <CardContent>
               <QATable
-                qaPairs={qaPairs.map(qa => {
-                  const mapped = {
-                    ...qa,
-                    companyId: qa.companyId || '',
-                  };
-                  console.log('Mapped Q&A for QATable:', qa.id, 'categoryId:', mapped.categoryId, 'categoryName:', mapped.categoryName);
-                  return mapped;
-                })}
+                qaPairs={qaPairs.map(qa => ({
+                  ...qa,
+                  companyId: qa.companyId || '',
+                }))}
                 categories={categories}
               />
             </CardContent>
