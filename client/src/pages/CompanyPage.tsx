@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar, Eye } from "lucide-react";
+import { Pencil, Check, X, Plus, Trash2, User, FileText, Calendar, Eye, GitMerge } from "lucide-react";
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -185,6 +185,41 @@ export default function CompanyPage() {
       toast({
         title: "Error",
         description: "Failed to delete contact",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const mergeDuplicateContactsMutation = useMutation({
+    mutationFn: async () => {
+      if (!overview?.company.id) throw new Error("Company not found");
+      const res = await apiRequest('POST', `/api/companies/${overview.company.id}/merge-duplicate-contacts`, {});
+      return res.json();
+    },
+    onSuccess: (data: { merged: number; kept: number }) => {
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
+        }
+      });
+      
+      if (data.merged > 0) {
+        toast({
+          title: "Success",
+          description: `Merged ${data.merged} duplicate contact${data.merged > 1 ? 's' : ''} into ${data.kept} unique contact${data.kept > 1 ? 's' : ''}`,
+        });
+      } else {
+        toast({
+          title: "No duplicates found",
+          description: "All contacts are already unique",
+        });
+      }
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to merge duplicate contacts",
         variant: "destructive",
       });
     },
@@ -651,15 +686,27 @@ export default function CompanyPage() {
                   </CardDescription>
                 </div>
             {!isAddingContact && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setIsAddingContact(true)}
-                data-testid="button-add-contact"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Contact
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => mergeDuplicateContactsMutation.mutate()}
+                  disabled={mergeDuplicateContactsMutation.isPending}
+                  data-testid="button-merge-duplicates"
+                >
+                  <GitMerge className="h-4 w-4 mr-2" />
+                  Merge Duplicates
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAddingContact(true)}
+                  data-testid="button-add-contact"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Contact
+                </Button>
+              </div>
             )}
           </div>
         </CardHeader>

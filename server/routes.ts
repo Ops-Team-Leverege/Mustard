@@ -878,6 +878,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/companies/:companyId/merge-duplicate-contacts", isAuthenticated, async (req, res) => {
+    try {
+      const { companyId } = req.params;
+      
+      const company = await storage.getCompany(companyId);
+      if (!company) {
+        res.status(404).json({ error: "Company not found" });
+        return;
+      }
+      
+      const result = await storage.mergeDuplicateContacts(companyId);
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
