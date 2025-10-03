@@ -13,7 +13,11 @@ export default function TranscriptInput() {
     setIsAnalyzing(true);
     
     try {
-      const response = await apiRequest('POST', '/api/transcripts', data);
+      const submissionData = {
+        ...data,
+        createdAt: data.meetingDate ? new Date(data.meetingDate).toISOString() : undefined,
+      };
+      const response = await apiRequest('POST', '/api/transcripts', submissionData);
       const result = await response.json();
       
       // Invalidate all relevant caches to ensure fresh data

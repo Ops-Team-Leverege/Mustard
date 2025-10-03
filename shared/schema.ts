@@ -102,9 +102,9 @@ const customerSchema = z.object({
 
 export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
-  createdAt: true,
   customerNames: true,
 }).extend({
+  createdAt: z.string().or(z.date()).optional(),
   customerNames: z.string().min(1, "At least one customer is required"),
   customers: z.array(customerSchema).min(1, "At least one customer is required"),
 });

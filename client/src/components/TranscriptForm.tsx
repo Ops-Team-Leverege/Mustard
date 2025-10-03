@@ -25,6 +25,7 @@ export interface Customer {
 export interface TranscriptData {
   companyName: string;
   name?: string;
+  meetingDate?: string;
   transcript: string;
   leverageTeam: string;
   customerNames: string;
@@ -39,6 +40,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const [formData, setFormData] = useState<TranscriptData>({
     companyName: '',
     name: '',
+    meetingDate: '',
     transcript: '',
     leverageTeam: '',
     customerNames: '',
@@ -213,6 +215,20 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             />
             <p className="text-xs text-muted-foreground">
               Optional name to identify this transcript
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="meetingDate" data-testid="label-meeting-date">Meeting Date</Label>
+            <Input
+              id="meetingDate"
+              type="date"
+              data-testid="input-meeting-date"
+              value={formData.meetingDate}
+              onChange={(e) => setFormData({ ...formData, meetingDate: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional date when the meeting took place
             </p>
           </div>
 

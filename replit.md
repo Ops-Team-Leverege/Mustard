@@ -30,8 +30,9 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express sessions with PostgreSQL store.
 - **Development Experience**: Replit-specific plugins, HMR, separate dev/prod configs.
 - **Data Linkage**: Q&A pairs linked to contacts for richer customer data; product insights and Q&A pairs linked to transcripts via `transcriptId`.
-- **Timestamp Tracking**: `createdAt` timestamps for product insights and Q&A pairs.
+- **Timestamp Tracking**: `createdAt` timestamps for product insights and Q&A pairs; transcripts support custom meeting dates via optional date input on upload form.
 - **Transcript Detail View**: Dedicated page (`/transcripts/:id`) shows individual transcript with filtered insights/Q&A from that specific call, accessible by clicking transcript rows on company pages.
+- **Meeting Date Support**: Transcript upload form includes optional meeting date field to set custom date for when meeting occurred; if not provided, defaults to current timestamp.
 
 ## External Dependencies
 
