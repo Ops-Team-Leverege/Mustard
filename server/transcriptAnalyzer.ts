@@ -4,7 +4,7 @@ import type { Category } from "@shared/schema";
 // Using OpenAI blueprint - the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 90000, // 90 seconds timeout for long transcripts
+  timeout: 180000, // 3 minutes timeout for very long transcripts
   maxRetries: 0, // No retries to avoid further delays
 });
 
