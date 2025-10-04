@@ -579,7 +579,7 @@ export class MemStorage implements IStorage {
     return feature;
   }
 
-  async updateFeature(id: string, name: string, description?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined> {
+  async updateFeature(id: string, name: string, description?: string | null, value?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined> {
     const feature = this.features.get(id);
     if (!feature) return undefined;
     
@@ -587,6 +587,7 @@ export class MemStorage implements IStorage {
       ...feature,
       name,
       description: description !== undefined ? (description ?? null) : feature.description,
+      value: value !== undefined ? (value ?? null) : feature.value,
       videoLink: videoLink !== undefined ? (videoLink ?? null) : feature.videoLink,
       helpGuideLink: helpGuideLink !== undefined ? (helpGuideLink ?? null) : feature.helpGuideLink,
       categoryId: categoryId !== undefined ? (categoryId ?? null) : feature.categoryId,
@@ -1338,9 +1339,10 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateFeature(id: string, name: string, description?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined> {
+  async updateFeature(id: string, name: string, description?: string | null, value?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined> {
     const updateData: any = { name };
     if (description !== undefined) updateData.description = description;
+    if (value !== undefined) updateData.value = value;
     if (videoLink !== undefined) updateData.videoLink = videoLink;
     if (helpGuideLink !== undefined) updateData.helpGuideLink = helpGuideLink;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
