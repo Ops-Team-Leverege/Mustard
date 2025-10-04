@@ -56,6 +56,7 @@ export const features = pgTable("features", {
   videoLink: text("video_link"),
   helpGuideLink: text("help_guide_link"),
   categoryId: varchar("category_id"),
+  releaseDate: timestamp("release_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
