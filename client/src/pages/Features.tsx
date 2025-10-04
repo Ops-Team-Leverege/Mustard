@@ -50,12 +50,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, ExternalLink } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, Search } from "lucide-react";
 
 type Feature = {
   id: string;
   name: string;
   description: string | null;
+  value: string | null;
   videoLink: string | null;
   helpGuideLink: string | null;
   categoryId: string | null;
@@ -74,6 +75,8 @@ export default function Features() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
   const addForm = useForm<InsertFeature>({
     resolver: zodResolver(insertFeatureSchema),
@@ -192,6 +195,7 @@ export default function Features() {
     editForm.reset({
       name: feature.name,
       description: feature.description,
+      value: feature.value,
       videoLink: feature.videoLink,
       helpGuideLink: feature.helpGuideLink,
       categoryId: feature.categoryId,
@@ -220,6 +224,19 @@ export default function Features() {
     }
   };
 
+  // Filter features based on search and category
+  const filteredFeatures = features.filter((feature) => {
+    const matchesSearch = searchQuery === "" || 
+      feature.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (feature.description && feature.description.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesCategory = categoryFilter === "all" || 
+      (categoryFilter === "none" && !feature.categoryId) ||
+      feature.categoryId === categoryFilter;
+    
+    return matchesSearch && matchesCategory;
+  });
+
   return (
     <div className="container mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-6">
@@ -235,11 +252,44 @@ export default function Features() {
         </Button>
       </div>
 
+      {/* Search and Filter */}
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            type="text"
+            placeholder="Search by name or description..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-testid="input-search-features"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-64" data-testid="select-category-filter">
+            <SelectValue placeholder="Filter by category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="none">No Category</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading features...</div>
       ) : features.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           No features yet. Click "Add Feature" to create one.
+        </div>
+      ) : filteredFeatures.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No features match your search or filter criteria.
         </div>
       ) : (
         <div className="border rounded-md">
@@ -248,6 +298,7 @@ export default function Features() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Value</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Video Demo</TableHead>
                 <TableHead>Help Guide</TableHead>
@@ -255,7 +306,7 @@ export default function Features() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {features.map((feature) => (
+              {filteredFeatures.map((feature) => (
                 <TableRow key={feature.id} data-testid={`row-feature-${feature.id}`}>
                   <TableCell className="font-medium">
                     <Link href={`/features/${feature.id}`}>
@@ -266,6 +317,9 @@ export default function Features() {
                   </TableCell>
                   <TableCell className="max-w-md">
                     <div className="whitespace-pre-wrap line-clamp-3">{feature.description || "—"}</div>
+                  </TableCell>
+                  <TableCell className="max-w-md">
+                    <div className="whitespace-pre-wrap line-clamp-3">{feature.value || "—"}</div>
                   </TableCell>
                   <TableCell>
                     {feature.categoryName ? (
@@ -374,6 +428,25 @@ export default function Features() {
                         {...field}
                         value={field.value || ""}
                         data-testid="input-feature-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addForm.control}
+                name="value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Value (Why This Feature Matters)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Explain why this feature matters and the value it provides"
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-feature-value"
                       />
                     </FormControl>
                     <FormMessage />
@@ -507,6 +580,25 @@ export default function Features() {
                         {...field}
                         value={field.value || ""}
                         data-testid="input-edit-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="value"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Value (Why This Feature Matters)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Explain why this feature matters and the value it provides"
+                        rows={3}
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-value"
                       />
                     </FormControl>
                     <FormMessage />
