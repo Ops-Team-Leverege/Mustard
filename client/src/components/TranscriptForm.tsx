@@ -158,7 +158,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       customers,
     };
     
-    console.log('Transcript submitted:', submissionData);
     onSubmit?.(submissionData);
   };
 
