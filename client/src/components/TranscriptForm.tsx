@@ -288,7 +288,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             <Textarea
               id="mainMeetingTakeaways"
               data-testid="input-main-meeting-takeaways"
-              placeholder="Summarize the key takeaways from this meeting..."
+              placeholder="Add your general thoughts on the opportunity, the receptiveness of the customer, and anything else that we wouldn't be able to gather or understand just from the transcript"
               className="min-h-[100px]"
               value={formData.mainMeetingTakeaways}
               onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
