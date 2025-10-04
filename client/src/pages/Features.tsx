@@ -61,6 +61,7 @@ type Feature = {
   helpGuideLink: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  releaseDate: Date | null;
   createdAt: Date;
 };
 
@@ -83,9 +84,11 @@ export default function Features() {
     defaultValues: {
       name: "",
       description: null,
+      value: null,
       videoLink: null,
       helpGuideLink: null,
       categoryId: null,
+      releaseDate: null,
     },
   });
 
@@ -94,9 +97,11 @@ export default function Features() {
     defaultValues: {
       name: "",
       description: null,
+      value: null,
       videoLink: null,
       helpGuideLink: null,
       categoryId: null,
+      releaseDate: null,
     },
   });
 
@@ -183,15 +188,18 @@ export default function Features() {
     addForm.reset({
       name: "",
       description: null,
+      value: null,
       videoLink: null,
       helpGuideLink: null,
       categoryId: null,
+      releaseDate: null,
     });
     setIsAddDialogOpen(true);
   };
 
   const handleEdit = (feature: Feature) => {
     setSelectedFeature(feature);
+    const releaseDateValue = feature.releaseDate ? new Date(feature.releaseDate) : null;
     editForm.reset({
       name: feature.name,
       description: feature.description,
@@ -199,6 +207,7 @@ export default function Features() {
       videoLink: feature.videoLink,
       helpGuideLink: feature.helpGuideLink,
       categoryId: feature.categoryId,
+      releaseDate: releaseDateValue,
     });
     setIsEditDialogOpen(true);
   };
@@ -518,6 +527,25 @@ export default function Features() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={addForm.control}
+                name="releaseDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Release Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
+                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        data-testid="input-feature-releasedate"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button 
                   type="button" 
@@ -666,6 +694,25 @@ export default function Features() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="releaseDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Release Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                        value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
+                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        data-testid="input-edit-releasedate"
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
