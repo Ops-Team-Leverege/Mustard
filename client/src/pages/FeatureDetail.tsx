@@ -21,6 +21,7 @@ type Feature = {
   helpGuideLink: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  releaseDate: Date | null;
   createdAt: Date;
 };
 
@@ -41,6 +42,7 @@ export default function FeatureDetail() {
     videoLink: '',
     helpGuideLink: '',
     categoryId: '',
+    releaseDate: null as Date | null,
   });
 
   const { data: feature, isLoading: isLoadingFeature } = useQuery<Feature>({
@@ -58,7 +60,7 @@ export default function FeatureDetail() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string | null; value: string | null; videoLink: string | null; helpGuideLink: string | null; categoryId: string | null }) => {
+    mutationFn: async (data: { name: string; description: string | null; value: string | null; videoLink: string | null; helpGuideLink: string | null; categoryId: string | null; releaseDate: Date | null }) => {
       const res = await apiRequest('PATCH', `/api/features/${featureId}`, data);
       return res.json();
     },
@@ -91,6 +93,7 @@ export default function FeatureDetail() {
         videoLink: feature.videoLink || '',
         helpGuideLink: feature.helpGuideLink || '',
         categoryId: feature.categoryId || 'none',
+        releaseDate: feature.releaseDate,
       });
       setIsEditing(true);
     }
@@ -104,6 +107,7 @@ export default function FeatureDetail() {
       videoLink: editForm.videoLink || null,
       helpGuideLink: editForm.helpGuideLink || null,
       categoryId: editForm.categoryId === 'none' ? null : editForm.categoryId,
+      releaseDate: editForm.releaseDate,
     });
   };
 
@@ -116,6 +120,7 @@ export default function FeatureDetail() {
       videoLink: '',
       helpGuideLink: '',
       categoryId: '',
+      releaseDate: null,
     });
   };
 
@@ -276,6 +281,14 @@ export default function FeatureDetail() {
                     </a>
                   </div>
                 )}
+                {feature.releaseDate && (
+                  <div>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-2">Release Date</h3>
+                    <p data-testid="text-release-date">
+                      {new Date(feature.releaseDate).toLocaleDateString()}
+                    </p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -317,6 +330,15 @@ export default function FeatureDetail() {
                     onChange={(e) => setEditForm({ ...editForm, helpGuideLink: e.target.value })}
                     placeholder="https://..."
                     data-testid="input-edit-helpguidelink"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Release Date</h3>
+                  <Input
+                    type="date"
+                    value={editForm.releaseDate ? new Date(editForm.releaseDate).toISOString().split('T')[0] : ""}
+                    onChange={(e) => setEditForm({ ...editForm, releaseDate: e.target.value ? new Date(e.target.value) : null })}
+                    data-testid="input-edit-releasedate"
                   />
                 </div>
               </div>
