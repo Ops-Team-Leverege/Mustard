@@ -212,7 +212,8 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                               ...formData, 
                               companyName: company.name,
                               companyDescription: company.companyDescription || '',
-                              numberOfStores: company.numberOfStores || ''
+                              numberOfStores: company.numberOfStores || '',
+                              serviceTags: company.serviceTags || []
                             });
                             setSelectedCompanyId(company.id);
                             setCompanySearchOpen(false);
