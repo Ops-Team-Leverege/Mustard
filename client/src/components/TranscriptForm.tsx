@@ -34,7 +34,6 @@ export interface TranscriptData {
   companyDescription?: string;
   numberOfStores?: string;
   contactJobTitle?: string;
-  mainInterestAreas?: string;
   mainMeetingTakeaways?: string;
 }
 
@@ -60,7 +59,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     companyDescription: '',
     numberOfStores: '',
     contactJobTitle: '',
-    mainInterestAreas: '',
     mainMeetingTakeaways: '',
   });
 
@@ -519,18 +517,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               placeholder="e.g., 150 or Not applicable"
               value={formData.numberOfStores}
               onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mainInterestAreas" data-testid="label-main-interest-areas">Main Interest Areas in Product</Label>
-            <Textarea
-              id="mainInterestAreas"
-              data-testid="input-main-interest-areas"
-              placeholder="Describe the main product features or areas they're interested in..."
-              className="min-h-[100px]"
-              value={formData.mainInterestAreas}
-              onChange={(e) => setFormData({ ...formData, mainInterestAreas: e.target.value })}
             />
           </div>
 
