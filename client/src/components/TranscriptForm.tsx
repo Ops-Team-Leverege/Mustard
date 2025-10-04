@@ -284,6 +284,18 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="mainMeetingTakeaways" data-testid="label-main-meeting-takeaways">Main Meeting Takeaways</Label>
+            <Textarea
+              id="mainMeetingTakeaways"
+              data-testid="input-main-meeting-takeaways"
+              placeholder="Summarize the key takeaways from this meeting..."
+              className="min-h-[100px]"
+              value={formData.mainMeetingTakeaways}
+              onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label data-testid="label-leverage-team">Leverege Team Members <span className="text-destructive">*</span></Label>
             
             <Popover open={teamSearchOpen} onOpenChange={setTeamSearchOpen}>
@@ -609,18 +621,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               placeholder="e.g., 150 or Not applicable"
               value={formData.numberOfStores}
               onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="mainMeetingTakeaways" data-testid="label-main-meeting-takeaways">Main Meeting Takeaways</Label>
-            <Textarea
-              id="mainMeetingTakeaways"
-              data-testid="input-main-meeting-takeaways"
-              placeholder="Summarize the key takeaways from this meeting..."
-              className="min-h-[100px]"
-              value={formData.mainMeetingTakeaways}
-              onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
             />
           </div>
 
