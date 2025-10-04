@@ -51,6 +51,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, ExternalLink, Search } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Feature = {
   id: string;
@@ -247,6 +248,20 @@ export default function Features() {
     return matchesSearch && matchesCategory;
   });
 
+  // Filter features released in the last 2 weeks
+  const twoWeeksAgo = new Date();
+  twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+  
+  const recentlyReleasedFeatures = features.filter((feature) => {
+    if (!feature.releaseDate) return false;
+    const releaseDate = new Date(feature.releaseDate);
+    return releaseDate >= twoWeeksAgo && releaseDate <= new Date();
+  }).sort((a, b) => {
+    const dateA = new Date(a.releaseDate!);
+    const dateB = new Date(b.releaseDate!);
+    return dateB.getTime() - dateA.getTime();
+  });
+
   return (
     <div className="container mx-auto py-8 px-6">
       <div className="flex items-center justify-between mb-6">
@@ -290,6 +305,41 @@ export default function Features() {
           </SelectContent>
         </Select>
       </div>
+
+      {/* Recently Released Card */}
+      {!isLoading && recentlyReleasedFeatures.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Recently Released</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {recentlyReleasedFeatures.map((feature) => (
+                <Link key={feature.id} href={`/features/${feature.id}`}>
+                  <div 
+                    className="flex items-center justify-between p-3 rounded-md hover-elevate cursor-pointer border" 
+                    data-testid={`recent-feature-${feature.id}`}
+                  >
+                    <div className="flex-1">
+                      <h4 className="font-medium text-sm" data-testid={`text-feature-name-${feature.id}`}>
+                        {feature.name}
+                      </h4>
+                      {feature.description && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                          {feature.description}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground ml-4">
+                      {new Date(feature.releaseDate!).toLocaleDateString()}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading features...</div>
