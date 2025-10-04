@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Sparkles, Loader2, Plus, X, User, Check, ChevronsUpDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ export interface TranscriptData {
   customers?: Customer[];
   companyDescription?: string;
   numberOfStores?: string;
+  serviceTags?: string[];
   contactJobTitle?: string;
   mainMeetingTakeaways?: string;
 }
@@ -58,6 +60,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     customerNames: '',
     companyDescription: '',
     numberOfStores: '',
+    serviceTags: [],
     contactJobTitle: '',
     mainMeetingTakeaways: '',
   });
@@ -507,6 +510,31 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               value={formData.companyDescription}
               onChange={(e) => setFormData({ ...formData, companyDescription: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-3">
+            <Label data-testid="label-service-tags">Service Tags</Label>
+            <div className="space-y-2">
+              {["tire services", "oil & express services", "commercial truck services", "full services"].map((tag) => (
+                <div key={tag} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`service-tag-${tag}`}
+                    checked={formData.serviceTags?.includes(tag)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setFormData({ ...formData, serviceTags: [...(formData.serviceTags || []), tag] });
+                      } else {
+                        setFormData({ ...formData, serviceTags: formData.serviceTags?.filter(t => t !== tag) || [] });
+                      }
+                    }}
+                    data-testid={`checkbox-service-tag-${tag}`}
+                  />
+                  <Label htmlFor={`service-tag-${tag}`} className="text-sm font-normal cursor-pointer">
+                    {tag}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-2">
