@@ -16,6 +16,7 @@ type Feature = {
   id: string;
   name: string;
   description: string | null;
+  value: string | null;
   videoLink: string | null;
   helpGuideLink: string | null;
   categoryId: string | null;
@@ -36,6 +37,7 @@ export default function FeatureDetail() {
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
+    value: '',
     videoLink: '',
     helpGuideLink: '',
     categoryId: '',
@@ -56,7 +58,7 @@ export default function FeatureDetail() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string | null; videoLink: string | null; helpGuideLink: string | null; categoryId: string | null }) => {
+    mutationFn: async (data: { name: string; description: string | null; value: string | null; videoLink: string | null; helpGuideLink: string | null; categoryId: string | null }) => {
       const res = await apiRequest('PATCH', `/api/features/${featureId}`, data);
       return res.json();
     },
@@ -85,6 +87,7 @@ export default function FeatureDetail() {
       setEditForm({
         name: feature.name,
         description: feature.description || '',
+        value: feature.value || '',
         videoLink: feature.videoLink || '',
         helpGuideLink: feature.helpGuideLink || '',
         categoryId: feature.categoryId || 'none',
@@ -97,6 +100,7 @@ export default function FeatureDetail() {
     updateMutation.mutate({
       name: editForm.name,
       description: editForm.description || null,
+      value: editForm.value || null,
       videoLink: editForm.videoLink || null,
       helpGuideLink: editForm.helpGuideLink || null,
       categoryId: editForm.categoryId === 'none' ? null : editForm.categoryId,
@@ -108,6 +112,7 @@ export default function FeatureDetail() {
     setEditForm({
       name: '',
       description: '',
+      value: '',
       videoLink: '',
       helpGuideLink: '',
       categoryId: '',
@@ -233,6 +238,15 @@ export default function FeatureDetail() {
                 </div>
               )}
               
+              {feature.value && (
+                <div>
+                  <h3 className="text-sm font-medium text-muted-foreground mb-2">Value (Why This Feature Matters)</h3>
+                  <p className="whitespace-pre-wrap" data-testid="text-value">
+                    {feature.value}
+                  </p>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                 {feature.videoLink && (
                   <div>
@@ -274,6 +288,16 @@ export default function FeatureDetail() {
                   placeholder="Brief description (supports bullet points and multiple lines)"
                   rows={4}
                   data-testid="input-edit-description"
+                />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">Value (Why This Feature Matters)</h3>
+                <Textarea
+                  value={editForm.value}
+                  onChange={(e) => setEditForm({ ...editForm, value: e.target.value })}
+                  placeholder="Explain why this feature matters and the value it provides"
+                  rows={3}
+                  data-testid="input-edit-value"
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
