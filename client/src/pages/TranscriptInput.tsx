@@ -10,6 +10,7 @@ export default function TranscriptInput() {
   const [, setLocation] = useLocation();
 
   const handleSubmit = async (data: TranscriptData) => {
+    console.log('[TranscriptInput] handleSubmit called with data:', data);
     setIsAnalyzing(true);
     
     try {
@@ -17,8 +18,11 @@ export default function TranscriptInput() {
         ...data,
         createdAt: data.meetingDate ? new Date(data.meetingDate).toISOString() : undefined,
       };
+      console.log('[TranscriptInput] Sending submission data:', submissionData);
       const response = await apiRequest('POST', '/api/transcripts', submissionData);
+      console.log('[TranscriptInput] Response status:', response.status);
       const result = await response.json();
+      console.log('[TranscriptInput] Response result:', result);
       
       // Invalidate all relevant caches to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
@@ -37,6 +41,7 @@ export default function TranscriptInput() {
         setLocation(`/transcripts/${result.transcript.id}`);
       }, 1000);
     } catch (error) {
+      console.error('[TranscriptInput] Error during submission:', error);
       toast({
         title: "Analysis Failed",
         description: error instanceof Error ? error.message : "Failed to analyze transcript",
