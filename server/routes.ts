@@ -767,14 +767,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/features/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, value, videoLink, helpGuideLink, categoryId } = req.body;
+      const { name, description, value, videoLink, helpGuideLink, categoryId, releaseDate } = req.body;
       
       if (!name || typeof name !== 'string') {
         res.status(400).json({ error: "Name is required" });
         return;
       }
       
-      const feature = await storage.updateFeature(id, name, description, value, videoLink, helpGuideLink, categoryId);
+      const releaseDateValue = releaseDate ? new Date(releaseDate) : undefined;
+      
+      const feature = await storage.updateFeature(id, name, description, value, videoLink, helpGuideLink, categoryId, releaseDateValue);
       
       if (!feature) {
         res.status(404).json({ error: "Feature not found" });
