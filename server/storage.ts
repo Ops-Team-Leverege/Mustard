@@ -76,7 +76,7 @@ export interface IStorage {
   getFeatures(): Promise<FeatureWithCategory[]>;
   getFeature(id: string): Promise<Feature | undefined>;
   createFeature(feature: InsertFeature): Promise<Feature>;
-  updateFeature(id: string, name: string, description?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined>;
+  updateFeature(id: string, name: string, description?: string | null, value?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null): Promise<Feature | undefined>;
   deleteFeature(id: string): Promise<boolean>;
 
   // Companies

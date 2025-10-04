@@ -52,6 +52,7 @@ export const features = pgTable("features", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   description: text("description"),
+  value: text("value"),
   videoLink: text("video_link"),
   helpGuideLink: text("help_guide_link"),
   categoryId: varchar("category_id"),
