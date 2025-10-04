@@ -750,7 +750,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/features", isAuthenticated, async (req, res) => {
     try {
-      const data = insertFeatureSchema.parse(req.body);
+      const body = { ...req.body };
+      if (body.releaseDate) {
+        body.releaseDate = new Date(body.releaseDate);
+      }
+      const data = insertFeatureSchema.parse(body);
       const feature = await storage.createFeature(data);
       res.json(feature);
     } catch (error) {
