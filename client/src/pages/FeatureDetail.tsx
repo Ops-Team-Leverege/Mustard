@@ -61,7 +61,11 @@ export default function FeatureDetail() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { name: string; description: string | null; value: string | null; videoLink: string | null; helpGuideLink: string | null; categoryId: string | null; releaseDate: Date | null }) => {
-      const res = await apiRequest('PATCH', `/api/features/${featureId}`, data);
+      const payload = {
+        ...data,
+        releaseDate: data.releaseDate ? data.releaseDate.toISOString() : null,
+      };
+      const res = await apiRequest('PATCH', `/api/features/${featureId}`, payload);
       return res.json();
     },
     onSuccess: () => {

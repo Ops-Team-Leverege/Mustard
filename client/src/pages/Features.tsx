@@ -116,7 +116,11 @@ export default function Features() {
 
   const addMutation = useMutation({
     mutationFn: async (data: InsertFeature) => {
-      const res = await apiRequest('POST', '/api/features', data);
+      const payload = {
+        ...data,
+        releaseDate: data.releaseDate ? data.releaseDate.toISOString() : null,
+      };
+      const res = await apiRequest('POST', '/api/features', payload);
       return res.json();
     },
     onSuccess: () => {
@@ -140,7 +144,11 @@ export default function Features() {
   const editMutation = useMutation({
     mutationFn: async (data: { id: string } & InsertFeature) => {
       const { id, ...updateData } = data;
-      const res = await apiRequest('PATCH', `/api/features/${id}`, updateData);
+      const payload = {
+        ...updateData,
+        releaseDate: updateData.releaseDate ? updateData.releaseDate.toISOString() : null,
+      };
+      const res = await apiRequest('PATCH', `/api/features/${id}`, payload);
       return res.json();
     },
     onSuccess: () => {
