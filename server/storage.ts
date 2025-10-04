@@ -1309,10 +1309,12 @@ export class DbStorage implements IStorage {
         id: featuresTable.id,
         name: featuresTable.name,
         description: featuresTable.description,
+        value: featuresTable.value,
         videoLink: featuresTable.videoLink,
         helpGuideLink: featuresTable.helpGuideLink,
         categoryId: featuresTable.categoryId,
         categoryName: categoriesTable.name,
+        releaseDate: featuresTable.releaseDate,
         createdAt: featuresTable.createdAt,
       })
       .from(featuresTable)
