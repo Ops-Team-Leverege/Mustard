@@ -72,6 +72,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [teamSearchOpen, setTeamSearchOpen] = useState(false);
   const [teamSearchValue, setTeamSearchValue] = useState('');
+  const [existingContactOpen, setExistingContactOpen] = useState(false);
 
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
@@ -82,22 +83,24 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     enabled: !!selectedCompanyId,
   });
 
-  // Load contacts when a company is selected
-  useEffect(() => {
-    if (companyContacts.length > 0) {
-      const contactsAsCustomers = companyContacts.map(contact => ({
-        name: contact.name,
-        nameInTranscript: contact.nameInTranscript || '',
-        jobTitle: contact.jobTitle || '',
-      }));
-      setCustomers(contactsAsCustomers);
-    }
-  }, [companyContacts]);
-
   const handleAddCustomer = () => {
     if (!newCustomer.name.trim()) return;
     setCustomers([...customers, newCustomer]);
     setNewCustomer({ name: '', nameInTranscript: '', jobTitle: '' });
+  };
+
+  const handleAddExistingContact = (contact: any) => {
+    // Check if contact is already added
+    const alreadyAdded = customers.some(c => c.name === contact.name);
+    if (alreadyAdded) return;
+    
+    const newContactData: Customer = {
+      name: contact.name,
+      nameInTranscript: contact.nameInTranscript || '',
+      jobTitle: contact.jobTitle || '',
+    };
+    setCustomers([...customers, newContactData]);
+    setExistingContactOpen(false);
   };
 
   const handleRemoveCustomer = (index: number) => {
@@ -444,6 +447,66 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                 </Button>
               </div>
             </div>
+
+            {selectedCompanyId && companyContacts.length > 0 && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+            )}
+
+            {selectedCompanyId && companyContacts.length > 0 && (
+              <Popover open={existingContactOpen} onOpenChange={setExistingContactOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={existingContactOpen}
+                    className="w-full justify-between"
+                    data-testid="button-add-existing-contact"
+                  >
+                    Add an existing contact
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput 
+                      placeholder="Search contacts..." 
+                      data-testid="input-existing-contact-search"
+                    />
+                    <CommandList>
+                      <CommandEmpty>No contacts found</CommandEmpty>
+                      <CommandGroup>
+                        {companyContacts
+                          .filter(contact => !customers.some(c => c.name === contact.name))
+                          .map((contact) => (
+                            <CommandItem
+                              key={contact.id}
+                              value={contact.name}
+                              onSelect={() => handleAddExistingContact(contact)}
+                              data-testid={`option-existing-contact-${contact.id}`}
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              <div className="flex flex-col">
+                                <span>{contact.name}</span>
+                                {contact.jobTitle && (
+                                  <span className="text-xs text-muted-foreground">{contact.jobTitle}</span>
+                                )}
+                              </div>
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+            )}
 
             {customers.length > 0 ? (
               <div className="space-y-3">
