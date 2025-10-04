@@ -118,7 +118,9 @@ export default function Features() {
     mutationFn: async (data: InsertFeature) => {
       const payload = {
         ...data,
-        releaseDate: data.releaseDate ? data.releaseDate.toISOString() : null,
+        releaseDate: data.releaseDate 
+          ? (data.releaseDate instanceof Date ? data.releaseDate.toISOString() : data.releaseDate)
+          : null,
       };
       const res = await apiRequest('POST', '/api/features', payload);
       return res.json();
@@ -146,7 +148,9 @@ export default function Features() {
       const { id, ...updateData } = data;
       const payload = {
         ...updateData,
-        releaseDate: updateData.releaseDate ? updateData.releaseDate.toISOString() : null,
+        releaseDate: updateData.releaseDate 
+          ? (updateData.releaseDate instanceof Date ? updateData.releaseDate.toISOString() : updateData.releaseDate)
+          : null,
       };
       const res = await apiRequest('PATCH', `/api/features/${id}`, payload);
       return res.json();

@@ -63,7 +63,9 @@ export default function FeatureDetail() {
     mutationFn: async (data: { name: string; description: string | null; value: string | null; videoLink: string | null; helpGuideLink: string | null; categoryId: string | null; releaseDate: Date | null }) => {
       const payload = {
         ...data,
-        releaseDate: data.releaseDate ? data.releaseDate.toISOString() : null,
+        releaseDate: data.releaseDate 
+          ? (data.releaseDate instanceof Date ? data.releaseDate.toISOString() : data.releaseDate)
+          : null,
       };
       const res = await apiRequest('PATCH', `/api/features/${featureId}`, payload);
       return res.json();
