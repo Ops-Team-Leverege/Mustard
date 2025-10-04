@@ -57,7 +57,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Transcripts (protected routes)
   app.post("/api/transcripts", isAuthenticated, async (req, res) => {
     try {
-      const validatedData = insertTranscriptSchema.parse(req.body);
+      const body = { ...req.body };
+      // Convert createdAt string to Date if provided
+      if (body.createdAt && typeof body.createdAt === 'string') {
+        body.createdAt = new Date(body.createdAt);
+      }
+      
+      const validatedData = insertTranscriptSchema.parse(body);
       const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; nameInTranscript?: string; jobTitle?: string }> };
       
       // Find or create company

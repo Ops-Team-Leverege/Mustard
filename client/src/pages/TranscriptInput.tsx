@@ -36,7 +36,7 @@ export default function TranscriptInput() {
     try {
       const submissionData = {
         ...data,
-        createdAt: data.meetingDate ? new Date(data.meetingDate).toISOString() : undefined,
+        createdAt: data.meetingDate && data.meetingDate.trim() ? new Date(data.meetingDate).toISOString() : undefined,
       };
       const response = await apiRequest('POST', '/api/transcripts', submissionData);
       const result = await response.json();
