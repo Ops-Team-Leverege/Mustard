@@ -588,7 +588,10 @@ export default function Features() {
                         type="date"
                         {...field}
                         value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
-                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        onChange={(e) => {
+                          const value = e.target.value.trim();
+                          field.onChange(value ? new Date(value) : null);
+                        }}
                         data-testid="input-feature-releasedate"
                       />
                     </FormControl>
@@ -759,7 +762,10 @@ export default function Features() {
                         type="date"
                         {...field}
                         value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
-                        onChange={(e) => field.onChange(e.target.value ? new Date(e.target.value) : null)}
+                        onChange={(e) => {
+                          const value = e.target.value.trim();
+                          field.onChange(value ? new Date(value) : null);
+                        }}
                         data-testid="input-edit-releasedate"
                       />
                     </FormControl>
