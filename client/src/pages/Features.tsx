@@ -228,7 +228,8 @@ export default function Features() {
   const filteredFeatures = features.filter((feature) => {
     const matchesSearch = searchQuery === "" || 
       feature.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (feature.description && feature.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      (feature.description && feature.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (feature.value && feature.value.toLowerCase().includes(searchQuery.toLowerCase()));
     
     const matchesCategory = categoryFilter === "all" || 
       (categoryFilter === "none" && !feature.categoryId) ||
@@ -258,7 +259,7 @@ export default function Features() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             type="text"
-            placeholder="Search by name or description..."
+            placeholder="Search by name, description, or value..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
