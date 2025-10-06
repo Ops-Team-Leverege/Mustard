@@ -13,6 +13,7 @@ Preferred communication style: Simple, everyday language.
 - **UI**: Shadcn/ui (New York style) built on Radix UI, styled with Tailwind CSS and CVA. Dark mode first with light mode support, inspired by Linear/Notion aesthetics.
 - **State Management**: TanStack Query for server state and caching; React hooks for local component state.
 - **Routing**: Wouter for client-side routing.
+- **Navigation**: Organized tab navigation with dropdown support; Product Insights, Q&A Database, and Transcripts grouped under a "Databases" dropdown for cleaner navigation structure. Uses Radix DropdownMenu with proper keyboard accessibility (Tab, arrow keys, Enter/Space).
 - **Design System**: Custom color palette via CSS variables, Inter font family, emphasis on data clarity.
 
 ### Backend
