@@ -30,9 +30,15 @@ const tabs = [
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
   { id: 'features', label: 'Features', path: '/features' },
-  { id: 'insights', label: 'Product Insights', path: '/insights' },
-  { id: 'qa', label: 'Q&A Database', path: '/qa' },
-  { id: 'transcripts', label: 'Transcripts', path: '/transcripts' },
+  { 
+    id: 'databases', 
+    label: 'Databases', 
+    items: [
+      { id: 'insights', label: 'Product Insights', path: '/insights' },
+      { id: 'qa', label: 'Q&A Database', path: '/qa' },
+      { id: 'transcripts', label: 'Transcripts', path: '/transcripts' },
+    ]
+  },
 ];
 
 function ProtectedRoute({ 
