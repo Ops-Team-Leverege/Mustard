@@ -271,6 +271,11 @@
     @apply hidden;
   }
 
+  /* Fix calendar icon visibility in dark mode */
+  .dark input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
   /* Placeholder styling for contentEditable div */
   [contenteditable][data-placeholder]:empty::before {
     content: attr(data-placeholder);
