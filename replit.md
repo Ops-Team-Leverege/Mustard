@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Data Layer**: PostgreSQL database with Drizzle ORM, Zod for schema validation. Neon serverless driver for production.
 - **AI Integration**: OpenAI API (GPT-5) for transcript analysis, structured prompt engineering for insight/Q&A extraction and categorization.
 - **Authentication**: Replit Auth (OpenID Connect) for user authentication (Google, GitHub, X, Apple, email/password), session-based with PostgreSQL session store. Access restricted to `@leverege.com` email addresses.
-- **Database Schema**: `transcripts`, `categories`, `product_insights`, `qa_pairs`, `companies`, `contacts`, `users`, `sessions`, `features`.
+- **Database Schema**: `transcripts`, `categories`, `product_insights`, `qa_pairs`, `companies`, `contacts`, `users`, `sessions`, `features`, `roadmap_config`, `roadmap_tickets`.
 
 ### Key Architectural Decisions
 - **Single-Page Application (SPA)**: Client-side routing with Wouter.
@@ -41,6 +41,7 @@ Preferred communication style: Simple, everyday language.
 - **Temporal Context**: Product insights and Q&A tables include "Transcript Date" column showing when the associated meeting occurred, enabling users to identify when insights were spoken and track conversation timelines.
 - **Features Management**: Dedicated Features page (`/features`) allows tracking existing product features with demo video links and help guide links. Features can optionally be linked to categories for organization. All CRUD operations (create, read, update, delete) are supported with proper form validation using react-hook-form and zodResolver. Feature detail page (`/features/:id`) displays individual feature information with description supporting multi-line text and bullet points, plus related product insights from the linked category for deeper context.
 - **Rich Text Support**: Transcript upload form includes mainMeetingTakeaways field supporting multi-line text with bullet points and formatted lists. Field uses standard textarea for input and whitespace-pre-wrap CSS for display preservation on transcript detail pages, maintaining original formatting including newlines and manual bullet characters (•, -, *).
+- **Jira Roadmap**: Dedicated Roadmap page (`/roadmap`) integrates with Jira to display tickets from two configurable Jira projects. Users can configure project keys via settings dialog and sync tickets on demand. Synced tickets display with full metadata including status badges, priority indicators, assignee info, labels, and due dates. All Jira credentials managed securely through Replit's Jira integration.
 
 ## External Dependencies
 
@@ -78,4 +79,4 @@ Preferred communication style: Simple, everyday language.
 
 ### Integrations
 - **Replit Auth**: User authentication system.
-- **Jira Integration**: Links product insights to Jira tickets by posting comments via Jira REST API.
+- **Jira Integration**: Two-way integration supporting (1) linking product insights to Jira tickets by posting comments via Jira REST API, and (2) syncing tickets from two configured Jira projects to display in the Roadmap page, with automatic credential management through Replit's secure connection system.
