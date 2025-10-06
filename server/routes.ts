@@ -1090,21 +1090,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allJiraTickets = [...project1Tickets, ...project2Tickets];
 
       // Transform Jira tickets to our schema
-      const ticketsToStore = allJiraTickets.map(issue => ({
-        jiraKey: issue.key,
-        projectKey: issue.fields.project.key,
-        summary: issue.fields.summary,
-        description: issue.fields.description || null,
-        status: issue.fields.status.name,
-        priority: issue.fields.priority?.name || null,
-        assignee: issue.fields.assignee?.displayName || null,
-        reporter: issue.fields.reporter?.displayName || null,
-        issueType: issue.fields.issuetype.name,
-        labels: issue.fields.labels || [],
-        dueDate: issue.fields.duedate ? new Date(issue.fields.duedate) : null,
-        createdAt: new Date(issue.fields.created),
-        updatedAt: new Date(issue.fields.updated),
-      }));
+      const ticketsToStore = allJiraTickets
+        .filter(issue => issue.fields?.status && issue.fields?.issuetype)
+        .map(issue => ({
+          jiraKey: issue.key,
+          projectKey: issue.fields.project.key,
+          summary: issue.fields.summary,
+          description: issue.fields.description?.toString() || null,
+          status: issue.fields.status.name,
+          priority: issue.fields.priority?.name || null,
+          assignee: issue.fields.assignee?.displayName || null,
+          reporter: issue.fields.reporter?.displayName || null,
+          issueType: issue.fields.issuetype.name,
+          labels: issue.fields.labels || [],
+          dueDate: issue.fields.duedate ? new Date(issue.fields.duedate) : null,
+          createdAt: new Date(issue.fields.created),
+          updatedAt: new Date(issue.fields.updated),
+        }));
 
       // Upsert tickets into database
       const savedTickets = await storage.upsertRoadmapTickets(ticketsToStore);

@@ -31,6 +31,7 @@ const tabs = [
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
   { id: 'features', label: 'Features', path: '/features' },
+  { id: 'roadmap', label: 'Roadmap', path: '/roadmap' },
   { 
     id: 'databases', 
     label: 'Databases', 
@@ -143,6 +144,14 @@ function Router() {
       <Route path="/features/:id">
         <ProtectedRoute 
           component={FeatureDetail} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/roadmap">
+        <ProtectedRoute 
+          component={Roadmap} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
