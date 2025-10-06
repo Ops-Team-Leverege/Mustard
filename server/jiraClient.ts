@@ -20,7 +20,7 @@ async function getAccessToken() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
+  const response = await fetch(
     'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=jira',
     {
       headers: {
@@ -28,13 +28,25 @@ async function getAccessToken() {
         'X_REPLIT_TOKEN': xReplitToken
       }
     }
-  ).then(res => res.json()).then(data => data.items?.[0]);
+  );
+  
+  const data = await response.json();
+  console.log('Jira connection response:', JSON.stringify(data, null, 2));
+  
+  connectionSettings = data.items?.[0];
 
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
+  const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
   const hostName = connectionSettings?.settings?.site_url;
 
+  console.log('Connection settings:', {
+    hasConnectionSettings: !!connectionSettings,
+    hasAccessToken: !!accessToken,
+    hasHostName: !!hostName,
+    settingsKeys: connectionSettings?.settings ? Object.keys(connectionSettings.settings) : []
+  });
+
   if (!connectionSettings || !accessToken || !hostName) {
-    throw new Error('Jira not connected');
+    throw new Error('Jira not connected. Check logs for details.');
   }
 
   return {accessToken, hostName};
