@@ -224,16 +224,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/transcripts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, createdAt, mainMeetingTakeaways } = req.body;
-      const transcript = await storage.updateTranscript(id, { 
+      const { name, createdAt, mainMeetingTakeaways, transcript } = req.body;
+      const updatedTranscript = await storage.updateTranscript(id, { 
         name: name !== undefined ? (name || null) : undefined,
         createdAt: createdAt !== undefined ? new Date(createdAt) : undefined,
         mainMeetingTakeaways: mainMeetingTakeaways !== undefined ? (mainMeetingTakeaways || null) : undefined,
+        transcript: transcript !== undefined ? (transcript || null) : undefined,
       });
-      if (!transcript) {
+      if (!updatedTranscript) {
         return res.status(404).json({ error: "Transcript not found" });
       }
-      res.json(transcript);
+      res.json(updatedTranscript);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }

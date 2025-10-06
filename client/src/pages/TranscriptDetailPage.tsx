@@ -33,6 +33,7 @@ export default function TranscriptDetailPage() {
     name: '',
     createdAt: '',
     mainMeetingTakeaways: '',
+    transcript: '',
   });
 
   const { data, isLoading } = useQuery<TranscriptDetails>({
@@ -45,7 +46,7 @@ export default function TranscriptDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string }) => {
+    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string; transcript: string }) => {
       if (!transcriptId) throw new Error("Transcript not found");
       
       let createdAtISO = data.createdAt;
@@ -59,6 +60,7 @@ export default function TranscriptDetailPage() {
         name: data.name || null,
         createdAt: createdAtISO,
         mainMeetingTakeaways: data.mainMeetingTakeaways || null,
+        transcript: data.transcript || null,
       });
       return res.json();
     },
@@ -97,6 +99,7 @@ export default function TranscriptDetailPage() {
       name: data.transcript.name || '',
       createdAt: createdAtString,
       mainMeetingTakeaways: data.transcript.mainMeetingTakeaways || '',
+      transcript: data.transcript.transcript || '',
     });
     setIsEditing(true);
   };
@@ -111,6 +114,7 @@ export default function TranscriptDetailPage() {
       name: '',
       createdAt: '',
       mainMeetingTakeaways: '',
+      transcript: '',
     });
   };
 
@@ -270,11 +274,21 @@ export default function TranscriptDetailPage() {
           <div className="space-y-4">
             <div>
               <h3 className="text-sm font-medium mb-2">Transcript Content</h3>
-              <div className="bg-muted/50 rounded-md p-4 max-h-60 overflow-y-auto">
-                <p className="text-sm whitespace-pre-wrap" data-testid="transcript-content">
-                  {transcript.transcript}
-                </p>
-              </div>
+              {!isEditing ? (
+                <div className="bg-muted/50 rounded-md p-4 max-h-60 overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap" data-testid="transcript-content">
+                    {transcript.transcript}
+                  </p>
+                </div>
+              ) : (
+                <Textarea
+                  value={editForm.transcript}
+                  onChange={(e) => setEditForm({ ...editForm, transcript: e.target.value })}
+                  placeholder="Paste the full transcript here..."
+                  className="min-h-[240px]"
+                  data-testid="input-transcript-content"
+                />
+              )}
             </div>
           </div>
         </CardContent>

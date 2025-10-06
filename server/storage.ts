@@ -46,7 +46,7 @@ export interface IStorage {
   getTranscript(id: string): Promise<Transcript | undefined>;
   getTranscriptsByCompany(companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
-  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null }): Promise<Transcript | undefined>;
+  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
 
   // Product Insights
@@ -190,7 +190,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.transcripts.values()).filter(t => t.companyId === companyId);
   }
 
-  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null }): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
     
@@ -199,6 +199,7 @@ export class MemStorage implements IStorage {
       ...(updates.name !== undefined && { name: updates.name }),
       ...(updates.createdAt !== undefined && { createdAt: updates.createdAt }),
       ...(updates.mainMeetingTakeaways !== undefined && { mainMeetingTakeaways: updates.mainMeetingTakeaways }),
+      ...(updates.transcript !== undefined && { transcript: updates.transcript }),
     };
     this.transcripts.set(id, updated);
     return updated;
@@ -993,11 +994,12 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null }): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.createdAt !== undefined) updateData.createdAt = updates.createdAt;
     if (updates.mainMeetingTakeaways !== undefined) updateData.mainMeetingTakeaways = updates.mainMeetingTakeaways;
+    if (updates.transcript !== undefined) updateData.transcript = updates.transcript;
     
     const results = await this.db
       .update(transcriptsTable)
