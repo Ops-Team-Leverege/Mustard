@@ -34,7 +34,7 @@ export default function Roadmap() {
 
   const configMutation = useMutation({
     mutationFn: async (data: { projectKey1: string; projectKey2: string }) =>
-      apiRequest("/api/roadmap/config", "POST", data),
+      apiRequest("POST", "/api/roadmap/config", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/roadmap/config"] });
       setIsConfigOpen(false);
@@ -54,7 +54,7 @@ export default function Roadmap() {
 
   const syncMutation = useMutation({
     mutationFn: async () =>
-      apiRequest("/api/roadmap/sync", "POST"),
+      apiRequest("POST", "/api/roadmap/sync"),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/roadmap/tickets"] });
       toast({
