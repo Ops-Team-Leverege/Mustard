@@ -8,14 +8,12 @@ import {
   insertFeatureSchema,
   insertCompanySchema,
   insertContactSchema,
-  insertRoadmapConfigSchema,
   type ProductInsightWithCategory,
 } from "@shared/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { fetchJiraTickets } from "./jiraClient";
 
 function generateSlug(companyName: string): string {
   const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -1030,95 +1028,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await storage.mergeDuplicateContacts(companyId);
       res.json(result);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
-  // Roadmap routes
-  app.get("/api/roadmap/config", isAuthenticated, async (req, res) => {
-    try {
-      const config = await storage.getRoadmapConfig();
-      res.json(config || null);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
-  app.post("/api/roadmap/config", isAuthenticated, async (req, res) => {
-    try {
-      const validatedData = insertRoadmapConfigSchema.parse(req.body);
-      const config = await storage.upsertRoadmapConfig(validatedData);
-      res.json(config);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
-  app.get("/api/roadmap/tickets", isAuthenticated, async (req, res) => {
-    try {
-      const tickets = await storage.getRoadmapTickets();
-      res.json(tickets);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
-  app.get("/api/roadmap/tickets/:projectKey", isAuthenticated, async (req, res) => {
-    try {
-      const { projectKey } = req.params;
-      const tickets = await storage.getRoadmapTicketsByProject(projectKey);
-      res.json(tickets);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
-  app.post("/api/roadmap/sync", isAuthenticated, async (req, res) => {
-    try {
-      const config = await storage.getRoadmapConfig();
-      
-      if (!config) {
-        res.status(400).json({ error: "Roadmap configuration not set. Please configure projects first." });
-        return;
-      }
-
-      // Fetch tickets from both projects
-      const [project1Tickets, project2Tickets] = await Promise.all([
-        fetchJiraTickets(config.projectKey1),
-        fetchJiraTickets(config.projectKey2),
-      ]);
-
-      const allJiraTickets = [...project1Tickets, ...project2Tickets];
-
-      // Transform Jira tickets to our schema
-      const ticketsToStore = allJiraTickets
-        .filter(issue => issue.fields?.status && issue.fields?.issuetype)
-        .map(issue => ({
-          jiraKey: issue.key,
-          projectKey: issue.fields.project.key,
-          summary: issue.fields.summary,
-          description: issue.fields.description?.toString() || null,
-          status: issue.fields.status.name,
-          priority: issue.fields.priority?.name || null,
-          assignee: issue.fields.assignee?.displayName || null,
-          reporter: issue.fields.reporter?.displayName || null,
-          issueType: issue.fields.issuetype.name,
-          labels: issue.fields.labels || [],
-          dueDate: issue.fields.duedate ? new Date(issue.fields.duedate) : null,
-          createdAt: new Date(issue.fields.created),
-          updatedAt: new Date(issue.fields.updated),
-        }));
-
-      // Upsert tickets into database
-      const savedTickets = await storage.upsertRoadmapTickets(ticketsToStore);
-      
-      res.json({ 
-        message: "Roadmap synchronized successfully", 
-        ticketCount: savedTickets.length,
-        tickets: savedTickets 
-      });
-    } catch (error) {
-      console.error("Error syncing roadmap:", error);
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
