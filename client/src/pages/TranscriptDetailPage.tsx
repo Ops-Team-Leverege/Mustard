@@ -51,9 +51,7 @@ export default function TranscriptDetailPage() {
       
       let createdAtISO = data.createdAt;
       if (data.createdAt) {
-        const date = new Date(data.createdAt);
-        date.setUTCHours(0, 0, 0, 0);
-        createdAtISO = date.toISOString();
+        createdAtISO = new Date(data.createdAt + 'T12:00:00').toISOString();
       }
       
       const res = await apiRequest('PATCH', `/api/transcripts/${transcriptId}`, {

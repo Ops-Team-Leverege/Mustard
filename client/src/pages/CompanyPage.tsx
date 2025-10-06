@@ -62,9 +62,7 @@ export default function CompanyPage() {
       
       let pilotStartDateISO = null;
       if (data.pilotStartDate) {
-        const date = new Date(data.pilotStartDate);
-        date.setUTCHours(0, 0, 0, 0);
-        pilotStartDateISO = date.toISOString();
+        pilotStartDateISO = new Date(data.pilotStartDate + 'T12:00:00').toISOString();
       }
       
       const res = await apiRequest('PATCH', `/api/companies/${overview.company.id}`, {
@@ -402,7 +400,7 @@ export default function CompanyPage() {
     updateTranscriptMutation.mutate({ 
       id: editingTranscriptId, 
       name: editTranscriptName.trim(),
-      createdAt: editTranscriptDate ? new Date(editTranscriptDate).toISOString() : undefined,
+      createdAt: editTranscriptDate ? new Date(editTranscriptDate + 'T12:00:00').toISOString() : undefined,
     });
   };
 

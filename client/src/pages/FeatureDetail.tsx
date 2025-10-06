@@ -345,7 +345,7 @@ export default function FeatureDetail() {
                     value={editForm.releaseDate ? new Date(editForm.releaseDate).toISOString().split('T')[0] : ""}
                     onChange={(e) => {
                       const value = e.target.value.trim();
-                      setEditForm({ ...editForm, releaseDate: value ? new Date(value) : null });
+                      setEditForm({ ...editForm, releaseDate: value ? new Date(value + 'T12:00:00') : null });
                     }}
                     data-testid="input-edit-releasedate"
                   />

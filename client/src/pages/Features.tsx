@@ -602,7 +602,7 @@ export default function Features() {
                         value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
                         onChange={(e) => {
                           const value = e.target.value.trim();
-                          field.onChange(value ? new Date(value) : null);
+                          field.onChange(value ? new Date(value + 'T12:00:00') : null);
                         }}
                         data-testid="input-feature-releasedate"
                       />
@@ -776,7 +776,7 @@ export default function Features() {
                         value={field.value ? new Date(field.value).toISOString().split('T')[0] : ""}
                         onChange={(e) => {
                           const value = e.target.value.trim();
-                          field.onChange(value ? new Date(value) : null);
+                          field.onChange(value ? new Date(value + 'T12:00:00') : null);
                         }}
                         data-testid="input-edit-releasedate"
                       />
