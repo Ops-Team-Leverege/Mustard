@@ -86,33 +86,6 @@ export const qaPairs = pgTable("qa_pairs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Roadmap configuration - stores which Jira projects to track
-export const roadmapConfig = pgTable("roadmap_config", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  projectKey1: text("project_key_1").notNull(),
-  projectKey2: text("project_key_2").notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Jira tickets pulled for roadmap
-export const roadmapTickets = pgTable("roadmap_tickets", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  jiraKey: text("jira_key").notNull().unique(),
-  projectKey: text("project_key").notNull(),
-  summary: text("summary").notNull(),
-  description: text("description"),
-  status: text("status").notNull(),
-  priority: text("priority"),
-  assignee: text("assignee"),
-  reporter: text("reporter"),
-  issueType: text("issue_type").notNull(),
-  labels: text("labels").array(),
-  dueDate: timestamp("due_date"),
-  createdAt: timestamp("created_at").notNull(),
-  updatedAt: timestamp("updated_at").notNull(),
-  lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
-});
-
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 // Session storage table - mandatory for Replit Auth
 export const sessions = pgTable(
@@ -183,16 +156,6 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   createdAt: true,
 });
 
-export const insertRoadmapConfigSchema = createInsertSchema(roadmapConfig).omit({
-  id: true,
-  updatedAt: true,
-});
-
-export const insertRoadmapTicketSchema = createInsertSchema(roadmapTickets).omit({
-  id: true,
-  lastSyncedAt: true,
-});
-
 export type InsertTranscript = z.infer<typeof insertTranscriptSchema>;
 export type Transcript = typeof transcripts.$inferSelect;
 
@@ -213,12 +176,6 @@ export type Contact = typeof contacts.$inferSelect;
 
 export type InsertFeature = z.infer<typeof insertFeatureSchema>;
 export type Feature = typeof features.$inferSelect;
-
-export type InsertRoadmapConfig = z.infer<typeof insertRoadmapConfigSchema>;
-export type RoadmapConfig = typeof roadmapConfig.$inferSelect;
-
-export type InsertRoadmapTicket = z.infer<typeof insertRoadmapTicketSchema>;
-export type RoadmapTicket = typeof roadmapTickets.$inferSelect;
 
 // Extended type for UI with category name
 export type ProductInsightWithCategory = ProductInsight & {
