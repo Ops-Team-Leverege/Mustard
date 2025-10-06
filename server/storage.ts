@@ -20,10 +20,6 @@ import {
   type CategoryOverview,
   type User,
   type UpsertUser,
-  type RoadmapConfig,
-  type InsertRoadmapConfig,
-  type RoadmapTicket,
-  type InsertRoadmapTicket,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -32,8 +28,6 @@ import {
   companies as companiesTable,
   contacts as contactsTable,
   users as usersTable,
-  roadmapConfig as roadmapConfigTable,
-  roadmapTickets as roadmapTicketsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -105,14 +99,6 @@ export interface IStorage {
   // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
-
-  // Roadmap
-  getRoadmapConfig(): Promise<RoadmapConfig | undefined>;
-  upsertRoadmapConfig(config: InsertRoadmapConfig): Promise<RoadmapConfig>;
-  getRoadmapTickets(): Promise<RoadmapTicket[]>;
-  getRoadmapTicketsByProject(projectKey: string): Promise<RoadmapTicket[]>;
-  upsertRoadmapTickets(tickets: InsertRoadmapTicket[]): Promise<RoadmapTicket[]>;
-  deleteRoadmapTicket(jiraKey: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -124,8 +110,6 @@ export class MemStorage implements IStorage {
   private companies: Map<string, Company>;
   private contacts: Map<string, Contact>;
   private users: Map<string, User>;
-  private roadmapConfig: RoadmapConfig | undefined;
-  private roadmapTickets: Map<string, RoadmapTicket>;
 
   constructor() {
     this.transcripts = new Map();
@@ -136,8 +120,6 @@ export class MemStorage implements IStorage {
     this.companies = new Map();
     this.contacts = new Map();
     this.users = new Map();
-    this.roadmapConfig = undefined;
-    this.roadmapTickets = new Map();
 
     // Initialize with default categories
     const defaultCategories = [
@@ -898,53 +880,6 @@ export class MemStorage implements IStorage {
       insights,
       qaPairs,
     };
-  }
-
-  async getRoadmapConfig(): Promise<RoadmapConfig | undefined> {
-    return this.roadmapConfig;
-  }
-
-  async upsertRoadmapConfig(config: InsertRoadmapConfig): Promise<RoadmapConfig> {
-    const now = new Date();
-    const newConfig: RoadmapConfig = {
-      id: this.roadmapConfig?.id || randomUUID(),
-      ...config,
-      updatedAt: now,
-    };
-    this.roadmapConfig = newConfig;
-    return newConfig;
-  }
-
-  async getRoadmapTickets(): Promise<RoadmapTicket[]> {
-    return Array.from(this.roadmapTickets.values());
-  }
-
-  async getRoadmapTicketsByProject(projectKey: string): Promise<RoadmapTicket[]> {
-    return Array.from(this.roadmapTickets.values()).filter(
-      ticket => ticket.projectKey === projectKey
-    );
-  }
-
-  async upsertRoadmapTickets(tickets: InsertRoadmapTicket[]): Promise<RoadmapTicket[]> {
-    const result: RoadmapTicket[] = [];
-    const now = new Date();
-    
-    for (const ticketData of tickets) {
-      const existing = this.roadmapTickets.get(ticketData.jiraKey);
-      const ticket: RoadmapTicket = {
-        id: existing?.id || randomUUID(),
-        ...ticketData,
-        lastSyncedAt: now,
-      };
-      this.roadmapTickets.set(ticket.jiraKey, ticket);
-      result.push(ticket);
-    }
-    
-    return result;
-  }
-
-  async deleteRoadmapTicket(jiraKey: string): Promise<boolean> {
-    return this.roadmapTickets.delete(jiraKey);
   }
 }
 
@@ -1793,83 +1728,6 @@ export class DbStorage implements IStorage {
         contactJobTitle: qa.contactJobTitle || null,
       })),
     };
-  }
-
-  async getRoadmapConfig(): Promise<RoadmapConfig | undefined> {
-    const configs = await this.db.select().from(roadmapConfigTable).limit(1);
-    return configs[0];
-  }
-
-  async upsertRoadmapConfig(config: InsertRoadmapConfig): Promise<RoadmapConfig> {
-    const existing = await this.getRoadmapConfig();
-    
-    if (existing) {
-      const [updated] = await this.db
-        .update(roadmapConfigTable)
-        .set({
-          ...config,
-          updatedAt: new Date(),
-        })
-        .where(eq(roadmapConfigTable.id, existing.id))
-        .returning();
-      return updated;
-    }
-    
-    const [created] = await this.db
-      .insert(roadmapConfigTable)
-      .values(config)
-      .returning();
-    return created;
-  }
-
-  async getRoadmapTickets(): Promise<RoadmapTicket[]> {
-    return this.db.select().from(roadmapTicketsTable);
-  }
-
-  async getRoadmapTicketsByProject(projectKey: string): Promise<RoadmapTicket[]> {
-    return this.db
-      .select()
-      .from(roadmapTicketsTable)
-      .where(eq(roadmapTicketsTable.projectKey, projectKey));
-  }
-
-  async upsertRoadmapTickets(tickets: InsertRoadmapTicket[]): Promise<RoadmapTicket[]> {
-    const result: RoadmapTicket[] = [];
-    
-    for (const ticket of tickets) {
-      const existing = await this.db
-        .select()
-        .from(roadmapTicketsTable)
-        .where(eq(roadmapTicketsTable.jiraKey, ticket.jiraKey))
-        .limit(1);
-      
-      if (existing.length > 0) {
-        const [updated] = await this.db
-          .update(roadmapTicketsTable)
-          .set({
-            ...ticket,
-            lastSyncedAt: new Date(),
-          })
-          .where(eq(roadmapTicketsTable.jiraKey, ticket.jiraKey))
-          .returning();
-        result.push(updated);
-      } else {
-        const [created] = await this.db
-          .insert(roadmapTicketsTable)
-          .values(ticket)
-          .returning();
-        result.push(created);
-      }
-    }
-    
-    return result;
-  }
-
-  async deleteRoadmapTicket(jiraKey: string): Promise<boolean> {
-    const result = await this.db
-      .delete(roadmapTicketsTable)
-      .where(eq(roadmapTicketsTable.jiraKey, jiraKey));
-    return true;
   }
 }
 
