@@ -943,7 +943,11 @@ export default function CompanyPage() {
                               </p>
                               <p className="text-sm text-muted-foreground truncate" data-testid={`text-transcript-date-${transcript.id}`}>
                                 <Calendar className="h-3 w-3 inline mr-1" />
-                                {format(new Date(transcript.createdAt), 'MMM d, yyyy')}
+                                {(() => {
+                                  const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
+                                  const datePart = dateStr.split('T')[0];
+                                  return format(new Date(datePart + 'T12:00:00'), 'MMM d, yyyy');
+                                })()}
                               </p>
                             </div>
                           </div>

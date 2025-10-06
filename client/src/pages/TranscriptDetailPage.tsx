@@ -171,7 +171,11 @@ export default function TranscriptDetailPage() {
                     )}
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
-                      <span>{format(new Date(transcript.createdAt), "MMMM d, yyyy")}</span>
+                      <span>{(() => {
+                        const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
+                        const datePart = dateStr.split('T')[0];
+                        return format(new Date(datePart + 'T12:00:00'), "MMMM d, yyyy");
+                      })()}</span>
                     </div>
                   </div>
                   {transcript.mainMeetingTakeaways && (

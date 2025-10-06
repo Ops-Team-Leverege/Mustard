@@ -314,7 +314,11 @@ export default function Features() {
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground ml-4">
-                      {new Date(feature.releaseDate!).toLocaleDateString()}
+                      {(() => {
+                        const dateStr = typeof feature.releaseDate === 'string' ? feature.releaseDate : feature.releaseDate!.toISOString();
+                        const datePart = dateStr.split('T')[0];
+                        return new Date(datePart + 'T12:00:00').toLocaleDateString();
+                      })()}
                     </div>
                   </div>
                 </Link>

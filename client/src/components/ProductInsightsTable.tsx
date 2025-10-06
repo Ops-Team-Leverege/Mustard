@@ -410,7 +410,11 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-transcript-date-${insight.id}`}>
-                    {insight.transcriptDate ? new Date(insight.transcriptDate).toLocaleDateString() : '-'}
+                    {insight.transcriptDate ? (() => {
+                      const dateStr = typeof insight.transcriptDate === 'string' ? insight.transcriptDate : insight.transcriptDate.toISOString();
+                      const datePart = dateStr.split('T')[0];
+                      return new Date(datePart + 'T12:00:00').toLocaleDateString();
+                    })() : '-'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${insight.id}`}>
                     {insight.createdAt ? new Date(insight.createdAt).toLocaleString() : '-'}

@@ -124,7 +124,11 @@ export default function Companies() {
                         </div>
                         <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
                           <Calendar className="h-3 w-3" />
-                          {format(new Date(transcript.createdAt), 'MMM d')}
+                          {(() => {
+                            const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
+                            const datePart = dateStr.split('T')[0];
+                            return format(new Date(datePart + 'T12:00:00'), 'MMM d');
+                          })()}
                         </div>
                       </div>
                     </Link>

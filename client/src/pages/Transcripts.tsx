@@ -137,7 +137,11 @@ export default function Transcripts() {
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-3.5 w-3.5" />
-                        <span>{format(new Date(transcript.createdAt), 'MMM d, yyyy')}</span>
+                        <span>{(() => {
+                          const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
+                          const datePart = dateStr.split('T')[0];
+                          return format(new Date(datePart + 'T12:00:00'), 'MMM d, yyyy');
+                        })()}</span>
                       </div>
                     </div>
                   </div>

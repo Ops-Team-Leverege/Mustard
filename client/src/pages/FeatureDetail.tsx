@@ -291,7 +291,11 @@ export default function FeatureDetail() {
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground mb-2">Release Date</h3>
                     <p data-testid="text-release-date">
-                      {new Date(feature.releaseDate).toLocaleDateString()}
+                      {(() => {
+                        const dateStr = typeof feature.releaseDate === 'string' ? feature.releaseDate : feature.releaseDate.toISOString();
+                        const datePart = dateStr.split('T')[0];
+                        return new Date(datePart + 'T12:00:00').toLocaleDateString();
+                      })()}
                     </p>
                   </div>
                 )}

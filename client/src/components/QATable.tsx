@@ -444,7 +444,11 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                     )}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-transcript-date-${qa.id}`}>
-                    {qa.transcriptDate ? new Date(qa.transcriptDate).toLocaleDateString() : '-'}
+                    {qa.transcriptDate ? (() => {
+                      const dateStr = typeof qa.transcriptDate === 'string' ? qa.transcriptDate : qa.transcriptDate.toISOString();
+                      const datePart = dateStr.split('T')[0];
+                      return new Date(datePart + 'T12:00:00').toLocaleDateString();
+                    })() : '-'}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${qa.id}`}>
                     {qa.createdAt ? new Date(qa.createdAt).toLocaleString() : '-'}
