@@ -16,6 +16,7 @@ import Companies from "@/pages/Companies";
 import CompanyPage from "@/pages/CompanyPage";
 import CategoryPage from "@/pages/CategoryPage";
 import TranscriptDetailPage from "@/pages/TranscriptDetailPage";
+import Roadmap from "@/pages/Roadmap";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
