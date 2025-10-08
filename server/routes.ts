@@ -520,6 +520,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/qa-pairs/:id/best-answer", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isBestAnswer } = req.body;
+      
+      const qaPair = await storage.updateQABestAnswer(id, isBestAnswer);
+      
+      if (!qaPair) {
+        res.status(404).json({ error: "Q&A pair not found" });
+        return;
+      }
+      
+      res.json(qaPair);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.delete("/api/qa-pairs/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
