@@ -520,34 +520,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/qa-pairs/:id/best-answer", isAuthenticated, async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // Validate request body
-      const bestAnswerSchema = z.object({
-        isBestAnswer: z.boolean(),
-      });
-      
-      const validatedData = bestAnswerSchema.parse(req.body);
-      
-      const qaPair = await storage.updateQABestAnswer(id, validatedData.isBestAnswer);
-      
-      if (!qaPair) {
-        res.status(404).json({ error: "Q&A pair not found" });
-        return;
-      }
-      
-      res.json(qaPair);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: "Invalid request body", details: error.errors });
-        return;
-      }
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
-
   app.delete("/api/qa-pairs/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;

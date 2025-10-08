@@ -60,7 +60,6 @@ export interface IStorage {
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
   updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined>;
-  updateQABestAnswer(id: string, isBestAnswer: boolean): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
   getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
@@ -381,7 +380,6 @@ export class MemStorage implements IStorage {
       companyId: insertQAPair.companyId ?? null,
       categoryId: insertQAPair.categoryId ?? null,
       contactId: insertQAPair.contactId ?? null,
-      isBestAnswer: insertQAPair.isBestAnswer ?? false,
       createdAt: new Date(),
       id,
     };
@@ -406,7 +404,6 @@ export class MemStorage implements IStorage {
         companyId: insertQAPair.companyId ?? null,
         categoryId: insertQAPair.categoryId ?? null,
         contactId: insertQAPair.contactId ?? null,
-        isBestAnswer: insertQAPair.isBestAnswer ?? false,
         createdAt: new Date(),
         id,
       };
@@ -428,18 +425,6 @@ export class MemStorage implements IStorage {
       company,
       companyId,
       contactId: contactId !== undefined ? contactId : qaPair.contactId,
-    };
-    this.qaPairs.set(id, updated);
-    return updated;
-  }
-
-  async updateQABestAnswer(id: string, isBestAnswer: boolean): Promise<QAPair | undefined> {
-    const qaPair = this.qaPairs.get(id);
-    if (!qaPair) return undefined;
-    
-    const updated: QAPair = {
-      ...qaPair,
-      isBestAnswer,
     };
     this.qaPairs.set(id, updated);
     return updated;
@@ -1128,7 +1113,6 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
-        isBestAnswer: qaPairsTable.isBestAnswer,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1161,7 +1145,6 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
-        isBestAnswer: qaPairsTable.isBestAnswer,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1213,15 +1196,6 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async updateQABestAnswer(id: string, isBestAnswer: boolean): Promise<QAPair | undefined> {
-    const results = await this.db
-      .update(qaPairsTable)
-      .set({ isBestAnswer })
-      .where(eq(qaPairsTable.id, id))
-      .returning();
-    return results[0];
-  }
-
   async deleteQAPair(id: string): Promise<boolean> {
     const results = await this.db
       .delete(qaPairsTable)
@@ -1251,7 +1225,6 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
-        isBestAnswer: qaPairsTable.isBestAnswer,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1516,7 +1489,6 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
-        isBestAnswer: qaPairsTable.isBestAnswer,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1729,7 +1701,6 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
-        isBestAnswer: qaPairsTable.isBestAnswer,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
