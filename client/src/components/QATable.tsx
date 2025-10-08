@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Star } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -33,6 +33,7 @@ export interface QAPair {
   companyId: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
+  isStarred?: string;
   createdAt?: Date | string | null;
   transcriptDate?: Date | string | null;
 }
@@ -175,6 +176,30 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
       toast({
         title: "Error",
         description: "Failed to add Q&A pair",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleStarMutation = useMutation({
+    mutationFn: async ({ id, isStarred }: { id: string; isStarred: string }) => {
+      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}/star`, { isStarred });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update star status",
         variant: "destructive",
       });
     },
@@ -334,6 +359,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-[50px]"></TableHead>
               <TableHead className="min-w-[250px]">Question</TableHead>
               <TableHead className="min-w-[250px]">Answer</TableHead>
               <TableHead className="min-w-[150px]">Asked By</TableHead>
@@ -386,13 +412,28 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
           <TableBody>
             {paginatedQAPairs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   {filteredQAPairs.length === 0 ? 'No Q&A pairs found' : 'No Q&A pairs on this page'}
                 </TableCell>
               </TableRow>
             ) : (
               paginatedQAPairs.map((qa) => (
                 <TableRow key={qa.id} data-testid={`row-qa-${qa.id}`}>
+                  <TableCell>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => toggleStarMutation.mutate({ 
+                        id: qa.id, 
+                        isStarred: qa.isStarred === 'true' ? 'false' : 'true' 
+                      })}
+                      disabled={toggleStarMutation.isPending}
+                      data-testid={`button-star-${qa.id}`}
+                      className={qa.isStarred === 'true' ? 'text-yellow-500' : ''}
+                    >
+                      <Star className={`w-4 h-4 ${qa.isStarred === 'true' ? 'fill-current' : ''}`} />
+                    </Button>
+                  </TableCell>
                   <TableCell className="font-medium" data-testid={`text-question-${qa.id}`}>
                     {qa.question}
                   </TableCell>
