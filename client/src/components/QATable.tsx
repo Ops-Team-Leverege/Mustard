@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Combobox } from "@/components/ui/combobox";
-import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Search, Pencil, Trash2, Plus, ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, Star } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
@@ -33,6 +33,7 @@ export interface QAPair {
   companyId: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
+  isBestAnswer?: boolean;
   createdAt?: Date | string | null;
   transcriptDate?: Date | string | null;
 }
@@ -176,6 +177,22 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
         title: "Error",
         description: "Failed to add Q&A pair",
         variant: "destructive",
+      });
+    },
+  });
+
+  const toggleBestAnswerMutation = useMutation({
+    mutationFn: async ({ id, isBestAnswer }: { id: string; isBestAnswer: boolean }) => {
+      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}/best-answer`, { isBestAnswer });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/companies');
+        }
       });
     },
   });
@@ -380,13 +397,14 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                   )}
                 </button>
               </TableHead>
+              <TableHead className="min-w-[80px] text-center">Best</TableHead>
               <TableHead className="min-w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedQAPairs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   {filteredQAPairs.length === 0 ? 'No Q&A pairs found' : 'No Q&A pairs on this page'}
                 </TableCell>
               </TableRow>
@@ -452,6 +470,18 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-${qa.id}`}>
                     {qa.createdAt ? new Date(qa.createdAt).toLocaleString() : '-'}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => toggleBestAnswerMutation.mutate({ id: qa.id, isBestAnswer: !qa.isBestAnswer })}
+                      disabled={toggleBestAnswerMutation.isPending}
+                      data-testid={`button-best-answer-${qa.id}`}
+                      className={qa.isBestAnswer ? 'text-yellow-500 hover:text-yellow-600' : ''}
+                    >
+                      <Star className={`w-4 h-4 ${qa.isBestAnswer ? 'fill-yellow-500' : ''}`} />
+                    </Button>
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
