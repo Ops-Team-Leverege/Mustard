@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, index, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -83,6 +83,7 @@ export const qaPairs = pgTable("qa_pairs", {
   company: text("company").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
   categoryId: varchar("category_id"),
+  isBestAnswer: boolean("is_best_answer").default(false).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
