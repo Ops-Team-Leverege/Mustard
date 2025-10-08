@@ -188,6 +188,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/qa-pairs'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
