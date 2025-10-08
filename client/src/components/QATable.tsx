@@ -65,6 +65,7 @@ interface QATableProps {
 export default function QATable({ qaPairs, categories = [], defaultCompany }: QATableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [starredFilter, setStarredFilter] = useState('all');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
   const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', company: '', categoryId: null as string | null, contactId: null as string | null });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -261,7 +262,11 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
       (categoryFilter === 'NEW' && !qa.categoryId) ||
       qa.categoryId === categoryFilter;
     
-    return matchesSearch && matchesCategory;
+    const matchesStarred = starredFilter === 'all' || 
+      (starredFilter === 'starred' && qa.isStarred === 'true') ||
+      (starredFilter === 'unstarred' && qa.isStarred !== 'true');
+    
+    return matchesSearch && matchesCategory && matchesStarred;
   });
 
   const handleSort = (column: 'category' | 'createdAt' | 'transcriptDate') => {
@@ -320,6 +325,11 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
     setCurrentPage(1);
   };
 
+  const handleStarredFilterChange = (value: string) => {
+    setStarredFilter(value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex gap-4 flex-wrap items-center justify-between">
@@ -334,6 +344,16 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               data-testid="input-search-qa"
             />
           </div>
+          <Select value={starredFilter} onValueChange={handleStarredFilterChange}>
+            <SelectTrigger className="w-[140px]" data-testid="select-starred-filter-qa">
+              <SelectValue placeholder="All Q&As" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Q&As</SelectItem>
+              <SelectItem value="starred">Starred</SelectItem>
+              <SelectItem value="unstarred">Unstarred</SelectItem>
+            </SelectContent>
+          </Select>
           <Combobox
             options={[
               { value: 'all', label: 'All categories' },
