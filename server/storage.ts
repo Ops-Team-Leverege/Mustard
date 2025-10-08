@@ -63,6 +63,7 @@ export interface IStorage {
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
   getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
+  toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined>;
 
   // Categories
   getCategories(): Promise<Category[]>;
@@ -380,6 +381,7 @@ export class MemStorage implements IStorage {
       companyId: insertQAPair.companyId ?? null,
       categoryId: insertQAPair.categoryId ?? null,
       contactId: insertQAPair.contactId ?? null,
+      isStarred: 'false',
       createdAt: new Date(),
       id,
     };
@@ -404,6 +406,7 @@ export class MemStorage implements IStorage {
         companyId: insertQAPair.companyId ?? null,
         categoryId: insertQAPair.categoryId ?? null,
         contactId: insertQAPair.contactId ?? null,
+        isStarred: 'false',
         createdAt: new Date(),
         id,
       };
@@ -411,6 +414,18 @@ export class MemStorage implements IStorage {
       return qaPair;
     });
     return qaPairs;
+  }
+
+  async toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined> {
+    const qaPair = this.qaPairs.get(id);
+    if (!qaPair) return undefined;
+    
+    const updated: QAPair = {
+      ...qaPair,
+      isStarred,
+    };
+    this.qaPairs.set(id, updated);
+    return updated;
   }
 
   async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined> {
@@ -1113,6 +1128,7 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1145,6 +1161,7 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1213,6 +1230,15 @@ export class DbStorage implements IStorage {
     return results.length > 0;
   }
 
+  async toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined> {
+    const results = await this.db
+      .update(qaPairsTable)
+      .set({ isStarred })
+      .where(eq(qaPairsTable.id, id))
+      .returning();
+    return results[0];
+  }
+
   async getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]> {
     const results = await this.db
       .select({
@@ -1225,6 +1251,7 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1489,6 +1516,7 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,
@@ -1701,6 +1729,7 @@ export class DbStorage implements IStorage {
         company: qaPairsTable.company,
         companyId: qaPairsTable.companyId,
         categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
         categoryName: categoriesTable.name,
         contactName: contactsTable.name,
         contactJobTitle: contactsTable.jobTitle,

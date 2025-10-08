@@ -536,6 +536,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/qa-pairs/:id/star", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isStarred } = req.body;
+      
+      const qaPair = await storage.toggleQAPairStar(id, isStarred);
+      
+      if (!qaPair) {
+        res.status(404).json({ error: "Q&A pair not found" });
+        return;
+      }
+      
+      res.json(qaPair);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.post("/api/qa-pairs", isAuthenticated, async (req, res) => {
     try {
       const { question, answer, asker, company, categoryId, contactId } = req.body;
