@@ -35,22 +35,72 @@ export interface AnalysisResult {
   qaPairs: QAPairResult[];
 }
 
-export async function analyzeTranscript(
-  input: TranscriptAnalysisInput
+// Split transcript into chunks at natural boundaries
+function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = 50000): string[] {
+  // If transcript is small enough, return as single chunk
+  if (transcript.length <= maxChunkSize) {
+    return [transcript];
+  }
+
+  const chunks: string[] = [];
+  let remainingText = transcript;
+
+  while (remainingText.length > 0) {
+    if (remainingText.length <= maxChunkSize) {
+      chunks.push(remainingText);
+      break;
+    }
+
+    // Try to split at a paragraph boundary (double newline)
+    let splitIndex = remainingText.lastIndexOf('\n\n', maxChunkSize);
+    
+    // If no paragraph boundary, try single newline
+    if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
+      splitIndex = remainingText.lastIndexOf('\n', maxChunkSize);
+    }
+    
+    // If still no good split point, try a period with space
+    if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
+      splitIndex = remainingText.lastIndexOf('. ', maxChunkSize);
+      if (splitIndex !== -1) splitIndex += 1; // Include the period
+    }
+    
+    // If still nothing, just split at maxChunkSize
+    if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
+      splitIndex = maxChunkSize;
+    }
+
+    chunks.push(remainingText.substring(0, splitIndex).trim());
+    remainingText = remainingText.substring(splitIndex).trim();
+  }
+
+  return chunks;
+}
+
+async function analyzeTranscriptChunk(
+  transcript: string,
+  companyName: string,
+  leverageTeam: string[],
+  customerNames: string[],
+  categories: Category[],
+  chunkNumber: number = 1,
+  totalChunks: number = 1
 ): Promise<AnalysisResult> {
-  const categoryList = input.categories.map(c => 
+  const categoryList = categories.map(c => 
     `- ${c.name} (ID: ${c.id})${c.description ? `: ${c.description}` : ''}`
   ).join('\n');
   
-  const prompt = `You are analyzing a BD (Business Development) call transcript to extract product insights and Q&A pairs.
+  const chunkInfo = totalChunks > 1 ? ` (Part ${chunkNumber} of ${totalChunks})` : '';
+  
+  const prompt = `You are analyzing a BD (Business Development) call transcript to extract product insights and Q&A pairs${chunkInfo}.
 
 TRANSCRIPT:
-${input.transcript}
+${transcript}
 
 CONTEXT:
-- Company: ${input.companyName}
-- Leverege Team Members: ${input.leverageTeam.join(', ')}
-- Customer Names: ${input.customerNames.join(', ')}
+- Company: ${companyName}
+- Leverege Team Members: ${leverageTeam.join(', ')}
+- Customer Names: ${customerNames.join(', ')}
 
 AVAILABLE CATEGORIES:
 ${categoryList}
@@ -147,7 +197,56 @@ IMPORTANT:
 
     return result;
   } catch (error) {
-    console.error("Error analyzing transcript:", error);
+    console.error("Error analyzing transcript chunk:", error);
     throw new Error(`Failed to analyze transcript: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+}
+
+export async function analyzeTranscript(
+  input: TranscriptAnalysisInput
+): Promise<AnalysisResult> {
+  const chunks = splitTranscriptIntoChunks(input.transcript);
+  
+  console.log(`Analyzing transcript in ${chunks.length} chunk(s)...`);
+  
+  // If single chunk, process normally
+  if (chunks.length === 1) {
+    return await analyzeTranscriptChunk(
+      chunks[0],
+      input.companyName,
+      input.leverageTeam,
+      input.customerNames,
+      input.categories,
+      1,
+      1
+    );
+  }
+  
+  // Process multiple chunks and merge results
+  const allInsights: ProductInsightResult[] = [];
+  const allQAPairs: QAPairResult[] = [];
+  
+  for (let i = 0; i < chunks.length; i++) {
+    console.log(`Processing chunk ${i + 1} of ${chunks.length}...`);
+    
+    const chunkResult = await analyzeTranscriptChunk(
+      chunks[i],
+      input.companyName,
+      input.leverageTeam,
+      input.customerNames,
+      input.categories,
+      i + 1,
+      chunks.length
+    );
+    
+    allInsights.push(...chunkResult.insights);
+    allQAPairs.push(...chunkResult.qaPairs);
+  }
+  
+  console.log(`Merged results: ${allInsights.length} insights, ${allQAPairs.length} Q&A pairs`);
+  
+  return {
+    insights: allInsights,
+    qaPairs: allQAPairs
+  };
 }
