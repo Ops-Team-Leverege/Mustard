@@ -36,7 +36,7 @@ export interface AnalysisResult {
 }
 
 // Split transcript into chunks at natural boundaries
-function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = 25000): string[] {
+function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = 15000): string[] {
   // If transcript is small enough, return as single chunk
   if (transcript.length <= maxChunkSize) {
     return [transcript];
