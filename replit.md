@@ -20,7 +20,7 @@ Preferred communication style: Simple, everyday language.
 - **Framework**: Express.js with TypeScript.
 - **API**: RESTful JSON API under `/api`, centralized error handling.
 - **Data Layer**: PostgreSQL database with Drizzle ORM, Zod for schema validation. Neon serverless driver for production.
-- **AI Integration**: OpenAI API (GPT-5) for transcript analysis, structured prompt engineering for insight/Q&A extraction and categorization.
+- **AI Integration**: OpenAI API (GPT-5) for transcript analysis, structured prompt engineering for insight/Q&A extraction and categorization. Automatic transcript batching for transcripts over 25,000 characters to prevent timeout errors.
 - **Authentication**: Replit Auth (OpenID Connect) for user authentication (Google, GitHub, X, Apple, email/password), session-based with PostgreSQL session store. Access restricted to `@leverege.com` email addresses.
 - **Database Schema**: `transcripts`, `categories`, `product_insights`, `qa_pairs`, `companies`, `contacts`, `users`, `sessions`, `features`.
 
