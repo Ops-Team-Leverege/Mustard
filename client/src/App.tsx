@@ -7,6 +7,7 @@ import TabNavigation from "@/components/TabNavigation";
 import ThemeToggle from "@/components/ThemeToggle";
 import TranscriptInput from "@/pages/TranscriptInput";
 import Transcripts from "@/pages/Transcripts";
+import Latest from "@/pages/Latest";
 import ProductInsights from "@/pages/ProductInsights";
 import QADatabase from "@/pages/QADatabase";
 import Categories from "@/pages/Categories";
@@ -27,9 +28,6 @@ import { useEffect, useRef } from "react";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
-  { id: 'companies', label: 'Companies', path: '/companies' },
-  { id: 'categories', label: 'Categories', path: '/categories' },
-  { id: 'features', label: 'Features', path: '/features' },
   { 
     id: 'databases', 
     label: 'Databases', 
@@ -39,6 +37,10 @@ const tabs = [
       { id: 'transcripts', label: 'Transcripts', path: '/transcripts' },
     ]
   },
+  { id: 'latest', label: 'Latest', path: '/latest' },
+  { id: 'companies', label: 'Companies', path: '/companies' },
+  { id: 'categories', label: 'Categories', path: '/categories' },
+  { id: 'features', label: 'Features', path: '/features' },
 ];
 
 function ProtectedRoute({ 
@@ -78,6 +80,14 @@ function Router() {
       <Route path="/transcripts">
         <ProtectedRoute 
           component={Transcripts} 
+          isAuthenticated={isAuthenticated}
+          isLoading={isLoading}
+          isDomainRestricted={isDomainRestricted}
+        />
+      </Route>
+      <Route path="/latest">
+        <ProtectedRoute 
+          component={Latest} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
