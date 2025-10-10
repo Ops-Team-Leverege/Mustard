@@ -101,10 +101,11 @@ export default function Latest() {
     .sort((a, b) => b.releaseDate.getTime() - a.releaseDate.getTime());
 
   // Filter insights from last 7 days
+  const now = new Date();
   const recentInsights = insights
     .filter((insight) => {
       const createdDate = new Date(insight.createdAt);
-      return createdDate >= sevenDaysAgo && createdDate <= new Date();
+      return createdDate >= sevenDaysAgo && createdDate <= now;
     })
     .map((insight) => ({
       id: insight.id,
@@ -123,7 +124,7 @@ export default function Latest() {
     .filter((qa) => {
       if (!qa.createdAt) return false;
       const createdDate = new Date(qa.createdAt);
-      return createdDate >= sevenDaysAgo && createdDate <= new Date();
+      return createdDate >= sevenDaysAgo && createdDate <= now;
     })
     .map((qa) => ({
       ...qa,
