@@ -28,6 +28,10 @@ import { useEffect, useRef } from "react";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
+  { id: 'latest', label: 'Latest', path: '/latest' },
+  { id: 'companies', label: 'Companies', path: '/companies' },
+  { id: 'categories', label: 'Categories', path: '/categories' },
+  { id: 'features', label: 'Features', path: '/features' },
   { 
     id: 'databases', 
     label: 'Databases', 
@@ -37,10 +41,6 @@ const tabs = [
       { id: 'transcripts', label: 'Transcripts', path: '/transcripts' },
     ]
   },
-  { id: 'latest', label: 'Latest', path: '/latest' },
-  { id: 'companies', label: 'Companies', path: '/companies' },
-  { id: 'categories', label: 'Categories', path: '/categories' },
-  { id: 'features', label: 'Features', path: '/features' },
 ];
 
 function ProtectedRoute({ 
