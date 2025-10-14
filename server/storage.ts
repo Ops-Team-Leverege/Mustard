@@ -20,6 +20,9 @@ import {
   type CategoryOverview,
   type User,
   type UpsertUser,
+  type POSSystem,
+  type POSSystemWithCompanies,
+  type InsertPOSSystem,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -28,6 +31,8 @@ import {
   companies as companiesTable,
   contacts as contactsTable,
   users as usersTable,
+  posSystems as posSystemsTable,
+  posSystemCompanies as posSystemCompaniesTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -100,6 +105,13 @@ export interface IStorage {
   // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+
+  // POS Systems
+  getPOSSystems(): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
+  getPOSSystem(id: string): Promise<import("@shared/schema").POSSystem | undefined>;
+  createPOSSystem(posSystem: import("@shared/schema").InsertPOSSystem): Promise<import("@shared/schema").POSSystem>;
+  updatePOSSystem(id: string, name: string, websiteLink?: string | null, description?: string | null, companyIds?: string[]): Promise<import("@shared/schema").POSSystem | undefined>;
+  deletePOSSystem(id: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -895,6 +907,27 @@ export class MemStorage implements IStorage {
       insights,
       qaPairs,
     };
+  }
+
+  // POS Systems (stub implementations - not used in production)
+  async getPOSSystems(): Promise<POSSystemWithCompanies[]> {
+    return [];
+  }
+
+  async getPOSSystem(id: string): Promise<POSSystem | undefined> {
+    return undefined;
+  }
+
+  async createPOSSystem(posSystem: InsertPOSSystem): Promise<POSSystem> {
+    throw new Error("MemStorage not supported for POS Systems");
+  }
+
+  async updatePOSSystem(id: string, name: string, websiteLink?: string | null, description?: string | null, companyIds?: string[]): Promise<POSSystem | undefined> {
+    return undefined;
+  }
+
+  async deletePOSSystem(id: string): Promise<boolean> {
+    return false;
   }
 }
 
@@ -1757,6 +1790,119 @@ export class DbStorage implements IStorage {
         contactJobTitle: qa.contactJobTitle || null,
       })),
     };
+  }
+
+  // POS Systems operations
+  async getPOSSystems(): Promise<POSSystemWithCompanies[]> {
+    const systems = await this.db.select().from(posSystemsTable);
+    
+    // Get all companies for each system
+    const systemsWithCompanies = await Promise.all(
+      systems.map(async (system) => {
+        const companyLinks = await this.db
+          .select()
+          .from(posSystemCompaniesTable)
+          .where(eq(posSystemCompaniesTable.posSystemId, system.id));
+        
+        const companyIds = companyLinks.map(link => link.companyId);
+        const companies = companyIds.length > 0
+          ? await this.db
+              .select()
+              .from(companiesTable)
+              .where(drizzleSql`${companiesTable.id} = ANY(${companyIds})`)
+          : [];
+        
+        return {
+          ...system,
+          companies,
+        };
+      })
+    );
+    
+    return systemsWithCompanies;
+  }
+
+  async getPOSSystem(id: string): Promise<POSSystem | undefined> {
+    const [system] = await this.db
+      .select()
+      .from(posSystemsTable)
+      .where(eq(posSystemsTable.id, id));
+    return system;
+  }
+
+  async createPOSSystem(posSystemData: InsertPOSSystem): Promise<POSSystem> {
+    const { companyIds, ...systemData } = posSystemData;
+    
+    const [system] = await this.db
+      .insert(posSystemsTable)
+      .values(systemData)
+      .returning();
+    
+    // Create company relationships if provided
+    if (companyIds && companyIds.length > 0) {
+      await this.db.insert(posSystemCompaniesTable).values(
+        companyIds.map(companyId => ({
+          posSystemId: system.id,
+          companyId,
+        }))
+      );
+    }
+    
+    return system;
+  }
+
+  async updatePOSSystem(
+    id: string,
+    name: string,
+    websiteLink?: string | null,
+    description?: string | null,
+    companyIds?: string[]
+  ): Promise<POSSystem | undefined> {
+    const [system] = await this.db
+      .update(posSystemsTable)
+      .set({
+        name,
+        websiteLink: websiteLink ?? null,
+        description: description ?? null,
+      })
+      .where(eq(posSystemsTable.id, id))
+      .returning();
+    
+    if (!system) return undefined;
+    
+    // Update company relationships if provided
+    if (companyIds !== undefined) {
+      // Delete existing relationships
+      await this.db
+        .delete(posSystemCompaniesTable)
+        .where(eq(posSystemCompaniesTable.posSystemId, id));
+      
+      // Create new relationships
+      if (companyIds.length > 0) {
+        await this.db.insert(posSystemCompaniesTable).values(
+          companyIds.map(companyId => ({
+            posSystemId: id,
+            companyId,
+          }))
+        );
+      }
+    }
+    
+    return system;
+  }
+
+  async deletePOSSystem(id: string): Promise<boolean> {
+    // Delete company relationships first
+    await this.db
+      .delete(posSystemCompaniesTable)
+      .where(eq(posSystemCompaniesTable.posSystemId, id));
+    
+    // Delete the POS system
+    const result = await this.db
+      .delete(posSystemsTable)
+      .where(eq(posSystemsTable.id, id));
+    
+    return true;
   }
 }
 
