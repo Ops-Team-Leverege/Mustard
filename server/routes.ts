@@ -180,6 +180,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })
       );
       
+      // Handle POS system detection and linking
+      let posSystem = null;
+      if (analysis.posSystem) {
+        posSystem = await storage.findOrCreatePOSSystemAndLink(
+          analysis.posSystem.name,
+          company.id,
+          analysis.posSystem.websiteLink,
+          analysis.posSystem.description
+        );
+        console.log(`POS system detected and linked: ${posSystem.name} -> ${company.name}`);
+      }
+      
       res.json({
         transcript,
         insights,
@@ -190,6 +202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company.name,
           slug: company.slug,
         },
+        posSystem,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
