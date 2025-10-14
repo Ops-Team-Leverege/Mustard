@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Data Layer**: PostgreSQL database with Drizzle ORM, Zod for schema validation. Neon serverless driver for production.
 - **AI Integration**: OpenAI API (GPT-5) for transcript analysis, structured prompt engineering for insight/Q&A extraction and categorization. Automatic transcript batching for transcripts over 15,000 characters to prevent timeout errors.
 - **Authentication**: Replit Auth (OpenID Connect) for user authentication (Google, GitHub, X, Apple, email/password), session-based with PostgreSQL session store. Access restricted to `@leverege.com` email addresses.
-- **Database Schema**: `transcripts`, `categories`, `product_insights`, `qa_pairs`, `companies`, `contacts`, `users`, `sessions`, `features`.
+- **Database Schema**: `transcripts`, `categories`, `product_insights`, `qa_pairs`, `companies`, `contacts`, `users`, `sessions`, `features`, `pos_systems`, `pos_system_companies`.
 
 ### Key Architectural Decisions
 - **Single-Page Application (SPA)**: Client-side routing with Wouter.
@@ -42,6 +42,7 @@ Preferred communication style: Simple, everyday language.
 - **Features Management**: Dedicated Features page (`/features`) allows tracking existing product features with demo video links and help guide links. Features can optionally be linked to categories for organization. All CRUD operations (create, read, update, delete) are supported with proper form validation using react-hook-form and zodResolver. Feature detail page (`/features/:id`) displays individual feature information with description supporting multi-line text and bullet points, plus related product insights from the linked category for deeper context.
 - **Rich Text Support**: Transcript upload form includes mainMeetingTakeaways field supporting multi-line text with bullet points and formatted lists. Field uses standard textarea for input and whitespace-pre-wrap CSS for display preservation on transcript detail pages, maintaining original formatting including newlines and manual bullet characters (•, -, *).
 - **Q&A Star Feature**: Q&A pairs can be starred/favorited for quick reference. Star toggle button appears in the first column of the Q&A table, with filled yellow star for starred items and empty star for unstarred. Star status persists in database (isStarred text field, default 'false') and syncs across all views via TanStack Query cache invalidation.
+- **POS Systems Database**: Dedicated database for tracking Point of Sales systems with name, website link, description, and multi-company relationships. Accessible via Databases dropdown in navigation. Supports full CRUD operations with multi-select company associations using checkbox-based selection interface. Uses junction table (`pos_system_companies`) for many-to-many relationship between POS systems and companies.
 
 ## External Dependencies
 
