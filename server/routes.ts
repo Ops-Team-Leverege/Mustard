@@ -8,9 +8,11 @@ import {
   insertFeatureSchema,
   insertCompanySchema,
   insertContactSchema,
+  insertPOSSystemSchema,
   type ProductInsightWithCategory,
 } from "@shared/schema";
 import { z } from "zod";
+import { fromZodError } from "zod-validation-error";
 import { randomUUID } from "crypto";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -1045,6 +1047,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const result = await storage.mergeDuplicateContacts(companyId);
       res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // POS Systems routes
+  app.get("/api/pos-systems", isAuthenticated, async (_req, res) => {
+    try {
+      const systems = await storage.getPOSSystems();
+      res.json(systems);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/pos-systems/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const system = await storage.getPOSSystem(id);
+      
+      if (!system) {
+        res.status(404).json({ error: "POS system not found" });
+        return;
+      }
+      
+      res.json(system);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.post("/api/pos-systems", isAuthenticated, async (req, res) => {
+    try {
+      const validatedData = insertPOSSystemSchema.parse(req.body);
+      const system = await storage.createPOSSystem(validatedData);
+      res.json(system);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: fromZodError(error).message });
+        return;
+      }
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.patch("/api/pos-systems/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, websiteLink, description, companyIds } = req.body;
+      
+      if (!name) {
+        res.status(400).json({ error: "Name is required" });
+        return;
+      }
+      
+      const system = await storage.updatePOSSystem(id, name, websiteLink, description, companyIds);
+      
+      if (!system) {
+        res.status(404).json({ error: "POS system not found" });
+        return;
+      }
+      
+      res.json(system);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.delete("/api/pos-systems/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const success = await storage.deletePOSSystem(id);
+      
+      if (!success) {
+        res.status(404).json({ error: "POS system not found" });
+        return;
+      }
+      
+      res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
