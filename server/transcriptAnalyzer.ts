@@ -30,9 +30,16 @@ export interface QAPairResult {
   categoryId: string | null;
 }
 
+export interface POSSystemResult {
+  name: string;
+  websiteLink?: string;
+  description?: string;
+}
+
 export interface AnalysisResult {
   insights: ProductInsightResult[];
   qaPairs: QAPairResult[];
+  posSystem: POSSystemResult | null;
 }
 
 // Split transcript into chunks at natural boundaries
@@ -136,6 +143,14 @@ Identify product-specific questions asked during the call. For each:
 - asker: The name of the person who asked (from customer names list)
 - categoryId: Match to one of the category IDs above, or null if no good match (will be marked as NEW)
 
+TASK 3 - Detect Point of Sale (POS) System:
+If the customer mentions their POS system by name (e.g., Square, Toast, Clover, Lightspeed, NCR, etc.), extract:
+- name: The POS system name (normalized, e.g., "Square" not "square pos system")
+- websiteLink: If mentioned or if you know it, provide the official website (optional)
+- description: Brief description of what was mentioned about it (optional)
+
+If no POS system is mentioned, set "posSystem" to null.
+
 OUTPUT FORMAT:
 Respond with valid JSON in this exact structure:
 {
@@ -154,7 +169,12 @@ Respond with valid JSON in this exact structure:
       "asker": "person name",
       "categoryId": "category-id-or-null"
     }
-  ]
+  ],
+  "posSystem": {
+    "name": "POS system name",
+    "websiteLink": "https://example.com (optional)",
+    "description": "brief description (optional)"
+  }
 }
 
 IMPORTANT:
@@ -194,6 +214,9 @@ IMPORTANT:
     if (!result.qaPairs || !Array.isArray(result.qaPairs)) {
       result.qaPairs = [];
     }
+    if (!result.posSystem) {
+      result.posSystem = null;
+    }
 
     return result;
   } catch (error) {
@@ -225,6 +248,7 @@ export async function analyzeTranscript(
   // Process multiple chunks and merge results
   const allInsights: ProductInsightResult[] = [];
   const allQAPairs: QAPairResult[] = [];
+  let detectedPOSSystem: POSSystemResult | null = null;
   
   for (let i = 0; i < chunks.length; i++) {
     console.log(`Processing chunk ${i + 1} of ${chunks.length}...`);
@@ -241,12 +265,18 @@ export async function analyzeTranscript(
     
     allInsights.push(...chunkResult.insights);
     allQAPairs.push(...chunkResult.qaPairs);
+    
+    // Take the first non-null POS system detected
+    if (chunkResult.posSystem && !detectedPOSSystem) {
+      detectedPOSSystem = chunkResult.posSystem;
+    }
   }
   
-  console.log(`Merged results: ${allInsights.length} insights, ${allQAPairs.length} Q&A pairs`);
+  console.log(`Merged results: ${allInsights.length} insights, ${allQAPairs.length} Q&A pairs${detectedPOSSystem ? ', POS system detected: ' + detectedPOSSystem.name : ''}`);
   
   return {
     insights: allInsights,
-    qaPairs: allQAPairs
+    qaPairs: allQAPairs,
+    posSystem: detectedPOSSystem
   };
 }
