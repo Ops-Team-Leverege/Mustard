@@ -87,6 +87,20 @@ export const qaPairs = pgTable("qa_pairs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const posSystems = pgTable("pos_systems", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  websiteLink: text("website_link"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const posSystemCompanies = pgTable("pos_system_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  posSystemId: varchar("pos_system_id").notNull(),
+  companyId: varchar("company_id").notNull(),
+});
+
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 // Session storage table - mandatory for Replit Auth
 export const sessions = pgTable(
@@ -157,6 +171,13 @@ export const insertContactSchema = createInsertSchema(contacts).omit({
   createdAt: true,
 });
 
+export const insertPOSSystemSchema = createInsertSchema(posSystems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  companyIds: z.array(z.string()).optional(),
+});
+
 export type InsertTranscript = z.infer<typeof insertTranscriptSchema>;
 export type Transcript = typeof transcripts.$inferSelect;
 
@@ -177,6 +198,13 @@ export type Contact = typeof contacts.$inferSelect;
 
 export type InsertFeature = z.infer<typeof insertFeatureSchema>;
 export type Feature = typeof features.$inferSelect;
+
+export type InsertPOSSystem = z.infer<typeof insertPOSSystemSchema>;
+export type POSSystem = typeof posSystems.$inferSelect;
+
+export type POSSystemWithCompanies = POSSystem & {
+  companies: Company[];
+};
 
 // Extended type for UI with category name
 export type ProductInsightWithCategory = ProductInsight & {
