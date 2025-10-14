@@ -37,7 +37,7 @@ import {
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, sql as drizzleSql } from "drizzle-orm";
+import { eq, sql as drizzleSql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // Transcripts
@@ -1824,7 +1824,7 @@ export class DbStorage implements IStorage {
           ? await this.db
               .select()
               .from(companiesTable)
-              .where(drizzleSql`${companiesTable.id} = ANY(${companyIds})`)
+              .where(inArray(companiesTable.id, companyIds))
           : [];
         
         return {
