@@ -109,9 +109,12 @@ export interface IStorage {
   // POS Systems
   getPOSSystems(): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
   getPOSSystem(id: string): Promise<import("@shared/schema").POSSystem | undefined>;
+  getPOSSystemByName(name: string): Promise<import("@shared/schema").POSSystem | undefined>;
   createPOSSystem(posSystem: import("@shared/schema").InsertPOSSystem): Promise<import("@shared/schema").POSSystem>;
   updatePOSSystem(id: string, name: string, websiteLink?: string | null, description?: string | null, companyIds?: string[]): Promise<import("@shared/schema").POSSystem | undefined>;
   deletePOSSystem(id: string): Promise<boolean>;
+  linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void>;
+  findOrCreatePOSSystemAndLink(name: string, companyId: string, websiteLink?: string, description?: string): Promise<import("@shared/schema").POSSystem>;
 }
 
 export class MemStorage implements IStorage {
@@ -928,6 +931,18 @@ export class MemStorage implements IStorage {
 
   async deletePOSSystem(id: string): Promise<boolean> {
     return false;
+  }
+
+  async getPOSSystemByName(name: string): Promise<POSSystem | undefined> {
+    return undefined;
+  }
+
+  async linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void> {
+    throw new Error("MemStorage not supported for POS Systems");
+  }
+
+  async findOrCreatePOSSystemAndLink(name: string, companyId: string, websiteLink?: string, description?: string): Promise<POSSystem> {
+    throw new Error("MemStorage not supported for POS Systems");
   }
 }
 
@@ -1903,6 +1918,56 @@ export class DbStorage implements IStorage {
       .where(eq(posSystemsTable.id, id));
     
     return true;
+  }
+
+  async getPOSSystemByName(name: string): Promise<POSSystem | undefined> {
+    const [system] = await this.db
+      .select()
+      .from(posSystemsTable)
+      .where(drizzleSql`LOWER(${posSystemsTable.name}) = LOWER(${name})`);
+    return system;
+  }
+
+  async linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void> {
+    // Check if link already exists
+    const [existing] = await this.db
+      .select()
+      .from(posSystemCompaniesTable)
+      .where(
+        drizzleSql`${posSystemCompaniesTable.posSystemId} = ${posSystemId} AND ${posSystemCompaniesTable.companyId} = ${companyId}`
+      );
+    
+    if (!existing) {
+      await this.db.insert(posSystemCompaniesTable).values({
+        posSystemId,
+        companyId,
+      });
+    }
+  }
+
+  async findOrCreatePOSSystemAndLink(
+    name: string,
+    companyId: string,
+    websiteLink?: string,
+    description?: string
+  ): Promise<POSSystem> {
+    // Try to find existing POS system by name (case-insensitive)
+    let system = await this.getPOSSystemByName(name);
+    
+    if (system) {
+      // Link to company if not already linked
+      await this.linkCompanyToPOSSystem(system.id, companyId);
+    } else {
+      // Create new POS system
+      system = await this.createPOSSystem({
+        name,
+        websiteLink: websiteLink || null,
+        description: description || null,
+        companyIds: [companyId],
+      });
+    }
+    
+    return system;
   }
 }
 
