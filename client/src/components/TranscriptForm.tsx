@@ -5,7 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, Loader2, Plus, X, User, Check, ChevronsUpDown } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Sparkles, Loader2, Plus, X, User, Check, ChevronsUpDown, FileText, StickyNote } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -28,6 +29,7 @@ export interface TranscriptData {
   companyName: string;
   name?: string;
   meetingDate?: string;
+  contentType?: "transcript" | "notes";
   transcript: string;
   leverageTeam: string;
   customerNames: string;
@@ -51,10 +53,12 @@ const LEVEREGE_TEAM_OPTIONS = [
 ];
 
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
+  const [contentType, setContentType] = useState<"transcript" | "notes">("transcript");
   const [formData, setFormData] = useState<TranscriptData>({
     companyName: '',
     name: '',
     meetingDate: '',
+    contentType: 'transcript',
     transcript: '',
     leverageTeam: '',
     customerNames: '',
@@ -73,6 +77,11 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const [teamSearchOpen, setTeamSearchOpen] = useState(false);
   const [teamSearchValue, setTeamSearchValue] = useState('');
   const [existingContactOpen, setExistingContactOpen] = useState(false);
+
+  // Sync contentType state with formData
+  useEffect(() => {
+    setFormData(prev => ({ ...prev, contentType }));
+  }, [contentType]);
 
   const { data: companies = [] } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
@@ -139,7 +148,12 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       return;
     }
     
-    if (!formData.transcript.trim()) {
+    // For transcripts, require transcript field. For notes, require mainMeetingTakeaways
+    if (contentType === "transcript" && !formData.transcript.trim()) {
+      return;
+    }
+    
+    if (contentType === "notes" && !formData.mainMeetingTakeaways?.trim()) {
       return;
     }
     
@@ -153,9 +167,12 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     
     const submissionData = {
       ...formData,
+      contentType,
       leverageTeam: leverageTeamString,
       customerNames,
       customers,
+      // For notes mode, use mainMeetingTakeaways as the transcript content
+      transcript: contentType === "notes" ? (formData.mainMeetingTakeaways || '') : formData.transcript,
     };
     
     onSubmit?.(submissionData);
@@ -164,10 +181,40 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   return (
     <Card className="max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle className="text-2xl font-semibold">Add New Transcript</CardTitle>
+        <CardTitle className="text-2xl font-semibold">
+          {contentType === "transcript" ? "Add New Transcript" : "Add Meeting Notes"}
+        </CardTitle>
         <CardDescription>
-          Upload BD call transcript to extract product insights and customer questions
+          {contentType === "transcript" 
+            ? "Upload BD call transcript to extract product insights and customer questions"
+            : "Upload meeting notes from an onsite visit to extract product insights and customer questions"}
         </CardDescription>
+        
+        <div className="flex items-center space-x-4 pt-4 border-t mt-4">
+          <div className="flex items-center space-x-3 flex-1">
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
+              contentType === "transcript" ? "bg-primary/10 text-primary" : "text-muted-foreground"
+            )}>
+              <FileText className="h-4 w-4" />
+              <span className="text-sm font-medium">Transcript</span>
+            </div>
+            
+            <Switch
+              checked={contentType === "notes"}
+              onCheckedChange={(checked) => setContentType(checked ? "notes" : "transcript")}
+              data-testid="switch-content-type"
+            />
+            
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
+              contentType === "notes" ? "bg-primary/10 text-primary" : "text-muted-foreground"
+            )}>
+              <StickyNote className="h-4 w-4" />
+              <span className="text-sm font-medium">Meeting Notes</span>
+            </div>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -269,28 +316,36 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="transcript" data-testid="label-transcript">Transcript <span className="text-destructive">*</span></Label>
-            <Textarea
-              id="transcript"
-              data-testid="input-transcript"
-              placeholder="Paste the full BD call transcript here..."
-              className="min-h-[200px] font-mono text-sm"
-              value={formData.transcript}
-              onChange={(e) => setFormData({ ...formData, transcript: e.target.value })}
-              required
-            />
-          </div>
+          {contentType === "transcript" && (
+            <div className="space-y-2">
+              <Label htmlFor="transcript" data-testid="label-transcript">Transcript <span className="text-destructive">*</span></Label>
+              <Textarea
+                id="transcript"
+                data-testid="input-transcript"
+                placeholder="Paste the full BD call transcript here..."
+                className="min-h-[200px] font-mono text-sm"
+                value={formData.transcript}
+                onChange={(e) => setFormData({ ...formData, transcript: e.target.value })}
+                required
+              />
+            </div>
+          )}
 
           <div className="space-y-2">
-            <Label htmlFor="mainMeetingTakeaways" data-testid="label-main-meeting-takeaways">Main Meeting Takeaways</Label>
+            <Label htmlFor="mainMeetingTakeaways" data-testid="label-main-meeting-takeaways">
+              {contentType === "notes" ? "Meeting Notes" : "Main Meeting Takeaways"}
+              {contentType === "notes" && <span className="text-destructive"> *</span>}
+            </Label>
             <Textarea
               id="mainMeetingTakeaways"
               data-testid="input-main-meeting-takeaways"
-              placeholder="Add your general thoughts on the opportunity, the receptiveness of the customer, and anything else that we wouldn't be able to gather or understand just from the transcript"
-              className="min-h-[100px]"
+              placeholder={contentType === "notes" 
+                ? "Paste your meeting notes here - they can be brief, informal, or fragmented. The AI will extract insights and questions from them."
+                : "Add your general thoughts on the opportunity, the receptiveness of the customer, and anything else that we wouldn't be able to gather or understand just from the transcript"}
+              className={contentType === "notes" ? "min-h-[200px] font-mono text-sm" : "min-h-[100px]"}
               value={formData.mainMeetingTakeaways}
               onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
+              required={contentType === "notes"}
             />
           </div>
 
@@ -626,7 +681,14 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           <Button
             type="submit"
             className="w-full"
-            disabled={isAnalyzing || customers.length === 0 || !formData.companyName.trim() || !formData.transcript.trim() || teamMembers.length === 0}
+            disabled={
+              isAnalyzing || 
+              customers.length === 0 || 
+              !formData.companyName.trim() || 
+              teamMembers.length === 0 ||
+              (contentType === "transcript" && !formData.transcript.trim()) ||
+              (contentType === "notes" && !formData.mainMeetingTakeaways?.trim())
+            }
             data-testid="button-analyze-transcript"
           >
             {isAnalyzing ? (
@@ -637,7 +699,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             ) : (
               <>
                 <Sparkles className="w-4 h-4 mr-2" />
-                Analyze Transcript
+                {contentType === "transcript" ? "Analyze Transcript" : "Analyze Meeting Notes"}
               </>
             )}
           </Button>
