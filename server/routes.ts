@@ -87,8 +87,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const leverageTeam = data.leverageTeam.split(',').map(s => s.trim()).filter(s => s);
       const customerNames = data.customerNames.split(',').map(s => s.trim()).filter(s => s);
       
+      // For notes mode, use mainMeetingTakeaways as the content to analyze
+      const contentToAnalyze = data.contentType === "notes" 
+        ? (data.mainMeetingTakeaways || '')
+        : (data.transcript || '');
+      
       const analysis = await analyzeTranscript({
-        transcript: data.transcript,
+        transcript: contentToAnalyze,
         companyName: data.companyName,
         leverageTeam,
         customerNames,
