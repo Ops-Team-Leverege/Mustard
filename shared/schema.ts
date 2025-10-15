@@ -8,7 +8,8 @@ export const transcripts = pgTable("transcripts", {
   name: text("name"), // Meeting/transcript name - user editable
   companyName: text("company_name").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
-  transcript: text("transcript").notNull(),
+  contentType: text("content_type").default("transcript").notNull(), // "transcript" or "notes"
+  transcript: text("transcript"), // Can be null if contentType is "notes"
   leverageTeam: text("leverage_team").notNull(),
   customerNames: text("customer_names").notNull(),
   companyDescription: text("company_description"),
@@ -133,10 +134,25 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
   customerNames: true,
 }).extend({
+  contentType: z.enum(["transcript", "notes"]).default("transcript"),
+  transcript: z.string().optional(),
   createdAt: z.string().or(z.date()).optional(),
   customerNames: z.string().min(1, "At least one customer is required"),
   customers: z.array(customerSchema).min(1, "At least one customer is required"),
-});
+}).refine(
+  (data) => {
+    // If contentType is "transcript", transcript field must be provided
+    if (data.contentType === "transcript") {
+      return data.transcript && data.transcript.trim().length > 0;
+    }
+    // If contentType is "notes", transcript field is optional (notes go in mainMeetingTakeaways)
+    return true;
+  },
+  {
+    message: "Transcript content is required when content type is 'transcript'",
+    path: ["transcript"],
+  }
+);
 
 export const insertProductInsightSchema = createInsertSchema(productInsights).omit({
   id: true,
