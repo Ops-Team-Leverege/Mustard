@@ -93,6 +93,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         leverageTeam,
         customerNames,
         categories,
+        contentType: data.contentType,
       });
       
       // Only create transcript after successful analysis, including companyId
