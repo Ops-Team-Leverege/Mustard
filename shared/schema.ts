@@ -136,6 +136,7 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
 }).extend({
   contentType: z.enum(["transcript", "notes"]).default("transcript"),
   transcript: z.string().optional(),
+  mainMeetingTakeaways: z.string().optional(),
   createdAt: z.string().or(z.date()).optional(),
   customerNames: z.string().min(1, "At least one customer is required"),
   customers: z.array(customerSchema).min(1, "At least one customer is required"),
@@ -145,11 +146,14 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
     if (data.contentType === "transcript") {
       return data.transcript && data.transcript.trim().length > 0;
     }
-    // If contentType is "notes", transcript field is optional (notes go in mainMeetingTakeaways)
+    // If contentType is "notes", mainMeetingTakeaways field must be provided
+    if (data.contentType === "notes") {
+      return data.mainMeetingTakeaways && data.mainMeetingTakeaways.trim().length > 0;
+    }
     return true;
   },
   {
-    message: "Transcript content is required when content type is 'transcript'",
+    message: "Transcript content is required when content type is 'transcript', and meeting notes are required when content type is 'notes'",
     path: ["transcript"],
   }
 );
