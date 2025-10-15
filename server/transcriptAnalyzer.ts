@@ -14,6 +14,7 @@ interface TranscriptAnalysisInput {
   leverageTeam: string[];
   customerNames: string[];
   categories: Category[];
+  contentType?: "transcript" | "notes";
 }
 
 export interface ProductInsightResult {
@@ -91,7 +92,8 @@ async function analyzeTranscriptChunk(
   customerNames: string[],
   categories: Category[],
   chunkNumber: number = 1,
-  totalChunks: number = 1
+  totalChunks: number = 1,
+  contentType: "transcript" | "notes" = "transcript"
 ): Promise<AnalysisResult> {
   const categoryList = categories.map(c => 
     `- ${c.name} (ID: ${c.id})${c.description ? `: ${c.description}` : ''}`
@@ -99,9 +101,12 @@ async function analyzeTranscriptChunk(
   
   const chunkInfo = totalChunks > 1 ? ` (Part ${chunkNumber} of ${totalChunks})` : '';
   
-  const prompt = `You are analyzing a BD (Business Development) call transcript to extract product insights and Q&A pairs${chunkInfo}.
+  const isNotes = contentType === "notes";
+  const contentLabel = isNotes ? "meeting notes" : "BD (Business Development) call transcript";
+  
+  const prompt = `You are analyzing ${contentLabel} to extract product insights and Q&A pairs${chunkInfo}.
 
-TRANSCRIPT:
+${isNotes ? 'MEETING NOTES:' : 'TRANSCRIPT:'}
 ${transcript}
 
 CONTEXT:
@@ -111,6 +116,10 @@ CONTEXT:
 
 AVAILABLE CATEGORIES:
 ${categoryList}
+
+${isNotes ? `
+NOTE: These are meeting notes from an onsite visit, not a full transcript. The notes may be brief, informal, or fragmented. Extract insights and questions based on the captured information, understanding that details may be condensed or paraphrased by the note-taker.
+` : ''}
 
 TASK 1 - Extract Product Insights (LEARNINGS ONLY):
 Focus on meaningful learnings, NOT simple confirmations or explanations. Extract insights ONLY if they meet one of these criteria:
@@ -127,17 +136,17 @@ B) Customer asks about or expresses interest in NEW features we DON'T currently 
 
 DO NOT include:
 - Simple confirmations of how a feature works
-- BD team explaining features (unless customer responds with value/need)
+${isNotes ? '- General observations without specific product relevance' : '- BD team explaining features (unless customer responds with value/need)'}
 - Administrative or scheduling topics
 
 For each insight:
 - feature: The specific feature or capability name
 - context: Why this feature is important/valuable to the customer (their use case/need)
-- quote: Customer quote - lightly paraphrased for readability while preserving exact intent and meaning
+- quote: ${isNotes ? 'Key observation or customer statement from notes - lightly paraphrased for clarity' : 'Customer quote - lightly paraphrased for readability while preserving exact intent and meaning'}
 - categoryId: Match to one of the category IDs above, or null if no good match (will be marked as NEW)
 
 TASK 2 - Extract Q&A Pairs:
-Identify product-specific questions asked during the call. For each:
+${isNotes ? 'Identify any product-specific questions that were asked and answered during the meeting.' : 'Identify product-specific questions asked during the call.'} For each:
 - question: The question that was asked (product-related only, not scheduling/admin) - lightly paraphrased for clarity
 - answer: The answer that was provided - lightly paraphrased for clarity
 - asker: The name of the person who asked (from customer names list)
@@ -229,8 +238,9 @@ export async function analyzeTranscript(
   input: TranscriptAnalysisInput
 ): Promise<AnalysisResult> {
   const chunks = splitTranscriptIntoChunks(input.transcript);
+  const contentType = input.contentType || "transcript";
   
-  console.log(`Analyzing transcript in ${chunks.length} chunk(s)...`);
+  console.log(`Analyzing ${contentType} in ${chunks.length} chunk(s)...`);
   
   // If single chunk, process normally
   if (chunks.length === 1) {
@@ -241,7 +251,8 @@ export async function analyzeTranscript(
       input.customerNames,
       input.categories,
       1,
-      1
+      1,
+      contentType
     );
   }
   
@@ -260,7 +271,8 @@ export async function analyzeTranscript(
       input.customerNames,
       input.categories,
       i + 1,
-      chunks.length
+      chunks.length,
+      contentType
     );
     
     allInsights.push(...chunkResult.insights);
