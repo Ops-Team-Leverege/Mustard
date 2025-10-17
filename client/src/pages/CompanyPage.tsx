@@ -21,12 +21,24 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { CompanyOverview, Contact } from "@shared/schema";
 
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
+
 export default function CompanyPage() {
   const params = useParams();
   const companySlug = params.slug;
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
   const [editForm, setEditForm] = useState({
     name: '',
     companyDescription: '',
@@ -548,7 +560,7 @@ export default function CompanyPage() {
                       </p>
                     </div>
                   )}
-                  {overview.company.serviceTags && overview.company.serviceTags.length > 0 && (
+                  {user?.currentProduct === "PitCrew" && overview.company.serviceTags && overview.company.serviceTags.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold mb-1">Service Tags</h3>
                       <div className="flex gap-2 flex-wrap">
@@ -608,30 +620,32 @@ export default function CompanyPage() {
                       data-testid="input-number-of-stores"
                     />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-semibold mb-2">Service Tags</h3>
-                    <div className="space-y-2">
-                      {["tire services", "oil & express services", "commercial truck services", "full services"].map((tag) => (
-                        <div key={tag} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`service-tag-${tag}`}
-                            checked={editForm.serviceTags.includes(tag)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setEditForm({ ...editForm, serviceTags: [...editForm.serviceTags, tag] });
-                              } else {
-                                setEditForm({ ...editForm, serviceTags: editForm.serviceTags.filter(t => t !== tag) });
-                              }
-                            }}
-                            data-testid={`checkbox-service-tag-${tag}`}
-                          />
-                          <Label htmlFor={`service-tag-${tag}`} className="text-sm font-normal cursor-pointer">
-                            {tag}
-                          </Label>
-                        </div>
-                      ))}
+                  {user?.currentProduct === "PitCrew" && (
+                    <div>
+                      <h3 className="text-sm font-semibold mb-2">Service Tags</h3>
+                      <div className="space-y-2">
+                        {["tire services", "oil & express services", "commercial truck services", "full services"].map((tag) => (
+                          <div key={tag} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`service-tag-${tag}`}
+                              checked={editForm.serviceTags.includes(tag)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setEditForm({ ...editForm, serviceTags: [...editForm.serviceTags, tag] });
+                                } else {
+                                  setEditForm({ ...editForm, serviceTags: editForm.serviceTags.filter(t => t !== tag) });
+                                }
+                              }}
+                              data-testid={`checkbox-service-tag-${tag}`}
+                            />
+                            <Label htmlFor={`service-tag-${tag}`} className="text-sm font-normal cursor-pointer">
+                              {tag}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </div>

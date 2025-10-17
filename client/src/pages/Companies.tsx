@@ -8,6 +8,14 @@ import { useState } from "react";
 import { format } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
+
 interface Company {
   id: string;
   name: string;
@@ -50,6 +58,10 @@ const STAGE_COLORS: Record<string, string> = {
 
 export default function Companies() {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
 
   const { data: companies = [], isLoading } = useQuery<Company[]>({
     queryKey: ['/api/companies'],
@@ -226,7 +238,7 @@ export default function Companies() {
                   )}
                 </CardHeader>
                 <CardContent className="pt-0">
-                  {company.serviceTags && company.serviceTags.length > 0 ? (
+                  {user?.currentProduct === "PitCrew" && company.serviceTags && company.serviceTags.length > 0 ? (
                     <div className="flex gap-2 flex-wrap">
                       {company.serviceTags.map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs" data-testid={`badge-service-tag-${company.id}-${tag}`}>
