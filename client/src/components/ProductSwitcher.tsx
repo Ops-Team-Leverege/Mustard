@@ -4,7 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane";
 
 interface User {
   id: string;
@@ -52,7 +52,7 @@ export default function ProductSwitcher() {
   }
 
   const currentProduct = user.currentProduct || "PitCrew";
-  const products: Product[] = ["PitCrew", "AutoTrace", "WorkWatch"];
+  const products: Product[] = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane"];
 
   return (
     <div className="flex items-center gap-1" data-testid="product-switcher">
