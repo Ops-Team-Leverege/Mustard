@@ -67,11 +67,11 @@ export default function ProductSwitcher() {
           key={product}
           variant={product === currentProduct ? "default" : "ghost"}
           size="sm"
-          className={product === currentProduct ? "text-primary-foreground" : ""}
+          className={product === currentProduct ? "text-white" : ""}
           data-testid={`product-button-${product}`}
-          disabled={product === currentProduct || switchProductMutation.isPending}
+          disabled={switchProductMutation.isPending}
           onClick={() => {
-            if (product !== currentProduct) {
+            if (product !== currentProduct && !switchProductMutation.isPending) {
               switchProductMutation.mutate(product);
             }
           }}
