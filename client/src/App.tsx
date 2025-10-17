@@ -24,7 +24,7 @@ import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
-import pitcrewLogo from "@assets/pitcrew_1759419966878.png";
+import mustardLogo from "@assets/ChatGPT Image Oct 17, 2025, 01_05_54 PM_1760720789936.png";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef } from "react";
 
@@ -217,7 +217,7 @@ function AuthenticatedApp() {
           <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src={pitcrewLogo} alt="PitCrew Logo" className="h-8 w-8 rounded-md" />
+                <img src={mustardLogo} alt="Mustard Logo" className="h-8 w-8 rounded-md" />
                 <div>
                   <h1 className="font-semibold text-lg">Mustard</h1>
                 </div>
