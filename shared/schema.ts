@@ -4,7 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Product types
-export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch"] as const;
+export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane"] as const;
 export type Product = typeof PRODUCTS[number];
 
 export const transcripts = pgTable("transcripts", {
