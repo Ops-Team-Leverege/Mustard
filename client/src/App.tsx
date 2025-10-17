@@ -26,7 +26,8 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import mustardLogo from "@assets/ChatGPT Image Oct 17, 2025, 01_05_54 PM_1760720789936.png";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const tabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
@@ -187,6 +188,7 @@ function AuthenticatedApp() {
   const { isAuthenticated, isLoading, error } = useAuth();
   const { toast } = useToast();
   const hasShownError = useRef(false);
+  const [showLogoDialog, setShowLogoDialog] = useState(false);
 
   useEffect(() => {
     if (error && !hasShownError.current) {
@@ -217,7 +219,13 @@ function AuthenticatedApp() {
           <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <img src={mustardLogo} alt="Mustard Logo" className="h-8 w-8 rounded-md" />
+                <button 
+                  onClick={() => setShowLogoDialog(true)}
+                  className="hover-elevate active-elevate-2 transition-transform rounded-md overflow-visible"
+                  data-testid="button-logo"
+                >
+                  <img src={mustardLogo} alt="Mustard Logo" className="h-8 w-8 rounded-md" />
+                </button>
                 <div>
                   <h1 className="font-semibold text-lg">Mustard</h1>
                 </div>
@@ -244,6 +252,24 @@ function AuthenticatedApp() {
       <main className="pb-12">
         <Router />
       </main>
+
+      <Dialog open={showLogoDialog} onOpenChange={setShowLogoDialog}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-logo">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-bold">
+              <div className="flex flex-col items-center gap-4">
+                <img src={mustardLogo} alt="Mustard Logo" className="h-24 w-24 rounded-lg" />
+                <span className="text-3xl">Life's Too Short for Mild.</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center pt-4">
+            <Button onClick={() => setShowLogoDialog(false)} data-testid="button-close-logo-dialog">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
