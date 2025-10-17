@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import TabNavigation from "@/components/TabNavigation";
 import ThemeToggle from "@/components/ThemeToggle";
+import ProductSwitcher from "@/components/ProductSwitcher";
 import TranscriptInput from "@/pages/TranscriptInput";
 import Transcripts from "@/pages/Transcripts";
 import Latest from "@/pages/Latest";
@@ -222,6 +223,7 @@ function AuthenticatedApp() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                <ProductSwitcher />
                 <ThemeToggle />
                 <Button 
                   variant="ghost" 

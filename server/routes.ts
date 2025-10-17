@@ -131,6 +131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: null,
           companyDescription: data.companyDescription || null,
           numberOfStores: data.numberOfStores || null,
+          product,
         });
       }
       
@@ -157,6 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transcript = await storage.createTranscript({
         ...data,
         companyId: company.id,
+        product,
       });
       
       // Get all existing contacts for this company first
@@ -188,6 +190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               nameInTranscript: customer.nameInTranscript || null,
               jobTitle: customer.jobTitle || null,
               companyId: company.id,
+              product,
             });
             contacts.push(contact);
             existingContacts.push(contact); // Add to list for Q&A matching below
@@ -208,6 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           company: data.companyName,
           companyId: company.id,
           categoryId: insight.categoryId,
+          product,
         }))
       );
       
@@ -234,6 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             company: data.companyName,
             companyId: company.id,
             categoryId: qa.categoryId,
+            product,
           };
         })
       );
@@ -440,6 +445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          product,
         });
       }
       
@@ -491,6 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          product,
         });
       }
       
@@ -502,6 +509,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         company,
         companyId: companyRecord.id,
         categoryId: categoryId || null,
+        product,
       });
       
       res.json(insight);
@@ -588,6 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          product,
         });
       }
       
@@ -657,6 +666,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          product,
         });
       }
       
@@ -669,6 +679,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         company,
         companyId: companyRecord.id,
         categoryId: categoryId || null,
+        product,
       });
       
       res.json(qaPair);
@@ -763,10 +774,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/categories", isAuthenticated, async (req, res) => {
+  app.post("/api/categories", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const data = insertCategorySchema.parse(req.body);
-      const category = await storage.createCategory(data);
+      const category = await storage.createCategory({
+        ...data,
+        product,
+      });
       res.json(category);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -863,14 +878,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/features", isAuthenticated, async (req, res) => {
+  app.post("/api/features", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const body = { ...req.body };
       if (body.releaseDate) {
         body.releaseDate = new Date(body.releaseDate);
       }
       const data = insertFeatureSchema.parse(body);
-      const feature = await storage.createFeature(data);
+      const feature = await storage.createFeature({
+        ...data,
+        product,
+      });
       res.json(feature);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1003,10 +1022,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies", isAuthenticated, async (req, res) => {
+  app.post("/api/companies", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const data = insertCompanySchema.parse(req.body);
-      const company = await storage.createCompany(data);
+      const company = await storage.createCompany({
+        ...data,
+        product,
+      });
       res.json(company);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1175,10 +1198,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/pos-systems", isAuthenticated, async (req, res) => {
+  app.post("/api/pos-systems", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const validatedData = insertPOSSystemSchema.parse(req.body);
-      const system = await storage.createPOSSystem(validatedData);
+      const system = await storage.createPOSSystem({
+        ...validatedData,
+        product,
+      });
       res.json(system);
     } catch (error) {
       if (error instanceof z.ZodError) {
