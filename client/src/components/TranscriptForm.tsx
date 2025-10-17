@@ -14,6 +14,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { Company } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
+
 interface TranscriptFormProps {
   onSubmit?: (data: TranscriptData) => void;
   isAnalyzing?: boolean;
@@ -54,6 +62,10 @@ const LEVEREGE_TEAM_OPTIONS = [
 
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
   const [contentType, setContentType] = useState<"transcript" | "notes">("transcript");
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
   const [formData, setFormData] = useState<TranscriptData>({
     companyName: '',
     name: '',
@@ -642,30 +654,32 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             />
           </div>
 
-          <div className="space-y-3">
-            <Label data-testid="label-service-tags">Service Tags</Label>
-            <div className="space-y-2">
-              {["tire services", "oil & express services", "commercial truck services", "full services"].map((tag) => (
-                <div key={tag} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`service-tag-${tag}`}
-                    checked={formData.serviceTags?.includes(tag)}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setFormData({ ...formData, serviceTags: [...(formData.serviceTags || []), tag] });
-                      } else {
-                        setFormData({ ...formData, serviceTags: formData.serviceTags?.filter(t => t !== tag) || [] });
-                      }
-                    }}
-                    data-testid={`checkbox-service-tag-${tag}`}
-                  />
-                  <Label htmlFor={`service-tag-${tag}`} className="text-sm font-normal cursor-pointer">
-                    {tag}
-                  </Label>
-                </div>
-              ))}
+          {user?.currentProduct === "PitCrew" && (
+            <div className="space-y-3">
+              <Label data-testid="label-service-tags">Service Tags</Label>
+              <div className="space-y-2">
+                {["tire services", "oil & express services", "commercial truck services", "full services"].map((tag) => (
+                  <div key={tag} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`service-tag-${tag}`}
+                      checked={formData.serviceTags?.includes(tag)}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setFormData({ ...formData, serviceTags: [...(formData.serviceTags || []), tag] });
+                        } else {
+                          setFormData({ ...formData, serviceTags: formData.serviceTags?.filter(t => t !== tag) || [] });
+                        }
+                      }}
+                      data-testid={`checkbox-service-tag-${tag}`}
+                    />
+                    <Label htmlFor={`service-tag-${tag}`} className="text-sm font-normal cursor-pointer">
+                      {tag}
+                    </Label>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="numberOfStores" data-testid="label-number-of-stores">Number of Stores</Label>
