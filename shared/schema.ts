@@ -3,8 +3,13 @@ import { pgTable, text, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Product types
+export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch"] as const;
+export type Product = typeof PRODUCTS[number];
+
 export const transcripts = pgTable("transcripts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   name: text("name"), // Meeting/transcript name - user editable
   companyName: text("company_name").notNull(), // Legacy field, kept for backward compatibility
   companyId: varchar("company_id"), // New normalized field
@@ -22,6 +27,7 @@ export const transcripts = pgTable("transcripts", {
 
 export const companies = pgTable("companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   notes: text("notes"),
@@ -35,6 +41,7 @@ export const companies = pgTable("companies", {
 
 export const contacts = pgTable("contacts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   companyId: varchar("company_id").notNull(),
   name: text("name").notNull(),
   nameInTranscript: text("name_in_transcript"),
@@ -44,13 +51,15 @@ export const contacts = pgTable("contacts", {
 
 export const categories = pgTable("categories", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
+  product: text("product").default("PitCrew").notNull(),
+  name: text("name").notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const features = pgTable("features", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   value: text("value"),
@@ -63,6 +72,7 @@ export const features = pgTable("features", {
 
 export const productInsights = pgTable("product_insights", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   transcriptId: varchar("transcript_id"),
   feature: text("feature").notNull(),
   context: text("context").notNull(),
@@ -76,6 +86,7 @@ export const productInsights = pgTable("product_insights", {
 
 export const qaPairs = pgTable("qa_pairs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   transcriptId: varchar("transcript_id"),
   question: text("question").notNull(),
   answer: text("answer").notNull(),
@@ -90,6 +101,7 @@ export const qaPairs = pgTable("qa_pairs", {
 
 export const posSystems = pgTable("pos_systems", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
   name: text("name").notNull(),
   websiteLink: text("website_link"),
   description: text("description"),
@@ -134,6 +146,7 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
   customerNames: true,
 }).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
   contentType: z.enum(["transcript", "notes"]).default("transcript"),
   transcript: z.string().optional(),
   mainMeetingTakeaways: z.string().optional(),
@@ -161,27 +174,36 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
 export const insertProductInsightSchema = createInsertSchema(productInsights).omit({
   id: true,
   createdAt: true,
+}).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
 });
 
 export const insertQAPairSchema = createInsertSchema(qaPairs).omit({
   id: true,
   createdAt: true,
+}).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
 });
 
 export const insertCategorySchema = createInsertSchema(categories).omit({
   id: true,
   createdAt: true,
+}).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
 });
 
 export const insertFeatureSchema = createInsertSchema(features).omit({
   id: true,
   createdAt: true,
+}).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
 });
 
 export const insertCompanySchema = createInsertSchema(companies).omit({
   id: true,
   createdAt: true,
 }).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
   stage: z.enum(["Prospect", "Pilot", "Rollout", "Scale"]).optional(),
   serviceTags: z.array(z.enum(["tire services", "oil & express services", "commercial truck services", "full services"])).optional(),
 });
@@ -189,12 +211,15 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
 export const insertContactSchema = createInsertSchema(contacts).omit({
   id: true,
   createdAt: true,
+}).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
 });
 
 export const insertPOSSystemSchema = createInsertSchema(posSystems).omit({
   id: true,
   createdAt: true,
 }).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
   companyIds: z.array(z.string()).optional(),
 });
 
