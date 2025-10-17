@@ -1,12 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ChevronDown } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -49,9 +42,11 @@ export default function ProductSwitcher() {
 
   if (isLoading || !user) {
     return (
-      <Button variant="ghost" size="sm" disabled data-testid="button-product-switcher">
-        Loading...
-      </Button>
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="sm" disabled>
+          Loading...
+        </Button>
+      </div>
     );
   }
 
@@ -59,36 +54,23 @@ export default function ProductSwitcher() {
   const products: Product[] = ["PitCrew", "AutoTrace", "WorkWatch"];
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="gap-1"
-          data-testid="button-product-switcher"
+    <div className="flex items-center gap-1" data-testid="product-switcher">
+      {products.map((product) => (
+        <Button
+          key={product}
+          variant={product === currentProduct ? "default" : "ghost"}
+          size="sm"
+          data-testid={`product-button-${product}`}
+          disabled={product === currentProduct || switchProductMutation.isPending}
+          onClick={() => {
+            if (product !== currentProduct) {
+              switchProductMutation.mutate(product);
+            }
+          }}
         >
-          {currentProduct}
-          <ChevronDown className="h-3 w-3" />
+          {product}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {products.map((product) => (
-          <DropdownMenuItem
-            key={product}
-            data-testid={`product-option-${product}`}
-            className="cursor-pointer"
-            disabled={product === currentProduct || switchProductMutation.isPending}
-            onSelect={() => {
-              if (product !== currentProduct) {
-                switchProductMutation.mutate(product);
-              }
-            }}
-          >
-            {product}
-            {product === currentProduct && " (current)"}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      ))}
+    </div>
   );
 }
