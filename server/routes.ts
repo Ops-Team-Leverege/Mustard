@@ -108,8 +108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Transcripts (protected routes)
-  app.post("/api/transcripts", isAuthenticated, async (req, res) => {
+  app.post("/api/transcripts", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const body = { ...req.body };
       // Convert createdAt string to Date if provided
       if (body.createdAt && typeof body.createdAt === 'string') {
@@ -121,7 +122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find or create company
       const slug = generateSlug(data.companyName);
-      let company = await storage.getCompanyBySlug(slug);
+      let company = await storage.getCompanyBySlug(product, slug);
       
       if (!company) {
         company = await storage.createCompany({
@@ -134,7 +135,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Analyze with AI first (before persisting transcript)
-      const categories = await storage.getCategories();
+      const categories = await storage.getCategories(product);
       const leverageTeam = data.leverageTeam.split(',').map(s => s.trim()).filter(s => s);
       const customerNames = data.customerNames.split(',').map(s => s.trim()).filter(s => s);
       
@@ -159,7 +160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Get all existing contacts for this company first
-      const existingContacts = await storage.getContactsByCompany(company.id);
+      const existingContacts = await storage.getContactsByCompany(product, company.id);
       
       // Create or reuse contact records from validated customers array
       const contacts = [];
@@ -241,6 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let posSystem = null;
       if (analysis.posSystem) {
         posSystem = await storage.findOrCreatePOSSystemAndLink(
+          product,
           analysis.posSystem.name,
           company.id,
           analysis.posSystem.websiteLink,
@@ -272,19 +274,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/transcripts", isAuthenticated, async (_req, res) => {
+  app.get("/api/transcripts", isAuthenticated, async (req: any, res) => {
     try {
-      const transcripts = await storage.getTranscripts();
+      const { product } = await getUserAndProduct(req);
+      const transcripts = await storage.getTranscripts(product);
       res.json(transcripts);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
-  app.get("/api/companies/:companyId/transcripts", isAuthenticated, async (req, res) => {
+  app.get("/api/companies/:companyId/transcripts", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { companyId } = req.params;
-      const transcripts = await storage.getTranscriptsByCompany(companyId);
+      const transcripts = await storage.getTranscriptsByCompany(product, companyId);
       res.json(transcripts);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
@@ -326,19 +330,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/transcripts/:id/details", isAuthenticated, async (req, res) => {
+  app.get("/api/transcripts/:id/details", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
-      const transcript = await storage.getTranscript(id);
+      const transcript = await storage.getTranscript(product, id);
       
       if (!transcript) {
         return res.status(404).json({ error: "Transcript not found" });
       }
 
       const [insights, qaPairs, company] = await Promise.all([
-        storage.getProductInsightsByTranscript(id),
-        storage.getQAPairsByTranscript(id),
-        transcript.companyId ? storage.getCompany(transcript.companyId) : Promise.resolve(undefined),
+        storage.getProductInsightsByTranscript(product, id),
+        storage.getQAPairsByTranscript(product, id),
+        transcript.companyId ? storage.getCompany(product, transcript.companyId) : Promise.resolve(undefined),
       ]);
 
       res.json({
@@ -353,12 +358,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product Insights
-  app.get("/api/insights", isAuthenticated, async (_req, res) => {
+  app.get("/api/insights", isAuthenticated, async (req: any, res) => {
     try {
-      const insights = await storage.getProductInsights();
+      const { product } = await getUserAndProduct(req);
+      const insights = await storage.getProductInsights(product);
       
       // Add usage count for each category
-      const categories = await storage.getCategories();
+      const categories = await storage.getCategories(product);
       const categoryUsage = new Map<string, number>();
       
       insights.forEach(insight => {
@@ -381,8 +387,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/insights/:id/category", isAuthenticated, async (req, res) => {
+  app.patch("/api/insights/:id/category", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { categoryId } = req.body;
       
@@ -393,7 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (categoryId) {
-        const category = await storage.getCategory(categoryId);
+        const category = await storage.getCategory(product, categoryId);
         if (!category) {
           res.status(400).json({ error: "Category not found" });
           return;
@@ -413,8 +420,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/insights/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/insights/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { feature, context, quote, company } = req.body;
       
@@ -425,7 +433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find or create company to get companyId
       const slug = generateSlug(company);
-      let companyRecord = await storage.getCompanyBySlug(slug);
+      let companyRecord = await storage.getCompanyBySlug(product, slug);
       
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
@@ -464,8 +472,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/insights", isAuthenticated, async (req, res) => {
+  app.post("/api/insights", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { feature, context, quote, company, categoryId } = req.body;
       
       if (!feature || !context || !quote || !company) {
@@ -475,7 +484,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find or create company
       const slug = generateSlug(company);
-      let companyRecord = await storage.getCompanyBySlug(slug);
+      let companyRecord = await storage.getCompanyBySlug(product, slug);
       
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
@@ -502,12 +511,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Q&A Pairs
-  app.get("/api/qa-pairs", isAuthenticated, async (_req, res) => {
+  app.get("/api/qa-pairs", isAuthenticated, async (req: any, res) => {
     try {
-      const qaPairs = await storage.getQAPairs();
+      const { product } = await getUserAndProduct(req);
+      const qaPairs = await storage.getQAPairs(product);
       
       // Add usage count for each category (for consistency with insights)
-      const categories = await storage.getCategories();
+      const categories = await storage.getCategories(product);
       const categoryUsage = new Map<string, number>();
       
       qaPairs.forEach(qa => {
@@ -525,8 +535,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/qa-pairs/:id/category", isAuthenticated, async (req, res) => {
+  app.patch("/api/qa-pairs/:id/category", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { categoryId } = req.body;
       
@@ -537,7 +548,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (categoryId) {
-        const category = await storage.getCategory(categoryId);
+        const category = await storage.getCategory(product, categoryId);
         if (!category) {
           res.status(400).json({ error: "Category not found" });
           return;
@@ -557,8 +568,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/qa-pairs/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/qa-pairs/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { question, answer, asker, company, contactId } = req.body;
       
@@ -569,7 +581,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find or create company to get companyId
       const slug = generateSlug(company);
-      let companyRecord = await storage.getCompanyBySlug(slug);
+      let companyRecord = await storage.getCompanyBySlug(product, slug);
       
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
@@ -626,8 +638,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/qa-pairs", isAuthenticated, async (req, res) => {
+  app.post("/api/qa-pairs", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { question, answer, asker, company, categoryId, contactId } = req.body;
       
       if (!question || !answer || !asker || !company) {
@@ -637,7 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Find or create company
       const slug = generateSlug(company);
-      let companyRecord = await storage.getCompanyBySlug(slug);
+      let companyRecord = await storage.getCompanyBySlug(product, slug);
       
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
@@ -665,12 +678,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Categories
-  app.get("/api/categories", isAuthenticated, async (_req, res) => {
+  app.get("/api/categories", isAuthenticated, async (req: any, res) => {
     try {
-      const categories = await storage.getCategories();
+      const { product } = await getUserAndProduct(req);
+      const categories = await storage.getCategories(product);
       
       // Add usage count for insights in each category
-      const insights = await storage.getProductInsights();
+      const insights = await storage.getProductInsights(product);
       const insightUsage = new Map<string, number>();
       
       insights.forEach(insight => {
@@ -683,7 +697,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       // Add Q&A pair count for each category
-      const qaPairs = await storage.getQAPairs();
+      const qaPairs = await storage.getQAPairs(product);
       const qaUsage = new Map<string, number>();
       
       qaPairs.forEach(qa => {
@@ -707,11 +721,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/categories/company-stats", isAuthenticated, async (_req, res) => {
+  app.get("/api/categories/company-stats", isAuthenticated, async (req: any, res) => {
     try {
-      const categories = await storage.getCategories();
-      const insights = await storage.getProductInsights();
-      const qaPairs = await storage.getQAPairs();
+      const { product } = await getUserAndProduct(req);
+      const categories = await storage.getCategories(product);
+      const insights = await storage.getProductInsights(product);
+      const qaPairs = await storage.getQAPairs(product);
       
       // Count unique companies per category for insights
       const insightCompanyCount = new Map<string, Set<string>>();
@@ -803,10 +818,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/categories/:id/overview", isAuthenticated, async (req, res) => {
+  app.get("/api/categories/:id/overview", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
-      const overview = await storage.getCategoryOverview(id);
+      const overview = await storage.getCategoryOverview(product, id);
       
       if (!overview) {
         res.status(404).json({ error: "Category not found" });
@@ -820,19 +836,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Features
-  app.get("/api/features", isAuthenticated, async (_req, res) => {
+  app.get("/api/features", isAuthenticated, async (req: any, res) => {
     try {
-      const features = await storage.getFeatures();
+      const { product } = await getUserAndProduct(req);
+      const features = await storage.getFeatures(product);
       res.json(features);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
-  app.get("/api/features/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/features/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
-      const feature = await storage.getFeature(id);
+      const feature = await storage.getFeature(product, id);
       
       if (!feature) {
         res.status(404).json({ error: "Feature not found" });
@@ -907,18 +925,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Companies
-  app.get("/api/companies", isAuthenticated, async (req, res) => {
+  app.get("/api/companies", isAuthenticated, async (req: any, res) => {
     try {
-      const companies = await storage.getCompanies();
+      const { product } = await getUserAndProduct(req);
+      const companies = await storage.getCompanies(product);
       res.json(companies);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
-  app.get("/api/dashboard/stats", isAuthenticated, async (_req, res) => {
+  app.get("/api/dashboard/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const companies = await storage.getCompanies();
+      const { product } = await getUserAndProduct(req);
+      const companies = await storage.getCompanies(product);
       const stageStats = companies.reduce((acc, company) => {
         const stage = company.stage || 'Unknown';
         acc[stage] = (acc[stage] || 0) + 1;
@@ -931,12 +951,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/dashboard/recent-transcripts", isAuthenticated, async (_req, res) => {
+  app.get("/api/dashboard/recent-transcripts", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      const allTranscripts = await storage.getTranscripts();
+      const allTranscripts = await storage.getTranscripts(product);
       const recentTranscripts = allTranscripts
         .filter(t => new Date(t.createdAt) >= sevenDaysAgo)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
@@ -948,10 +969,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:slug", isAuthenticated, async (req, res) => {
+  app.get("/api/companies/:slug", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { slug } = req.params;
-      const company = await storage.getCompanyBySlug(slug);
+      const company = await storage.getCompanyBySlug(product, slug);
       
       if (!company) {
         res.status(404).json({ error: "Company not found" });
@@ -964,10 +986,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/companies/:slug/overview", isAuthenticated, async (req, res) => {
+  app.get("/api/companies/:slug/overview", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { slug } = req.params;
-      const overview = await storage.getCompanyOverview(slug);
+      const overview = await storage.getCompanyOverview(product, slug);
       
       if (!overview) {
         res.status(404).json({ error: "Company not found" });
@@ -1040,10 +1063,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contacts
-  app.get("/api/contacts/company/:companyId", isAuthenticated, async (req, res) => {
+  app.get("/api/contacts/company/:companyId", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { companyId } = req.params;
-      const contacts = await storage.getContactsByCompany(companyId);
+      const contacts = await storage.getContactsByCompany(product, companyId);
       res.json(contacts);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
@@ -1105,17 +1129,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/companies/:companyId/merge-duplicate-contacts", isAuthenticated, async (req, res) => {
+  app.post("/api/companies/:companyId/merge-duplicate-contacts", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { companyId } = req.params;
       
-      const company = await storage.getCompany(companyId);
+      const company = await storage.getCompany(product, companyId);
       if (!company) {
         res.status(404).json({ error: "Company not found" });
         return;
       }
       
-      const result = await storage.mergeDuplicateContacts(companyId);
+      const result = await storage.mergeDuplicateContacts(product, companyId);
       res.json(result);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
@@ -1123,19 +1148,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // POS Systems routes
-  app.get("/api/pos-systems", isAuthenticated, async (_req, res) => {
+  app.get("/api/pos-systems", isAuthenticated, async (req: any, res) => {
     try {
-      const systems = await storage.getPOSSystems();
+      const { product } = await getUserAndProduct(req);
+      const systems = await storage.getPOSSystems(product);
       res.json(systems);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
     }
   });
 
-  app.get("/api/pos-systems/:id", isAuthenticated, async (req, res) => {
+  app.get("/api/pos-systems/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const { product } = await getUserAndProduct(req);
       const { id } = req.params;
-      const system = await storage.getPOSSystem(id);
+      const system = await storage.getPOSSystem(product, id);
       
       if (!system) {
         res.status(404).json({ error: "POS system not found" });
