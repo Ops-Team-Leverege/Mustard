@@ -23,6 +23,7 @@ import {
   type POSSystem,
   type POSSystemWithCompanies,
   type InsertPOSSystem,
+  type Product,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -37,21 +38,21 @@ import {
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, sql as drizzleSql, inArray } from "drizzle-orm";
+import { eq, sql as drizzleSql, inArray, and } from "drizzle-orm";
 
 export interface IStorage {
   // Transcripts
-  getTranscripts(): Promise<Transcript[]>;
-  getTranscript(id: string): Promise<Transcript | undefined>;
-  getTranscriptsByCompany(companyId: string): Promise<Transcript[]>;
+  getTranscripts(product: Product): Promise<Transcript[]>;
+  getTranscript(product: Product, id: string): Promise<Transcript | undefined>;
+  getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
   updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
 
   // Product Insights
-  getProductInsights(): Promise<ProductInsightWithCategory[]>;
-  getProductInsightsByTranscript(transcriptId: string): Promise<ProductInsightWithCategory[]>;
-  getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]>;
+  getProductInsights(product: Product): Promise<ProductInsightWithCategory[]>;
+  getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]>;
+  getProductInsightsByCategory(product: Product, categoryId: string): Promise<ProductInsightWithCategory[]>;
   createProductInsight(insight: InsertProductInsight): Promise<ProductInsight>;
   createProductInsights(insights: InsertProductInsight[]): Promise<ProductInsight[]>;
   updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined>;
@@ -60,61 +61,61 @@ export interface IStorage {
   assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
 
   // Q&A Pairs
-  getQAPairs(): Promise<QAPairWithCategory[]>;
-  getQAPairsByTranscript(transcriptId: string): Promise<QAPairWithCategory[]>;
+  getQAPairs(product: Product): Promise<QAPairWithCategory[]>;
+  getQAPairsByTranscript(product: Product, transcriptId: string): Promise<QAPairWithCategory[]>;
   createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
   createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
   updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined>;
   deleteQAPair(id: string): Promise<boolean>;
   assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
-  getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]>;
+  getQAPairsByCompany(product: Product, companyId: string): Promise<QAPairWithCategory[]>;
   toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined>;
 
   // Categories
-  getCategories(): Promise<Category[]>;
-  getCategory(id: string): Promise<Category | undefined>;
+  getCategories(product: Product): Promise<Category[]>;
+  getCategory(product: Product, id: string): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined>;
   deleteCategory(id: string): Promise<boolean>;
-  getCategoryOverview(categoryId: string): Promise<CategoryOverview | null>;
+  getCategoryOverview(product: Product, categoryId: string): Promise<CategoryOverview | null>;
 
   // Features
-  getFeatures(): Promise<FeatureWithCategory[]>;
-  getFeature(id: string): Promise<Feature | undefined>;
+  getFeatures(product: Product): Promise<FeatureWithCategory[]>;
+  getFeature(product: Product, id: string): Promise<Feature | undefined>;
   createFeature(feature: InsertFeature): Promise<Feature>;
   updateFeature(id: string, name: string, description?: string | null, value?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null, releaseDate?: Date | null): Promise<Feature | undefined>;
   deleteFeature(id: string): Promise<boolean>;
 
   // Companies
-  getCompanies(): Promise<Company[]>;
-  getCompany(id: string): Promise<Company | undefined>;
-  getCompanyBySlug(slug: string): Promise<Company | undefined>;
+  getCompanies(product: Product): Promise<Company[]>;
+  getCompany(product: Product, id: string): Promise<Company | undefined>;
+  getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<boolean>;
-  getCompanyOverview(slug: string): Promise<CompanyOverview | null>;
+  getCompanyOverview(product: Product, slug: string): Promise<CompanyOverview | null>;
   updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void>;
 
   // Contacts
-  getContactsByCompany(companyId: string): Promise<Contact[]>;
+  getContactsByCompany(product: Product, companyId: string): Promise<Contact[]>;
   createContact(contact: InsertContact): Promise<Contact>;
   updateContact(id: string, name: string, nameInTranscript?: string | null, jobTitle?: string | null): Promise<Contact | undefined>;
   deleteContact(id: string): Promise<boolean>;
-  mergeDuplicateContacts(companyId: string): Promise<{ merged: number; kept: number }>;
+  mergeDuplicateContacts(product: Product, companyId: string): Promise<{ merged: number; kept: number }>;
 
   // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
 
   // POS Systems
-  getPOSSystems(): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
-  getPOSSystem(id: string): Promise<import("@shared/schema").POSSystem | undefined>;
-  getPOSSystemByName(name: string): Promise<import("@shared/schema").POSSystem | undefined>;
+  getPOSSystems(product: Product): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
+  getPOSSystem(product: Product, id: string): Promise<import("@shared/schema").POSSystem | undefined>;
+  getPOSSystemByName(product: Product, name: string): Promise<import("@shared/schema").POSSystem | undefined>;
   createPOSSystem(posSystem: import("@shared/schema").InsertPOSSystem): Promise<import("@shared/schema").POSSystem>;
   updatePOSSystem(id: string, name: string, websiteLink?: string | null, description?: string | null, companyIds?: string[]): Promise<import("@shared/schema").POSSystem | undefined>;
   deletePOSSystem(id: string): Promise<boolean>;
   linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void>;
-  findOrCreatePOSSystemAndLink(name: string, companyId: string, websiteLink?: string, description?: string): Promise<import("@shared/schema").POSSystem>;
+  findOrCreatePOSSystemAndLink(product: Product, name: string, companyId: string, websiteLink?: string, description?: string): Promise<import("@shared/schema").POSSystem>;
 }
 
 export class MemStorage implements IStorage {
@@ -137,7 +138,7 @@ export class MemStorage implements IStorage {
     this.contacts = new Map();
     this.users = new Map();
 
-    // Initialize with default categories
+    // Initialize with default categories for PitCrew
     const defaultCategories = [
       { name: 'Analytics', description: 'Reporting, dashboards, data visualization, and business intelligence features' },
       { name: 'Mobile', description: 'Mobile app features, offline mode, and mobile-specific functionality' },
@@ -148,6 +149,7 @@ export class MemStorage implements IStorage {
       const id = randomUUID();
       this.categories.set(id, {
         id,
+        product: 'PitCrew',
         name,
         description,
         createdAt: new Date(),
@@ -156,14 +158,17 @@ export class MemStorage implements IStorage {
   }
 
   // Transcripts
-  async getTranscripts(): Promise<Transcript[]> {
-    return Array.from(this.transcripts.values()).sort((a, b) => 
-      b.createdAt.getTime() - a.createdAt.getTime()
-    );
+  async getTranscripts(product: Product): Promise<Transcript[]> {
+    return Array.from(this.transcripts.values())
+      .filter(t => t.product === product)
+      .sort((a, b) => 
+        b.createdAt.getTime() - a.createdAt.getTime()
+      );
   }
 
-  async getTranscript(id: string): Promise<Transcript | undefined> {
-    return this.transcripts.get(id);
+  async getTranscript(product: Product, id: string): Promise<Transcript | undefined> {
+    const transcript = this.transcripts.get(id);
+    return transcript?.product === product ? transcript : undefined;
   }
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
@@ -184,8 +189,8 @@ export class MemStorage implements IStorage {
     return transcript;
   }
 
-  async getTranscriptsByCompany(companyId: string): Promise<Transcript[]> {
-    return Array.from(this.transcripts.values()).filter(t => t.companyId === companyId);
+  async getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]> {
+    return Array.from(this.transcripts.values()).filter(t => t.product === product && t.companyId === companyId);
   }
 
   async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
@@ -237,19 +242,21 @@ export class MemStorage implements IStorage {
     };
   }
 
-  async getProductInsights(): Promise<ProductInsightWithCategory[]> {
-    return Array.from(this.productInsights.values()).map(i => this.enrichInsightWithCategory(i));
-  }
-
-  async getProductInsightsByTranscript(transcriptId: string): Promise<ProductInsightWithCategory[]> {
+  async getProductInsights(product: Product): Promise<ProductInsightWithCategory[]> {
     return Array.from(this.productInsights.values())
-      .filter(insight => insight.transcriptId === transcriptId)
+      .filter(i => i.product === product)
       .map(i => this.enrichInsightWithCategory(i));
   }
 
-  async getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]> {
+  async getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]> {
     return Array.from(this.productInsights.values())
-      .filter(insight => insight.categoryId === categoryId)
+      .filter(insight => insight.product === product && insight.transcriptId === transcriptId)
+      .map(i => this.enrichInsightWithCategory(i));
+  }
+
+  async getProductInsightsByCategory(product: Product, categoryId: string): Promise<ProductInsightWithCategory[]> {
+    return Array.from(this.productInsights.values())
+      .filter(insight => insight.product === product && insight.categoryId === categoryId)
       .map(i => this.enrichInsightWithCategory(i));
   }
 
@@ -373,13 +380,15 @@ export class MemStorage implements IStorage {
     };
   }
 
-  async getQAPairs(): Promise<QAPairWithCategory[]> {
-    return Array.from(this.qaPairs.values()).map(qa => this.enrichQAPairWithCategory(qa));
+  async getQAPairs(product: Product): Promise<QAPairWithCategory[]> {
+    return Array.from(this.qaPairs.values())
+      .filter(qa => qa.product === product)
+      .map(qa => this.enrichQAPairWithCategory(qa));
   }
 
-  async getQAPairsByTranscript(transcriptId: string): Promise<QAPairWithCategory[]> {
+  async getQAPairsByTranscript(product: Product, transcriptId: string): Promise<QAPairWithCategory[]> {
     return Array.from(this.qaPairs.values())
-      .filter(qa => qa.transcriptId === transcriptId)
+      .filter(qa => qa.product === product && qa.transcriptId === transcriptId)
       .map(qa => this.enrichQAPairWithCategory(qa));
   }
 
@@ -479,9 +488,9 @@ export class MemStorage implements IStorage {
     return true;
   }
 
-  async getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]> {
+  async getQAPairsByCompany(product: Product, companyId: string): Promise<QAPairWithCategory[]> {
     const qaPairs = Array.from(this.qaPairs.values())
-      .filter(qa => qa.companyId === companyId);
+      .filter(qa => qa.product === product && qa.companyId === companyId);
     
     return qaPairs.map(qa => {
       const category = qa.categoryId ? this.categories.get(qa.categoryId) : null;
@@ -498,14 +507,17 @@ export class MemStorage implements IStorage {
   }
 
   // Categories
-  async getCategories(): Promise<Category[]> {
-    return Array.from(this.categories.values()).sort((a, b) => 
-      a.name.localeCompare(b.name)
-    );
+  async getCategories(product: Product): Promise<Category[]> {
+    return Array.from(this.categories.values())
+      .filter(c => c.product === product)
+      .sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
   }
 
-  async getCategory(id: string): Promise<Category | undefined> {
-    return this.categories.get(id);
+  async getCategory(product: Product, id: string): Promise<Category | undefined> {
+    const category = this.categories.get(id);
+    return category?.product === product ? category : undefined;
   }
 
   async createCategory(insertCategory: InsertCategory): Promise<Category> {
@@ -580,8 +592,8 @@ export class MemStorage implements IStorage {
   }
 
   // Features
-  async getFeatures(): Promise<FeatureWithCategory[]> {
-    const features = Array.from(this.features.values());
+  async getFeatures(product: Product): Promise<FeatureWithCategory[]> {
+    const features = Array.from(this.features.values()).filter(f => f.product === product);
     return features.map(feature => {
       const category = feature.categoryId ? this.categories.get(feature.categoryId) : null;
       return {
@@ -591,8 +603,9 @@ export class MemStorage implements IStorage {
     }).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  async getFeature(id: string): Promise<Feature | undefined> {
-    return this.features.get(id);
+  async getFeature(product: Product, id: string): Promise<Feature | undefined> {
+    const feature = this.features.get(id);
+    return feature?.product === product ? feature : undefined;
   }
 
   async createFeature(insertFeature: InsertFeature): Promise<Feature> {
@@ -635,18 +648,21 @@ export class MemStorage implements IStorage {
   }
 
   // Companies
-  async getCompanies(): Promise<Company[]> {
-    return Array.from(this.companies.values()).sort((a, b) => 
-      a.name.localeCompare(b.name)
-    );
+  async getCompanies(product: Product): Promise<Company[]> {
+    return Array.from(this.companies.values())
+      .filter(c => c.product === product)
+      .sort((a, b) => 
+        a.name.localeCompare(b.name)
+      );
   }
 
-  async getCompany(id: string): Promise<Company | undefined> {
-    return this.companies.get(id);
+  async getCompany(product: Product, id: string): Promise<Company | undefined> {
+    const company = this.companies.get(id);
+    return company?.product === product ? company : undefined;
   }
 
-  async getCompanyBySlug(slug: string): Promise<Company | undefined> {
-    return Array.from(this.companies.values()).find(c => c.slug === slug);
+  async getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined> {
+    return Array.from(this.companies.values()).find(c => c.product === product && c.slug === slug);
   }
 
   async createCompany(insertCompany: InsertCompany): Promise<Company> {
@@ -709,20 +725,20 @@ export class MemStorage implements IStorage {
     }
   }
 
-  async getCompanyOverview(slug: string): Promise<CompanyOverview | null> {
-    const company = await this.getCompanyBySlug(slug);
+  async getCompanyOverview(product: Product, slug: string): Promise<CompanyOverview | null> {
+    const company = await this.getCompanyBySlug(product, slug);
     if (!company) return null;
 
     // Get transcripts for this company - match by both companyId and legacy companyName field
     const companyTranscripts = Array.from(this.transcripts.values()).filter(
-      t => t.companyId === company.id || t.companyName.toLowerCase() === company.name.toLowerCase()
+      t => t.product === product && (t.companyId === company.id || t.companyName.toLowerCase() === company.name.toLowerCase())
     );
 
     // Get insights - both by legacy company field and new companyId
     const insights = Array.from(this.productInsights.values())
       .filter(i => 
-        i.companyId === company.id || 
-        i.company.toLowerCase() === company.name.toLowerCase()
+        i.product === product && (i.companyId === company.id || 
+        i.company.toLowerCase() === company.name.toLowerCase())
       )
       .map(i => {
         const enriched = this.enrichInsightWithCategory(i);
@@ -735,8 +751,8 @@ export class MemStorage implements IStorage {
     // Get Q&A pairs - both by legacy company field and new companyId
     const qaPairs = Array.from(this.qaPairs.values())
       .filter(qa => 
-        qa.companyId === company.id || 
-        qa.company.toLowerCase() === company.name.toLowerCase()
+        qa.product === product && (qa.companyId === company.id || 
+        qa.company.toLowerCase() === company.name.toLowerCase())
       )
       .map(qa => {
         const enriched = this.enrichQAPairWithCategory(qa);
@@ -748,7 +764,7 @@ export class MemStorage implements IStorage {
 
     // Get contacts for this company
     const contacts = Array.from(this.contacts.values()).filter(
-      c => c.companyId === company.id
+      c => c.product === product && c.companyId === company.id
     );
 
     return {
@@ -764,8 +780,8 @@ export class MemStorage implements IStorage {
   }
 
   // Contacts
-  async getContactsByCompany(companyId: string): Promise<Contact[]> {
-    return Array.from(this.contacts.values()).filter(c => c.companyId === companyId);
+  async getContactsByCompany(product: Product, companyId: string): Promise<Contact[]> {
+    return Array.from(this.contacts.values()).filter(c => c.product === product && c.companyId === companyId);
   }
 
   async createContact(insertContact: InsertContact): Promise<Contact> {
@@ -799,8 +815,8 @@ export class MemStorage implements IStorage {
     return this.contacts.delete(id);
   }
 
-  async mergeDuplicateContacts(companyId: string): Promise<{ merged: number; kept: number }> {
-    const contacts = await this.getContactsByCompany(companyId);
+  async mergeDuplicateContacts(product: Product, companyId: string): Promise<{ merged: number; kept: number }> {
+    const contacts = await this.getContactsByCompany(product, companyId);
     
     // Group contacts by normalized name (case-insensitive)
     const contactGroups = new Map<string, Contact[]>();
@@ -889,18 +905,18 @@ export class MemStorage implements IStorage {
     return user;
   }
 
-  async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
+  async getCategoryOverview(product: Product, categoryId: string): Promise<CategoryOverview | null> {
     const category = this.categories.get(categoryId);
-    if (!category) return null;
+    if (!category || category.product !== product) return null;
 
     // Get insights for this category
     const insights = Array.from(this.productInsights.values())
-      .filter(i => i.categoryId === categoryId)
+      .filter(i => i.product === product && i.categoryId === categoryId)
       .map(i => this.enrichInsightWithCategory(i));
 
     // Get Q&A pairs for this category
     const qaPairs = Array.from(this.qaPairs.values())
-      .filter(qa => qa.categoryId === categoryId)
+      .filter(qa => qa.product === product && qa.categoryId === categoryId)
       .map(qa => this.enrichQAPairWithCategory(qa));
 
     return {
@@ -913,11 +929,11 @@ export class MemStorage implements IStorage {
   }
 
   // POS Systems (stub implementations - not used in production)
-  async getPOSSystems(): Promise<POSSystemWithCompanies[]> {
+  async getPOSSystems(product: Product): Promise<POSSystemWithCompanies[]> {
     return [];
   }
 
-  async getPOSSystem(id: string): Promise<POSSystem | undefined> {
+  async getPOSSystem(product: Product, id: string): Promise<POSSystem | undefined> {
     return undefined;
   }
 
@@ -933,7 +949,7 @@ export class MemStorage implements IStorage {
     return false;
   }
 
-  async getPOSSystemByName(name: string): Promise<POSSystem | undefined> {
+  async getPOSSystemByName(product: Product, name: string): Promise<POSSystem | undefined> {
     return undefined;
   }
 
@@ -958,19 +974,20 @@ export class DbStorage implements IStorage {
   }
 
   // Transcripts
-  async getTranscripts(): Promise<Transcript[]> {
+  async getTranscripts(product: Product): Promise<Transcript[]> {
     const results = await this.db
       .select()
       .from(transcriptsTable)
+      .where(eq(transcriptsTable.product, product))
       .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`);
     return results;
   }
 
-  async getTranscript(id: string): Promise<Transcript | undefined> {
+  async getTranscript(product: Product, id: string): Promise<Transcript | undefined> {
     const results = await this.db
       .select()
       .from(transcriptsTable)
-      .where(eq(transcriptsTable.id, id))
+      .where(and(eq(transcriptsTable.product, product), eq(transcriptsTable.id, id)))
       .limit(1);
     return results[0];
   }
@@ -983,11 +1000,11 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async getTranscriptsByCompany(companyId: string): Promise<Transcript[]> {
+  async getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]> {
     const results = await this.db
       .select()
       .from(transcriptsTable)
-      .where(eq(transcriptsTable.companyId, companyId))
+      .where(and(eq(transcriptsTable.product, product), eq(transcriptsTable.companyId, companyId)))
       .orderBy(transcriptsTable.createdAt);
     return results;
   }
@@ -1027,37 +1044,11 @@ export class DbStorage implements IStorage {
   }
 
   // Product Insights
-  async getProductInsights(): Promise<ProductInsightWithCategory[]> {
+  async getProductInsights(product: Product): Promise<ProductInsightWithCategory[]> {
     const results = await this.db
       .select({
         id: productInsightsTable.id,
-        transcriptId: productInsightsTable.transcriptId,
-        feature: productInsightsTable.feature,
-        context: productInsightsTable.context,
-        quote: productInsightsTable.quote,
-        company: productInsightsTable.company,
-        categoryId: productInsightsTable.categoryId,
-        categoryName: categoriesTable.name,
-        companyId: productInsightsTable.companyId,
-        jiraTicketKey: productInsightsTable.jiraTicketKey,
-        createdAt: productInsightsTable.createdAt,
-        transcriptDate: transcriptsTable.createdAt,
-      })
-      .from(productInsightsTable)
-      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
-      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id));
-    
-    return results.map(r => ({
-      ...r,
-      categoryName: r.categoryName || null,
-      transcriptDate: r.transcriptDate || null,
-    }));
-  }
-
-  async getProductInsightsByTranscript(transcriptId: string): Promise<ProductInsightWithCategory[]> {
-    const results = await this.db
-      .select({
-        id: productInsightsTable.id,
+        product: productInsightsTable.product,
         transcriptId: productInsightsTable.transcriptId,
         feature: productInsightsTable.feature,
         context: productInsightsTable.context,
@@ -1073,7 +1064,7 @@ export class DbStorage implements IStorage {
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(eq(productInsightsTable.transcriptId, transcriptId));
+      .where(eq(productInsightsTable.product, product));
     
     return results.map(r => ({
       ...r,
@@ -1082,10 +1073,11 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getProductInsightsByCategory(categoryId: string): Promise<ProductInsightWithCategory[]> {
+  async getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]> {
     const results = await this.db
       .select({
         id: productInsightsTable.id,
+        product: productInsightsTable.product,
         transcriptId: productInsightsTable.transcriptId,
         feature: productInsightsTable.feature,
         context: productInsightsTable.context,
@@ -1101,7 +1093,36 @@ export class DbStorage implements IStorage {
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(eq(productInsightsTable.categoryId, categoryId));
+      .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.transcriptId, transcriptId)));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      transcriptDate: r.transcriptDate || null,
+    }));
+  }
+
+  async getProductInsightsByCategory(product: Product, categoryId: string): Promise<ProductInsightWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: productInsightsTable.id,
+        product: productInsightsTable.product,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+        companyId: productInsightsTable.companyId,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
+        createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
+      .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
     
     return results.map(r => ({
       ...r,
@@ -1164,43 +1185,11 @@ export class DbStorage implements IStorage {
   }
 
   // Q&A Pairs
-  async getQAPairs(): Promise<QAPairWithCategory[]> {
+  async getQAPairs(product: Product): Promise<QAPairWithCategory[]> {
     const results = await this.db
       .select({
         id: qaPairsTable.id,
-        transcriptId: qaPairsTable.transcriptId,
-        question: qaPairsTable.question,
-        answer: qaPairsTable.answer,
-        asker: qaPairsTable.asker,
-        contactId: qaPairsTable.contactId,
-        company: qaPairsTable.company,
-        companyId: qaPairsTable.companyId,
-        categoryId: qaPairsTable.categoryId,
-        isStarred: qaPairsTable.isStarred,
-        categoryName: categoriesTable.name,
-        contactName: contactsTable.name,
-        contactJobTitle: contactsTable.jobTitle,
-        createdAt: qaPairsTable.createdAt,
-        transcriptDate: transcriptsTable.createdAt,
-      })
-      .from(qaPairsTable)
-      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
-      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
-      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id));
-    
-    return results.map(r => ({
-      ...r,
-      categoryName: r.categoryName || null,
-      contactName: r.contactName || null,
-      contactJobTitle: r.contactJobTitle || null,
-      transcriptDate: r.transcriptDate || null,
-    }));
-  }
-
-  async getQAPairsByTranscript(transcriptId: string): Promise<QAPairWithCategory[]> {
-    const results = await this.db
-      .select({
-        id: qaPairsTable.id,
+        product: qaPairsTable.product,
         transcriptId: qaPairsTable.transcriptId,
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
@@ -1220,7 +1209,42 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(eq(qaPairsTable.transcriptId, transcriptId));
+      .where(eq(qaPairsTable.product, product));
+    
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      contactName: r.contactName || null,
+      contactJobTitle: r.contactJobTitle || null,
+      transcriptDate: r.transcriptDate || null,
+    }));
+  }
+
+  async getQAPairsByTranscript(product: Product, transcriptId: string): Promise<QAPairWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: qaPairsTable.id,
+        product: qaPairsTable.product,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
+        categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
+      .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.transcriptId, transcriptId)));
     
     return results.map(r => ({
       ...r,
@@ -1287,10 +1311,11 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
-  async getQAPairsByCompany(companyId: string): Promise<QAPairWithCategory[]> {
+  async getQAPairsByCompany(product: Product, companyId: string): Promise<QAPairWithCategory[]> {
     const results = await this.db
       .select({
         id: qaPairsTable.id,
+        product: qaPairsTable.product,
         transcriptId: qaPairsTable.transcriptId,
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
@@ -1310,7 +1335,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(eq(qaPairsTable.companyId, companyId));
+      .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.companyId, companyId)));
     
     return results.map(r => ({
       ...r,
@@ -1322,18 +1347,19 @@ export class DbStorage implements IStorage {
   }
 
   // Categories
-  async getCategories(): Promise<Category[]> {
+  async getCategories(product: Product): Promise<Category[]> {
     return await this.db
       .select()
       .from(categoriesTable)
+      .where(eq(categoriesTable.product, product))
       .orderBy(categoriesTable.name);
   }
 
-  async getCategory(id: string): Promise<Category | undefined> {
+  async getCategory(product: Product, id: string): Promise<Category | undefined> {
     const results = await this.db
       .select()
       .from(categoriesTable)
-      .where(eq(categoriesTable.id, id))
+      .where(and(eq(categoriesTable.product, product), eq(categoriesTable.id, id)))
       .limit(1);
     return results[0];
   }
@@ -1380,10 +1406,11 @@ export class DbStorage implements IStorage {
   }
 
   // Features
-  async getFeatures(): Promise<FeatureWithCategory[]> {
+  async getFeatures(product: Product): Promise<FeatureWithCategory[]> {
     const results = await this.db
       .select({
         id: featuresTable.id,
+        product: featuresTable.product,
         name: featuresTable.name,
         description: featuresTable.description,
         value: featuresTable.value,
@@ -1396,6 +1423,7 @@ export class DbStorage implements IStorage {
       })
       .from(featuresTable)
       .leftJoin(categoriesTable, eq(featuresTable.categoryId, categoriesTable.id))
+      .where(eq(featuresTable.product, product))
       .orderBy(featuresTable.name);
     
     return results.map(r => ({
@@ -1404,11 +1432,11 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getFeature(id: string): Promise<Feature | undefined> {
+  async getFeature(product: Product, id: string): Promise<Feature | undefined> {
     const results = await this.db
       .select()
       .from(featuresTable)
-      .where(eq(featuresTable.id, id))
+      .where(and(eq(featuresTable.product, product), eq(featuresTable.id, id)))
       .limit(1);
     return results[0];
   }
@@ -1447,27 +1475,28 @@ export class DbStorage implements IStorage {
   }
 
   // Companies
-  async getCompanies(): Promise<Company[]> {
+  async getCompanies(product: Product): Promise<Company[]> {
     return await this.db
       .select()
       .from(companiesTable)
+      .where(eq(companiesTable.product, product))
       .orderBy(companiesTable.name);
   }
 
-  async getCompany(id: string): Promise<Company | undefined> {
+  async getCompany(product: Product, id: string): Promise<Company | undefined> {
     const results = await this.db
       .select()
       .from(companiesTable)
-      .where(eq(companiesTable.id, id))
+      .where(and(eq(companiesTable.product, product), eq(companiesTable.id, id)))
       .limit(1);
     return results[0];
   }
 
-  async getCompanyBySlug(slug: string): Promise<Company | undefined> {
+  async getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined> {
     const results = await this.db
       .select()
       .from(companiesTable)
-      .where(eq(companiesTable.slug, slug))
+      .where(and(eq(companiesTable.product, product), eq(companiesTable.slug, slug)))
       .limit(1);
     return results[0];
   }
@@ -1517,22 +1546,23 @@ export class DbStorage implements IStorage {
       .where(eq(qaPairsTable.companyId, companyId));
   }
 
-  async getCompanyOverview(slug: string): Promise<CompanyOverview | null> {
-    const company = await this.getCompanyBySlug(slug);
+  async getCompanyOverview(product: Product, slug: string): Promise<CompanyOverview | null> {
+    const company = await this.getCompanyBySlug(product, slug);
     if (!company) return null;
 
-    // Get transcripts for this company - match by both companyId and legacy companyName field
+    // Get transcripts for this company - match by both companyId and legacy companyName field, filter by product
     const companyTranscripts = await this.db
       .select()
       .from(transcriptsTable)
       .where(
-        drizzleSql`${transcriptsTable.companyId} = ${company.id} OR LOWER(${transcriptsTable.companyName}) = LOWER(${company.name})`
+        drizzleSql`${transcriptsTable.product} = ${product} AND (${transcriptsTable.companyId} = ${company.id} OR LOWER(${transcriptsTable.companyName}) = LOWER(${company.name}))`
       );
 
-    // Get insights with category names - match by both companyId and legacy company field
+    // Get insights with category names - match by both companyId and legacy company field, filter by product
     const insights = await this.db
       .select({
         id: productInsightsTable.id,
+        product: productInsightsTable.product,
         transcriptId: productInsightsTable.transcriptId,
         feature: productInsightsTable.feature,
         context: productInsightsTable.context,
@@ -1549,13 +1579,14 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(
-        drizzleSql`${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name})`
+        drizzleSql`${productInsightsTable.product} = ${product} AND (${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name}))`
       );
 
-    // Get Q&A pairs with category and contact info - match by both companyId and legacy company field
+    // Get Q&A pairs with category and contact info - match by both companyId and legacy company field, filter by product
     const qaPairs = await this.db
       .select({
         id: qaPairsTable.id,
+        product: qaPairsTable.product,
         transcriptId: qaPairsTable.transcriptId,
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
@@ -1576,14 +1607,14 @@ export class DbStorage implements IStorage {
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(
-        drizzleSql`${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name})`
+        drizzleSql`${qaPairsTable.product} = ${product} AND (${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name}))`
       );
 
-    // Get contacts for this company
+    // Get contacts for this company - filter by product
     const contacts = await this.db
       .select()
       .from(contactsTable)
-      .where(eq(contactsTable.companyId, company.id));
+      .where(and(eq(contactsTable.product, product), eq(contactsTable.companyId, company.id)));
 
     return {
       company,
@@ -1608,11 +1639,11 @@ export class DbStorage implements IStorage {
   }
 
   // Contacts
-  async getContactsByCompany(companyId: string): Promise<Contact[]> {
+  async getContactsByCompany(product: Product, companyId: string): Promise<Contact[]> {
     return await this.db
       .select()
       .from(contactsTable)
-      .where(eq(contactsTable.companyId, companyId));
+      .where(and(eq(contactsTable.product, product), eq(contactsTable.companyId, companyId)));
   }
 
   async createContact(insertContact: InsertContact): Promise<Contact> {
@@ -1740,14 +1771,15 @@ export class DbStorage implements IStorage {
     return user;
   }
 
-  async getCategoryOverview(categoryId: string): Promise<CategoryOverview | null> {
-    const category = await this.getCategory(categoryId);
+  async getCategoryOverview(product: Product, categoryId: string): Promise<CategoryOverview | null> {
+    const category = await this.getCategory(product, categoryId);
     if (!category) return null;
 
     // Get insights for this category with category names
     const insights = await this.db
       .select({
         id: productInsightsTable.id,
+        product: productInsightsTable.product,
         transcriptId: productInsightsTable.transcriptId,
         feature: productInsightsTable.feature,
         context: productInsightsTable.context,
@@ -1763,12 +1795,13 @@ export class DbStorage implements IStorage {
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(eq(productInsightsTable.categoryId, categoryId));
+      .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
 
     // Get Q&A pairs for this category with category and contact info
     const qaPairs = await this.db
       .select({
         id: qaPairsTable.id,
+        product: qaPairsTable.product,
         transcriptId: qaPairsTable.transcriptId,
         question: qaPairsTable.question,
         answer: qaPairsTable.answer,
@@ -1788,7 +1821,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(eq(qaPairsTable.categoryId, categoryId));
+      .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.categoryId, categoryId)));
 
     return {
       category,
@@ -1808,8 +1841,8 @@ export class DbStorage implements IStorage {
   }
 
   // POS Systems operations
-  async getPOSSystems(): Promise<POSSystemWithCompanies[]> {
-    const systems = await this.db.select().from(posSystemsTable);
+  async getPOSSystems(product: Product): Promise<POSSystemWithCompanies[]> {
+    const systems = await this.db.select().from(posSystemsTable).where(eq(posSystemsTable.product, product));
     
     // Get all companies for each system
     const systemsWithCompanies = await Promise.all(
@@ -1824,7 +1857,7 @@ export class DbStorage implements IStorage {
           ? await this.db
               .select()
               .from(companiesTable)
-              .where(inArray(companiesTable.id, companyIds))
+              .where(and(eq(companiesTable.product, product), inArray(companiesTable.id, companyIds)))
           : [];
         
         return {
@@ -1837,11 +1870,11 @@ export class DbStorage implements IStorage {
     return systemsWithCompanies;
   }
 
-  async getPOSSystem(id: string): Promise<POSSystem | undefined> {
+  async getPOSSystem(product: Product, id: string): Promise<POSSystem | undefined> {
     const [system] = await this.db
       .select()
       .from(posSystemsTable)
-      .where(eq(posSystemsTable.id, id));
+      .where(and(eq(posSystemsTable.product, product), eq(posSystemsTable.id, id)));
     return system;
   }
 
@@ -1920,11 +1953,11 @@ export class DbStorage implements IStorage {
     return true;
   }
 
-  async getPOSSystemByName(name: string): Promise<POSSystem | undefined> {
+  async getPOSSystemByName(product: Product, name: string): Promise<POSSystem | undefined> {
     const [system] = await this.db
       .select()
       .from(posSystemsTable)
-      .where(drizzleSql`LOWER(${posSystemsTable.name}) = LOWER(${name})`);
+      .where(drizzleSql`${posSystemsTable.product} = ${product} AND LOWER(${posSystemsTable.name}) = LOWER(${name})`);
     return system;
   }
 
@@ -1946,13 +1979,14 @@ export class DbStorage implements IStorage {
   }
 
   async findOrCreatePOSSystemAndLink(
+    product: Product,
     name: string,
     companyId: string,
     websiteLink?: string,
     description?: string
   ): Promise<POSSystem> {
     // Try to find existing POS system by name (case-insensitive)
-    let system = await this.getPOSSystemByName(name);
+    let system = await this.getPOSSystemByName(product, name);
     
     if (system) {
       // Link to company if not already linked
@@ -1960,6 +1994,7 @@ export class DbStorage implements IStorage {
     } else {
       // Create new POS system
       system = await this.createPOSSystem({
+        product,
         name,
         websiteLink: websiteLink || null,
         description: description || null,
