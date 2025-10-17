@@ -10,6 +10,8 @@ import {
   insertContactSchema,
   insertPOSSystemSchema,
   type ProductInsightWithCategory,
+  type Product,
+  PRODUCTS,
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -21,6 +23,21 @@ function generateSlug(companyName: string): string {
   const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
   // If slug is empty (no alphanumerics in name), use a uuid suffix
   return slug || `company-${randomUUID().split('-')[0]}`;
+}
+
+// Helper function to get current user and their selected product
+async function getUserAndProduct(req: any): Promise<{ userId: string; user: any; product: Product }> {
+  const userId = req.user.claims.sub;
+  const user = await storage.getUser(userId);
+  
+  if (!user) {
+    throw new Error("User not found");
+  }
+  
+  // User's current product defaults to PitCrew if not set
+  const product = (user.currentProduct as Product) || 'PitCrew';
+  
+  return { userId, user, product };
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -53,6 +70,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Product management routes
+  app.get('/api/products', isAuthenticated, async (req: any, res) => {
+    try {
+      // Return list of available products
+      res.json({ products: PRODUCTS });
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.put('/api/user/product', isAuthenticated, async (req: any, res) => {
+    try {
+      const { product } = req.body;
+      
+      // Validate product
+      if (!PRODUCTS.includes(product)) {
+        return res.status(400).json({ message: "Invalid product" });
+      }
+      
+      const { userId } = await getUserAndProduct(req);
+      const updatedUser = await storage.updateUserProduct(userId, product);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user product:", error);
+      res.status(500).json({ message: "Failed to update product" });
     }
   });
 

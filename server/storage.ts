@@ -106,6 +106,7 @@ export interface IStorage {
   // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserProduct(userId: string, product: Product): Promise<User | undefined>;
 
   // POS Systems
   getPOSSystems(product: Product): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
@@ -897,12 +898,26 @@ export class MemStorage implements IStorage {
       firstName: userData.firstName || null,
       lastName: userData.lastName || null,
       profileImageUrl: userData.profileImageUrl || null,
+      currentProduct: existingUser?.currentProduct || 'PitCrew',
       createdAt: existingUser?.createdAt || now,
       updatedAt: now,
     };
     
     this.users.set(user.id, user);
     return user;
+  }
+
+  async updateUserProduct(userId: string, product: Product): Promise<User | undefined> {
+    const user = this.users.get(userId);
+    if (!user) return undefined;
+    
+    const updated = {
+      ...user,
+      currentProduct: product,
+      updatedAt: new Date(),
+    };
+    this.users.set(userId, updated);
+    return updated;
   }
 
   async getCategoryOverview(product: Product, categoryId: string): Promise<CategoryOverview | null> {
@@ -1767,6 +1782,18 @@ export class DbStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
+      .returning();
+    return user;
+  }
+
+  async updateUserProduct(userId: string, product: Product): Promise<User | undefined> {
+    const [user] = await this.db
+      .update(usersTable)
+      .set({ 
+        currentProduct: product,
+        updatedAt: new Date(),
+      })
+      .where(eq(usersTable.id, userId))
       .returning();
     return user;
   }
