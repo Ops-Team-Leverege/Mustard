@@ -3,14 +3,28 @@ import TranscriptForm, { TranscriptData } from "@/components/TranscriptForm";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
+import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useQuery } from "@tanstack/react-query";
+
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
 
 export default function TranscriptInput() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStep, setAnalysisStep] = useState(0);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
 
   useEffect(() => {
     if (!isAnalyzing) return;
@@ -76,6 +90,8 @@ export default function TranscriptInput() {
     { label: "Organizing findings", description: "Almost done..." },
   ];
 
+  const currentProduct = user?.currentProduct || "PitCrew";
+
   return (
     <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
       {isAnalyzing ? (
@@ -133,6 +149,15 @@ export default function TranscriptInput() {
       ) : null}
       
       <div className={isAnalyzing ? "opacity-50 pointer-events-none" : ""}>
+        <Alert className="mb-6 border-2 border-primary bg-primary/10">
+          <AlertCircle className="h-5 w-5 text-primary" />
+          <AlertDescription className="ml-2">
+            <span className="font-semibold text-lg">Adding transcript for: {currentProduct}</span>
+            <p className="text-sm mt-1 text-muted-foreground">
+              This transcript will be saved to <strong>{currentProduct}</strong>. Use the product switcher in the header to change products.
+            </p>
+          </AlertDescription>
+        </Alert>
         <TranscriptForm onSubmit={handleSubmit} isAnalyzing={isAnalyzing} />
       </div>
     </div>
