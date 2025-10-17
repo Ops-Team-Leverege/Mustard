@@ -120,11 +120,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = insertTranscriptSchema.parse(body);
       const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; nameInTranscript?: string; jobTitle?: string }> };
       
-      // Find or create company
-      const slug = generateSlug(data.companyName);
-      let company = await storage.getCompanyBySlug(product, slug);
+      // Find or create company - check by name first to prevent duplicates
+      let company = await storage.getCompanyByName(product, data.companyName);
       
       if (!company) {
+        // Generate slug and create company
+        const slug = generateSlug(data.companyName);
         company = await storage.createCompany({
           name: data.companyName,
           slug,

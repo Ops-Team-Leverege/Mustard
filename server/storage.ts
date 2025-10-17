@@ -90,6 +90,7 @@ export interface IStorage {
   getCompanies(product: Product): Promise<Company[]>;
   getCompany(product: Product, id: string): Promise<Company | undefined>;
   getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined>;
+  getCompanyByName(product: Product, name: string): Promise<Company | undefined>;
   createCompany(company: InsertCompany): Promise<Company>;
   updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined>;
   deleteCompany(id: string): Promise<boolean>;
@@ -664,6 +665,13 @@ export class MemStorage implements IStorage {
 
   async getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined> {
     return Array.from(this.companies.values()).find(c => c.product === product && c.slug === slug);
+  }
+
+  async getCompanyByName(product: Product, name: string): Promise<Company | undefined> {
+    const nameLower = name.toLowerCase().trim();
+    return Array.from(this.companies.values()).find(c => 
+      c.product === product && c.name.toLowerCase().trim() === nameLower
+    );
   }
 
   async createCompany(insertCompany: InsertCompany): Promise<Company> {
@@ -1512,6 +1520,20 @@ export class DbStorage implements IStorage {
       .select()
       .from(companiesTable)
       .where(and(eq(companiesTable.product, product), eq(companiesTable.slug, slug)))
+      .limit(1);
+    return results[0];
+  }
+
+  async getCompanyByName(product: Product, name: string): Promise<Company | undefined> {
+    const results = await this.db
+      .select()
+      .from(companiesTable)
+      .where(
+        and(
+          eq(companiesTable.product, product),
+          drizzleSql`LOWER(TRIM(${companiesTable.name})) = LOWER(TRIM(${name}))`
+        )
+      )
       .limit(1);
     return results[0];
   }
