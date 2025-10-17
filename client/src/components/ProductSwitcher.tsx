@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane";
+import type { Product } from "@shared/schema";
+import { PRODUCTS } from "@shared/schema";
 
 interface User {
   id: string;
@@ -52,7 +52,7 @@ export default function ProductSwitcher() {
   }
 
   const currentProduct = user.currentProduct || "PitCrew";
-  const products: Product[] = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane"];
+  const products = [...PRODUCTS];
 
   return (
     <div className="flex items-center gap-1" data-testid="product-switcher">
