@@ -19,7 +19,6 @@ import CompanyPage from "@/pages/CompanyPage";
 import CategoryPage from "@/pages/CategoryPage";
 import TranscriptDetailPage from "@/pages/TranscriptDetailPage";
 import POSSystems from "@/pages/POSSystems";
-import Roadmap from "@/pages/Roadmap";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/Landing";
@@ -36,7 +35,6 @@ const tabs = [
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
   { id: 'features', label: 'Features', path: '/features' },
-  { id: 'roadmap', label: 'Roadmap', path: '/roadmap' },
   { 
     id: 'databases', 
     label: 'Databases', 
@@ -166,14 +164,6 @@ function Router() {
       <Route path="/pos-systems">
         <ProtectedRoute 
           component={POSSystems} 
-          isAuthenticated={isAuthenticated}
-          isLoading={isLoading}
-          isDomainRestricted={isDomainRestricted}
-        />
-      </Route>
-      <Route path="/roadmap">
-        <ProtectedRoute 
-          component={Roadmap} 
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
