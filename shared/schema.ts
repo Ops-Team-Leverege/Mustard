@@ -134,6 +134,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   currentProduct: text("current_product").default("PitCrew").notNull(), // Current selected product
+  jiraProjectKeys: text("jira_project_keys").array(), // Array of Jira project keys for roadmap
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

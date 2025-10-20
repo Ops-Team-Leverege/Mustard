@@ -1256,6 +1256,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Jira Roadmap routes
+  app.get("/api/roadmap/jira-projects", isAuthenticated, async (req: any, res) => {
+    try {
+      const { user } = await getUserAndProduct(req);
+      res.json({ projectKeys: user.jiraProjectKeys || [] });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.put("/api/roadmap/jira-projects", isAuthenticated, async (req: any, res) => {
+    try {
+      const { userId } = await getUserAndProduct(req);
+      const { projectKeys } = req.body;
+      
+      if (!Array.isArray(projectKeys)) {
+        res.status(400).json({ error: "projectKeys must be an array" });
+        return;
+      }
+      
+      const user = await storage.updateUserJiraProjects(userId, projectKeys);
+      res.json({ projectKeys: user.jiraProjectKeys || [] });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  app.get("/api/roadmap/issues", isAuthenticated, async (req: any, res) => {
+    try {
+      const { user } = await getUserAndProduct(req);
+      const projectKeys = user.jiraProjectKeys || [];
+      
+      if (projectKeys.length === 0) {
+        res.json([]);
+        return;
+      }
+      
+      const { getIssuesFromProjects } = await import("./jira");
+      const issues = await getIssuesFromProjects(projectKeys);
+      res.json(issues);
+    } catch (error) {
+      console.error("Error fetching Jira issues:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch Jira issues" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
