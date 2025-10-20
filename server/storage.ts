@@ -908,6 +908,7 @@ export class MemStorage implements IStorage {
       lastName: userData.lastName || null,
       profileImageUrl: userData.profileImageUrl || null,
       currentProduct: existingUser?.currentProduct || 'PitCrew',
+      jiraProjectKeys: existingUser?.jiraProjectKeys || null,
       createdAt: existingUser?.createdAt || now,
       updatedAt: now,
     };
@@ -1726,11 +1727,14 @@ export class DbStorage implements IStorage {
     return results.length > 0;
   }
 
-  async mergeDuplicateContacts(companyId: string): Promise<{ merged: number; kept: number }> {
+  async mergeDuplicateContacts(product: Product, companyId: string): Promise<{ merged: number; kept: number }> {
     const contacts = await this.db
       .select()
       .from(contactsTable)
-      .where(eq(contactsTable.companyId, companyId))
+      .where(and(
+        eq(contactsTable.product, product),
+        eq(contactsTable.companyId, companyId)
+      ))
       .orderBy(contactsTable.createdAt);
     
     // Group contacts by normalized name (case-insensitive)

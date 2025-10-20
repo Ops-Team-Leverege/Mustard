@@ -97,6 +97,16 @@ export default function Roadmap() {
     const trimmed = projectInput.trim().toUpperCase();
     if (!trimmed) return;
     
+    // Validate project key format (only uppercase letters, numbers, and underscores)
+    if (!/^[A-Z0-9_]+$/.test(trimmed)) {
+      toast({
+        title: "Invalid project key",
+        description: "Project keys must contain only uppercase letters, numbers, and underscores.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (projectKeys.includes(trimmed)) {
       toast({
         title: "Project already added",

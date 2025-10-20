@@ -1276,6 +1276,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      // Validate project keys to prevent JQL injection
+      const validProjectKeyPattern = /^[A-Z0-9_]+$/;
+      const invalidKeys = projectKeys.filter(key => !validProjectKeyPattern.test(key));
+      
+      if (invalidKeys.length > 0) {
+        res.status(400).json({ 
+          error: `Invalid project keys: ${invalidKeys.join(', ')}. Project keys must contain only uppercase letters, numbers, and underscores.` 
+        });
+        return;
+      }
+      
       const user = await storage.updateUserJiraProjects(userId, projectKeys);
       res.json({ projectKeys: user.jiraProjectKeys || [] });
     } catch (error) {

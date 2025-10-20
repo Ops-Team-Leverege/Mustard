@@ -3,8 +3,12 @@ import { Version3Client } from 'jira.js';
 let connectionSettings: any;
 
 async function getAccessToken() {
-  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
-    return connectionSettings.settings.access_token;
+  if (connectionSettings?.settings?.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
+    const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
+    const hostName = connectionSettings?.settings?.site_url;
+    if (accessToken && hostName) {
+      return {accessToken, hostName};
+    }
   }
   
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME
@@ -18,21 +22,25 @@ async function getAccessToken() {
     throw new Error('X_REPLIT_TOKEN not found for repl/depl');
   }
 
-  connectionSettings = await fetch(
-    'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=jira',
-    {
-      headers: {
-        'Accept': 'application/json',
-        'X_REPLIT_TOKEN': xReplitToken
+  try {
+    connectionSettings = await fetch(
+      'https://' + hostname + '/api/v2/connection?include_secrets=true&connector_names=jira',
+      {
+        headers: {
+          'Accept': 'application/json',
+          'X_REPLIT_TOKEN': xReplitToken
+        }
       }
-    }
-  ).then(res => res.json()).then(data => data.items?.[0]);
+    ).then(res => res.json()).then(data => data?.items?.[0]);
+  } catch (error) {
+    throw new Error('Failed to fetch Jira connection settings');
+  }
 
-  const accessToken = connectionSettings?.settings?.access_token || connectionSettings.settings?.oauth?.credentials?.access_token;
+  const accessToken = connectionSettings?.settings?.access_token || connectionSettings?.settings?.oauth?.credentials?.access_token;
   const hostName = connectionSettings?.settings?.site_url;
 
   if (!connectionSettings || !accessToken || !hostName) {
-    throw new Error('Jira not connected');
+    throw new Error('Jira not connected. Please set up the Jira integration in your Replit project settings.');
   }
 
   return {accessToken, hostName};
@@ -85,10 +93,28 @@ export interface JiraIssue {
   };
 }
 
+function validateProjectKey(key: string): boolean {
+  // Jira project keys must be uppercase alphanumeric and underscores only
+  return /^[A-Z0-9_]+$/.test(key);
+}
+
 export async function getIssuesFromProjects(projectKeys: string[]): Promise<JiraIssue[]> {
+  if (projectKeys.length === 0) {
+    return [];
+  }
+
+  // Validate all project keys to prevent JQL injection
+  const validKeys = projectKeys.filter(validateProjectKey);
+  
+  if (validKeys.length === 0) {
+    throw new Error('No valid project keys provided. Project keys must contain only uppercase letters, numbers, and underscores.');
+  }
+
   const client = await getUncachableJiraClient();
   
-  const jql = `project IN (${projectKeys.join(',')}) ORDER BY created DESC`;
+  // Safely construct JQL by quoting each project key
+  const quotedKeys = validKeys.map(key => `"${key}"`).join(',');
+  const jql = `project IN (${quotedKeys}) ORDER BY created DESC`;
   
   const response = await client.issueSearch.searchForIssuesUsingJql({
     jql,
@@ -107,5 +133,5 @@ export async function getIssuesFromProjects(projectKeys: string[]): Promise<Jira
     ],
   });
 
-  return response.issues as JiraIssue[];
+  return response.issues as unknown as JiraIssue[];
 }
