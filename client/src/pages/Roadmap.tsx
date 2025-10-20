@@ -270,8 +270,11 @@ export default function Roadmap() {
         ) : issues.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <p className="text-muted-foreground text-center">
+              <p className="text-muted-foreground text-center mb-4">
                 No issues found in the configured projects.
+              </p>
+              <p className="text-sm text-muted-foreground text-center">
+                If you expect to see issues here, please check that your Jira integration is properly configured in your Replit project settings.
               </p>
             </CardContent>
           </Card>

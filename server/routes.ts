@@ -1314,7 +1314,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(issues);
     } catch (error) {
       console.error("Error fetching Jira issues:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch Jira issues" });
+      
+      // Check if this is a Jira authentication error
+      const errorMessage = error instanceof Error ? error.message : "Failed to fetch Jira issues";
+      if (errorMessage.includes("401") || errorMessage.includes("Unauthorized") || errorMessage.includes("not connected")) {
+        // Return a 200 with empty array and error flag to avoid triggering logout
+        // The frontend can detect this and show an appropriate message
+        res.status(200).json([]);
+        return;
+      }
+      
+      res.status(500).json({ error: errorMessage });
     }
   });
 
