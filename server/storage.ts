@@ -108,7 +108,6 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserProduct(userId: string, product: Product): Promise<User | undefined>;
-  updateUserJiraProjects(userId: string, projectKeys: string[]): Promise<User>;
 
   // POS Systems
   getPOSSystems(product: Product): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
@@ -908,7 +907,6 @@ export class MemStorage implements IStorage {
       lastName: userData.lastName || null,
       profileImageUrl: userData.profileImageUrl || null,
       currentProduct: existingUser?.currentProduct || 'PitCrew',
-      jiraProjectKeys: existingUser?.jiraProjectKeys || null,
       createdAt: existingUser?.createdAt || now,
       updatedAt: now,
     };
@@ -924,19 +922,6 @@ export class MemStorage implements IStorage {
     const updated = {
       ...user,
       currentProduct: product,
-      updatedAt: new Date(),
-    };
-    this.users.set(userId, updated);
-    return updated;
-  }
-
-  async updateUserJiraProjects(userId: string, projectKeys: string[]): Promise<User> {
-    const user = this.users.get(userId);
-    if (!user) throw new Error("User not found");
-    
-    const updated = {
-      ...user,
-      jiraProjectKeys: projectKeys,
       updatedAt: new Date(),
     };
     this.users.set(userId, updated);
@@ -1835,20 +1820,6 @@ export class DbStorage implements IStorage {
       })
       .where(eq(usersTable.id, userId))
       .returning();
-    return user;
-  }
-
-  async updateUserJiraProjects(userId: string, projectKeys: string[]): Promise<User> {
-    const [user] = await this.db
-      .update(usersTable)
-      .set({ 
-        jiraProjectKeys: projectKeys,
-        updatedAt: new Date(),
-      })
-      .where(eq(usersTable.id, userId))
-      .returning();
-    
-    if (!user) throw new Error("User not found");
     return user;
   }
 
