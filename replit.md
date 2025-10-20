@@ -85,3 +85,6 @@ Preferred communication style: Simple, everyday language.
 ### Integrations
 - **Replit Auth**: User authentication system.
 - **Jira Integration**: Integration supporting linking product insights to Jira tickets by posting comments via Jira REST API, with automatic credential management through Replit's secure connection system.
+
+## Security
+- **JQL Injection Prevention**: Strict validation of Jira project keys using regex `/^[A-Z0-9_]+$/` at three layers (client, API route, Jira client) to prevent JQL injection attacks. Project keys are quoted when constructing JQL queries. Invalid keys are rejected before database persistence and filtered server-side to prevent legacy data exploitation.

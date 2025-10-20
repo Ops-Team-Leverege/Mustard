@@ -1276,9 +1276,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
+      // Normalize project keys: trim whitespace and convert to uppercase
+      const normalizedKeys = projectKeys.map(key => 
+        typeof key === 'string' ? key.trim().toUpperCase() : key
+      );
+      
       // Validate project keys to prevent JQL injection
       const validProjectKeyPattern = /^[A-Z0-9_]+$/;
-      const invalidKeys = projectKeys.filter(key => !validProjectKeyPattern.test(key));
+      const invalidKeys = normalizedKeys.filter(key => !validProjectKeyPattern.test(key));
       
       if (invalidKeys.length > 0) {
         res.status(400).json({ 
@@ -1287,7 +1292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      const user = await storage.updateUserJiraProjects(userId, projectKeys);
+      const user = await storage.updateUserJiraProjects(userId, normalizedKeys);
       res.json({ projectKeys: user.jiraProjectKeys || [] });
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
