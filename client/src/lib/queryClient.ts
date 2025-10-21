@@ -2,8 +2,44 @@ import { QueryClient, QueryFunction, QueryCache, MutationCache } from "@tanstack
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
+    const text = await res.text();
+    let cleanMessage = '';
+    
+    // Try to parse JSON error response
+    try {
+      const errorData = JSON.parse(text);
+      
+      // Extract clean error message from various formats
+      if (errorData.error) {
+        // Handle { error: "message" } or { error: { message: "..." } }
+        if (typeof errorData.error === 'string') {
+          cleanMessage = errorData.error;
+        } else if (Array.isArray(errorData.error)) {
+          // Handle Zod validation errors: { error: [{ message: "..." }, ...] }
+          cleanMessage = errorData.error.map((e: any) => e.message || JSON.stringify(e)).join(', ');
+        } else if (errorData.error.message) {
+          cleanMessage = errorData.error.message;
+        } else {
+          // Fallback for complex error objects
+          cleanMessage = JSON.stringify(errorData.error);
+        }
+      } else if (errorData.message) {
+        // Handle { message: "..." }
+        cleanMessage = errorData.message;
+      }
+    } catch (e) {
+      // If JSON parsing fails, use the raw text
+      if (e instanceof SyntaxError) {
+        cleanMessage = text || res.statusText;
+      } else {
+        // Re-throw unexpected errors
+        throw e;
+      }
+    }
+    
+    // Always include status code for auth detection logic (401 checks)
+    const finalMessage = cleanMessage || res.statusText || 'Request failed';
+    throw new Error(`${res.status}: ${finalMessage}`);
   }
 }
 
