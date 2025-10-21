@@ -181,7 +181,7 @@ export default function TranscriptDetailPage() {
                   {transcript.mainMeetingTakeaways && (
                     <div className="mt-3">
                       <h3 className="text-sm font-medium mb-1">Main Meeting Takeaways</h3>
-                      <div className="bg-muted/50 rounded-md p-3">
+                      <div className="bg-muted/50 rounded-md p-4 max-h-60 overflow-y-auto">
                         <p className="text-sm whitespace-pre-wrap" data-testid="main-meeting-takeaways">
                           {transcript.mainMeetingTakeaways}
                         </p>
