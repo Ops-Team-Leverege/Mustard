@@ -6,6 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ToastAction } from "@/components/ui/toast";
 import { useQuery } from "@tanstack/react-query";
 
 type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
@@ -73,11 +74,30 @@ export default function TranscriptInput() {
       }, 1000);
     } catch (error) {
       console.error('[TranscriptInput] Error during submission:', error);
-      toast({
-        title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "Failed to analyze transcript",
-        variant: "destructive",
-      });
+      
+      // Check if it's a timeout error (524 from Cloudflare or network timeout)
+      const errorMessage = error instanceof Error ? error.message : "Failed to analyze transcript";
+      const isTimeout = errorMessage.includes('524') || errorMessage.toLowerCase().includes('timeout');
+      
+      if (isTimeout) {
+        // For timeout errors, the transcript might have been created successfully
+        toast({
+          title: "Processing Timeout",
+          description: "The analysis is taking longer than expected. Your transcript may have been created successfully. Please check the transcripts page or try refreshing in a moment.",
+          variant: "default",
+          action: (
+            <ToastAction altText="View Transcripts" onClick={() => setLocation('/transcripts')}>
+              View Transcripts
+            </ToastAction>
+          ),
+        });
+      } else {
+        toast({
+          title: "Analysis Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -109,7 +129,10 @@ export default function TranscriptInput() {
                 <div className="space-y-2">
                   <h2 className="text-2xl font-semibold">Analyzing Transcript</h2>
                   <p className="text-sm text-muted-foreground">
-                    This may take 1-3 minutes for long transcripts. Please don't navigate away.
+                    This typically takes 1-3 minutes, but can take up to 5 minutes for very long transcripts.
+                  </p>
+                  <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
+                    Please don't navigate away or resubmit - your transcript is being processed!
                   </p>
                 </div>
 
