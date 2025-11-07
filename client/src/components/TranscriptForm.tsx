@@ -41,6 +41,7 @@ export interface TranscriptData {
   meetingDate?: string;
   contentType?: "transcript" | "notes";
   transcript: string;
+  supportingMaterials?: string;
   leverageTeam: string;
   customerNames: string;
   customers?: Customer[];
@@ -64,7 +65,7 @@ const LEVEREGE_TEAM_OPTIONS = [
 
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
   const [contentType, setContentType] = useState<"transcript" | "notes">("transcript");
-  const [inputMethod, setInputMethod] = useState<"text" | "file" | "url">("text");
+  const [supportingInputMethod, setSupportingInputMethod] = useState<"file" | "url">("file");
   const [fileUrl, setFileUrl] = useState("");
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const { toast } = useToast();
@@ -78,6 +79,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     meetingDate: '',
     contentType: 'transcript',
     transcript: '',
+    supportingMaterials: '',
     leverageTeam: '',
     customerNames: '',
     companyDescription: '',
@@ -175,14 +177,10 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
 
       const data = await response.json();
       
-      if (contentType === "transcript") {
-        setFormData(prev => ({ ...prev, transcript: data.text }));
-      } else {
-        setFormData(prev => ({ ...prev, mainMeetingTakeaways: data.text }));
-      }
+      setFormData(prev => ({ ...prev, supportingMaterials: data.text }));
 
       toast({
-        title: "File processed successfully",
+        title: "Supporting materials added",
         description: `Extracted ${data.text.length} characters from ${file.name}`,
       });
     } catch (error) {
@@ -216,14 +214,10 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
 
       const data = await response.json();
       
-      if (contentType === "transcript") {
-        setFormData(prev => ({ ...prev, transcript: data.text }));
-      } else {
-        setFormData(prev => ({ ...prev, mainMeetingTakeaways: data.text }));
-      }
+      setFormData(prev => ({ ...prev, supportingMaterials: data.text }));
 
       toast({
-        title: "Content fetched successfully",
+        title: "Supporting materials added",
         description: `Extracted ${data.text.length} characters from URL`,
       });
       
@@ -421,99 +415,15 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
           {contentType === "transcript" && (
             <div className="space-y-2">
               <Label htmlFor="transcript" data-testid="label-transcript">Transcript <span className="text-destructive">*</span></Label>
-              <Tabs defaultValue="text" value={inputMethod} onValueChange={(v) => setInputMethod(v as "text" | "file" | "url")}>
-                <TabsList className="grid w-full grid-cols-3" data-testid="tabs-input-method">
-                  <TabsTrigger value="text" data-testid="tab-paste-text">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Paste Text
-                  </TabsTrigger>
-                  <TabsTrigger value="file" data-testid="tab-upload-file">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload File
-                  </TabsTrigger>
-                  <TabsTrigger value="url" data-testid="tab-from-url">
-                    <Link2 className="h-4 w-4 mr-2" />
-                    From URL
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="text" className="mt-2">
-                  <Textarea
-                    id="transcript"
-                    data-testid="input-transcript"
-                    placeholder="Paste the full BD call transcript here..."
-                    className="min-h-[200px] font-mono text-sm"
-                    value={formData.transcript}
-                    onChange={(e) => setFormData({ ...formData, transcript: e.target.value })}
-                    required
-                  />
-                </TabsContent>
-                
-                <TabsContent value="file" className="mt-2">
-                  <div className="border-2 border-dashed rounded-md p-8 text-center space-y-4">
-                    <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <div>
-                      <Label htmlFor="file-upload" className="cursor-pointer">
-                        <span className="text-primary hover:underline">Choose a file</span>
-                        <span className="text-muted-foreground"> or drag and drop</span>
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Supports .txt, .docx, .pdf files
-                      </p>
-                      <Input
-                        id="file-upload"
-                        type="file"
-                        accept=".txt,.docx,.pdf"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        data-testid="input-file-upload"
-                        disabled={isProcessingFile}
-                      />
-                    </div>
-                    {isProcessingFile && (
-                      <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Processing file...</span>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="url" className="mt-2">
-                  <div className="space-y-3">
-                    <Input
-                      type="url"
-                      placeholder="https://docs.google.com/document/... or any text URL"
-                      value={fileUrl}
-                      onChange={(e) => setFileUrl(e.target.value)}
-                      data-testid="input-file-url"
-                      disabled={isProcessingFile}
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleUrlFetch}
-                      disabled={!fileUrl.trim() || isProcessingFile}
-                      className="w-full"
-                      data-testid="button-fetch-url"
-                    >
-                      {isProcessingFile ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Fetching...
-                        </>
-                      ) : (
-                        <>
-                          <Link2 className="h-4 w-4 mr-2" />
-                          Fetch Content
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Enter a URL to fetch transcript content
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
+              <Textarea
+                id="transcript"
+                data-testid="input-transcript"
+                placeholder="Paste the full BD call transcript here..."
+                className="min-h-[200px] font-mono text-sm"
+                value={formData.transcript}
+                onChange={(e) => setFormData({ ...formData, transcript: e.target.value })}
+                required
+              />
             </div>
           )}
 
@@ -524,99 +434,15 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
             </Label>
             
             {contentType === "notes" ? (
-              <Tabs defaultValue="text" value={inputMethod} onValueChange={(v) => setInputMethod(v as "text" | "file" | "url")}>
-                <TabsList className="grid w-full grid-cols-3" data-testid="tabs-notes-input-method">
-                  <TabsTrigger value="text" data-testid="tab-paste-notes-text">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Paste Text
-                  </TabsTrigger>
-                  <TabsTrigger value="file" data-testid="tab-upload-notes-file">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload File
-                  </TabsTrigger>
-                  <TabsTrigger value="url" data-testid="tab-from-notes-url">
-                    <Link2 className="h-4 w-4 mr-2" />
-                    From URL
-                  </TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="text" className="mt-2">
-                  <Textarea
-                    id="mainMeetingTakeaways"
-                    data-testid="input-main-meeting-takeaways"
-                    placeholder="Paste your meeting notes here - they can be brief, informal, or fragmented. The AI will extract insights and questions from them."
-                    className="min-h-[200px] font-mono text-sm"
-                    value={formData.mainMeetingTakeaways}
-                    onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
-                    required={contentType === "notes"}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="file" className="mt-2">
-                  <div className="border-2 border-dashed rounded-md p-8 text-center space-y-4">
-                    <Upload className="h-12 w-12 mx-auto text-muted-foreground" />
-                    <div>
-                      <Label htmlFor="notes-file-upload" className="cursor-pointer">
-                        <span className="text-primary hover:underline">Choose a file</span>
-                        <span className="text-muted-foreground"> or drag and drop</span>
-                      </Label>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Supports .txt, .docx, .pdf files
-                      </p>
-                      <Input
-                        id="notes-file-upload"
-                        type="file"
-                        accept=".txt,.docx,.pdf"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        data-testid="input-notes-file-upload"
-                        disabled={isProcessingFile}
-                      />
-                    </div>
-                    {isProcessingFile && (
-                      <div className="flex items-center justify-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span className="text-sm text-muted-foreground">Processing file...</span>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-                
-                <TabsContent value="url" className="mt-2">
-                  <div className="space-y-3">
-                    <Input
-                      type="url"
-                      placeholder="https://docs.google.com/document/... or any text URL"
-                      value={fileUrl}
-                      onChange={(e) => setFileUrl(e.target.value)}
-                      data-testid="input-notes-url"
-                      disabled={isProcessingFile}
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleUrlFetch}
-                      disabled={!fileUrl.trim() || isProcessingFile}
-                      className="w-full"
-                      data-testid="button-fetch-notes-url"
-                    >
-                      {isProcessingFile ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Fetching...
-                        </>
-                      ) : (
-                        <>
-                          <Link2 className="h-4 w-4 mr-2" />
-                          Fetch Content
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-muted-foreground">
-                      Enter a URL to fetch meeting notes content
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
+              <Textarea
+                id="mainMeetingTakeaways"
+                data-testid="input-main-meeting-takeaways"
+                placeholder="Paste your meeting notes here - they can be brief, informal, or fragmented. The AI will extract insights and questions from them."
+                className="min-h-[200px] font-mono text-sm"
+                value={formData.mainMeetingTakeaways}
+                onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
+                required={contentType === "notes"}
+              />
             ) : (
               <Textarea
                 id="mainMeetingTakeaways"
@@ -626,6 +452,93 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                 value={formData.mainMeetingTakeaways}
                 onChange={(e) => setFormData({ ...formData, mainMeetingTakeaways: e.target.value })}
               />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="supportingMaterials" data-testid="label-supporting-materials">Supporting Materials (Optional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Upload a deck, document, or other materials that support this call (e.g., presentation slides, product specs)
+            </p>
+            <Tabs defaultValue="file" value={supportingInputMethod} onValueChange={(v) => setSupportingInputMethod(v as "file" | "url")}>
+              <TabsList className="grid w-full grid-cols-2" data-testid="tabs-supporting-input-method">
+                <TabsTrigger value="file" data-testid="tab-supporting-file">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload File
+                </TabsTrigger>
+                <TabsTrigger value="url" data-testid="tab-supporting-url">
+                  <Link2 className="h-4 w-4 mr-2" />
+                  From URL
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="file" className="mt-2">
+                <div className="border-2 border-dashed rounded-md p-6 text-center space-y-3">
+                  <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
+                  <div>
+                    <Label htmlFor="supporting-file-upload" className="cursor-pointer">
+                      <span className="text-primary hover:underline">Choose a file</span>
+                      <span className="text-muted-foreground"> or drag and drop</span>
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Supports .txt, .docx, .pdf files
+                    </p>
+                    <Input
+                      id="supporting-file-upload"
+                      type="file"
+                      accept=".txt,.docx,.pdf"
+                      onChange={handleFileUpload}
+                      className="hidden"
+                      data-testid="input-supporting-file"
+                      disabled={isProcessingFile}
+                    />
+                  </div>
+                  {isProcessingFile && (
+                    <div className="flex items-center justify-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm text-muted-foreground">Processing file...</span>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="url" className="mt-2">
+                <div className="space-y-3">
+                  <Input
+                    type="url"
+                    placeholder="https://docs.google.com/... or any text URL"
+                    value={fileUrl}
+                    onChange={(e) => setFileUrl(e.target.value)}
+                    data-testid="input-supporting-url"
+                    disabled={isProcessingFile}
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleUrlFetch}
+                    disabled={!fileUrl.trim() || isProcessingFile}
+                    className="w-full"
+                    data-testid="button-fetch-supporting-url"
+                  >
+                    {isProcessingFile ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Fetching...
+                      </>
+                    ) : (
+                      <>
+                        <Link2 className="h-4 w-4 mr-2" />
+                        Fetch Content
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </TabsContent>
+            </Tabs>
+            {formData.supportingMaterials && (
+              <div className="mt-2 p-3 bg-muted rounded-md">
+                <p className="text-xs text-muted-foreground mb-1">Supporting materials added ({formData.supportingMaterials.length} characters)</p>
+                <p className="text-xs font-mono line-clamp-2">{formData.supportingMaterials.substring(0, 200)}...</p>
+              </div>
             )}
           </div>
 
