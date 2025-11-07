@@ -1,11 +1,10 @@
 import mammoth from "mammoth";
 import { Buffer } from "buffer";
+import { createRequire } from "module";
 
-// pdf-parse doesn't have proper ESM exports, use dynamic import
-async function parsePdf(buffer: Buffer) {
-  const pdfParse = (await import("pdf-parse")).default;
-  return await pdfParse(buffer);
-}
+// pdf-parse is CommonJS only, use require
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 export async function extractTextFromFile(buffer: Buffer, filename: string): Promise<string> {
   const extension = filename.toLowerCase().split('.').pop();
@@ -19,7 +18,7 @@ export async function extractTextFromFile(buffer: Buffer, filename: string): Pro
       return result.value;
     
     case 'pdf':
-      const data = await parsePdf(buffer);
+      const data = await pdfParse(buffer);
       return data.text;
     
     default:

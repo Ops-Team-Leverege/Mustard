@@ -176,9 +176,9 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       const data = await response.json();
       
       if (contentType === "transcript") {
-        setFormData({ ...formData, transcript: data.text });
+        setFormData(prev => ({ ...prev, transcript: data.text }));
       } else {
-        setFormData({ ...formData, mainMeetingTakeaways: data.text });
+        setFormData(prev => ({ ...prev, mainMeetingTakeaways: data.text }));
       }
 
       toast({
@@ -217,9 +217,9 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       const data = await response.json();
       
       if (contentType === "transcript") {
-        setFormData({ ...formData, transcript: data.text });
+        setFormData(prev => ({ ...prev, transcript: data.text }));
       } else {
-        setFormData({ ...formData, mainMeetingTakeaways: data.text });
+        setFormData(prev => ({ ...prev, mainMeetingTakeaways: data.text }));
       }
 
       toast({
