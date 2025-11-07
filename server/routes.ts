@@ -153,7 +153,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const analysis = await analyzeTranscript({
         transcript: contentToAnalyze,
-        supportingMaterials: data.supportingMaterials,
         companyName: data.companyName,
         leverageTeam,
         customerNames,

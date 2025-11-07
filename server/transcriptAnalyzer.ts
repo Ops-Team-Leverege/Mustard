@@ -10,7 +10,6 @@ const openai = new OpenAI({
 
 interface TranscriptAnalysisInput {
   transcript: string;
-  supportingMaterials?: string;
   companyName: string;
   leverageTeam: string[];
   customerNames: string[];
@@ -88,7 +87,6 @@ function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = 15
 
 async function analyzeTranscriptChunk(
   transcript: string,
-  supportingMaterials: string | undefined,
   companyName: string,
   leverageTeam: string[],
   customerNames: string[],
@@ -106,15 +104,10 @@ async function analyzeTranscriptChunk(
   const isNotes = contentType === "notes";
   const contentLabel = isNotes ? "meeting notes" : "BD (Business Development) call transcript";
   
-  const prompt = `You are analyzing ${contentLabel}${supportingMaterials ? ' and supporting materials' : ''} to extract product insights and Q&A pairs${chunkInfo}.
+  const prompt = `You are analyzing ${contentLabel} to extract product insights and Q&A pairs${chunkInfo}.
 
 ${isNotes ? 'MEETING NOTES:' : 'TRANSCRIPT:'}
 ${transcript}
-
-${supportingMaterials ? `
-SUPPORTING MATERIALS:
-${supportingMaterials}
-` : ''}
 
 CONTEXT:
 - Company: ${companyName}
@@ -126,10 +119,6 @@ ${categoryList}
 
 ${isNotes ? `
 NOTE: These are meeting notes from an onsite visit, not a full transcript. The notes may be brief, informal, or fragmented. Extract insights and questions based on the captured information, understanding that details may be condensed or paraphrased by the note-taker.
-` : ''}
-
-${supportingMaterials ? `
-NOTE: Additional supporting materials (such as presentation decks, product specifications, or documents) have been provided. Use these materials to supplement the ${isNotes ? 'notes' : 'transcript'} when extracting insights and Q&A pairs. The supporting materials may contain technical details, feature descriptions, or context that wasn't fully captured in the ${isNotes ? 'notes' : 'conversation'}.
 ` : ''}
 
 TASK 1 - Extract Product Insights (LEARNINGS ONLY):
@@ -257,7 +246,6 @@ export async function analyzeTranscript(
   if (chunks.length === 1) {
     return await analyzeTranscriptChunk(
       chunks[0],
-      input.supportingMaterials,
       input.companyName,
       input.leverageTeam,
       input.customerNames,
@@ -278,7 +266,6 @@ export async function analyzeTranscript(
     
     const chunkResult = await analyzeTranscriptChunk(
       chunks[i],
-      input.supportingMaterials,
       input.companyName,
       input.leverageTeam,
       input.customerNames,
