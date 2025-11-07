@@ -2,6 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
+import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
+import multer from "multer";
 import {
   insertTranscriptSchema,
   insertCategorySchema,
@@ -18,6 +20,9 @@ import { fromZodError } from "zod-validation-error";
 import { randomUUID } from "crypto";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
+
+// Configure multer for file uploads (store in memory)
+const upload = multer({ storage: multer.memoryStorage() });
 
 function generateSlug(companyName: string): string {
   const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -686,6 +691,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(qaPair);
     } catch (error) {
       res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
+  // File upload and text extraction
+  app.post("/api/extract-text-from-file", isAuthenticated, upload.single('file'), async (req: any, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const text = await extractTextFromFile(req.file.buffer, req.file.originalname);
+      
+      res.json({ 
+        text,
+        filename: req.file.originalname,
+        size: req.file.size
+      });
+    } catch (error) {
+      console.error("Error extracting text from file:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to extract text from file" 
+      });
+    }
+  });
+
+  // URL text extraction
+  app.post("/api/extract-text-from-url", isAuthenticated, async (req: any, res) => {
+    try {
+      const { url } = req.body;
+      
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+
+      const text = await extractTextFromUrl(url);
+      
+      res.json({ 
+        text,
+        url
+      });
+    } catch (error) {
+      console.error("Error extracting text from URL:", error);
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : "Failed to extract text from URL" 
+      });
     }
   });
 
