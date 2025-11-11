@@ -34,7 +34,7 @@ export const companies = pgTable("companies", {
   notes: text("notes"),
   companyDescription: text("company_description"),
   numberOfStores: text("number_of_stores"),
-  stage: text("stage"),
+  stage: text("stage").default("Prospect"),
   pilotStartDate: timestamp("pilot_start_date"),
   serviceTags: text("service_tags").array(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
