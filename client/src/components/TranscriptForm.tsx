@@ -70,7 +70,6 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
   const [contentType, setContentType] = useState<"transcript" | "notes">("transcript");
   const [supportingInputMethod, setSupportingInputMethod] = useState<"file" | "url">("file");
   const [fileUrl, setFileUrl] = useState("");
-  const [isProcessingFile, setIsProcessingFile] = useState(false);
   const { toast } = useToast();
 
   const { data: user } = useQuery<User>({
@@ -160,41 +159,19 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     option => !teamMembers.includes(option)
   );
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setIsProcessingFile(true);
-    const formDataToSend = new FormData();
-    formDataToSend.append('file', file);
+    setFormData(prev => ({ ...prev, supportingMaterials: file.name }));
 
-    try {
-      const response = await fetch('/api/extract-text-from-file', {
-        method: 'POST',
-        body: formDataToSend,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to process file');
-      }
-
-      const data = await response.json();
-      
-      setFormData(prev => ({ ...prev, supportingMaterials: data.text }));
-
-      toast({
-        title: "Supporting materials added",
-        description: `Extracted ${data.text.length} characters from ${file.name}`,
-      });
-    } catch (error) {
-      toast({
-        title: "Error processing file",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessingFile(false);
-    }
+    toast({
+      title: "File reference added",
+      description: `${file.name} added to supporting materials`,
+    });
+    
+    // Clear the file input
+    e.target.value = '';
   };
 
   const handleUrlAdd = () => {
@@ -458,24 +435,16 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                       <span className="text-muted-foreground"> or drag and drop</span>
                     </Label>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Supports .txt, .docx, .pdf files
+                      Add any file type as a reference
                     </p>
                     <Input
                       id="supporting-file-upload"
                       type="file"
-                      accept=".txt,.docx,.pdf"
                       onChange={handleFileUpload}
                       className="hidden"
                       data-testid="input-supporting-file"
-                      disabled={isProcessingFile}
                     />
                   </div>
-                  {isProcessingFile && (
-                    <div className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm text-muted-foreground">Processing file...</span>
-                    </div>
-                  )}
                 </div>
               </TabsContent>
               
