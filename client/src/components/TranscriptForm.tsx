@@ -197,43 +197,17 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     }
   };
 
-  const handleUrlFetch = async () => {
+  const handleUrlAdd = () => {
     if (!fileUrl.trim()) return;
 
-    setIsProcessingFile(true);
+    setFormData(prev => ({ ...prev, supportingMaterials: fileUrl.trim() }));
 
-    try {
-      const response = await fetch('/api/extract-text-from-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url: fileUrl }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch content from URL');
-      }
-
-      const data = await response.json();
-      
-      setFormData(prev => ({ ...prev, supportingMaterials: data.text }));
-
-      toast({
-        title: "Supporting materials added",
-        description: `Extracted ${data.text.length} characters from URL`,
-      });
-      
-      setFileUrl("");
-    } catch (error) {
-      toast({
-        title: "Error fetching URL",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessingFile(false);
-    }
+    toast({
+      title: "URL added",
+      description: "Supporting materials link saved",
+    });
+    
+    setFileUrl("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -509,30 +483,20 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
                 <div className="space-y-3">
                   <Input
                     type="url"
-                    placeholder="https://docs.google.com/... or any text URL"
+                    placeholder="https://docs.google.com/... or any URL"
                     value={fileUrl}
                     onChange={(e) => setFileUrl(e.target.value)}
                     data-testid="input-supporting-url"
-                    disabled={isProcessingFile}
                   />
                   <Button
                     type="button"
-                    onClick={handleUrlFetch}
-                    disabled={!fileUrl.trim() || isProcessingFile}
+                    onClick={handleUrlAdd}
+                    disabled={!fileUrl.trim()}
                     className="w-full"
-                    data-testid="button-fetch-supporting-url"
+                    data-testid="button-add-supporting-url"
                   >
-                    {isProcessingFile ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Fetching...
-                      </>
-                    ) : (
-                      <>
-                        <Link2 className="h-4 w-4 mr-2" />
-                        Fetch Content
-                      </>
-                    )}
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Add URL
                   </Button>
                 </div>
               </TabsContent>
