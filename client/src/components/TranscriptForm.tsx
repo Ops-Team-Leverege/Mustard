@@ -53,14 +53,17 @@ export interface TranscriptData {
 }
 
 const LEVEREGE_TEAM_OPTIONS = [
+  "Alison Leddy",
   "Calum McClelland",
-  "Hannah White",
-  "Steven Lee",
   "Corey Redd",
-  "Julia Conn",
   "Eric Conn",
+  "Hannah White",
+  "Julia Conn",
+  "Kevin Moran",
+  "Matthew Ok",
   "Ryan Chacon",
-  "Kevin Moran"
+  "Shela Duong",
+  "Steven Lee"
 ];
 
 export default function TranscriptForm({ onSubmit, isAnalyzing = false }: TranscriptFormProps) {
