@@ -471,9 +471,24 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
               </TabsContent>
             </Tabs>
             {formData.supportingMaterials && (
-              <div className="mt-2 p-3 bg-muted rounded-md">
-                <p className="text-xs text-muted-foreground mb-1">Supporting materials added ({formData.supportingMaterials.length} characters)</p>
-                <p className="text-xs font-mono line-clamp-2">{formData.supportingMaterials.substring(0, 200)}...</p>
+              <div className="mt-2 p-3 bg-muted rounded-md flex items-start gap-2">
+                {formData.supportingMaterials.startsWith('http') ? (
+                  <>
+                    <Link2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground mb-0.5">Link:</p>
+                      <p className="text-xs font-mono truncate">{formData.supportingMaterials}</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground mb-0.5">File:</p>
+                      <p className="text-xs font-mono truncate">{formData.supportingMaterials}</p>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
