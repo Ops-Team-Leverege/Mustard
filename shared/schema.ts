@@ -7,6 +7,10 @@ import { z } from "zod";
 export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane"] as const;
 export type Product = typeof PRODUCTS[number];
 
+// Processing status types
+export const PROCESSING_STATUSES = ["pending", "processing", "completed", "failed"] as const;
+export type ProcessingStatus = typeof PROCESSING_STATUSES[number];
+
 export const transcripts = pgTable("transcripts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   product: text("product").default("PitCrew").notNull(),
@@ -23,6 +27,10 @@ export const transcripts = pgTable("transcripts", {
   contactJobTitle: text("contact_job_title"),
   mainInterestAreas: text("main_interest_areas"),
   mainMeetingTakeaways: text("main_meeting_takeaways"),
+  processingStatus: text("processing_status").default("pending").notNull(), // "pending", "processing", "completed", "failed"
+  processingStartedAt: timestamp("processing_started_at"),
+  processingCompletedAt: timestamp("processing_completed_at"),
+  processingError: text("processing_error"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -147,6 +155,10 @@ const customerSchema = z.object({
 export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
   customerNames: true,
+  processingStatus: true,
+  processingStartedAt: true,
+  processingCompletedAt: true,
+  processingError: true,
 }).extend({
   product: z.enum(PRODUCTS).default("PitCrew"),
   contentType: z.enum(["transcript", "notes"]).default("transcript"),

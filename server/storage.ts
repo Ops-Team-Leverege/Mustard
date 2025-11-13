@@ -24,6 +24,7 @@ import {
   type POSSystemWithCompanies,
   type InsertPOSSystem,
   type Product,
+  type ProcessingStatus,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -47,6 +48,7 @@ export interface IStorage {
   getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
   updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
+  updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
 
   // Product Insights
@@ -179,11 +181,17 @@ export class MemStorage implements IStorage {
       ...insertTranscript,
       name: insertTranscript.name ?? null,
       companyId: insertTranscript.companyId ?? null,
+      transcript: insertTranscript.transcript ?? null,
+      supportingMaterials: insertTranscript.supportingMaterials ?? null,
       companyDescription: insertTranscript.companyDescription ?? null,
       numberOfStores: insertTranscript.numberOfStores ?? null,
       contactJobTitle: insertTranscript.contactJobTitle ?? null,
       mainInterestAreas: insertTranscript.mainInterestAreas ?? null,
       mainMeetingTakeaways: insertTranscript.mainMeetingTakeaways ?? null,
+      processingStatus: "pending",
+      processingStartedAt: null,
+      processingCompletedAt: null,
+      processingError: null,
       id,
       createdAt: new Date(),
     };
@@ -206,6 +214,49 @@ export class MemStorage implements IStorage {
       ...(updates.mainMeetingTakeaways !== undefined && { mainMeetingTakeaways: updates.mainMeetingTakeaways }),
       ...(updates.transcript !== undefined && { transcript: updates.transcript }),
     };
+    this.transcripts.set(id, updated);
+    return updated;
+  }
+
+  async updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined> {
+    const transcript = this.transcripts.get(id);
+    if (!transcript) return undefined;
+    
+    const now = new Date();
+    let updated: Transcript;
+    
+    if (status === "pending") {
+      updated = {
+        ...transcript,
+        processingStatus: "pending",
+        processingStartedAt: null,
+        processingCompletedAt: null,
+        processingError: null,
+      };
+    } else if (status === "processing") {
+      updated = {
+        ...transcript,
+        processingStatus: "processing",
+        processingStartedAt: now,
+        processingCompletedAt: null,
+        processingError: null,
+      };
+    } else if (status === "completed") {
+      updated = {
+        ...transcript,
+        processingStatus: "completed",
+        processingCompletedAt: now,
+        processingError: null,
+      };
+    } else { // failed
+      updated = {
+        ...transcript,
+        processingStatus: "failed",
+        processingCompletedAt: now,
+        processingError: error ?? "Processing failed",
+      };
+    }
+    
     this.transcripts.set(id, updated);
     return updated;
   }
@@ -691,6 +742,7 @@ export class MemStorage implements IStorage {
       numberOfStores: insertCompany.numberOfStores ?? null,
       stage: insertCompany.stage ?? null,
       pilotStartDate: insertCompany.pilotStartDate ?? null,
+      serviceTags: insertCompany.serviceTags ?? null,
       id,
       createdAt: new Date(),
     };
@@ -873,7 +925,7 @@ export class MemStorage implements IStorage {
         
         // Update all Q&A pairs that reference duplicates to point to the kept contact
         for (const duplicate of duplicates) {
-          for (const [qaId, qa] of this.qaPairs) {
+          for (const [qaId, qa] of Array.from(this.qaPairs.entries())) {
             if (qa.contactId === duplicate.id) {
               this.qaPairs.set(qaId, { ...qa, contactId: keepContact.id });
             }
@@ -1016,9 +1068,10 @@ export class DbStorage implements IStorage {
   }
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
+    const { customers, ...dbValues } = insertTranscript as any;
     const results = await this.db
       .insert(transcriptsTable)
-      .values(insertTranscript)
+      .values(dbValues)
       .returning();
     return results[0];
   }
@@ -1038,6 +1091,46 @@ export class DbStorage implements IStorage {
     if (updates.createdAt !== undefined) updateData.createdAt = updates.createdAt;
     if (updates.mainMeetingTakeaways !== undefined) updateData.mainMeetingTakeaways = updates.mainMeetingTakeaways;
     if (updates.transcript !== undefined) updateData.transcript = updates.transcript;
+    
+    const results = await this.db
+      .update(transcriptsTable)
+      .set(updateData)
+      .where(eq(transcriptsTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined> {
+    const now = new Date();
+    let updateData: any;
+    
+    if (status === "pending") {
+      updateData = {
+        processingStatus: "pending",
+        processingStartedAt: null,
+        processingCompletedAt: null,
+        processingError: null,
+      };
+    } else if (status === "processing") {
+      updateData = {
+        processingStatus: "processing",
+        processingStartedAt: now,
+        processingCompletedAt: null,
+        processingError: null,
+      };
+    } else if (status === "completed") {
+      updateData = {
+        processingStatus: "completed",
+        processingCompletedAt: now,
+        processingError: null,
+      };
+    } else { // failed
+      updateData = {
+        processingStatus: "failed",
+        processingCompletedAt: now,
+        processingError: error ?? "Processing failed",
+      };
+    }
     
     const results = await this.db
       .update(transcriptsTable)
