@@ -26,7 +26,7 @@ Preferred communication style: Simple, everyday language.
 
 ### Key Architectural Decisions
 - **Single-Page Application (SPA)**: Client-side routing with Wouter.
-- **AI-First Workflow**: Transcript analysis precedes database persistence; results dictate saved data.
+- **Asynchronous Transcript Processing**: Transcripts are stored immediately upon upload with `processingStatus: 'pending'`, users are redirected to the transcript detail page, and AI analysis runs in the background. Frontend polls the transcript status every 2 seconds while processing (`pending` → `processing` → `completed`/`failed`). Visual loading indicators and banners display processing state. Background processing includes in-memory concurrency locks (single-instance limitation), idempotent cleanup for interrupted runs, and proper error handling with `processingError` field storage. Failed transcripts can be manually retried without recreating.
 - **Type Safety**: Shared schema definitions (`shared/schema.ts`) and Zod for end-to-end type safety.
 - **Session Management**: Express sessions with PostgreSQL store.
 - **Development Experience**: Replit-specific plugins, HMR, separate dev/prod configs.
