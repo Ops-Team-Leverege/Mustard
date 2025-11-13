@@ -451,9 +451,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Transcript not found" });
       }
       
-      // Only allow retrying failed or pending transcripts
-      if (transcript.processingStatus !== "failed" && transcript.processingStatus !== "pending") {
-        return res.status(400).json({ error: "Can only retry failed or pending transcripts" });
+      // Only allow retrying failed, pending, or stuck processing transcripts
+      // (Processing transcripts can get stuck when server restarts)
+      if (transcript.processingStatus !== "failed" && 
+          transcript.processingStatus !== "pending" && 
+          transcript.processingStatus !== "processing") {
+        return res.status(400).json({ error: "Can only retry failed, pending, or processing transcripts" });
       }
       
       // Reset the transcript to pending status
