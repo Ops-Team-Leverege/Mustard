@@ -45,6 +45,157 @@ async function getUserAndProduct(req: any): Promise<{ userId: string; user: any;
   return { userId, user, product };
 }
 
+// Background processing function for transcript AI analysis
+async function processTranscriptInBackground(
+  transcriptId: string, 
+  product: Product
+): Promise<void> {
+  let createdInsightIds: string[] = [];
+  let createdQAPairIds: string[] = [];
+  
+  try {
+    // Update status to processing
+    await storage.updateTranscriptProcessingStatus(transcriptId, "processing");
+    
+    // Fetch fresh transcript data from storage
+    const transcript = await storage.getTranscript(product, transcriptId);
+    if (!transcript) {
+      throw new Error(`Transcript ${transcriptId} not found`);
+    }
+    
+    if (!transcript.companyId) {
+      throw new Error(`Transcript ${transcriptId} has no company association`);
+    }
+    
+    // Get company and contacts
+    const company = await storage.getCompany(product, transcript.companyId);
+    if (!company) {
+      throw new Error(`Company ${transcript.companyId} not found`);
+    }
+    
+    const allContacts = await storage.getContactsByCompany(product, company.id);
+    
+    // Get categories for AI analysis
+    const categories = await storage.getCategories(product);
+    
+    // Parse customer names and leverage team from transcript (with null/undefined guards)
+    const leverageTeam = transcript.leverageTeam 
+      ? transcript.leverageTeam.split(',').map(s => s.trim()).filter(s => s)
+      : [];
+    const customerNamesList = transcript.customerNames 
+      ? transcript.customerNames.split(',').map(s => s.trim()).filter(s => s)
+      : [];
+    
+    // Determine content to analyze based on type (fallback to "transcript" if undefined)
+    const contentType: "transcript" | "notes" = 
+      (transcript.contentType === "notes" || transcript.contentType === "transcript") 
+        ? transcript.contentType 
+        : "transcript";
+    const contentToAnalyze = contentType === "notes" 
+      ? (transcript.mainMeetingTakeaways || '')
+      : (transcript.transcript || '');
+    
+    if (!contentToAnalyze) {
+      throw new Error("No content to analyze");
+    }
+    
+    // Run AI analysis
+    const analysis = await analyzeTranscript({
+      transcript: contentToAnalyze,
+      companyName: company.name,
+      leverageTeam,
+      customerNames: customerNamesList,
+      categories,
+      contentType,
+    });
+    
+    // Save insights with companyId
+    const insights = await storage.createProductInsights(
+      analysis.insights.map(insight => ({
+        transcriptId: transcript.id,
+        feature: insight.feature,
+        context: insight.context,
+        quote: insight.quote,
+        company: company.name,
+        companyId: company.id,
+        categoryId: insight.categoryId,
+        product,
+      }))
+    );
+    createdInsightIds = insights.map(i => i.id);
+    
+    // Save Q&A pairs with companyId and matched contactId
+    const qaPairs = await storage.createQAPairs(
+      analysis.qaPairs.map(qa => {
+        // Try to match asker name to a contact (case-insensitive)
+        const matchedContact = allContacts.find(contact => {
+          const askerName = qa.asker.toLowerCase().trim();
+          const nameInTranscript = contact.nameInTranscript?.toLowerCase().trim();
+          const contactName = contact.name.toLowerCase().trim();
+          
+          // If nameInTranscript is provided, match against it; otherwise match against name
+          return nameInTranscript ? nameInTranscript === askerName : contactName === askerName;
+        });
+        
+        return {
+          transcriptId: transcript.id,
+          question: qa.question,
+          answer: qa.answer,
+          asker: qa.asker,
+          contactId: matchedContact?.id || null,
+          company: company.name,
+          companyId: company.id,
+          categoryId: qa.categoryId,
+          product,
+        };
+      })
+    );
+    createdQAPairIds = qaPairs.map(q => q.id);
+    
+    // Handle POS system detection and linking (after insights/Q&A succeed)
+    if (analysis.posSystem) {
+      await storage.findOrCreatePOSSystemAndLink(
+        product,
+        analysis.posSystem.name,
+        company.id,
+        analysis.posSystem.websiteLink,
+        analysis.posSystem.description
+      );
+      console.log(`POS system detected and linked: ${analysis.posSystem.name} -> ${company.name}`);
+    }
+    
+    // Mark as completed
+    await storage.updateTranscriptProcessingStatus(transcriptId, "completed");
+    console.log(`Successfully processed transcript ${transcriptId}`);
+    
+  } catch (error) {
+    // Mark as failed first to ensure status is always updated
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+    
+    try {
+      await storage.updateTranscriptProcessingStatus(transcriptId, "failed", errorMessage);
+    } catch (statusUpdateError) {
+      console.error(`Failed to update transcript status to failed for ${transcriptId}:`, statusUpdateError);
+    }
+    
+    // Clean up partial data (best effort - don't throw on cleanup failure)
+    try {
+      for (const insightId of createdInsightIds) {
+        await storage.deleteProductInsight(insightId);
+      }
+      for (const qaPairId of createdQAPairIds) {
+        await storage.deleteQAPair(qaPairId);
+      }
+      console.log(`Cleaned up ${createdInsightIds.length} insights and ${createdQAPairIds.length} Q&A pairs for failed transcript ${transcriptId}`);
+    } catch (cleanupError) {
+      console.error(`Failed to clean up partial data for transcript ${transcriptId}:`, cleanupError);
+    }
+    
+    console.error(`Failed to process transcript ${transcriptId}:`, error);
+    throw error;
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   await setupAuth(app);
@@ -141,26 +292,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Analyze with AI first (before persisting transcript)
-      const categories = await storage.getCategories(product);
-      const leverageTeam = data.leverageTeam.split(',').map(s => s.trim()).filter(s => s);
-      const customerNames = data.customerNames.split(',').map(s => s.trim()).filter(s => s);
-      
-      // For notes mode, use mainMeetingTakeaways as the content to analyze
-      const contentToAnalyze = data.contentType === "notes" 
-        ? (data.mainMeetingTakeaways || '')
-        : (data.transcript || '');
-      
-      const analysis = await analyzeTranscript({
-        transcript: contentToAnalyze,
-        companyName: data.companyName,
-        leverageTeam,
-        customerNames,
-        categories,
-        contentType: data.contentType,
-      });
-      
-      // Only create transcript after successful analysis, including companyId
+      // Create transcript immediately with "pending" status
       const transcript = await storage.createTranscript({
         ...data,
         companyId: company.id,
@@ -203,76 +335,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-
-      // Use all contacts (existing + newly created) for Q&A matching
-      const allContacts = existingContacts;
       
-      // Save insights with companyId
-      const insights = await storage.createProductInsights(
-        analysis.insights.map(insight => ({
-          transcriptId: transcript.id,
-          feature: insight.feature,
-          context: insight.context,
-          quote: insight.quote,
-          company: data.companyName,
-          companyId: company.id,
-          categoryId: insight.categoryId,
-          product,
-        }))
-      );
+      // Trigger async AI processing in background
+      processTranscriptInBackground(transcript.id, product).catch(err => {
+        console.error(`Background processing failed for transcript ${transcript.id}:`, err);
+      });
       
-      // Save Q&A pairs with companyId and matched contactId
-      const qaPairs = await storage.createQAPairs(
-        analysis.qaPairs.map(qa => {
-          // Try to match asker name to a contact (case-insensitive)
-          // Use nameInTranscript if available, otherwise use name
-          const matchedContact = allContacts.find(contact => {
-            const askerName = qa.asker.toLowerCase().trim();
-            const nameInTranscript = contact.nameInTranscript?.toLowerCase().trim();
-            const contactName = contact.name.toLowerCase().trim();
-            
-            // If nameInTranscript is provided, match against it; otherwise match against name
-            return nameInTranscript ? nameInTranscript === askerName : contactName === askerName;
-          });
-          
-          return {
-            transcriptId: transcript.id,
-            question: qa.question,
-            answer: qa.answer,
-            asker: qa.asker,
-            contactId: matchedContact?.id || null,
-            company: data.companyName,
-            companyId: company.id,
-            categoryId: qa.categoryId,
-            product,
-          };
-        })
-      );
-      
-      // Handle POS system detection and linking
-      let posSystem = null;
-      if (analysis.posSystem) {
-        posSystem = await storage.findOrCreatePOSSystemAndLink(
-          product,
-          analysis.posSystem.name,
-          company.id,
-          analysis.posSystem.websiteLink,
-          analysis.posSystem.description
-        );
-        console.log(`POS system detected and linked: ${posSystem.name} -> ${company.name}`);
-      }
-      
-      res.json({
+      // Return 202 Accepted immediately with transcript info
+      res.status(202).json({
         transcript,
-        insights,
-        qaPairs,
         contacts,
         company: {
           id: company.id,
           name: company.name,
           slug: company.slug,
         },
-        posSystem,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
