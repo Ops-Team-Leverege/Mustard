@@ -1,12 +1,9 @@
-import { useState, useEffect } from "react";
 import TranscriptForm, { TranscriptData } from "@/components/TranscriptForm";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Sparkles, CheckCircle2, AlertCircle } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ToastAction } from "@/components/ui/toast";
 import { useQuery } from "@tanstack/react-query";
 
 type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
@@ -18,8 +15,6 @@ interface User {
 }
 
 export default function TranscriptInput() {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisStep, setAnalysisStep] = useState(0);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -27,27 +22,7 @@ export default function TranscriptInput() {
     queryKey: ["/api/auth/user"],
   });
 
-  useEffect(() => {
-    if (!isAnalyzing) return;
-    
-    // Simulate analysis progress steps for better UX
-    const steps = [
-      { delay: 0, step: 0 },
-      { delay: 3000, step: 1 },
-      { delay: 8000, step: 2 },
-      { delay: 15000, step: 3 },
-    ];
-    
-    const timers = steps.map(({ delay, step }) =>
-      setTimeout(() => setAnalysisStep(step), delay)
-    );
-    
-    return () => timers.forEach(clearTimeout);
-  }, [isAnalyzing]);
-
   const handleSubmit = async (data: TranscriptData) => {
-    setIsAnalyzing(true);
-    
     try {
       const submissionData = {
         ...data,
@@ -59,130 +34,41 @@ export default function TranscriptInput() {
       // Invalidate all relevant caches to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/transcripts'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/insights'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/qa'] });
-      await queryClient.invalidateQueries({ queryKey: ['/api/companies', result.company.slug, 'overview'] });
       
       toast({
-        title: "Analysis Complete",
-        description: `Product insights and Q&A pairs have been extracted. Taking you to the transcript...`,
+        title: "Transcript Created",
+        description: "AI analysis is running in the background. You'll see results as they become available.",
       });
       
-      // Navigate to transcript detail page
-      setTimeout(() => {
-        setLocation(`/transcripts/${result.transcript.id}`);
-      }, 1000);
+      // Navigate to transcript detail page immediately
+      setLocation(`/transcripts/${result.transcript.id}`);
     } catch (error) {
       console.error('[TranscriptInput] Error during submission:', error);
       
-      // Check if it's a timeout error (524 from Cloudflare or network timeout)
-      const errorMessage = error instanceof Error ? error.message : "Failed to analyze transcript";
-      const isTimeout = errorMessage.includes('524') || errorMessage.toLowerCase().includes('timeout');
+      const errorMessage = error instanceof Error ? error.message : "Failed to create transcript";
       
-      if (isTimeout) {
-        // For timeout errors, the transcript might have been created successfully
-        toast({
-          title: "Processing Timeout",
-          description: "The analysis is taking longer than expected. Your transcript may have been created successfully. Please check the transcripts page or try refreshing in a moment.",
-          variant: "default",
-          action: (
-            <ToastAction altText="View Transcripts" onClick={() => setLocation('/transcripts')}>
-              View Transcripts
-            </ToastAction>
-          ),
-        });
-      } else {
-        toast({
-          title: "Analysis Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
-    } finally {
-      setIsAnalyzing(false);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
-
-  const analysisSteps = [
-    { label: "Reading transcript", description: "Processing your conversation..." },
-    { label: "Identifying product insights", description: "Finding valuable customer feedback..." },
-    { label: "Extracting Q&A pairs", description: "Categorizing questions and answers..." },
-    { label: "Organizing findings", description: "Almost done..." },
-  ];
 
   const currentProduct = user?.currentProduct || "PitCrew";
 
   return (
     <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
-      {isAnalyzing ? (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-lg w-full">
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center space-y-6">
-                <div className="relative">
-                  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Sparkles className="w-10 h-10 text-primary animate-pulse" />
-                  </div>
-                  <Loader2 className="w-24 h-24 text-primary/30 animate-spin absolute -top-2 -left-2" />
-                </div>
-                
-                <div className="space-y-2">
-                  <h2 className="text-2xl font-semibold">Analyzing Transcript</h2>
-                  <p className="text-sm text-muted-foreground">
-                    This typically takes 1-3 minutes, but can take up to 5 minutes for very long transcripts.
-                  </p>
-                  <p className="text-sm font-medium text-amber-600 dark:text-amber-500">
-                    Please don't navigate away or resubmit - your transcript is being processed!
-                  </p>
-                </div>
-
-                <div className="w-full space-y-4">
-                  {analysisSteps.map((step, index) => (
-                    <div
-                      key={index}
-                      className="flex items-start gap-3 text-left"
-                      data-testid={`analysis-step-${index}`}
-                    >
-                      <div className="mt-0.5">
-                        {index < analysisStep ? (
-                          <CheckCircle2 className="w-5 h-5 text-primary" />
-                        ) : index === analysisStep ? (
-                          <Loader2 className="w-5 h-5 text-primary animate-spin" />
-                        ) : (
-                          <div className="w-5 h-5 rounded-full border-2 border-muted" />
-                        )}
-                      </div>
-                      <div className="flex-1 space-y-1">
-                        <p className={`font-medium ${index <= analysisStep ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {step.label}
-                        </p>
-                        {index === analysisStep && (
-                          <p className="text-sm text-muted-foreground">
-                            {step.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
-      
-      <div className={isAnalyzing ? "opacity-50 pointer-events-none" : ""}>
-        <Alert className="mb-6 border-2 border-primary bg-primary/10">
-          <AlertCircle className="h-5 w-5 text-primary" />
-          <AlertDescription className="ml-2">
-            <span className="font-semibold text-lg">Adding transcript for: {currentProduct}</span>
-            <p className="text-sm mt-1 text-muted-foreground">
-              This transcript will be saved to <strong>{currentProduct}</strong>. Use the product switcher in the header to change products.
-            </p>
-          </AlertDescription>
-        </Alert>
-        <TranscriptForm onSubmit={handleSubmit} isAnalyzing={isAnalyzing} />
-      </div>
+      <Alert className="mb-6 border-2 border-primary bg-primary/10">
+        <AlertCircle className="h-5 w-5 text-primary" />
+        <AlertDescription className="ml-2">
+          <span className="font-semibold text-lg">Adding transcript for: {currentProduct}</span>
+          <p className="text-sm mt-1 text-muted-foreground">
+            This transcript will be saved to <strong>{currentProduct}</strong>. Use the product switcher in the header to change products.
+          </p>
+        </AlertDescription>
+      </Alert>
+      <TranscriptForm onSubmit={handleSubmit} />
     </div>
   );
 }

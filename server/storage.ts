@@ -47,7 +47,7 @@ export interface IStorage {
   getTranscript(product: Product, id: string): Promise<Transcript | undefined>;
   getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
-  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
+  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
   updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
 
@@ -1088,11 +1088,13 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.createdAt !== undefined) updateData.createdAt = updates.createdAt;
     if (updates.mainMeetingTakeaways !== undefined) updateData.mainMeetingTakeaways = updates.mainMeetingTakeaways;
+    if (updates.nextSteps !== undefined) updateData.nextSteps = updates.nextSteps;
+    if (updates.supportingMaterials !== undefined) updateData.supportingMaterials = updates.supportingMaterials;
     if (updates.transcript !== undefined) updateData.transcript = updates.transcript;
     
     const results = await this.db
