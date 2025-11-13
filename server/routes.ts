@@ -440,6 +440,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/transcripts/:id/retry", isAuthenticated, async (req: any, res) => {
+    try {
+      const { product } = await getUserAndProduct(req);
+      const { id } = req.params;
+      
+      const transcript = await storage.getTranscript(product, id);
+      if (!transcript) {
+        return res.status(404).json({ error: "Transcript not found" });
+      }
+      
+      // Only allow retrying failed or pending transcripts
+      if (transcript.processingStatus !== "failed" && transcript.processingStatus !== "pending") {
+        return res.status(400).json({ error: "Can only retry failed or pending transcripts" });
+      }
+      
+      // Reset the transcript to pending status
+      await storage.updateTranscriptProcessingStatus(id, "pending");
+      
+      // Trigger background processing
+      processTranscriptInBackground(id, product).catch(error => {
+        console.error(`Background processing error for transcript ${id}:`, error);
+      });
+      
+      res.json({ success: true, message: "Transcript processing restarted" });
+    } catch (error) {
+      console.error("Error retrying transcript:", error);
+      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  });
+
   app.get("/api/transcripts/:id/details", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
