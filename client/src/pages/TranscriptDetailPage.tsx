@@ -34,6 +34,8 @@ export default function TranscriptDetailPage() {
     name: '',
     createdAt: '',
     mainMeetingTakeaways: '',
+    nextSteps: '',
+    supportingMaterials: '',
     transcript: '',
   });
 
@@ -53,7 +55,7 @@ export default function TranscriptDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string; transcript: string }) => {
+    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string; nextSteps: string; supportingMaterials: string; transcript: string }) => {
       if (!transcriptId) throw new Error("Transcript not found");
       
       let createdAtISO = data.createdAt;
@@ -65,6 +67,8 @@ export default function TranscriptDetailPage() {
         name: data.name || null,
         createdAt: createdAtISO,
         mainMeetingTakeaways: data.mainMeetingTakeaways || null,
+        nextSteps: data.nextSteps || null,
+        supportingMaterials: data.supportingMaterials || null,
         transcript: data.transcript || null,
       });
       return res.json();
@@ -104,6 +108,8 @@ export default function TranscriptDetailPage() {
       name: data.transcript.name || '',
       createdAt: createdAtString,
       mainMeetingTakeaways: data.transcript.mainMeetingTakeaways || '',
+      nextSteps: data.transcript.nextSteps || '',
+      supportingMaterials: data.transcript.supportingMaterials || '',
       transcript: data.transcript.transcript || '',
     });
     setIsEditing(true);
@@ -119,6 +125,8 @@ export default function TranscriptDetailPage() {
       name: '',
       createdAt: '',
       mainMeetingTakeaways: '',
+      nextSteps: '',
+      supportingMaterials: '',
       transcript: '',
     });
   };
@@ -220,6 +228,56 @@ export default function TranscriptDetailPage() {
                       </div>
                     </div>
                   )}
+                  {transcript.nextSteps && transcript.nextSteps.trim() && (
+                    <div className="mt-3">
+                      <h3 className="text-sm font-medium mb-1">Next Steps</h3>
+                      <div className="bg-muted/50 rounded-md p-4 max-h-60 overflow-y-auto">
+                        <p className="text-sm whitespace-pre-wrap" data-testid="next-steps">
+                          {transcript.nextSteps}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {transcript.supportingMaterials && transcript.supportingMaterials.trim() && (
+                    <div className="mt-3">
+                      <h3 className="text-sm font-medium mb-1">Supporting Materials</h3>
+                      <div className="bg-muted/50 rounded-md p-4">
+                        {(() => {
+                          const material = transcript.supportingMaterials;
+                          try {
+                            const url = new URL(material);
+                            // Only allow http and https schemes to prevent XSS
+                            if (url.protocol === 'http:' || url.protocol === 'https:') {
+                              return (
+                                <a 
+                                  href={material} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:underline"
+                                  data-testid="supporting-materials-link"
+                                >
+                                  {material}
+                                </a>
+                              );
+                            }
+                            // Invalid scheme - render as text
+                            return (
+                              <p className="text-sm" data-testid="supporting-materials-file">
+                                {material}
+                              </p>
+                            );
+                          } catch {
+                            // Not a valid URL - render as text (likely a filename)
+                            return (
+                              <p className="text-sm" data-testid="supporting-materials-file">
+                                {material}
+                              </p>
+                            );
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="space-y-3">
@@ -250,6 +308,25 @@ export default function TranscriptDetailPage() {
                       placeholder="Summarize the key takeaways from this meeting..."
                       className="min-h-[100px]"
                       data-testid="input-main-meeting-takeaways"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1">Next Steps</h3>
+                    <Textarea
+                      value={editForm.nextSteps}
+                      onChange={(e) => setEditForm({ ...editForm, nextSteps: e.target.value })}
+                      placeholder="What are the next steps for this opportunity?"
+                      className="min-h-[100px]"
+                      data-testid="input-next-steps"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold mb-1">Supporting Materials</h3>
+                    <Input
+                      value={editForm.supportingMaterials}
+                      onChange={(e) => setEditForm({ ...editForm, supportingMaterials: e.target.value })}
+                      placeholder="File name or URL of supporting materials"
+                      data-testid="input-supporting-materials"
                     />
                   </div>
                   {company && (
