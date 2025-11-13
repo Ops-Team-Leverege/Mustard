@@ -27,6 +27,7 @@ export const transcripts = pgTable("transcripts", {
   contactJobTitle: text("contact_job_title"),
   mainInterestAreas: text("main_interest_areas"),
   mainMeetingTakeaways: text("main_meeting_takeaways"),
+  nextSteps: text("next_steps"),
   processingStatus: text("processing_status").default("pending").notNull(), // "pending", "processing", "completed", "failed"
   processingStartedAt: timestamp("processing_started_at"),
   processingCompletedAt: timestamp("processing_completed_at"),
