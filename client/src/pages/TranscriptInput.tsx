@@ -1,3 +1,4 @@
+import { useState } from "react";
 import TranscriptForm, { TranscriptData } from "@/components/TranscriptForm";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -15,6 +16,7 @@ interface User {
 }
 
 export default function TranscriptInput() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -23,6 +25,9 @@ export default function TranscriptInput() {
   });
 
   const handleSubmit = async (data: TranscriptData) => {
+    if (isSubmitting) return; // Prevent double submission
+    
+    setIsSubmitting(true);
     try {
       const submissionData = {
         ...data,
@@ -52,6 +57,7 @@ export default function TranscriptInput() {
         description: errorMessage,
         variant: "destructive",
       });
+      setIsSubmitting(false); // Re-enable form only on error
     }
   };
 
@@ -68,7 +74,7 @@ export default function TranscriptInput() {
           </p>
         </AlertDescription>
       </Alert>
-      <TranscriptForm onSubmit={handleSubmit} />
+      <TranscriptForm onSubmit={handleSubmit} isSubmitting={isSubmitting} />
     </div>
   );
 }

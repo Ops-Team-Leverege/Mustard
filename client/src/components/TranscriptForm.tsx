@@ -26,6 +26,7 @@ interface User {
 
 interface TranscriptFormProps {
   onSubmit?: (data: TranscriptData) => void;
+  isSubmitting?: boolean;
 }
 
 export interface Customer {
@@ -66,7 +67,7 @@ const LEVEREGE_TEAM_OPTIONS = [
   "Steven Lee"
 ];
 
-export default function TranscriptForm({ onSubmit }: TranscriptFormProps) {
+export default function TranscriptForm({ onSubmit, isSubmitting = false }: TranscriptFormProps) {
   const [contentType, setContentType] = useState<"transcript" | "notes">("transcript");
   const [supportingInputMethod, setSupportingInputMethod] = useState<"file" | "url">("file");
   const [fileUrl, setFileUrl] = useState("");
@@ -849,6 +850,7 @@ export default function TranscriptForm({ onSubmit }: TranscriptFormProps) {
             type="submit"
             className="w-full"
             disabled={
+              isSubmitting ||
               customers.length === 0 || 
               !formData.companyName.trim() || 
               teamMembers.length === 0 ||
@@ -857,8 +859,17 @@ export default function TranscriptForm({ onSubmit }: TranscriptFormProps) {
             }
             data-testid="button-analyze-transcript"
           >
-            <Sparkles className="w-4 h-4 mr-2" />
-            {contentType === "transcript" ? "Analyze Transcript" : "Analyze Meeting Notes"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                {contentType === "transcript" ? "Analyze Transcript" : "Analyze Meeting Notes"}
+              </>
+            )}
           </Button>
         </form>
       </CardContent>
