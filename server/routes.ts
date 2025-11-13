@@ -193,7 +193,8 @@ async function processTranscriptInBackground(
       console.log(`POS system detected and linked: ${analysis.posSystem.name} -> ${company.name}`);
     }
     
-    // Mark as completed
+    // Mark as completed with final step
+    await storage.updateProcessingStep(transcriptId, "complete");
     await storage.updateTranscriptProcessingStatus(transcriptId, "completed");
     console.log(`Successfully processed transcript ${transcriptId}`);
     
