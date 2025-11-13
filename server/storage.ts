@@ -188,6 +188,7 @@ export class MemStorage implements IStorage {
       contactJobTitle: insertTranscript.contactJobTitle ?? null,
       mainInterestAreas: insertTranscript.mainInterestAreas ?? null,
       mainMeetingTakeaways: insertTranscript.mainMeetingTakeaways ?? null,
+      nextSteps: insertTranscript.nextSteps ?? null,
       processingStatus: "pending",
       processingStartedAt: null,
       processingCompletedAt: null,
@@ -203,7 +204,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.transcripts.values()).filter(t => t.product === product && t.companyId === companyId);
   }
 
-  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
     
@@ -212,6 +213,8 @@ export class MemStorage implements IStorage {
       ...(updates.name !== undefined && { name: updates.name }),
       ...(updates.createdAt !== undefined && { createdAt: updates.createdAt }),
       ...(updates.mainMeetingTakeaways !== undefined && { mainMeetingTakeaways: updates.mainMeetingTakeaways }),
+      ...(updates.nextSteps !== undefined && { nextSteps: updates.nextSteps }),
+      ...(updates.supportingMaterials !== undefined && { supportingMaterials: updates.supportingMaterials }),
       ...(updates.transcript !== undefined && { transcript: updates.transcript }),
     };
     this.transcripts.set(id, updated);
@@ -1894,7 +1897,7 @@ export class DbStorage implements IStorage {
       .insert(usersTable)
       .values(userData)
       .onConflictDoUpdate({
-        target: usersTable.id,
+        target: usersTable.email,
         set: {
           ...userData,
           updatedAt: new Date(),

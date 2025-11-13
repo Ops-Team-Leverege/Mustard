@@ -402,11 +402,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/transcripts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, createdAt, mainMeetingTakeaways, transcript } = req.body;
+      const { name, createdAt, mainMeetingTakeaways, nextSteps, supportingMaterials, transcript } = req.body;
       const updatedTranscript = await storage.updateTranscript(id, { 
         name: name !== undefined ? (name || null) : undefined,
         createdAt: createdAt !== undefined ? new Date(createdAt) : undefined,
         mainMeetingTakeaways: mainMeetingTakeaways !== undefined ? (mainMeetingTakeaways || null) : undefined,
+        nextSteps: nextSteps !== undefined ? (nextSteps || null) : undefined,
+        supportingMaterials: supportingMaterials !== undefined ? (supportingMaterials || null) : undefined,
         transcript: transcript !== undefined ? (transcript || null) : undefined,
       });
       if (!updatedTranscript) {

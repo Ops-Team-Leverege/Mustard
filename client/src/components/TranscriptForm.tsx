@@ -217,7 +217,7 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
     const customerNames = customers.map(c => c.name).join(', ');
     const leverageTeamString = teamMembers.join(', ');
     
-    const submissionData = {
+    const submissionData: any = {
       ...formData,
       contentType,
       leverageTeam: leverageTeamString,
@@ -226,6 +226,14 @@ export default function TranscriptForm({ onSubmit, isAnalyzing = false }: Transc
       // For notes mode, use mainMeetingTakeaways as the transcript content
       transcript: contentType === "notes" ? (formData.mainMeetingTakeaways || '') : formData.transcript,
     };
+    
+    // Only include optional fields if they have non-empty values
+    if (!formData.supportingMaterials?.trim()) {
+      delete submissionData.supportingMaterials;
+    }
+    if (!formData.nextSteps?.trim()) {
+      delete submissionData.nextSteps;
+    }
     
     onSubmit?.(submissionData);
   };
