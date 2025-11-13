@@ -193,7 +193,10 @@ export default function TranscriptDetailPage() {
     const now = Date.now();
     const durationMs = now - startTime;
     const minutes = Math.floor(durationMs / (1000 * 60));
-    const isStuck = minutes > 10;
+    
+    // Check stuck status using milliseconds to avoid floor/ceiling issues
+    // Stuck = processing for more than 10 minutes (600,000 ms)
+    const isStuck = durationMs > 10 * 60 * 1000;
     
     let durationText = "";
     if (minutes < 1) {
