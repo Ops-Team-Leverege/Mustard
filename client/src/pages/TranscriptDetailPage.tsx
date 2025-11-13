@@ -185,6 +185,31 @@ export default function TranscriptDetailPage() {
   const isProcessing = processingStatus === "pending" || processingStatus === "processing";
   const isFailed = processingStatus === "failed";
 
+  // Calculate processing duration and detect stuck transcripts
+  const getProcessingDuration = (): { minutes: number; isStuck: boolean; durationText: string } | null => {
+    if (!transcript.processingStartedAt) return null;
+    
+    const startTime = new Date(transcript.processingStartedAt).getTime();
+    const now = Date.now();
+    const durationMs = now - startTime;
+    const minutes = Math.floor(durationMs / (1000 * 60));
+    const isStuck = minutes > 10;
+    
+    let durationText = "";
+    if (minutes < 1) {
+      durationText = "Less than a minute";
+    } else if (minutes === 1) {
+      durationText = "1 minute";
+    } else {
+      durationText = `${minutes} minutes`;
+    }
+    
+    return { minutes, isStuck, durationText };
+  };
+
+  const processingDuration = getProcessingDuration();
+  const isStuckProcessing = isProcessing && processingDuration?.isStuck;
+
   // Map processing steps to user-friendly labels
   const getStepLabel = (step: string | null): string => {
     if (!step) return "Waiting to start...";
@@ -212,21 +237,60 @@ export default function TranscriptDetailPage() {
         </Button>
       </div>
 
-      {/* Processing status banner */}
-      {isProcessing && (
+      {/* Stuck processing alert - shows when processing for >10 minutes */}
+      {isStuckProcessing && (
+        <Alert variant="destructive" data-testid="alert-stuck-processing">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Processing May Be Stuck</AlertTitle>
+          <AlertDescription>
+            <div className="space-y-2">
+              <div>
+                This transcript has been processing for {processingDuration?.durationText}. 
+                The server may have restarted during analysis.
+              </div>
+              <div className="text-xs">Current step: {getStepLabel(processingStep)}</div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => retryMutation.mutate()}
+                disabled={retryMutation.isPending}
+                data-testid="button-retry-stuck-analysis"
+                className="bg-background hover-elevate active-elevate-2"
+              >
+                {retryMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                    Retrying...
+                  </>
+                ) : (
+                  "Retry Analysis"
+                )}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Normal processing banner - shows when processing <10 minutes */}
+      {isProcessing && !isStuckProcessing && (
         <Alert data-testid="alert-processing">
           <Loader2 className="h-4 w-4 animate-spin" />
           <AlertTitle>Processing Transcript</AlertTitle>
           <AlertDescription>
             <div className="space-y-1">
               <div>{getStepLabel(processingStep)}</div>
+              {processingDuration && (
+                <div className="text-xs text-muted-foreground">
+                  Processing for {processingDuration.durationText}...
+                </div>
+              )}
               <div className="text-xs text-muted-foreground">This page will automatically update when complete.</div>
             </div>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Error status banner */}
+      {/* Error status banner - shows when processing failed */}
       {isFailed && (
         <Alert variant="destructive" data-testid="alert-failed">
           <AlertCircle className="h-4 w-4" />
