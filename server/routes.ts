@@ -127,6 +127,7 @@ async function processTranscriptInBackground(
     }
     
     // Run AI analysis
+    await storage.updateProcessingStep(transcriptId, "analyzing_transcript");
     const analysis = await analyzeTranscript({
       transcript: contentToAnalyze,
       companyName: company.name,
@@ -137,6 +138,7 @@ async function processTranscriptInBackground(
     });
     
     // Save insights with companyId
+    await storage.updateProcessingStep(transcriptId, "extracting_insights");
     await storage.createProductInsights(
       analysis.insights.map(insight => ({
         transcriptId: transcript.id,
@@ -151,6 +153,7 @@ async function processTranscriptInBackground(
     );
     
     // Save Q&A pairs with companyId and matched contactId
+    await storage.updateProcessingStep(transcriptId, "extracting_qa");
     await storage.createQAPairs(
       analysis.qaPairs.map(qa => {
         // Try to match asker name to a contact (case-insensitive)
@@ -178,6 +181,7 @@ async function processTranscriptInBackground(
     );
     
     // Handle POS system detection and linking
+    await storage.updateProcessingStep(transcriptId, "detecting_pos_systems");
     if (analysis.posSystem) {
       await storage.findOrCreatePOSSystemAndLink(
         product,
