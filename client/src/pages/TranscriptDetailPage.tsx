@@ -95,6 +95,33 @@ export default function TranscriptDetailPage() {
     },
   });
 
+  const retryMutation = useMutation({
+    mutationFn: async () => {
+      if (!transcriptId) throw new Error("Transcript not found");
+      const res = await apiRequest('POST', `/api/transcripts/${transcriptId}/retry`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && key.startsWith('/api/transcripts');
+        }
+      });
+      toast({
+        title: "Success",
+        description: "Transcript analysis restarted",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to restart analysis",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleStartEdit = () => {
     if (!data?.transcript) return;
     
@@ -154,8 +181,22 @@ export default function TranscriptDetailPage() {
 
   const { transcript, insights, qaPairs, company } = data;
   const processingStatus = transcript.processingStatus;
+  const processingStep = transcript.processingStep;
   const isProcessing = processingStatus === "pending" || processingStatus === "processing";
   const isFailed = processingStatus === "failed";
+
+  // Map processing steps to user-friendly labels
+  const getStepLabel = (step: string | null): string => {
+    if (!step) return "Waiting to start...";
+    const stepMap: Record<string, string> = {
+      analyzing_transcript: "Analyzing transcript with AI",
+      extracting_insights: "Extracting product insights",
+      extracting_qa: "Extracting Q&A pairs",
+      detecting_pos_systems: "Detecting POS systems",
+      complete: "Analysis complete"
+    };
+    return stepMap[step] || step;
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -177,7 +218,10 @@ export default function TranscriptDetailPage() {
           <Loader2 className="h-4 w-4 animate-spin" />
           <AlertTitle>Processing Transcript</AlertTitle>
           <AlertDescription>
-            AI analysis is in progress. This page will automatically update when complete.
+            <div className="space-y-1">
+              <div>{getStepLabel(processingStep)}</div>
+              <div className="text-xs text-muted-foreground">This page will automatically update when complete.</div>
+            </div>
           </AlertDescription>
         </Alert>
       )}
@@ -188,7 +232,26 @@ export default function TranscriptDetailPage() {
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Processing Failed</AlertTitle>
           <AlertDescription>
-            {transcript.processingError || "An error occurred while processing this transcript."}
+            <div className="space-y-2">
+              <div>{transcript.processingError || "An error occurred while processing this transcript."}</div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => retryMutation.mutate()}
+                disabled={retryMutation.isPending}
+                data-testid="button-retry-analysis"
+                className="bg-background hover-elevate active-elevate-2"
+              >
+                {retryMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-2 animate-spin" />
+                    Retrying...
+                  </>
+                ) : (
+                  "Retry Analysis"
+                )}
+              </Button>
+            </div>
           </AlertDescription>
         </Alert>
       )}
