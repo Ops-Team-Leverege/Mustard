@@ -45,27 +45,54 @@ async function getUserAndProduct(req: any): Promise<{ userId: string; user: any;
   return { userId, user, product };
 }
 
+// In-memory lock to prevent concurrent processing of the same transcript
+const processingLocks = new Set<string>();
+
 // Background processing function for transcript AI analysis
 async function processTranscriptInBackground(
   transcriptId: string, 
   product: Product
 ): Promise<void> {
-  let createdInsightIds: string[] = [];
-  let createdQAPairIds: string[] = [];
+  // Atomic lock acquisition: Prevent concurrent processing of the same transcript
+  if (processingLocks.has(transcriptId)) {
+    console.log(`Transcript ${transcriptId} is already being processed by another job, skipping`);
+    return;
+  }
+  processingLocks.add(transcriptId);
   
   try {
-    // Update status to processing
-    await storage.updateTranscriptProcessingStatus(transcriptId, "processing");
-    
-    // Fetch fresh transcript data from storage
+    // Fetch transcript to check current status
     const transcript = await storage.getTranscript(product, transcriptId);
     if (!transcript) {
       throw new Error(`Transcript ${transcriptId} not found`);
     }
     
+    // Skip if already completed successfully
+    if (transcript.processingStatus === "completed") {
+      console.log(`Transcript ${transcriptId} has already been processed successfully, skipping`);
+      return;
+    }
+    
     if (!transcript.companyId) {
       throw new Error(`Transcript ${transcriptId} has no company association`);
     }
+    
+    // Idempotent retry safety: Clear any existing artifacts from incomplete runs
+    // (handles pending, processing, or failed states - including crash/restart scenarios)
+    const existingInsights = await storage.getProductInsightsByTranscript(product, transcriptId);
+    for (const insight of existingInsights) {
+      await storage.deleteProductInsight(insight.id);
+    }
+    const existingQAPairs = await storage.getQAPairsByTranscript(product, transcriptId);
+    for (const qaPair of existingQAPairs) {
+      await storage.deleteQAPair(qaPair.id);
+    }
+    if (existingInsights.length > 0 || existingQAPairs.length > 0) {
+      console.log(`Cleaned up ${existingInsights.length} insights and ${existingQAPairs.length} Q&A pairs from previous incomplete run of transcript ${transcriptId}`);
+    }
+    
+    // Update status to processing (after cleanup)
+    await storage.updateTranscriptProcessingStatus(transcriptId, "processing");
     
     // Get company and contacts
     const company = await storage.getCompany(product, transcript.companyId);
@@ -110,7 +137,7 @@ async function processTranscriptInBackground(
     });
     
     // Save insights with companyId
-    const insights = await storage.createProductInsights(
+    await storage.createProductInsights(
       analysis.insights.map(insight => ({
         transcriptId: transcript.id,
         feature: insight.feature,
@@ -122,10 +149,9 @@ async function processTranscriptInBackground(
         product,
       }))
     );
-    createdInsightIds = insights.map(i => i.id);
     
     // Save Q&A pairs with companyId and matched contactId
-    const qaPairs = await storage.createQAPairs(
+    await storage.createQAPairs(
       analysis.qaPairs.map(qa => {
         // Try to match asker name to a contact (case-insensitive)
         const matchedContact = allContacts.find(contact => {
@@ -150,9 +176,8 @@ async function processTranscriptInBackground(
         };
       })
     );
-    createdQAPairIds = qaPairs.map(q => q.id);
     
-    // Handle POS system detection and linking (after insights/Q&A succeed)
+    // Handle POS system detection and linking
     if (analysis.posSystem) {
       await storage.findOrCreatePOSSystemAndLink(
         product,
@@ -169,30 +194,21 @@ async function processTranscriptInBackground(
     console.log(`Successfully processed transcript ${transcriptId}`);
     
   } catch (error) {
-    // Mark as failed first to ensure status is always updated
+    // Mark as failed - partial data remains linked to failed transcript for manual review/cleanup
     const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
     
     try {
       await storage.updateTranscriptProcessingStatus(transcriptId, "failed", errorMessage);
+      console.log(`Marked transcript ${transcriptId} as failed. Partial data retained for manual review.`);
     } catch (statusUpdateError) {
       console.error(`Failed to update transcript status to failed for ${transcriptId}:`, statusUpdateError);
     }
     
-    // Clean up partial data (best effort - don't throw on cleanup failure)
-    try {
-      for (const insightId of createdInsightIds) {
-        await storage.deleteProductInsight(insightId);
-      }
-      for (const qaPairId of createdQAPairIds) {
-        await storage.deleteQAPair(qaPairId);
-      }
-      console.log(`Cleaned up ${createdInsightIds.length} insights and ${createdQAPairIds.length} Q&A pairs for failed transcript ${transcriptId}`);
-    } catch (cleanupError) {
-      console.error(`Failed to clean up partial data for transcript ${transcriptId}:`, cleanupError);
-    }
-    
     console.error(`Failed to process transcript ${transcriptId}:`, error);
     throw error;
+  } finally {
+    // Always release lock, regardless of success or failure
+    processingLocks.delete(transcriptId);
   }
 }
 

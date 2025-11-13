@@ -8,7 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Calendar, Building2, Pencil, Check, X } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowLeft, Calendar, Building2, Pencil, Check, X, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -39,6 +40,12 @@ export default function TranscriptDetailPage() {
   const { data, isLoading } = useQuery<TranscriptDetails>({
     queryKey: [`/api/transcripts/${transcriptId}/details`],
     enabled: !!transcriptId,
+    // Poll every 2 seconds while processing
+    refetchInterval: (query) => {
+      const transcript = query.state.data?.transcript;
+      const status = transcript?.processingStatus;
+      return (status === "pending" || status === "processing") ? 2000 : false;
+    },
   });
 
   const { data: categories = [] } = useQuery<Array<{ id: string; name: string; description?: string }>>({
@@ -138,6 +145,9 @@ export default function TranscriptDetailPage() {
   }
 
   const { transcript, insights, qaPairs, company } = data;
+  const processingStatus = transcript.processingStatus;
+  const isProcessing = processingStatus === "pending" || processingStatus === "processing";
+  const isFailed = processingStatus === "failed";
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -152,6 +162,28 @@ export default function TranscriptDetailPage() {
           Back to {company?.name || 'Transcripts'}
         </Button>
       </div>
+
+      {/* Processing status banner */}
+      {isProcessing && (
+        <Alert data-testid="alert-processing">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertTitle>Processing Transcript</AlertTitle>
+          <AlertDescription>
+            AI analysis is in progress. This page will automatically update when complete.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Error status banner */}
+      {isFailed && (
+        <Alert variant="destructive" data-testid="alert-failed">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Processing Failed</AlertTitle>
+          <AlertDescription>
+            {transcript.processingError || "An error occurred while processing this transcript."}
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Card>
         <CardHeader>
@@ -296,56 +328,71 @@ export default function TranscriptDetailPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="insights" className="w-full">
-        <TabsList data-testid="tabs-transcript-details">
-          <TabsTrigger value="insights" data-testid="tab-insights">
-            Product Insights ({insights.length})
-          </TabsTrigger>
-          <TabsTrigger value="qa" data-testid="tab-qa">
-            Q&A Pairs ({qaPairs.length})
-          </TabsTrigger>
-        </TabsList>
+      {/* Show insights/Q&A only when processing is complete */}
+      {!isProcessing && (
+        <Tabs defaultValue="insights" className="w-full">
+          <TabsList data-testid="tabs-transcript-details">
+            <TabsTrigger value="insights" data-testid="tab-insights">
+              Product Insights ({insights.length})
+            </TabsTrigger>
+            <TabsTrigger value="qa" data-testid="tab-qa">
+              Q&A Pairs ({qaPairs.length})
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="insights" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Product Insights</CardTitle>
-              <CardDescription>
-                Insights extracted from this transcript
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ProductInsightsTable
-                insights={insights.map(i => ({
-                  ...i,
-                  category: i.categoryName || 'NEW',
-                }))}
-                categories={categories}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
+          <TabsContent value="insights" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Product Insights</CardTitle>
+                <CardDescription>
+                  Insights extracted from this transcript
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ProductInsightsTable
+                  insights={insights.map(i => ({
+                    ...i,
+                    category: i.categoryName || 'NEW',
+                  }))}
+                  categories={categories}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <TabsContent value="qa" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Q&A Pairs</CardTitle>
-              <CardDescription>
-                Questions and answers from this transcript
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <QATable
-                qaPairs={qaPairs.map(qa => ({
-                  ...qa,
-                  companyId: qa.companyId || '',
-                }))}
-                categories={categories}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="qa" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Q&A Pairs</CardTitle>
+                <CardDescription>
+                  Questions and answers from this transcript
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <QATable
+                  qaPairs={qaPairs.map(qa => ({
+                    ...qa,
+                    companyId: qa.companyId || '',
+                  }))}
+                  categories={categories}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {/* Show placeholder while processing */}
+      {isProcessing && (
+        <Card>
+          <CardContent className="p-12 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+            <p className="text-muted-foreground" data-testid="text-processing-message">
+              Analyzing transcript and extracting insights...
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
