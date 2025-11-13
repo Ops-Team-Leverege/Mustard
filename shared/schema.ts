@@ -11,6 +11,10 @@ export type Product = typeof PRODUCTS[number];
 export const PROCESSING_STATUSES = ["pending", "processing", "completed", "failed"] as const;
 export type ProcessingStatus = typeof PROCESSING_STATUSES[number];
 
+// Processing step types - granular steps during AI analysis
+export const PROCESSING_STEPS = ["analyzing_transcript", "extracting_insights", "extracting_qa", "detecting_pos_systems", "complete"] as const;
+export type ProcessingStep = typeof PROCESSING_STEPS[number];
+
 export const transcripts = pgTable("transcripts", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   product: text("product").default("PitCrew").notNull(),
@@ -29,6 +33,7 @@ export const transcripts = pgTable("transcripts", {
   mainMeetingTakeaways: text("main_meeting_takeaways"),
   nextSteps: text("next_steps"),
   processingStatus: text("processing_status").default("pending").notNull(), // "pending", "processing", "completed", "failed"
+  processingStep: text("processing_step"), // Granular step: "analyzing_transcript", "extracting_insights", "extracting_qa", "detecting_pos_systems", "complete"
   processingStartedAt: timestamp("processing_started_at"),
   processingCompletedAt: timestamp("processing_completed_at"),
   processingError: text("processing_error"),
@@ -157,6 +162,7 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
   customerNames: true,
   processingStatus: true,
+  processingStep: true,
   processingStartedAt: true,
   processingCompletedAt: true,
   processingError: true,
