@@ -25,6 +25,7 @@ import {
   type InsertPOSSystem,
   type Product,
   type ProcessingStatus,
+  type ProcessingStep,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -49,6 +50,7 @@ export interface IStorage {
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
   updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
   updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
+  updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
 
   // Product Insights
@@ -190,6 +192,7 @@ export class MemStorage implements IStorage {
       mainMeetingTakeaways: insertTranscript.mainMeetingTakeaways ?? null,
       nextSteps: insertTranscript.nextSteps ?? null,
       processingStatus: "pending",
+      processingStep: null,
       processingStartedAt: null,
       processingCompletedAt: null,
       processingError: null,
@@ -232,6 +235,7 @@ export class MemStorage implements IStorage {
       updated = {
         ...transcript,
         processingStatus: "pending",
+        processingStep: null,
         processingStartedAt: null,
         processingCompletedAt: null,
         processingError: null,
@@ -240,6 +244,7 @@ export class MemStorage implements IStorage {
       updated = {
         ...transcript,
         processingStatus: "processing",
+        processingStep: "analyzing_transcript",
         processingStartedAt: now,
         processingCompletedAt: null,
         processingError: null,
@@ -248,6 +253,7 @@ export class MemStorage implements IStorage {
       updated = {
         ...transcript,
         processingStatus: "completed",
+        processingStep: "complete",
         processingCompletedAt: now,
         processingError: null,
       };
@@ -259,6 +265,19 @@ export class MemStorage implements IStorage {
         processingError: error ?? "Processing failed",
       };
     }
+    
+    this.transcripts.set(id, updated);
+    return updated;
+  }
+
+  async updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined> {
+    const transcript = this.transcripts.get(id);
+    if (!transcript) return undefined;
+    
+    const updated = {
+      ...transcript,
+      processingStep: step,
+    };
     
     this.transcripts.set(id, updated);
     return updated;
@@ -1112,6 +1131,7 @@ export class DbStorage implements IStorage {
     if (status === "pending") {
       updateData = {
         processingStatus: "pending",
+        processingStep: null,
         processingStartedAt: null,
         processingCompletedAt: null,
         processingError: null,
@@ -1119,6 +1139,7 @@ export class DbStorage implements IStorage {
     } else if (status === "processing") {
       updateData = {
         processingStatus: "processing",
+        processingStep: "analyzing_transcript",
         processingStartedAt: now,
         processingCompletedAt: null,
         processingError: null,
@@ -1126,6 +1147,7 @@ export class DbStorage implements IStorage {
     } else if (status === "completed") {
       updateData = {
         processingStatus: "completed",
+        processingStep: "complete",
         processingCompletedAt: now,
         processingError: null,
       };
@@ -1140,6 +1162,15 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .update(transcriptsTable)
       .set(updateData)
+      .where(eq(transcriptsTable.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined> {
+    const results = await this.db
+      .update(transcriptsTable)
+      .set({ processingStep: step })
       .where(eq(transcriptsTable.id, id))
       .returning();
     return results[0];
