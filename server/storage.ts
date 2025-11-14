@@ -48,7 +48,7 @@ export interface IStorage {
   getTranscript(product: Product, id: string): Promise<Transcript | undefined>;
   getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
-  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined>;
+  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined>;
   updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
   updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
@@ -184,7 +184,7 @@ export class MemStorage implements IStorage {
       name: insertTranscript.name ?? null,
       companyId: insertTranscript.companyId ?? null,
       transcript: insertTranscript.transcript ?? null,
-      supportingMaterials: insertTranscript.supportingMaterials ?? null,
+      supportingMaterials: insertTranscript.supportingMaterials ?? [],
       companyDescription: insertTranscript.companyDescription ?? null,
       numberOfStores: insertTranscript.numberOfStores ?? null,
       contactJobTitle: insertTranscript.contactJobTitle ?? null,
@@ -207,7 +207,7 @@ export class MemStorage implements IStorage {
     return Array.from(this.transcripts.values()).filter(t => t.product === product && t.companyId === companyId);
   }
 
-  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
     
@@ -1107,7 +1107,7 @@ export class DbStorage implements IStorage {
     return results;
   }
 
-  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string | null; transcript?: string | null }): Promise<Transcript | undefined> {
+  async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined> {
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.createdAt !== undefined) updateData.createdAt = updates.createdAt;

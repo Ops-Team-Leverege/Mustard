@@ -413,7 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: createdAt !== undefined ? new Date(createdAt) : undefined,
         mainMeetingTakeaways: mainMeetingTakeaways !== undefined ? (mainMeetingTakeaways || null) : undefined,
         nextSteps: nextSteps !== undefined ? (nextSteps || null) : undefined,
-        supportingMaterials: supportingMaterials !== undefined ? (supportingMaterials || null) : undefined,
+        supportingMaterials: supportingMaterials !== undefined ? (Array.isArray(supportingMaterials) ? supportingMaterials : []) : undefined,
         transcript: transcript !== undefined ? (transcript || null) : undefined,
       });
       if (!updatedTranscript) {

@@ -41,7 +41,7 @@ export interface TranscriptData {
   meetingDate?: string;
   contentType?: "transcript" | "notes";
   transcript: string;
-  supportingMaterials?: string;
+  supportingMaterials?: string[];
   leverageTeam: string;
   customerNames: string;
   customers?: Customer[];
@@ -82,7 +82,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     meetingDate: '',
     contentType: 'transcript',
     transcript: '',
-    supportingMaterials: '',
+    supportingMaterials: [],
     leverageTeam: '',
     customerNames: '',
     companyDescription: '',
@@ -165,7 +165,10 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setFormData(prev => ({ ...prev, supportingMaterials: file.name }));
+    setFormData(prev => ({ 
+      ...prev, 
+      supportingMaterials: [...(prev.supportingMaterials || []), file.name] 
+    }));
 
     toast({
       title: "File reference added",
@@ -179,7 +182,10 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
   const handleUrlAdd = () => {
     if (!fileUrl.trim()) return;
 
-    setFormData(prev => ({ ...prev, supportingMaterials: fileUrl.trim() }));
+    setFormData(prev => ({ 
+      ...prev, 
+      supportingMaterials: [...(prev.supportingMaterials || []), fileUrl.trim()] 
+    }));
 
     toast({
       title: "URL added",
@@ -187,6 +193,13 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     });
     
     setFileUrl("");
+  };
+
+  const handleRemoveMaterial = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      supportingMaterials: prev.supportingMaterials?.filter((_, i) => i !== index) || []
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -228,7 +241,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     };
     
     // Only include optional fields if they have non-empty values
-    if (!formData.supportingMaterials?.trim()) {
+    if (!formData.supportingMaterials || formData.supportingMaterials.length === 0) {
       delete submissionData.supportingMaterials;
     }
     if (!formData.nextSteps?.trim()) {
@@ -492,25 +505,44 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
                 </div>
               </TabsContent>
             </Tabs>
-            {formData.supportingMaterials && (
-              <div className="mt-2 p-3 bg-muted rounded-md flex items-start gap-2">
-                {formData.supportingMaterials.startsWith('http') ? (
-                  <>
-                    <Link2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">Link:</p>
-                      <p className="text-xs font-mono truncate">{formData.supportingMaterials}</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground mb-0.5">File:</p>
-                      <p className="text-xs font-mono truncate">{formData.supportingMaterials}</p>
-                    </div>
-                  </>
-                )}
+            {formData.supportingMaterials && formData.supportingMaterials.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Added materials:</p>
+                {formData.supportingMaterials.map((material, index) => (
+                  <div 
+                    key={index} 
+                    className="p-3 bg-muted rounded-md flex items-start gap-2"
+                    data-testid={`supporting-material-${index}`}
+                  >
+                    {material.startsWith('http') ? (
+                      <>
+                        <Link2 className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground mb-0.5">Link:</p>
+                          <p className="text-xs font-mono truncate">{material}</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground mb-0.5">File:</p>
+                          <p className="text-xs font-mono truncate">{material}</p>
+                        </div>
+                      </>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveMaterial(index)}
+                      className="shrink-0 h-8 w-8"
+                      data-testid={`button-remove-material-${index}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

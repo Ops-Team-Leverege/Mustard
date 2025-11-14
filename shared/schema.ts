@@ -23,7 +23,7 @@ export const transcripts = pgTable("transcripts", {
   companyId: varchar("company_id"), // New normalized field
   contentType: text("content_type").default("transcript").notNull(), // "transcript" or "notes"
   transcript: text("transcript"), // Can be null if contentType is "notes"
-  supportingMaterials: text("supporting_materials"), // Additional documents/materials that support the call
+  supportingMaterials: text("supporting_materials").array(), // Additional documents/materials that support the call
   leverageTeam: text("leverage_team").notNull(),
   customerNames: text("customer_names").notNull(),
   companyDescription: text("company_description"),
@@ -171,6 +171,7 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   contentType: z.enum(["transcript", "notes"]).default("transcript"),
   transcript: z.string().optional(),
   mainMeetingTakeaways: z.string().optional(),
+  supportingMaterials: z.array(z.string()).default([]),
   createdAt: z.string().or(z.date()).optional(),
   customerNames: z.string().min(1, "At least one customer is required"),
   customers: z.array(customerSchema).min(1, "At least one customer is required"),

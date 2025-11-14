@@ -35,9 +35,10 @@ export default function TranscriptDetailPage() {
     createdAt: '',
     mainMeetingTakeaways: '',
     nextSteps: '',
-    supportingMaterials: '',
+    supportingMaterials: [] as string[],
     transcript: '',
   });
+  const [newMaterial, setNewMaterial] = useState('');
 
   const { data, isLoading } = useQuery<TranscriptDetails>({
     queryKey: [`/api/transcripts/${transcriptId}/details`],
@@ -55,7 +56,7 @@ export default function TranscriptDetailPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string; nextSteps: string; supportingMaterials: string; transcript: string }) => {
+    mutationFn: async (data: { name: string; createdAt: string; mainMeetingTakeaways: string; nextSteps: string; supportingMaterials: string[]; transcript: string }) => {
       if (!transcriptId) throw new Error("Transcript not found");
       
       let createdAtISO = data.createdAt;
@@ -68,7 +69,7 @@ export default function TranscriptDetailPage() {
         createdAt: createdAtISO,
         mainMeetingTakeaways: data.mainMeetingTakeaways || null,
         nextSteps: data.nextSteps || null,
-        supportingMaterials: data.supportingMaterials || null,
+        supportingMaterials: data.supportingMaterials.length > 0 ? data.supportingMaterials : [],
         transcript: data.transcript || null,
       });
       return res.json();
@@ -136,7 +137,7 @@ export default function TranscriptDetailPage() {
       createdAt: createdAtString,
       mainMeetingTakeaways: data.transcript.mainMeetingTakeaways || '',
       nextSteps: data.transcript.nextSteps || '',
-      supportingMaterials: data.transcript.supportingMaterials || '',
+      supportingMaterials: data.transcript.supportingMaterials || [],
       transcript: data.transcript.transcript || '',
     });
     setIsEditing(true);
@@ -153,9 +154,26 @@ export default function TranscriptDetailPage() {
       createdAt: '',
       mainMeetingTakeaways: '',
       nextSteps: '',
-      supportingMaterials: '',
+      supportingMaterials: [],
       transcript: '',
     });
+    setNewMaterial('');
+  };
+
+  const handleAddMaterial = () => {
+    if (!newMaterial.trim()) return;
+    setEditForm(prev => ({
+      ...prev,
+      supportingMaterials: [...prev.supportingMaterials, newMaterial.trim()]
+    }));
+    setNewMaterial('');
+  };
+
+  const handleRemoveMaterial = (index: number) => {
+    setEditForm(prev => ({
+      ...prev,
+      supportingMaterials: prev.supportingMaterials.filter((_, i) => i !== index)
+    }));
   };
 
   if (isLoading) {
@@ -368,43 +386,46 @@ export default function TranscriptDetailPage() {
                       </div>
                     </div>
                   )}
-                  {transcript.supportingMaterials && transcript.supportingMaterials.trim() && (
+                  {transcript.supportingMaterials && transcript.supportingMaterials.length > 0 && (
                     <div className="mt-3">
                       <h3 className="text-sm font-medium mb-1">Supporting Materials</h3>
-                      <div className="bg-muted/50 rounded-md p-4">
-                        {(() => {
-                          const material = transcript.supportingMaterials;
-                          try {
-                            const url = new URL(material);
-                            // Only allow http and https schemes to prevent XSS
-                            if (url.protocol === 'http:' || url.protocol === 'https:') {
-                              return (
-                                <a 
-                                  href={material} 
-                                  target="_blank" 
-                                  rel="noopener noreferrer"
-                                  className="text-sm text-primary hover:underline"
-                                  data-testid="supporting-materials-link"
-                                >
-                                  {material}
-                                </a>
-                              );
-                            }
-                            // Invalid scheme - render as text
-                            return (
-                              <p className="text-sm" data-testid="supporting-materials-file">
-                                {material}
-                              </p>
-                            );
-                          } catch {
-                            // Not a valid URL - render as text (likely a filename)
-                            return (
-                              <p className="text-sm" data-testid="supporting-materials-file">
-                                {material}
-                              </p>
-                            );
-                          }
-                        })()}
+                      <div className="space-y-2">
+                        {transcript.supportingMaterials.map((material, index) => (
+                          <div key={index} className="bg-muted/50 rounded-md p-4">
+                            {(() => {
+                              try {
+                                const url = new URL(material);
+                                // Only allow http and https schemes to prevent XSS
+                                if (url.protocol === 'http:' || url.protocol === 'https:') {
+                                  return (
+                                    <a 
+                                      href={material} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-sm text-primary hover:underline"
+                                      data-testid={`supporting-materials-link-${index}`}
+                                    >
+                                      {material}
+                                    </a>
+                                  );
+                                }
+                                // Invalid scheme - render as text
+                                return (
+                                  <p className="text-sm" data-testid={`supporting-materials-file-${index}`}>
+                                    {material}
+                                  </p>
+                                );
+                              } catch {
+                                // Not a valid URL - render as text (likely a filename)
+                                return (
+                                  <p className="text-sm" data-testid={`supporting-materials-file-${index}`}>
+                                    {material}
+                                  </p>
+                                );
+                              }
+                            })()}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -452,12 +473,52 @@ export default function TranscriptDetailPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-semibold mb-1">Supporting Materials</h3>
-                    <Input
-                      value={editForm.supportingMaterials}
-                      onChange={(e) => setEditForm({ ...editForm, supportingMaterials: e.target.value })}
-                      placeholder="File name or URL of supporting materials"
-                      data-testid="input-supporting-materials"
-                    />
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newMaterial}
+                          onChange={(e) => setNewMaterial(e.target.value)}
+                          placeholder="File name or URL"
+                          data-testid="input-new-material"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddMaterial();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleAddMaterial}
+                          disabled={!newMaterial.trim()}
+                          data-testid="button-add-material"
+                        >
+                          Add
+                        </Button>
+                      </div>
+                      {editForm.supportingMaterials.length > 0 && (
+                        <div className="space-y-2">
+                          {editForm.supportingMaterials.map((material, index) => (
+                            <div 
+                              key={index} 
+                              className="flex items-center gap-2 p-2 bg-muted rounded-md"
+                              data-testid={`edit-material-${index}`}
+                            >
+                              <p className="text-sm flex-1 truncate">{material}</p>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveMaterial(index)}
+                                data-testid={`button-remove-edit-material-${index}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {company && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
