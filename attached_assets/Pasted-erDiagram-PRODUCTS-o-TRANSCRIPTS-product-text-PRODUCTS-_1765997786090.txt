@@ -1,0 +1,138 @@
+erDiagram
+  PRODUCTS ||--o{ TRANSCRIPTS : "product (text)"
+  PRODUCTS ||--o{ COMPANIES : "product (text)"
+  PRODUCTS ||--o{ CATEGORIES : "product (text)"
+  PRODUCTS ||--o{ USERS : "current_product (text)"
+
+  COMPANIES ||--o{ TRANSCRIPTS : "company_id"
+  COMPANIES ||--o{ CONTACTS : "company_id"
+
+  TRANSCRIPTS ||--o{ PRODUCT_INSIGHTS : "transcript_id"
+  TRANSCRIPTS ||--o{ QA_PAIRS : "transcript_id"
+  TRANSCRIPTS ||--o{ SESSIONS : "transcript_id (if present)"
+
+  CATEGORIES ||--o{ PRODUCT_INSIGHTS : "category_id (nullable)"
+  CATEGORIES ||--o{ QA_PAIRS : "category_id (nullable)"
+
+  CONTACTS ||--o{ QA_PAIRS : "contact_id (nullable)"
+
+  POS_SYSTEMS ||--o{ POS_SYSTEM_COMPANIES : "pos_system_id"
+  COMPANIES ||--o{ POS_SYSTEM_COMPANIES : "company_id"
+
+  USERS ||--o{ SESSIONS : "user_id (if present)"
+
+  PRODUCTS {
+    text name
+  }
+
+  USERS {
+    varchar id PK
+    varchar email UNIQUE
+    varchar first_name
+    varchar last_name
+    varchar profile_image_url
+    timestamp created_at
+    timestamp updated_at
+    text current_product
+  }
+
+  COMPANIES {
+    varchar id PK
+    text name
+    text product
+  }
+
+  CONTACTS {
+    varchar id PK
+    varchar company_id FK
+    text name
+  }
+
+  TRANSCRIPTS {
+    varchar id PK
+    text company_name
+    text transcript
+    text leverage_team
+    text customer_names
+    timestamp created_at
+    varchar company_id FK
+    text company_description
+    text number_of_stores
+    text contact_job_title
+    text main_interest_areas
+    text name
+    text main_meeting_takeaways
+    text content_type
+    text product
+    text[] supporting_materials
+    text processing_status
+    timestamp processing_started_at
+    timestamp processing_completed_at
+    text processing_error
+    text next_steps
+    text processing_step
+  }
+
+  PRODUCT_INSIGHTS {
+    varchar id PK
+    varchar transcript_id FK
+    varchar company_id FK
+    varchar category_id FK
+    text feature
+    text context
+    text customer_quote
+    text product
+  }
+
+  QA_PAIRS {
+    varchar id PK
+    varchar transcript_id FK
+    varchar company_id FK
+    varchar category_id FK
+    varchar contact_id FK
+    text question
+    text answer
+    text asker
+    timestamp created_at
+    text is_starred
+    text product
+  }
+
+  CATEGORIES {
+    varchar id PK
+    text name
+    text description
+    text product
+  }
+
+  FEATURES {
+    varchar id PK
+    text name
+    text description
+    text value
+    varchar category_id FK
+    text video_demo
+    text help_guide
+    text product
+  }
+
+  POS_SYSTEMS {
+    varchar id PK
+    text name
+    text website_link
+    text description
+    text product
+  }
+
+  POS_SYSTEM_COMPANIES {
+    varchar id PK
+    varchar pos_system_id FK
+    varchar company_id FK
+  }
+
+  SESSIONS {
+    varchar id PK
+    varchar user_id FK
+    varchar transcript_id FK
+    timestamp created_at
+  }
