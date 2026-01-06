@@ -52,6 +52,9 @@ export interface IStorage {
   updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
   updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
+  
+  // Raw query for MCP
+  rawQuery(sql: string, params?: any[]): Promise<any[]>;
 
   // Product Insights
   getProductInsights(product: Product): Promise<ProductInsightWithCategory[]>;
@@ -143,7 +146,7 @@ export class MemStorage implements IStorage {
     this.companies = new Map();
     this.contacts = new Map();
     this.users = new Map();
-
+    
     // Initialize with default categories for PitCrew
     const defaultCategories = [
       { name: 'Analytics', description: 'Reporting, dashboards, data visualization, and business intelligence features' },
@@ -161,6 +164,10 @@ export class MemStorage implements IStorage {
         createdAt: new Date(),
       });
     });
+  }
+
+  async rawQuery(sql: string, params?: any[]): Promise<any[]> {
+    throw new Error("rawQuery not supported in MemStorage");
   }
 
   // Transcripts
@@ -849,7 +856,6 @@ export class MemStorage implements IStorage {
     const contacts = Array.from(this.contacts.values()).filter(
       c => c.product === product && c.companyId === company.id
     );
-
     return {
       company,
       transcriptCount: companyTranscripts.length,
@@ -1061,13 +1067,20 @@ export class MemStorage implements IStorage {
 
 export class DbStorage implements IStorage {
   private db;
+  private queryClient;
 
   constructor() {
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set");
     }
-    const queryClient = neon(process.env.DATABASE_URL);
-    this.db = drizzle(queryClient);
+    this.queryClient = neon(process.env.DATABASE_URL);  
+    this.db = drizzle(this.queryClient);
+  }
+  
+  // Method for MCP capabilities
+  async rawQuery(sql: string, params?: any[]): Promise<any[]> {
+    const result = await this.queryClient(sql, params ?? []);
+    return result;
   }
 
   // Transcripts

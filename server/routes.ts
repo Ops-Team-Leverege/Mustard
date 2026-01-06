@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
 import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
 import multer from "multer";
+import { createMCP } from "./mcp";
+import type { MCPContext } from "./mcp/types";
 import {
   insertTranscriptSchema,
   insertCategorySchema,
@@ -25,23 +27,28 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 const upload = multer({ storage: multer.memoryStorage() });
 
 function generateSlug(companyName: string): string {
-  const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
   // If slug is empty (no alphanumerics in name), use a uuid suffix
-  return slug || `company-${randomUUID().split('-')[0]}`;
+  return slug || `company-${randomUUID().split("-")[0]}`;
 }
 
 // Helper function to get current user and their selected product
-async function getUserAndProduct(req: any): Promise<{ userId: string; user: any; product: Product }> {
+async function getUserAndProduct(
+  req: any,
+): Promise<{ userId: string; user: any; product: Product }> {
   const userId = req.user.claims.sub;
   const user = await storage.getUser(userId);
-  
+
   if (!user) {
     throw new Error("User not found");
   }
-  
+
   // User's current product defaults to PitCrew if not set
-  const product = (user.currentProduct as Product) || 'PitCrew';
-  
+  const product = (user.currentProduct as Product) || "PitCrew";
+
   return { userId, user, product };
 }
 
@@ -50,82 +57,102 @@ const processingLocks = new Set<string>();
 
 // Background processing function for transcript AI analysis
 async function processTranscriptInBackground(
-  transcriptId: string, 
-  product: Product
+  transcriptId: string,
+  product: Product,
 ): Promise<void> {
   // Atomic lock acquisition: Prevent concurrent processing of the same transcript
   if (processingLocks.has(transcriptId)) {
-    console.log(`Transcript ${transcriptId} is already being processed by another job, skipping`);
+    console.log(
+      `Transcript ${transcriptId} is already being processed by another job, skipping`,
+    );
     return;
   }
   processingLocks.add(transcriptId);
-  
+
   try {
     // Fetch transcript to check current status
     const transcript = await storage.getTranscript(product, transcriptId);
     if (!transcript) {
       throw new Error(`Transcript ${transcriptId} not found`);
     }
-    
+
     // Skip if already completed successfully
     if (transcript.processingStatus === "completed") {
-      console.log(`Transcript ${transcriptId} has already been processed successfully, skipping`);
+      console.log(
+        `Transcript ${transcriptId} has already been processed successfully, skipping`,
+      );
       return;
     }
-    
+
     if (!transcript.companyId) {
       throw new Error(`Transcript ${transcriptId} has no company association`);
     }
-    
+
     // Idempotent retry safety: Clear any existing artifacts from incomplete runs
     // (handles pending, processing, or failed states - including crash/restart scenarios)
-    const existingInsights = await storage.getProductInsightsByTranscript(product, transcriptId);
+    const existingInsights = await storage.getProductInsightsByTranscript(
+      product,
+      transcriptId,
+    );
     for (const insight of existingInsights) {
       await storage.deleteProductInsight(insight.id);
     }
-    const existingQAPairs = await storage.getQAPairsByTranscript(product, transcriptId);
+    const existingQAPairs = await storage.getQAPairsByTranscript(
+      product,
+      transcriptId,
+    );
     for (const qaPair of existingQAPairs) {
       await storage.deleteQAPair(qaPair.id);
     }
     if (existingInsights.length > 0 || existingQAPairs.length > 0) {
-      console.log(`Cleaned up ${existingInsights.length} insights and ${existingQAPairs.length} Q&A pairs from previous incomplete run of transcript ${transcriptId}`);
+      console.log(
+        `Cleaned up ${existingInsights.length} insights and ${existingQAPairs.length} Q&A pairs from previous incomplete run of transcript ${transcriptId}`,
+      );
     }
-    
+
     // Update status to processing (after cleanup)
     await storage.updateTranscriptProcessingStatus(transcriptId, "processing");
-    
+
     // Get company and contacts
     const company = await storage.getCompany(product, transcript.companyId);
     if (!company) {
       throw new Error(`Company ${transcript.companyId} not found`);
     }
-    
+
     const allContacts = await storage.getContactsByCompany(product, company.id);
-    
+
     // Get categories for AI analysis
     const categories = await storage.getCategories(product);
-    
+
     // Parse customer names and leverage team from transcript (with null/undefined guards)
-    const leverageTeam = transcript.leverageTeam 
-      ? transcript.leverageTeam.split(',').map(s => s.trim()).filter(s => s)
+    const leverageTeam = transcript.leverageTeam
+      ? transcript.leverageTeam
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s)
       : [];
-    const customerNamesList = transcript.customerNames 
-      ? transcript.customerNames.split(',').map(s => s.trim()).filter(s => s)
+    const customerNamesList = transcript.customerNames
+      ? transcript.customerNames
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s)
       : [];
-    
+
     // Determine content to analyze based on type (fallback to "transcript" if undefined)
-    const contentType: "transcript" | "notes" = 
-      (transcript.contentType === "notes" || transcript.contentType === "transcript") 
-        ? transcript.contentType 
+    const contentType: "transcript" | "notes" =
+      transcript.contentType === "notes" ||
+      transcript.contentType === "transcript"
+        ? transcript.contentType
         : "transcript";
-    const contentToAnalyze = contentType === "notes" 
-      ? (transcript.mainMeetingTakeaways || '')
-      : (transcript.transcript || '');
-    
+    const contentToAnalyze =
+      contentType === "notes"
+        ? transcript.mainMeetingTakeaways || ""
+        : transcript.transcript || "";
+
     if (!contentToAnalyze) {
       throw new Error("No content to analyze");
     }
-    
+
     // Run AI analysis
     await storage.updateProcessingStep(transcriptId, "analyzing_transcript");
     const analysis = await analyzeTranscript({
@@ -136,11 +163,11 @@ async function processTranscriptInBackground(
       categories,
       contentType,
     });
-    
+
     // Save insights with companyId
     await storage.updateProcessingStep(transcriptId, "extracting_insights");
     await storage.createProductInsights(
-      analysis.insights.map(insight => ({
+      analysis.insights.map((insight) => ({
         transcriptId: transcript.id,
         feature: insight.feature,
         context: insight.context,
@@ -149,23 +176,27 @@ async function processTranscriptInBackground(
         companyId: company.id,
         categoryId: insight.categoryId,
         product,
-      }))
+      })),
     );
-    
+
     // Save Q&A pairs with companyId and matched contactId
     await storage.updateProcessingStep(transcriptId, "extracting_qa");
     await storage.createQAPairs(
-      analysis.qaPairs.map(qa => {
+      analysis.qaPairs.map((qa) => {
         // Try to match asker name to a contact (case-insensitive)
-        const matchedContact = allContacts.find(contact => {
+        const matchedContact = allContacts.find((contact) => {
           const askerName = qa.asker.toLowerCase().trim();
-          const nameInTranscript = contact.nameInTranscript?.toLowerCase().trim();
+          const nameInTranscript = contact.nameInTranscript
+            ?.toLowerCase()
+            .trim();
           const contactName = contact.name.toLowerCase().trim();
-          
+
           // If nameInTranscript is provided, match against it; otherwise match against name
-          return nameInTranscript ? nameInTranscript === askerName : contactName === askerName;
+          return nameInTranscript
+            ? nameInTranscript === askerName
+            : contactName === askerName;
         });
-        
+
         return {
           transcriptId: transcript.id,
           question: qa.question,
@@ -177,9 +208,9 @@ async function processTranscriptInBackground(
           categoryId: qa.categoryId,
           product,
         };
-      })
+      }),
     );
-    
+
     // Handle POS system detection and linking
     await storage.updateProcessingStep(transcriptId, "detecting_pos_systems");
     if (analysis.posSystem) {
@@ -188,27 +219,38 @@ async function processTranscriptInBackground(
         analysis.posSystem.name,
         company.id,
         analysis.posSystem.websiteLink,
-        analysis.posSystem.description
+        analysis.posSystem.description,
       );
-      console.log(`POS system detected and linked: ${analysis.posSystem.name} -> ${company.name}`);
+      console.log(
+        `POS system detected and linked: ${analysis.posSystem.name} -> ${company.name}`,
+      );
     }
-    
+
     // Mark as completed with final step
     await storage.updateProcessingStep(transcriptId, "complete");
     await storage.updateTranscriptProcessingStatus(transcriptId, "completed");
     console.log(`Successfully processed transcript ${transcriptId}`);
-    
   } catch (error) {
     // Mark as failed - partial data remains linked to failed transcript for manual review/cleanup
-    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-    
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error occurred";
+
     try {
-      await storage.updateTranscriptProcessingStatus(transcriptId, "failed", errorMessage);
-      console.log(`Marked transcript ${transcriptId} as failed. Partial data retained for manual review.`);
+      await storage.updateTranscriptProcessingStatus(
+        transcriptId,
+        "failed",
+        errorMessage,
+      );
+      console.log(
+        `Marked transcript ${transcriptId} as failed. Partial data retained for manual review.`,
+      );
     } catch (statusUpdateError) {
-      console.error(`Failed to update transcript status to failed for ${transcriptId}:`, statusUpdateError);
+      console.error(
+        `Failed to update transcript status to failed for ${transcriptId}:`,
+        statusUpdateError,
+      );
     }
-    
+
     console.error(`Failed to process transcript ${transcriptId}:`, error);
     throw error;
   } finally {
@@ -221,28 +263,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   await setupAuth(app);
 
+  const mcpContext: MCPContext = {
+    db: {
+      query: async (sql: string, params?: any[]) => {
+        // delegate to existing storage/db layer
+        return storage.rawQuery(sql, params);
+      },
+    },
+  };
+
+  const mcp = createMCP(mcpContext);
+
   // Auth routes (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      
+
       // Email domain restriction: only allow leverege.com
       if (!user?.email) {
-        return res.status(403).json({ 
-          message: "Email required. Only leverege.com email addresses are allowed.",
-          code: "DOMAIN_RESTRICTED"
+        return res.status(403).json({
+          message:
+            "Email required. Only leverege.com email addresses are allowed.",
+          code: "DOMAIN_RESTRICTED",
         });
       }
-      
-      const emailDomain = user.email.split('@')[1]?.toLowerCase();
-      if (emailDomain !== 'leverege.com') {
-        return res.status(403).json({ 
-          message: "Access denied. Only leverege.com email addresses are allowed.",
-          code: "DOMAIN_RESTRICTED"
+
+      const emailDomain = user.email.split("@")[1]?.toLowerCase();
+      if (emailDomain !== "leverege.com") {
+        return res.status(403).json({
+          message:
+            "Access denied. Only leverege.com email addresses are allowed.",
+          code: "DOMAIN_RESTRICTED",
         });
       }
-      
+
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -251,7 +306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Product management routes
-  app.get('/api/products', isAuthenticated, async (req: any, res) => {
+  app.get("/api/products", isAuthenticated, async (req: any, res) => {
     try {
       // Return list of available products
       res.json({ products: PRODUCTS });
@@ -261,22 +316,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/user/product', isAuthenticated, async (req: any, res) => {
+  app.put("/api/user/product", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = req.body;
-      
+
       // Validate product
       if (!PRODUCTS.includes(product)) {
         return res.status(400).json({ message: "Invalid product" });
       }
-      
+
       const { userId } = await getUserAndProduct(req);
       const updatedUser = await storage.updateUserProduct(userId, product);
-      
+
       if (!updatedUser) {
         return res.status(404).json({ message: "User not found" });
       }
-      
+
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user product:", error);
@@ -290,16 +345,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { product } = await getUserAndProduct(req);
       const body = { ...req.body };
       // Convert createdAt string to Date if provided
-      if (body.createdAt && typeof body.createdAt === 'string') {
+      if (body.createdAt && typeof body.createdAt === "string") {
         body.createdAt = new Date(body.createdAt);
       }
-      
+
       const validatedData = insertTranscriptSchema.parse(body);
-      const data = validatedData as typeof validatedData & { customers?: Array<{ name: string; nameInTranscript?: string; jobTitle?: string }> };
-      
+      const data = validatedData as typeof validatedData & {
+        customers?: Array<{
+          name: string;
+          nameInTranscript?: string;
+          jobTitle?: string;
+        }>;
+      };
+
       // Find or create company - check by name first to prevent duplicates
       let company = await storage.getCompanyByName(product, data.companyName);
-      
+
       if (!company) {
         // Generate slug and create company
         const slug = generateSlug(data.companyName);
@@ -312,33 +373,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           product,
         });
       }
-      
+
       // Create transcript immediately with "pending" status
       const transcript = await storage.createTranscript({
         ...data,
         companyId: company.id,
         product,
       });
-      
+
       // Get all existing contacts for this company first
-      const existingContacts = await storage.getContactsByCompany(product, company.id);
-      
+      const existingContacts = await storage.getContactsByCompany(
+        product,
+        company.id,
+      );
+
       // Create or reuse contact records from validated customers array
       const contacts = [];
       if (data.customers && Array.isArray(data.customers)) {
         for (const customer of data.customers) {
           const customerNameLower = customer.name.toLowerCase().trim();
-          
+
           // Check if contact already exists by matching against both name and nameInTranscript (case-insensitive)
-          const existingContact = existingContacts.find(c => {
+          const existingContact = existingContacts.find((c) => {
             const contactNameLower = c.name.toLowerCase().trim();
-            const nameInTranscriptLower = c.nameInTranscript?.toLowerCase().trim();
-            
+            const nameInTranscriptLower = c.nameInTranscript
+              ?.toLowerCase()
+              .trim();
+
             // Match if customer name matches either the contact's name or nameInTranscript
-            return contactNameLower === customerNameLower || 
-                   (nameInTranscriptLower && nameInTranscriptLower === customerNameLower);
+            return (
+              contactNameLower === customerNameLower ||
+              (nameInTranscriptLower &&
+                nameInTranscriptLower === customerNameLower)
+            );
           });
-          
+
           if (existingContact) {
             // Reuse existing contact
             contacts.push(existingContact);
@@ -356,12 +425,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      
+
       // Trigger async AI processing in background
-      processTranscriptInBackground(transcript.id, product).catch(err => {
-        console.error(`Background processing failed for transcript ${transcript.id}:`, err);
+      processTranscriptInBackground(transcript.id, product).catch((err) => {
+        console.error(
+          `Background processing failed for transcript ${transcript.id}:`,
+          err,
+        );
       });
-      
+
       // Return 202 Accepted immediately with transcript info
       res.status(202).json({
         transcript,
@@ -389,39 +461,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transcripts = await storage.getTranscripts(product);
       res.json(transcripts);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.get("/api/companies/:companyId/transcripts", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { companyId } = req.params;
-      const transcripts = await storage.getTranscriptsByCompany(product, companyId);
-      res.json(transcripts);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+  app.get(
+    "/api/companies/:companyId/transcripts",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { companyId } = req.params;
+        const transcripts = await storage.getTranscriptsByCompany(
+          product,
+          companyId,
+        );
+        res.json(transcripts);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+      }
+    },
+  );
 
   app.patch("/api/transcripts/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, createdAt, mainMeetingTakeaways, nextSteps, supportingMaterials, transcript } = req.body;
-      const updatedTranscript = await storage.updateTranscript(id, { 
-        name: name !== undefined ? (name || null) : undefined,
+      const {
+        name,
+        createdAt,
+        mainMeetingTakeaways,
+        nextSteps,
+        supportingMaterials,
+        transcript,
+      } = req.body;
+      const updatedTranscript = await storage.updateTranscript(id, {
+        name: name !== undefined ? name || null : undefined,
         createdAt: createdAt !== undefined ? new Date(createdAt) : undefined,
-        mainMeetingTakeaways: mainMeetingTakeaways !== undefined ? (mainMeetingTakeaways || null) : undefined,
-        nextSteps: nextSteps !== undefined ? (nextSteps || null) : undefined,
-        supportingMaterials: supportingMaterials !== undefined ? (Array.isArray(supportingMaterials) ? supportingMaterials : []) : undefined,
-        transcript: transcript !== undefined ? (transcript || null) : undefined,
+        mainMeetingTakeaways:
+          mainMeetingTakeaways !== undefined
+            ? mainMeetingTakeaways || null
+            : undefined,
+        nextSteps: nextSteps !== undefined ? nextSteps || null : undefined,
+        supportingMaterials:
+          supportingMaterials !== undefined
+            ? Array.isArray(supportingMaterials)
+              ? supportingMaterials
+              : []
+            : undefined,
+        transcript: transcript !== undefined ? transcript || null : undefined,
       });
       if (!updatedTranscript) {
         return res.status(404).json({ error: "Transcript not found" });
       }
       res.json(updatedTranscript);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -429,156 +535,206 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteTranscript(id);
-      
+
       if (!success) {
         return res.status(404).json({ error: "Transcript not found" });
       }
-      
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error deleting transcript:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.post("/api/transcripts/:id/retry", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { id } = req.params;
-      
-      const transcript = await storage.getTranscript(product, id);
-      if (!transcript) {
-        return res.status(404).json({ error: "Transcript not found" });
-      }
-      
-      // Only allow retrying failed, pending, or stuck processing transcripts
-      // (Processing transcripts can get stuck when server restarts)
-      if (transcript.processingStatus !== "failed" && 
-          transcript.processingStatus !== "pending" && 
-          transcript.processingStatus !== "processing") {
-        return res.status(400).json({ error: "Can only retry failed, pending, or processing transcripts" });
-      }
-      
-      // Reset the transcript to pending status
-      await storage.updateTranscriptProcessingStatus(id, "pending");
-      
-      // Trigger background processing
-      processTranscriptInBackground(id, product).catch(error => {
-        console.error(`Background processing error for transcript ${id}:`, error);
-      });
-      
-      res.json({ success: true, message: "Transcript processing restarted" });
-    } catch (error) {
-      console.error("Error retrying transcript:", error);
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+  app.post(
+    "/api/transcripts/:id/retry",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { id } = req.params;
 
-  app.get("/api/transcripts/:id/details", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { id } = req.params;
-      const transcript = await storage.getTranscript(product, id);
-      
-      if (!transcript) {
-        return res.status(404).json({ error: "Transcript not found" });
+        const transcript = await storage.getTranscript(product, id);
+        if (!transcript) {
+          return res.status(404).json({ error: "Transcript not found" });
+        }
+
+        // Only allow retrying failed, pending, or stuck processing transcripts
+        // (Processing transcripts can get stuck when server restarts)
+        if (
+          transcript.processingStatus !== "failed" &&
+          transcript.processingStatus !== "pending" &&
+          transcript.processingStatus !== "processing"
+        ) {
+          return res
+            .status(400)
+            .json({
+              error:
+                "Can only retry failed, pending, or processing transcripts",
+            });
+        }
+
+        // Reset the transcript to pending status
+        await storage.updateTranscriptProcessingStatus(id, "pending");
+
+        // Trigger background processing
+        processTranscriptInBackground(id, product).catch((error) => {
+          console.error(
+            `Background processing error for transcript ${id}:`,
+            error,
+          );
+        });
+
+        res.json({ success: true, message: "Transcript processing restarted" });
+      } catch (error) {
+        console.error("Error retrying transcript:", error);
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
       }
+    },
+  );
 
-      const [insights, qaPairs, company] = await Promise.all([
-        storage.getProductInsightsByTranscript(product, id),
-        storage.getQAPairsByTranscript(product, id),
-        transcript.companyId ? storage.getCompany(product, transcript.companyId) : Promise.resolve(undefined),
-      ]);
+  app.get(
+    "/api/transcripts/:id/details",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { id } = req.params;
+        const transcript = await storage.getTranscript(product, id);
 
-      res.json({
-        transcript,
-        insights,
-        qaPairs,
-        company,
-      });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+        if (!transcript) {
+          return res.status(404).json({ error: "Transcript not found" });
+        }
+
+        const [insights, qaPairs, company] = await Promise.all([
+          storage.getProductInsightsByTranscript(product, id),
+          storage.getQAPairsByTranscript(product, id),
+          transcript.companyId
+            ? storage.getCompany(product, transcript.companyId)
+            : Promise.resolve(undefined),
+        ]);
+
+        res.json({
+          transcript,
+          insights,
+          qaPairs,
+          company,
+        });
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+      }
+    },
+  );
 
   // Product Insights
   app.get("/api/insights", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const insights = await storage.getProductInsights(product);
-      
+
       // Add usage count for each category
       const categories = await storage.getCategories(product);
       const categoryUsage = new Map<string, number>();
-      
-      insights.forEach(insight => {
+
+      insights.forEach((insight) => {
         if (insight.categoryId) {
           categoryUsage.set(
             insight.categoryId,
-            (categoryUsage.get(insight.categoryId) || 0) + 1
+            (categoryUsage.get(insight.categoryId) || 0) + 1,
           );
         }
       });
-      
-      const enrichedInsights: Array<ProductInsightWithCategory & { categoryUsageCount?: number }> = insights.map(insight => ({
+
+      const enrichedInsights: Array<
+        ProductInsightWithCategory & { categoryUsageCount?: number }
+      > = insights.map((insight) => ({
         ...insight,
-        categoryUsageCount: insight.categoryId ? categoryUsage.get(insight.categoryId) : undefined,
+        categoryUsageCount: insight.categoryId
+          ? categoryUsage.get(insight.categoryId)
+          : undefined,
       }));
-      
+
       res.json(enrichedInsights);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.patch("/api/insights/:id/category", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { id } = req.params;
-      const { categoryId } = req.body;
-      
-      // Validate categoryId if provided
-      if (categoryId !== null && typeof categoryId !== 'string') {
-        res.status(400).json({ error: "Invalid categoryId" });
-        return;
-      }
-      
-      if (categoryId) {
-        const category = await storage.getCategory(product, categoryId);
-        if (!category) {
-          res.status(400).json({ error: "Category not found" });
+  app.patch(
+    "/api/insights/:id/category",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { id } = req.params;
+        const { categoryId } = req.body;
+
+        // Validate categoryId if provided
+        if (categoryId !== null && typeof categoryId !== "string") {
+          res.status(400).json({ error: "Invalid categoryId" });
           return;
         }
+
+        if (categoryId) {
+          const category = await storage.getCategory(product, categoryId);
+          if (!category) {
+            res.status(400).json({ error: "Category not found" });
+            return;
+          }
+        }
+
+        const success = await storage.assignCategoryToInsight(id, categoryId);
+
+        if (!success) {
+          res.status(404).json({ error: "Insight not found" });
+          return;
+        }
+
+        res.json({ success: true });
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
       }
-      
-      const success = await storage.assignCategoryToInsight(id, categoryId);
-      
-      if (!success) {
-        res.status(404).json({ error: "Insight not found" });
-        return;
-      }
-      
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+    },
+  );
 
   app.patch("/api/insights/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { feature, context, quote, company } = req.body;
-      
+
       if (!feature || !context || !quote || !company) {
-        res.status(400).json({ error: "Feature, context, quote, and company are required" });
+        res
+          .status(400)
+          .json({ error: "Feature, context, quote, and company are required" });
         return;
       }
-      
+
       // Find or create company to get companyId
       const slug = generateSlug(company);
       let companyRecord = await storage.getCompanyBySlug(product, slug);
-      
+
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
           name: company,
@@ -587,17 +743,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
           product,
         });
       }
-      
-      const insight = await storage.updateProductInsight(id, feature, context, quote, company, companyRecord.id);
-      
+
+      const insight = await storage.updateProductInsight(
+        id,
+        feature,
+        context,
+        quote,
+        company,
+        companyRecord.id,
+      );
+
       if (!insight) {
         res.status(404).json({ error: "Insight not found" });
         return;
       }
-      
+
       res.json(insight);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -605,15 +772,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteProductInsight(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "Insight not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -621,16 +792,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { product } = await getUserAndProduct(req);
       const { feature, context, quote, company, categoryId } = req.body;
-      
+
       if (!feature || !context || !quote || !company) {
-        res.status(400).json({ error: "Feature, context, quote, and company are required" });
+        res
+          .status(400)
+          .json({ error: "Feature, context, quote, and company are required" });
         return;
       }
-      
+
       // Find or create company
       const slug = generateSlug(company);
       let companyRecord = await storage.getCompanyBySlug(product, slug);
-      
+
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
           name: company,
@@ -639,7 +812,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           product,
         });
       }
-      
+
       const insight = await storage.createProductInsight({
         transcriptId: null,
         feature,
@@ -650,10 +823,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categoryId: categoryId || null,
         product,
       });
-      
+
       res.json(insight);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -662,74 +839,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { product } = await getUserAndProduct(req);
       const qaPairs = await storage.getQAPairs(product);
-      
+
       // Add usage count for each category (for consistency with insights)
       const categories = await storage.getCategories(product);
       const categoryUsage = new Map<string, number>();
-      
-      qaPairs.forEach(qa => {
+
+      qaPairs.forEach((qa) => {
         if (qa.categoryId) {
           categoryUsage.set(
             qa.categoryId,
-            (categoryUsage.get(qa.categoryId) || 0) + 1
+            (categoryUsage.get(qa.categoryId) || 0) + 1,
           );
         }
       });
-      
+
       res.json(qaPairs);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.patch("/api/qa-pairs/:id/category", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { id } = req.params;
-      const { categoryId } = req.body;
-      
-      // Validate categoryId if provided
-      if (categoryId !== null && typeof categoryId !== 'string') {
-        res.status(400).json({ error: "Invalid categoryId" });
-        return;
-      }
-      
-      if (categoryId) {
-        const category = await storage.getCategory(product, categoryId);
-        if (!category) {
-          res.status(400).json({ error: "Category not found" });
+  app.patch(
+    "/api/qa-pairs/:id/category",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { id } = req.params;
+        const { categoryId } = req.body;
+
+        // Validate categoryId if provided
+        if (categoryId !== null && typeof categoryId !== "string") {
+          res.status(400).json({ error: "Invalid categoryId" });
           return;
         }
+
+        if (categoryId) {
+          const category = await storage.getCategory(product, categoryId);
+          if (!category) {
+            res.status(400).json({ error: "Category not found" });
+            return;
+          }
+        }
+
+        const success = await storage.assignCategoryToQAPair(id, categoryId);
+
+        if (!success) {
+          res.status(404).json({ error: "Q&A pair not found" });
+          return;
+        }
+
+        res.json({ success: true });
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
       }
-      
-      const success = await storage.assignCategoryToQAPair(id, categoryId);
-      
-      if (!success) {
-        res.status(404).json({ error: "Q&A pair not found" });
-        return;
-      }
-      
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+    },
+  );
 
   app.patch("/api/qa-pairs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { question, answer, asker, company, contactId } = req.body;
-      
+
       if (!question || !answer || !asker || !company) {
-        res.status(400).json({ error: "Question, answer, asker, and company are required" });
+        res
+          .status(400)
+          .json({ error: "Question, answer, asker, and company are required" });
         return;
       }
-      
+
       // Find or create company to get companyId
       const slug = generateSlug(company);
       let companyRecord = await storage.getCompanyBySlug(product, slug);
-      
+
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
           name: company,
@@ -738,17 +929,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           product,
         });
       }
-      
-      const qaPair = await storage.updateQAPair(id, question, answer, asker, company, companyRecord.id, contactId);
-      
+
+      const qaPair = await storage.updateQAPair(
+        id,
+        question,
+        answer,
+        asker,
+        company,
+        companyRecord.id,
+        contactId,
+      );
+
       if (!qaPair) {
         res.status(404).json({ error: "Q&A pair not found" });
         return;
       }
-      
+
       res.json(qaPair);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -756,15 +959,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteQAPair(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "Q&A pair not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -772,34 +979,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { isStarred } = req.body;
-      
+
       const qaPair = await storage.toggleQAPairStar(id, isStarred);
-      
+
       if (!qaPair) {
         res.status(404).json({ error: "Q&A pair not found" });
         return;
       }
-      
+
       res.json(qaPair);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
   app.post("/api/qa-pairs", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
-      const { question, answer, asker, company, categoryId, contactId } = req.body;
-      
+      const { question, answer, asker, company, categoryId, contactId } =
+        req.body;
+
       if (!question || !answer || !asker || !company) {
-        res.status(400).json({ error: "Question, answer, asker, and company are required" });
+        res
+          .status(400)
+          .json({ error: "Question, answer, asker, and company are required" });
         return;
       }
-      
+
       // Find or create company
       const slug = generateSlug(company);
       let companyRecord = await storage.getCompanyBySlug(product, slug);
-      
+
       if (!companyRecord) {
         companyRecord = await storage.createCompany({
           name: company,
@@ -808,7 +1022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           product,
         });
       }
-      
+
       const qaPair = await storage.createQAPair({
         transcriptId: null,
         question,
@@ -820,143 +1034,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
         categoryId: categoryId || null,
         product,
       });
-      
+
       res.json(qaPair);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
   // File upload and text extraction
-  app.post("/api/extract-text-from-file", isAuthenticated, upload.single('file'), async (req: any, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
+  app.post(
+    "/api/extract-text-from-file",
+    isAuthenticated,
+    upload.single("file"),
+    async (req: any, res) => {
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
 
-      const text = await extractTextFromFile(req.file.buffer, req.file.originalname);
-      
-      res.json({ 
-        text,
-        filename: req.file.originalname,
-        size: req.file.size
-      });
-    } catch (error) {
-      console.error("Error extracting text from file:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "Failed to extract text from file" 
-      });
-    }
-  });
+        const text = await extractTextFromFile(
+          req.file.buffer,
+          req.file.originalname,
+        );
+
+        res.json({
+          text,
+          filename: req.file.originalname,
+          size: req.file.size,
+        });
+      } catch (error) {
+        console.error("Error extracting text from file:", error);
+        res.status(500).json({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to extract text from file",
+        });
+      }
+    },
+  );
 
   // URL text extraction
-  app.post("/api/extract-text-from-url", isAuthenticated, async (req: any, res) => {
-    try {
-      const { url } = req.body;
-      
-      if (!url) {
-        return res.status(400).json({ error: "URL is required" });
-      }
+  app.post(
+    "/api/extract-text-from-url",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { url } = req.body;
 
-      const text = await extractTextFromUrl(url);
-      
-      res.json({ 
-        text,
-        url
-      });
-    } catch (error) {
-      console.error("Error extracting text from URL:", error);
-      res.status(500).json({ 
-        error: error instanceof Error ? error.message : "Failed to extract text from URL" 
-      });
-    }
-  });
+        if (!url) {
+          return res.status(400).json({ error: "URL is required" });
+        }
+
+        const text = await extractTextFromUrl(url);
+
+        res.json({
+          text,
+          url,
+        });
+      } catch (error) {
+        console.error("Error extracting text from URL:", error);
+        res.status(500).json({
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to extract text from URL",
+        });
+      }
+    },
+  );
 
   // Categories
   app.get("/api/categories", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const categories = await storage.getCategories(product);
-      
+
       // Add usage count for insights in each category
       const insights = await storage.getProductInsights(product);
       const insightUsage = new Map<string, number>();
-      
-      insights.forEach(insight => {
+
+      insights.forEach((insight) => {
         if (insight.categoryId) {
           insightUsage.set(
             insight.categoryId,
-            (insightUsage.get(insight.categoryId) || 0) + 1
+            (insightUsage.get(insight.categoryId) || 0) + 1,
           );
         }
       });
-      
+
       // Add Q&A pair count for each category
       const qaPairs = await storage.getQAPairs(product);
       const qaUsage = new Map<string, number>();
-      
-      qaPairs.forEach(qa => {
+
+      qaPairs.forEach((qa) => {
         if (qa.categoryId) {
-          qaUsage.set(
-            qa.categoryId,
-            (qaUsage.get(qa.categoryId) || 0) + 1
-          );
+          qaUsage.set(qa.categoryId, (qaUsage.get(qa.categoryId) || 0) + 1);
         }
       });
-      
-      const categoriesWithCount = categories.map(cat => ({
+
+      const categoriesWithCount = categories.map((cat) => ({
         ...cat,
         usageCount: insightUsage.get(cat.id) || 0,
         qaCount: qaUsage.get(cat.id) || 0,
       }));
-      
+
       res.json(categoriesWithCount);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.get("/api/categories/company-stats", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const categories = await storage.getCategories(product);
-      const insights = await storage.getProductInsights(product);
-      const qaPairs = await storage.getQAPairs(product);
-      
-      // Count unique companies per category for insights
-      const insightCompanyCount = new Map<string, Set<string>>();
-      insights.forEach(insight => {
-        if (insight.categoryId && insight.companyId) {
-          if (!insightCompanyCount.has(insight.categoryId)) {
-            insightCompanyCount.set(insight.categoryId, new Set());
+  app.get(
+    "/api/categories/company-stats",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const categories = await storage.getCategories(product);
+        const insights = await storage.getProductInsights(product);
+        const qaPairs = await storage.getQAPairs(product);
+
+        // Count unique companies per category for insights
+        const insightCompanyCount = new Map<string, Set<string>>();
+        insights.forEach((insight) => {
+          if (insight.categoryId && insight.companyId) {
+            if (!insightCompanyCount.has(insight.categoryId)) {
+              insightCompanyCount.set(insight.categoryId, new Set());
+            }
+            insightCompanyCount.get(insight.categoryId)!.add(insight.companyId);
           }
-          insightCompanyCount.get(insight.categoryId)!.add(insight.companyId);
-        }
-      });
-      
-      // Count unique companies per category for Q&A pairs
-      const qaCompanyCount = new Map<string, Set<string>>();
-      qaPairs.forEach(qa => {
-        if (qa.categoryId && qa.companyId) {
-          if (!qaCompanyCount.has(qa.categoryId)) {
-            qaCompanyCount.set(qa.categoryId, new Set());
+        });
+
+        // Count unique companies per category for Q&A pairs
+        const qaCompanyCount = new Map<string, Set<string>>();
+        qaPairs.forEach((qa) => {
+          if (qa.categoryId && qa.companyId) {
+            if (!qaCompanyCount.has(qa.categoryId)) {
+              qaCompanyCount.set(qa.categoryId, new Set());
+            }
+            qaCompanyCount.get(qa.categoryId)!.add(qa.companyId);
           }
-          qaCompanyCount.get(qa.categoryId)!.add(qa.companyId);
-        }
-      });
-      
-      const categoryStats = categories.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        insightCompanyCount: insightCompanyCount.get(cat.id)?.size || 0,
-        qaCompanyCount: qaCompanyCount.get(cat.id)?.size || 0,
-      }));
-      
-      res.json(categoryStats);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+        });
+
+        const categoryStats = categories.map((cat) => ({
+          id: cat.id,
+          name: cat.name,
+          insightCompanyCount: insightCompanyCount.get(cat.id)?.size || 0,
+          qaCompanyCount: qaCompanyCount.get(cat.id)?.size || 0,
+        }));
+
+        res.json(categoryStats);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+      }
+    },
+  );
 
   app.post("/api/categories", isAuthenticated, async (req: any, res) => {
     try {
@@ -982,22 +1227,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { name, description } = req.body;
-      
-      if (!name || typeof name !== 'string') {
+
+      if (!name || typeof name !== "string") {
         res.status(400).json({ error: "Name is required" });
         return;
       }
-      
+
       const category = await storage.updateCategory(id, name, description);
-      
+
       if (!category) {
         res.status(404).json({ error: "Category not found" });
         return;
       }
-      
+
       res.json(category);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1005,34 +1254,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteCategory(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "Category not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.get("/api/categories/:id/overview", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { id } = req.params;
-      const overview = await storage.getCategoryOverview(product, id);
-      
-      if (!overview) {
-        res.status(404).json({ error: "Category not found" });
-        return;
+  app.get(
+    "/api/categories/:id/overview",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { id } = req.params;
+        const overview = await storage.getCategoryOverview(product, id);
+
+        if (!overview) {
+          res.status(404).json({ error: "Category not found" });
+          return;
+        }
+
+        res.json(overview);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
       }
-      
-      res.json(overview);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+    },
+  );
 
   // Features
   app.get("/api/features", isAuthenticated, async (req: any, res) => {
@@ -1041,7 +1302,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const features = await storage.getFeatures(product);
       res.json(features);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1050,15 +1315,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const feature = await storage.getFeature(product, id);
-      
+
       if (!feature) {
         res.status(404).json({ error: "Feature not found" });
         return;
       }
-      
+
       res.json(feature);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1089,25 +1358,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/features/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, description, value, videoLink, helpGuideLink, categoryId, releaseDate } = req.body;
-      
-      if (!name || typeof name !== 'string') {
+      const {
+        name,
+        description,
+        value,
+        videoLink,
+        helpGuideLink,
+        categoryId,
+        releaseDate,
+      } = req.body;
+
+      if (!name || typeof name !== "string") {
         res.status(400).json({ error: "Name is required" });
         return;
       }
-      
+
       const releaseDateValue = releaseDate ? new Date(releaseDate) : undefined;
-      
-      const feature = await storage.updateFeature(id, name, description, value, videoLink, helpGuideLink, categoryId, releaseDateValue);
-      
+
+      const feature = await storage.updateFeature(
+        id,
+        name,
+        description,
+        value,
+        videoLink,
+        helpGuideLink,
+        categoryId,
+        releaseDateValue,
+      );
+
       if (!feature) {
         res.status(404).json({ error: "Feature not found" });
         return;
       }
-      
+
       res.json(feature);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1115,15 +1405,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteFeature(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "Feature not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1134,7 +1428,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companies = await storage.getCompanies(product);
       res.json(companies);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1142,69 +1440,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { product } = await getUserAndProduct(req);
       const companies = await storage.getCompanies(product);
-      const stageStats = companies.reduce((acc, company) => {
-        const stage = company.stage || 'Unknown';
-        acc[stage] = (acc[stage] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>);
+      const stageStats = companies.reduce(
+        (acc, company) => {
+          const stage = company.stage || "Unknown";
+          acc[stage] = (acc[stage] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
 
       res.json({ stageStats });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.get("/api/dashboard/recent-transcripts", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      const allTranscripts = await storage.getTranscripts(product);
-      const recentTranscripts = allTranscripts
-        .filter(t => new Date(t.createdAt) >= sevenDaysAgo)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 10);
+  app.get(
+    "/api/dashboard/recent-transcripts",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      res.json(recentTranscripts);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+        const allTranscripts = await storage.getTranscripts(product);
+        const recentTranscripts = allTranscripts
+          .filter((t) => new Date(t.createdAt) >= sevenDaysAgo)
+          .sort(
+            (a, b) =>
+              new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          )
+          .slice(0, 10);
+
+        res.json(recentTranscripts);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+      }
+    },
+  );
 
   app.get("/api/companies/:slug", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const { slug } = req.params;
       const company = await storage.getCompanyBySlug(product, slug);
-      
+
       if (!company) {
         res.status(404).json({ error: "Company not found" });
         return;
       }
-      
+
       res.json(company);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.get("/api/companies/:slug/overview", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { slug } = req.params;
-      const overview = await storage.getCompanyOverview(product, slug);
-      
-      if (!overview) {
-        res.status(404).json({ error: "Company not found" });
-        return;
+  app.get(
+    "/api/companies/:slug/overview",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { slug } = req.params;
+        const overview = await storage.getCompanyOverview(product, slug);
+
+        if (!overview) {
+          res.status(404).json({ error: "Company not found" });
+          return;
+        }
+
+        res.json(overview);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
       }
-      
-      res.json(overview);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+    },
+  );
 
   app.post("/api/companies", isAuthenticated, async (req: any, res) => {
     try {
@@ -1229,27 +1557,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/companies/:id", isAuthenticated, async (req, res) => {
     try {
       const { id } = req.params;
-      const { name, notes, companyDescription, numberOfStores, stage, pilotStartDate, serviceTags } = req.body;
-      
-      if (!name || typeof name !== 'string') {
+      const {
+        name,
+        notes,
+        companyDescription,
+        numberOfStores,
+        stage,
+        pilotStartDate,
+        serviceTags,
+      } = req.body;
+
+      if (!name || typeof name !== "string") {
         res.status(400).json({ error: "Name is required" });
         return;
       }
-      
-      const pilotStartDateValue = pilotStartDate ? new Date(pilotStartDate) : null;
-      
-      const company = await storage.updateCompany(id, name, notes, companyDescription, numberOfStores, stage, pilotStartDateValue, serviceTags);
-      
+
+      const pilotStartDateValue = pilotStartDate
+        ? new Date(pilotStartDate)
+        : null;
+
+      const company = await storage.updateCompany(
+        id,
+        name,
+        notes,
+        companyDescription,
+        numberOfStores,
+        stage,
+        pilotStartDateValue,
+        serviceTags,
+      );
+
       if (!company) {
         res.status(404).json({ error: "Company not found" });
         return;
       }
-      
+
       await storage.updateCompanyNameInRelatedRecords(id, name);
-      
+
       res.json(company);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1257,29 +1608,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteCompany(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "Company not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
   // Contacts
-  app.get("/api/contacts/company/:companyId", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { companyId } = req.params;
-      const contacts = await storage.getContactsByCompany(product, companyId);
-      res.json(contacts);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+  app.get(
+    "/api/contacts/company/:companyId",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { companyId } = req.params;
+        const contacts = await storage.getContactsByCompany(product, companyId);
+        res.json(contacts);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
+      }
+    },
+  );
 
   app.post("/api/contacts", isAuthenticated, async (req, res) => {
     try {
@@ -1301,22 +1664,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { name, nameInTranscript, jobTitle } = req.body;
-      
+
       if (!name) {
         res.status(400).json({ error: "Name is required" });
         return;
       }
-      
-      const contact = await storage.updateContact(id, name, nameInTranscript, jobTitle);
-      
+
+      const contact = await storage.updateContact(
+        id,
+        name,
+        nameInTranscript,
+        jobTitle,
+      );
+
       if (!contact) {
         res.status(404).json({ error: "Contact not found" });
         return;
       }
-      
+
       res.json(contact);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1324,35 +1696,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deleteContact(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "Contact not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
-  app.post("/api/companies/:companyId/merge-duplicate-contacts", isAuthenticated, async (req: any, res) => {
-    try {
-      const { product } = await getUserAndProduct(req);
-      const { companyId } = req.params;
-      
-      const company = await storage.getCompany(product, companyId);
-      if (!company) {
-        res.status(404).json({ error: "Company not found" });
-        return;
+  app.post(
+    "/api/companies/:companyId/merge-duplicate-contacts",
+    isAuthenticated,
+    async (req: any, res) => {
+      try {
+        const { product } = await getUserAndProduct(req);
+        const { companyId } = req.params;
+
+        const company = await storage.getCompany(product, companyId);
+        if (!company) {
+          res.status(404).json({ error: "Company not found" });
+          return;
+        }
+
+        const result = await storage.mergeDuplicateContacts(product, companyId);
+        res.json(result);
+      } catch (error) {
+        res
+          .status(500)
+          .json({
+            error: error instanceof Error ? error.message : "Unknown error",
+          });
       }
-      
-      const result = await storage.mergeDuplicateContacts(product, companyId);
-      res.json(result);
-    } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
-    }
-  });
+    },
+  );
 
   // POS Systems routes
   app.get("/api/pos-systems", isAuthenticated, async (req: any, res) => {
@@ -1361,7 +1745,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const systems = await storage.getPOSSystems(product);
       res.json(systems);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1370,15 +1758,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const system = await storage.getPOSSystem(product, id);
-      
+
       if (!system) {
         res.status(404).json({ error: "POS system not found" });
         return;
       }
-      
+
       res.json(system);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1396,7 +1788,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.status(400).json({ error: fromZodError(error).message });
         return;
       }
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1404,22 +1800,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { name, websiteLink, description, companyIds } = req.body;
-      
+
       if (!name) {
         res.status(400).json({ error: "Name is required" });
         return;
       }
-      
-      const system = await storage.updatePOSSystem(id, name, websiteLink, description, companyIds);
-      
+
+      const system = await storage.updatePOSSystem(
+        id,
+        name,
+        websiteLink,
+        description,
+        companyIds,
+      );
+
       if (!system) {
         res.status(404).json({ error: "POS system not found" });
         return;
       }
-      
+
       res.json(system);
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
@@ -1427,18 +1833,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const success = await storage.deletePOSSystem(id);
-      
+
       if (!success) {
         res.status(404).json({ error: "POS system not found" });
         return;
       }
-      
+
       res.json({ success: true });
     } catch (error) {
-      res.status(500).json({ error: error instanceof Error ? error.message : "Unknown error" });
+      res
+        .status(500)
+        .json({
+          error: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   });
 
+  app.post("/api/mcp/run", isAuthenticated, async (req: any, res, next) => {
+    try {
+      const { capability, input } = req.body;
+
+      if (!capability) {
+        return res.status(400).json({ error: "capability is required" });
+      }
+
+      const result = await mcp.run(capability, input ?? {});
+
+      res.json({ result });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   const httpServer = createServer(app);
 
