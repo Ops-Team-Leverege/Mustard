@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { registerSlackRoutes } from "./slack";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
@@ -1865,6 +1866,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  registerSlackRoutes(app);
+  
   const httpServer = createServer(app);
 
   return httpServer;

@@ -4,10 +4,9 @@ import { z } from "zod";
 
 export type MCPContext = {
   db: {
-    query: (sql: string, params?: any[]) => Promise<any[]>;
+    query: (sql: string) => Promise<any[]>;
   };
 };
-
 /**
  * Helper type so every capability looks the same
  */
@@ -16,4 +15,5 @@ export type Capability = {
   description: string;
   inputSchema: z.ZodSchema<any>;
   handler: (ctx: MCPContext, input: any) => Promise<any>;
+
 };

@@ -2,6 +2,8 @@
 import type { MCPContext } from "./types";
 import { capabilities } from "./capabilities";
 
+
+
 export function createMCP(ctx: MCPContext) {
   return {
     async run(name: string, input: unknown) {
