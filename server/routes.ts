@@ -264,6 +264,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   await setupAuth(app);
 
+  registerSlackRoutes(app);
+  console.log("Slack routes registered at /api/slack/events");
+  
   const mcpContext: MCPContext = {
     db: {
       query: async (sql: string, params?: any[]) => {
@@ -1865,8 +1868,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(err);
     }
   });
-
-  registerSlackRoutes(app);
   
   const httpServer = createServer(app);
 
