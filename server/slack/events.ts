@@ -64,13 +64,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const ctx = makeMCPContext();
     const mcp = createMCP(ctx);
 
-    const result = await mcp.runFromText(text);
+    try {
+      const result = await mcp.runFromText(text);
 
-    await postSlackMessage({
-      channel,
-      text: String(result),
-      thread_ts: threadTs,
-    });
+      await postSlackMessage({
+        channel,
+        text: String(result),
+        thread_ts: threadTs,
+      });
+    } catch (err) {
+      console.error("MCP execution failed:", err);
+
+      await postSlackMessage({
+        channel,
+        text: "Sorry — I hit an internal error while processing that request.",
+        thread_ts: threadTs,
+      });
+    }
   } catch (err) {
     console.error("Slack event handler error:", err);
     // If we haven't responded yet, send error
