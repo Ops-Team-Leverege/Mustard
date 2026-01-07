@@ -20,8 +20,16 @@ export function verifySlackSignature(req: Request): boolean {
     return false;
   }
 
-  const body =
-    Buffer.isBuffer(req.body) ? req.body.toString("utf8") : String(req.body);
+  // Get raw body string for signature verification
+  let body: string;
+  if (Buffer.isBuffer(req.body)) {
+    body = req.body.toString("utf8");
+  } else if (typeof req.body === "object") {
+    // If express.json already parsed it, stringify it back
+    body = JSON.stringify(req.body);
+  } else {
+    body = String(req.body);
+  }
 
   const baseString = `v0:${timestamp}:${body}`;
 

@@ -1,5 +1,4 @@
 import type { Express } from "express";
-import { registerSlackRoutes } from "./slack";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
@@ -264,8 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   await setupAuth(app);
 
-  registerSlackRoutes(app);
-  console.log("Slack routes registered at /api/slack/events");
+  // Note: Slack routes are registered in index.ts BEFORE express.json() to preserve raw body
   
   const mcpContext: MCPContext = {
     db: {

@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { registerSlackRoutes } from "./slack";
 
 const app = express();
 // app.use(express.json());
@@ -37,7 +38,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  // JSON body parser must be added BEFORE routes
+  // Register Slack routes FIRST (before express.json) to preserve raw body for signature verification
+  registerSlackRoutes(app);
+  console.log("Slack routes registered at /api/slack/events");
+
+  // JSON body parser for all other routes
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
 

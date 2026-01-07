@@ -13,9 +13,26 @@ const seenEventIds = new Set<string>();
 
 export async function slackEventsHandler(req: Request, res: Response) {
   try {
-    // Parse the raw body
-    const bodyString = req.body.toString("utf8");
-    const payload = JSON.parse(bodyString);
+    // Handle body in multiple formats:
+    // - Buffer (from express.raw middleware)
+    // - Object (if express.json already parsed it)
+    // - String
+    let payload;
+    if (Buffer.isBuffer(req.body)) {
+      const bodyString = req.body.toString("utf8");
+      try {
+        payload = JSON.parse(bodyString);
+      } catch (parseErr) {
+        console.error("Failed to parse Slack payload:", parseErr);
+        return res.status(400).send("Invalid JSON");
+      }
+    } else if (typeof req.body === "object" && req.body !== null) {
+      // Already parsed by express.json
+      payload = req.body;
+    } else {
+      console.error("Unexpected body type:", typeof req.body);
+      return res.status(400).send("Invalid request body");
+    }
 
     // 1. URL verification handshake (do this FIRST, before signature check)
     if (payload.type === "url_verification") {
