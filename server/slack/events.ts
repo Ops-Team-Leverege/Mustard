@@ -33,8 +33,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
     res.status(200).send();
 
     // 4. Only handle event callbacks
-    if (payload.type !== "event_callback") return;
+    console.log("Slack payload type:", payload.type);
 
+    if (payload.type !== "event_callback") {
+      console.log("Not an event_callback");
+      return;
+    }
+
+    console.log("Event type:", payload.event?.type);
+
+    if (payload.event?.type !== "app_mention") {
+      console.log("Not an app_mention");
+      return;
+    }
     // 5. Dedupe events
     const eventId = String(payload.event_id || "");
     if (eventId && seenEventIds.has(eventId)) return;
