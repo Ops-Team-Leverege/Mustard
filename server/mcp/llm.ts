@@ -1,30 +1,39 @@
- import { OpenAI } from "openai";
+import { OpenAI } from "openai";
+import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
- export type CapabilityDescriptor = {
-   name: string;
-   description: string;
-   parameters: unknown; // JSON Schema
- };
+export type CapabilityDescriptor = {
+  name: string;
+  description: string;
+  parameters: z.ZodType<any>; // Zod schema
+};
 
- const openai = new OpenAI({
-   apiKey: process.env.OPENAI_API_KEY!,
- });
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
- export async function decideCapability({
-   text,
-   capabilities,
- }: {
-   text: string;
-   capabilities: CapabilityDescriptor[];
- }) {
-   const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = capabilities.map(c => ({
-     type: "function" as const,
-     function: {
-       name: c.name,
-       description: c.description,
-       parameters: c.parameters as Record<string, unknown>,
-     },
-   }));
+export async function decideCapability({
+  text,
+  capabilities,
+}: {
+  text: string;
+  capabilities: CapabilityDescriptor[];
+}) {
+  const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = capabilities.map(c => {
+    // Convert Zod schema to JSON Schema for OpenAI
+    const jsonSchema = zodToJsonSchema(c.parameters, { target: "openApi3" });
+    // Remove $schema wrapper that zodToJsonSchema adds
+    const { $schema, ...schemaWithoutMeta } = jsonSchema as Record<string, unknown>;
+    
+    return {
+      type: "function" as const,
+      function: {
+        name: c.name,
+        description: c.description,
+        parameters: schemaWithoutMeta,
+      },
+    };
+  });
 
    const response = await openai.chat.completions.create({
      model: "gpt-4o-mini",

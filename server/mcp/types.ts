@@ -4,7 +4,7 @@ import { z } from "zod";
 
 export type MCPContext = {
   db: {
-    query: (sql: string) => Promise<any[]>;
+    query: (sql: string, params?: any[]) => Promise<any[]>;
   };
 };
 /**

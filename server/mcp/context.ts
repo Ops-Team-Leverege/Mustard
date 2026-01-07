@@ -4,8 +4,8 @@ import { storage } from "../storage";
 export function makeMCPContext(): MCPContext {
   return {
     db: {
-      async query(sql: string) {
-        return storage.rawQuery(sql);
+      async query(sql: string, params?: any[]) {
+        return storage.rawQuery(sql, params);
       },
     },
   };
