@@ -261,14 +261,6 @@ async function processTranscriptInBackground(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // DEBUG: Log ALL incoming requests
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      console.log(`[DEBUG-GLOBAL] ${req.method} ${req.path} - body keys: ${req.body ? Object.keys(req.body).join(', ') : 'NO BODY'}`);
-    }
-    next();
-  });
-
   // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   await setupAuth(app);
 
@@ -360,9 +352,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (body.createdAt && typeof body.createdAt === "string") {
         body.createdAt = new Date(body.createdAt);
       }
-
-      // DEBUG: Log request body to identify validation issues
-      console.log("[DEBUG] Transcript request body:", JSON.stringify(body, null, 2));
 
       const validatedData = insertTranscriptSchema.parse(body);
       const data = validatedData as typeof validatedData & {
@@ -461,8 +450,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        // DEBUG: Log full Zod error details
-        console.log("[DEBUG] Zod validation error:", JSON.stringify(error.errors, null, 2));
         res.status(400).json({ error: error.errors });
       } else if (error instanceof Error) {
         res.status(500).json({ error: error.message });
