@@ -12,17 +12,19 @@ function cleanMention(text: string): string {
 const seenEventIds = new Set<string>();
 
 export async function slackEventsHandler(req: Request, res: Response) {
-  // 1. Verify Slack signature
-  if (!verifySlackSignature(req)) {
-    res.status(401).send("Invalid Slack signature");
-    return;
-  }
-
+  
   const payload = JSON.parse(req.body.toString("utf8"));
 
-  // 2. URL verification handshake
+
+  // 1. URL verification handshake
   if (payload.type === "url_verification") {
     res.status(200).json({ challenge: payload.challenge });
+    return;
+  }
+  
+  // 2. Verify Slack signature
+  if (!verifySlackSignature(req)) {
+    res.status(401).send("Invalid Slack signature");
     return;
   }
 

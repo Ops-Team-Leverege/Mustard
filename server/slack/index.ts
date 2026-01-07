@@ -4,7 +4,7 @@ import { slackEventsHandler } from "./events";
 
 export function registerSlackRoutes(app: Express) {
   app.post(
-    "/slack/events",
+    "api/slack/events",
     express.raw({ type: "application/json" }),
     slackEventsHandler
   );
