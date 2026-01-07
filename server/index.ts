@@ -37,10 +37,11 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  const server = await registerRoutes(app);
-
+  // JSON body parser must be added BEFORE routes
   app.use(express.json());
   app.use(express.urlencoded({ extended: false }));
+
+  const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
