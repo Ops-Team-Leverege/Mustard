@@ -261,6 +261,14 @@ async function processTranscriptInBackground(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // DEBUG: Log ALL incoming requests
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      console.log(`[DEBUG-GLOBAL] ${req.method} ${req.path} - body keys: ${req.body ? Object.keys(req.body).join(', ') : 'NO BODY'}`);
+    }
+    next();
+  });
+
   // Auth middleware (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
   await setupAuth(app);
 
