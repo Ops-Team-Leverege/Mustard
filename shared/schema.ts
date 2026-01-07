@@ -155,6 +155,7 @@ export const users = pgTable("users", {
 
 const customerSchema = z.object({
   name: z.string().min(1, "Customer name is required"),
+  nameInTranscript: z.string().optional(),
   jobTitle: z.string().optional(),
 });
 
