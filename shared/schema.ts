@@ -176,6 +176,9 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   createdAt: z.string().or(z.date()).optional(),
   customerNames: z.string().min(1, "At least one customer is required"),
   customers: z.array(customerSchema).min(1, "At least one customer is required"),
+  // Form-only fields (not stored in transcripts table, but sent by frontend)
+  serviceTags: z.array(z.string()).optional(),
+  meetingDate: z.string().optional(),
 }).refine(
   (data) => {
     // If contentType is "transcript", transcript field must be provided
