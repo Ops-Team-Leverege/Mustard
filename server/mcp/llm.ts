@@ -49,7 +49,13 @@ export async function decideCapability({
    const toolCall = message?.tool_calls?.[0];
 
    if (!toolCall || toolCall.type !== "function") {
-     throw new Error("No capability selected by LLM");
+     // No capability matched - return helpful fallback response
+     return {
+       name: "__fallback__",
+       args: { 
+         response: message?.content || "I can help you query our database. Try asking about companies, insights, or feedback." 
+       },
+     };
    }
 
    return {

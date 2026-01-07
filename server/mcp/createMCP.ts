@@ -15,13 +15,18 @@ export function createMCP(ctx: MCPContext) {
     const descriptors = capabilities.map(c => ({
       name: c.name,
       description: c.description,
-      parameters: c.inputSchema, // must be JSON Schema; see note below
+      parameters: c.inputSchema,
     }));
 
     const { name, args } = await decideCapability({
       text,
       capabilities: descriptors,
     });
+
+    // Handle fallback when no capability was selected
+    if (name === "__fallback__") {
+      return args.response;
+    }
 
     return run(name, args);
   }
