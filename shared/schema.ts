@@ -343,3 +343,6 @@ export type CategoryOverview = {
 // User types for authentication
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// TranscriptChunk type for RAG
+export type TranscriptChunk = typeof transcriptChunks.$inferSelect;

@@ -26,6 +26,7 @@ import {
   type Product,
   type ProcessingStatus,
   type ProcessingStep,
+  type TranscriptChunk,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -36,6 +37,7 @@ import {
   users as usersTable,
   posSystems as posSystemsTable,
   posSystemCompanies as posSystemCompaniesTable,
+  transcriptChunks as transcriptChunksTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -125,6 +127,10 @@ export interface IStorage {
   deletePOSSystem(id: string): Promise<boolean>;
   linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void>;
   findOrCreatePOSSystemAndLink(product: Product, name: string, companyId: string, websiteLink?: string, description?: string): Promise<import("@shared/schema").POSSystem>;
+
+  // Transcript Chunks (for RAG)
+  getLastTranscriptIdForCompany(companyId: string): Promise<string | null>;
+  getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -1062,6 +1068,14 @@ export class MemStorage implements IStorage {
 
   async findOrCreatePOSSystemAndLink(name: string, companyId: string, websiteLink?: string, description?: string): Promise<POSSystem> {
     throw new Error("MemStorage not supported for POS Systems");
+  }
+
+  async getLastTranscriptIdForCompany(companyId: string): Promise<string | null> {
+    throw new Error("MemStorage not supported for Transcript Chunks");
+  }
+
+  async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {
+    throw new Error("MemStorage not supported for Transcript Chunks");
   }
 }
 
@@ -2200,6 +2214,26 @@ export class DbStorage implements IStorage {
     }
     
     return system;
+  }
+
+  async getLastTranscriptIdForCompany(companyId: string): Promise<string | null> {
+    const [result] = await this.db
+      .select({ id: transcriptChunksTable.transcriptId })
+      .from(transcriptChunksTable)
+      .where(eq(transcriptChunksTable.companyId, companyId))
+      .orderBy(drizzleSql`${transcriptChunksTable.createdAt} DESC`)
+      .limit(1);
+    
+    return result?.id ?? null;
+  }
+
+  async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {
+    return this.db
+      .select()
+      .from(transcriptChunksTable)
+      .where(eq(transcriptChunksTable.transcriptId, transcriptId))
+      .orderBy(drizzleSql`${transcriptChunksTable.chunkIndex} ASC`)
+      .limit(limit);
   }
 }
 
