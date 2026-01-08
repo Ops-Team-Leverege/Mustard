@@ -1,5 +1,17 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, index, integer, customType } from "drizzle-orm/pg-core";
+
+const vector = customType<{ data: number[]; driverData: string }>({
+  dataType() {
+    return "vector(1536)";
+  },
+  toDriver(value: number[]): string {
+    return `[${value.join(",")}]`;
+  },
+  fromDriver(value: string): number[] {
+    return JSON.parse(value);
+  },
+});
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -127,6 +139,20 @@ export const posSystemCompanies = pgTable("pos_system_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   posSystemId: varchar("pos_system_id").notNull(),
   companyId: varchar("company_id").notNull(),
+});
+
+export const transcriptChunks = pgTable("transcript_chunks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transcriptId: varchar("transcript_id").notNull(),
+  companyId: varchar("company_id").notNull(),
+  content: text("content").notNull(),
+  embedding: vector("embedding"),
+  chunkIndex: integer("chunk_index").notNull(),
+  speakerName: text("speaker_name"),
+  speakerRole: text("speaker_role"),
+  meetingDate: timestamp("meeting_date"),
+  startTimestamp: text("start_timestamp"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
