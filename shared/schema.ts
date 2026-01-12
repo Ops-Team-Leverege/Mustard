@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, index, integer, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, index, uniqueIndex, integer, customType } from "drizzle-orm/pg-core";
 
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
@@ -153,7 +153,9 @@ export const transcriptChunks = pgTable("transcript_chunks", {
   meetingDate: timestamp("meeting_date"),
   startTimestamp: text("start_timestamp"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("transcript_chunks_transcript_chunk_idx").on(table.transcriptId, table.chunkIndex),
+]);
 
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 // Session storage table - mandatory for Replit Auth
@@ -346,3 +348,4 @@ export type User = typeof users.$inferSelect;
 
 // TranscriptChunk type for RAG
 export type TranscriptChunk = typeof transcriptChunks.$inferSelect;
+export type InsertTranscriptChunk = Omit<typeof transcriptChunks.$inferInsert, 'id' | 'createdAt'>;

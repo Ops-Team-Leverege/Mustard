@@ -27,6 +27,7 @@ import {
   type ProcessingStatus,
   type ProcessingStep,
   type TranscriptChunk,
+  type InsertTranscriptChunk,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -131,6 +132,8 @@ export interface IStorage {
   // Transcript Chunks (for RAG)
   getLastTranscriptIdForCompany(companyId: string): Promise<string | null>;
   getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]>;
+  listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]>;
+  insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -1075,6 +1078,14 @@ export class MemStorage implements IStorage {
   }
 
   async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {
+    throw new Error("MemStorage not supported for Transcript Chunks");
+  }
+
+  async listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]> {
+    throw new Error("MemStorage not supported for Transcript Chunks");
+  }
+
+  async insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void> {
     throw new Error("MemStorage not supported for Transcript Chunks");
   }
 }
@@ -2234,6 +2245,60 @@ export class DbStorage implements IStorage {
       .where(eq(transcriptChunksTable.transcriptId, transcriptId))
       .orderBy(drizzleSql`${transcriptChunksTable.chunkIndex} ASC`)
       .limit(limit);
+  }
+
+  async listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]> {
+    const { transcriptId, companyId, limit } = options;
+    
+    const conditions = [];
+    // Only include transcripts that have content and a companyId
+    conditions.push(drizzleSql`${transcriptsTable.transcript} IS NOT NULL`);
+    conditions.push(drizzleSql`${transcriptsTable.companyId} IS NOT NULL`);
+    
+    if (transcriptId) {
+      conditions.push(eq(transcriptsTable.id, transcriptId));
+    }
+    if (companyId) {
+      conditions.push(eq(transcriptsTable.companyId, companyId));
+    }
+    
+    const results = await this.db
+      .select({
+        id: transcriptsTable.id,
+        companyId: transcriptsTable.companyId,
+        content: transcriptsTable.transcript,
+        meetingDate: transcriptsTable.createdAt,
+        leverageTeam: transcriptsTable.leverageTeam,
+        customerNames: transcriptsTable.customerNames,
+      })
+      .from(transcriptsTable)
+      .where(drizzleSql`${drizzleSql.join(conditions, drizzleSql` AND `)}`)
+      .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`)
+      .limit(limit);
+    
+    // Filter out null companyId/content and map to expected type
+    return results
+      .filter(r => r.companyId !== null && r.content !== null)
+      .map(r => ({
+        id: r.id,
+        companyId: r.companyId!,
+        content: r.content!,
+        meetingDate: r.meetingDate,
+        leverageTeam: r.leverageTeam || null,
+        customerNames: r.customerNames || null,
+      }));
+  }
+
+  async insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void> {
+    if (chunks.length === 0) return;
+    
+    // Use ON CONFLICT DO NOTHING keyed by (transcript_id, chunk_index) for idempotency
+    await this.db
+      .insert(transcriptChunksTable)
+      .values(chunks)
+      .onConflictDoNothing({
+        target: [transcriptChunksTable.transcriptId, transcriptChunksTable.chunkIndex],
+      });
   }
 }
 
