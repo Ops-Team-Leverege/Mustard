@@ -10,3 +10,5 @@ export function makeMCPContext(): MCPContext {
     },
   };
 }
+
+export type { MCPContext };
