@@ -1,53 +1,39 @@
-/*This file:
-knows about Postgres
-knows about pgvector
-knows about speaker_role, meeting_date, etc.*/
+/**
+ * Retriever module for RAG pipeline.
+ * Uses storage abstraction methods only - no raw SQL.
+ */
 
-import { storage } from '../storage'
-import type { TranscriptChunk } from './types'
+import { storage } from "../storage";
+import type { TranscriptChunk } from "./types";
 
 /**
  * Returns chunks from the most recent transcript (meeting)
- * for a given company.
+ * for a given company using storage abstraction.
  */
 export async function getLastMeetingChunks(
   companyId: string,
   limit = 50
 ): Promise<TranscriptChunk[]> {
-  // 1️⃣ Find the most recent transcript for this company
-  const latestRows = await storage.rawQuery(
-    `SELECT transcript_id
-     FROM transcript_chunks
-     WHERE company_id = $1
-     ORDER BY meeting_date DESC NULLS LAST
-     LIMIT 1`,
-    [companyId]
-  );
+  // 1. Find the most recent transcript for this company
+  const transcriptId = await storage.getLastTranscriptIdForCompany(companyId);
 
-  if (!latestRows || latestRows.length === 0) {
+  if (!transcriptId) {
     return [];
   }
 
-  const transcriptId = latestRows[0].transcript_id;
+  // 2. Fetch chunks for that transcript
+  const chunks = await storage.getChunksForTranscript(transcriptId, limit);
 
-  // 2️⃣ Fetch chunks for that transcript
-  const rows = await storage.rawQuery(
-    `SELECT
-       id,
-       transcript_id,
-       company_id,
-       content,
-       chunk_index,
-       speaker_name,
-       speaker_role,
-       meeting_date,
-       start_timestamp
-     FROM transcript_chunks
-     WHERE transcript_id = $1
-     ORDER BY chunk_index
-     LIMIT $2`,
-    [transcriptId, limit]
-  );
-
-  return rows as TranscriptChunk[];
+  // 3. Map from Drizzle camelCase to RAG TranscriptChunk type
+  return chunks.map((chunk) => ({
+    id: chunk.id,
+    transcript_id: chunk.transcriptId,
+    company_id: chunk.companyId,
+    content: chunk.content,
+    chunk_index: chunk.chunkIndex,
+    speaker_name: chunk.speakerName || "Unknown",
+    speaker_role: (chunk.speakerRole as "customer" | "leverege" | "unknown") || "unknown",
+    meeting_date: chunk.meetingDate || new Date(),
+    start_timestamp: chunk.startTimestamp || null,
+  }));
 }

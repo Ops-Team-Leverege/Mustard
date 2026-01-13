@@ -10,16 +10,32 @@ export const getLastMeeting: Capability = {
     question: z.string().describe("The specific question about the meeting"),
   }),
   handler: async ({ db }, { companyName, question }) => {
+    // Step 1: Resolve company name with case-insensitive partial match
     const companyRows = await db.query(
-      `SELECT id FROM companies WHERE name ILIKE $1 LIMIT 1`,
-      [companyName]
+      `SELECT id, name FROM companies WHERE name ILIKE $1`,
+      [`%${companyName}%`]
     );
 
+    // Handle 0 matches
     if (!companyRows || companyRows.length === 0) {
-      return { answer: `Company "${companyName}" not found.`, citations: [] };
+      return {
+        answer: `I couldn't find a company matching "${companyName}". Please check the spelling or try a different name.`,
+        citations: [],
+      };
     }
 
+    // Handle >1 matches - ask for clarification
+    if (companyRows.length > 1) {
+      const names = companyRows.map((c: { name: string }) => c.name).join(", ");
+      return {
+        answer: `I found multiple companies matching "${companyName}": ${names}. Please be more specific about which company you mean.`,
+        citations: [],
+      };
+    }
+
+    // Exactly 1 match - proceed with RAG
     const companyId = companyRows[0].id;
+    const resolvedName = companyRows[0].name;
 
     const result = await answerQuestion({
       question,
@@ -27,6 +43,10 @@ export const getLastMeeting: Capability = {
       mode: "last_meeting",
     });
 
-    return result;
+    // Prepend the resolved company name for clarity
+    return {
+      answer: `[${resolvedName}] ${result.answer}`,
+      citations: result.citations,
+    };
   },
 };
