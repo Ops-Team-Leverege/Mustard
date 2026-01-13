@@ -17,6 +17,12 @@
 import { storage } from "../storage";
 import type { TranscriptChunk } from "./types";
 
+export type LastMeetingResult = {
+  chunks: TranscriptChunk[];
+  transcriptId: string;
+  transcriptCreatedAt: Date;
+} | null;
+
 /**
  * Returns chunks from the most recent transcript (meeting)
  * for a given company using storage abstraction.
@@ -24,19 +30,19 @@ import type { TranscriptChunk } from "./types";
 export async function getLastMeetingChunks(
   companyId: string,
   limit = 50
-): Promise<TranscriptChunk[]> {
-  // 1. Find the most recent transcript for this company
-  const transcriptId = await storage.getLastTranscriptIdForCompany(companyId);
+): Promise<LastMeetingResult> {
+  // 1. Find the most recent transcript for this company (includes createdAt)
+  const transcriptInfo = await storage.getLastTranscriptIdForCompany(companyId);
 
-  if (!transcriptId) {
-    return [];
+  if (!transcriptInfo) {
+    return null;
   }
 
   // 2. Fetch chunks for that transcript
-  const chunks = await storage.getChunksForTranscript(transcriptId, limit);
+  const chunks = await storage.getChunksForTranscript(transcriptInfo.id, limit);
 
   // 3. Map from Drizzle camelCase to RAG TranscriptChunk type
-  return chunks.map((chunk) => ({
+  const mappedChunks: TranscriptChunk[] = chunks.map((chunk) => ({
     id: chunk.id,
     transcript_id: chunk.transcriptId,
     company_id: chunk.companyId,
@@ -47,4 +53,10 @@ export async function getLastMeetingChunks(
     meeting_date: chunk.meetingDate || new Date(),
     start_timestamp: chunk.startTimestamp || null,
   }));
+
+  return {
+    chunks: mappedChunks,
+    transcriptId: transcriptInfo.id,
+    transcriptCreatedAt: transcriptInfo.createdAt,
+  };
 }

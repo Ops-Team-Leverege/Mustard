@@ -43,14 +43,16 @@ export const getLastMeeting: Capability = {
 
     // Step 2: Retrieve last meeting transcript chunks (deterministic)
     // getLastMeetingChunks uses storage abstraction internally
-    const rawChunks = await getLastMeetingChunks(companyId);
+    const result = await getLastMeetingChunks(companyId);
 
-    if (!rawChunks || rawChunks.length === 0) {
+    if (!result || result.chunks.length === 0) {
       return {
         answer: `I couldn't find any meeting transcripts for ${resolvedName}.`,
         citations: [],
       };
     }
+
+    const { chunks: rawChunks, transcriptId, transcriptCreatedAt } = result;
 
     // Map retriever's snake_case to composer's camelCase format
     const composerChunks: ComposerChunk[] = rawChunks.map((c) => ({
@@ -65,14 +67,11 @@ export const getLastMeeting: Capability = {
     const quotes = await selectRepresentativeQuotes(composerChunks);
 
     // Step 4: Persist the artifact for later reuse
-    // NOTE: Using now() as meeting timestamp; ideally would use chunk's meeting_date
-    const meetingTimestamp = rawChunks[0]?.meeting_date ?? new Date();
-    const transcriptId = rawChunks[0]?.transcript_id ?? null;
-    
+    // Use transcript.created_at as the meeting timestamp (meeting time, not processing time)
     await storage.saveMeetingSummary({
       companyId,
       transcriptId,
-      meetingTimestamp,
+      meetingTimestamp: transcriptCreatedAt,
       artifact: { summary, quotes },
     });
 

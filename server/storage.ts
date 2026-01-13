@@ -133,7 +133,7 @@ export interface IStorage {
   findOrCreatePOSSystemAndLink(product: Product, name: string, companyId: string, websiteLink?: string, description?: string): Promise<import("@shared/schema").POSSystem>;
 
   // Transcript Chunks (for RAG)
-  getLastTranscriptIdForCompany(companyId: string): Promise<string | null>;
+  getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date } | null>;
   getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]>;
   listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]>;
   insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void>;
@@ -1080,7 +1080,7 @@ export class MemStorage implements IStorage {
     throw new Error("MemStorage not supported for POS Systems");
   }
 
-  async getLastTranscriptIdForCompany(companyId: string): Promise<string | null> {
+  async getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date } | null> {
     throw new Error("MemStorage not supported for Transcript Chunks");
   }
 
@@ -2242,15 +2242,31 @@ export class DbStorage implements IStorage {
     return system;
   }
 
-  async getLastTranscriptIdForCompany(companyId: string): Promise<string | null> {
-    const [result] = await this.db
-      .select({ id: transcriptChunksTable.transcriptId })
+  async getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date } | null> {
+    // First find the most recent transcript ID from chunks
+    const [chunkResult] = await this.db
+      .select({ transcriptId: transcriptChunksTable.transcriptId })
       .from(transcriptChunksTable)
       .where(eq(transcriptChunksTable.companyId, companyId))
       .orderBy(drizzleSql`${transcriptChunksTable.createdAt} DESC`)
       .limit(1);
     
-    return result?.id ?? null;
+    if (!chunkResult?.transcriptId) {
+      return null;
+    }
+
+    // Then fetch the transcript's created_at (canonical meeting timestamp)
+    const [transcript] = await this.db
+      .select({ createdAt: transcriptsTable.createdAt })
+      .from(transcriptsTable)
+      .where(eq(transcriptsTable.id, chunkResult.transcriptId))
+      .limit(1);
+    
+    if (!transcript) {
+      return null;
+    }
+
+    return { id: chunkResult.transcriptId, createdAt: transcript.createdAt };
   }
 
   async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {

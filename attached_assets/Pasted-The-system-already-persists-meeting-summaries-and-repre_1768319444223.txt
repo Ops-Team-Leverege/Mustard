@@ -1,0 +1,86 @@
+The system already persists meeting summaries and representative quotes into a meeting_summaries table.
+
+There is an existing transcripts table with this schema (relevant fields):
+
+id (UUID, primary key)
+
+created_at (TIMESTAMP, default now)
+
+company_id
+
+transcript content fields
+
+Meeting summaries are derived from transcripts via RAG.
+
+Problem to Fix
+
+The current persistence logic uses an incorrect or temporary meeting timestamp (e.g. now() or a processing timestamp).
+
+This is wrong.
+
+Correct Behavior (must implement)
+
+Use transcripts.created_at as the canonical meeting_timestamp when persisting meeting summaries.
+
+Rationale:
+
+created_at represents when the meeting occurred (best available proxy)
+
+Processing timestamps must NOT be used
+
+This enables correct “latest meeting” ordering and reuse later
+
+What to Change (scope is narrow)
+
+Update the persistence call (e.g. in getLastMeeting.ts or equivalent):
+
+Pass transcript.created_at as meetingTimestamp
+
+Do NOT use new Date() unless no transcript is available
+
+If the transcript object is not currently available at the persistence site:
+
+Update the retriever call or return value to include:
+
+transcript.id
+
+transcript.created_at
+
+Do NOT add new queries if the data is already available
+
+(Optional but recommended)
+Add a short clarifying comment near the persistence call:
+
+// Use transcript.created_at as the meeting timestamp (meeting time, not processing time)
+
+Explicitly Out of Scope ❌
+
+❌ Do NOT change table schemas
+
+❌ Do NOT refactor storage helpers
+
+❌ Do NOT change ingestion
+
+❌ Do NOT change Slack or MCP routing
+
+❌ Do NOT add new abstractions
+
+This is a targeted correctness fix, not a refactor.
+
+Output Expected
+
+Updated code showing:
+
+meetingTimestamp sourced from transcripts.created_at
+
+Minimal diff
+
+No behavior change besides timestamp correctness
+
+Architectural Principle (do not violate)
+
+Transcripts = raw source of truth
+
+Meeting summaries = derived artifacts
+
+Timestamps must reflect meeting occurrence, not pipeline execution
