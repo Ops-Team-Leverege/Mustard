@@ -12,6 +12,7 @@ function cleanMention(text: string): string {
 const seenEventIds = new Set<string>();
 
 export async function slackEventsHandler(req: Request, res: Response) {
+  console.log("[Slack] Received event request");
   try {
     // Handle body in multiple formats:
     // - Buffer (from express.raw middleware)
