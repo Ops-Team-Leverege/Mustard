@@ -1,0 +1,138 @@
+Improve RAG Composer Structure (Purpose + Focus Areas)
+Context
+
+You are working in an existing TypeScript backend with a deliberate architecture:
+
+MCP → routing only (LLM for capability selection)
+
+RAG
+
+retriever.ts → deterministic data access
+
+composer.ts → LLM-based interpretation of retrieved data
+
+Slack → presentation only
+
+Ingestion → transcript chunking only
+
+The system already:
+
+Retrieves the latest meeting transcript
+
+Uses rag/composer.ts to produce a structured meeting summary
+
+Persists { summary, quotes } as a JSON artifact
+
+You must only modify the composer, not other layers.
+
+Goal
+
+Improve the structure and usefulness of the meeting summary by making the model explicitly capture:
+
+Why the meeting happened
+
+What the discussion focused on
+
+This should make summaries more human-readable and executive-friendly, without changing retrieval, storage, or Slack behavior.
+
+In Scope ✅
+
+Evolve the meeting summary output schema to add:
+
+purpose (string)
+
+focusAreas (string[])
+
+Update the LLM prompt in rag/composer.ts so the model:
+
+Clearly distinguishes purpose vs discussion topics
+
+Produces structured, high-signal outputs
+
+Remains neutral and factual
+
+Ensure the composer returns valid JSON only, matching the updated schema.
+
+Explicitly Out of Scope ❌
+
+❌ Do NOT change retrieval logic
+
+❌ Do NOT change Slack rendering
+
+❌ Do NOT change MCP routing
+
+❌ Do NOT change storage schemas or helpers
+
+❌ Do NOT add new files or abstractions
+
+❌ Do NOT add prose-heavy summaries
+
+This is a composer-only improvement.
+
+Updated Meeting Summary Schema
+
+Update the composer to return this exact shape:
+
+{
+  title: string,
+  purpose: string,
+  focusAreas: string[],
+  keyTakeaways: string[],
+  risksOrOpenQuestions: string[],
+  recommendedNextSteps: string[]
+}
+
+
+Notes:
+
+purpose = one sentence explaining why the meeting happened
+
+focusAreas = 2–5 recurring themes that dominated the discussion
+
+Keep keyTakeaways for now (do not remove it)
+
+Prompt Guidance (must follow)
+
+Update the LLM instructions so that:
+
+purpose answers why the meeting existed, not what was discussed
+
+focusAreas reflect recurring themes, not one-off comments
+
+The model:
+
+Uses only transcript content
+
+Does not invent facts or capabilities
+
+Avoids emotional inference
+
+Is concise and structured
+
+Constraints
+
+Keep the diff small
+
+Follow existing OpenAI usage patterns in the repo
+
+Do not change function signatures unless required by the new schema
+
+Add comments only where they clarify intent
+
+Output Expected
+
+Updated rag/composer.ts with:
+
+Revised prompt
+
+Updated output typing / parsing
+
+No changes outside the composer
+
+Architectural Principle (do not violate)
+
+Composer = interpretation only
+
+Retrieval, metadata, and presentation are handled elsewhere
+
+This change improves structure, not system behavior

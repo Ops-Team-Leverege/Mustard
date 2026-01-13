@@ -46,6 +46,8 @@ export type TranscriptChunk = {
  */
 export type MeetingSummary = {
   title: string;
+  purpose: string; // Why the meeting happened (one sentence)
+  focusAreas: string[]; // 2-5 recurring themes that dominated discussion
   keyTakeaways: string[];
   risksOrOpenQuestions: string[];
   recommendedNextSteps: string[];
@@ -104,6 +106,8 @@ Rules:
         content: `
 Produce a structured meeting summary with:
 - A short, factual title
+- Purpose: one sentence explaining WHY this meeting happened (not what was discussed)
+- Focus areas: 2-5 recurring themes that dominated the discussion (not one-off comments)
 - Key takeaways (prioritized, non-redundant)
 - Risks or open questions
 - Recommended next steps grounded in the discussion
@@ -111,6 +115,8 @@ Produce a structured meeting summary with:
 Return valid JSON only with this shape:
 {
   "title": string,
+  "purpose": string,
+  "focusAreas": string[],
   "keyTakeaways": string[],
   "risksOrOpenQuestions": string[],
   "recommendedNextSteps": string[]
