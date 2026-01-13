@@ -28,6 +28,8 @@ import {
   type ProcessingStep,
   type TranscriptChunk,
   type InsertTranscriptChunk,
+  type MeetingSummary,
+  type InsertMeetingSummary,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -39,6 +41,7 @@ import {
   posSystems as posSystemsTable,
   posSystemCompanies as posSystemCompaniesTable,
   transcriptChunks as transcriptChunksTable,
+  meetingSummaries as meetingSummariesTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -134,6 +137,10 @@ export interface IStorage {
   getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]>;
   listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]>;
   insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void>;
+
+  // Meeting Summaries (for persisting RAG artifacts)
+  saveMeetingSummary(data: InsertMeetingSummary): Promise<MeetingSummary>;
+  getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null>;
 }
 
 export class MemStorage implements IStorage {
@@ -1087,6 +1094,14 @@ export class MemStorage implements IStorage {
 
   async insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void> {
     throw new Error("MemStorage not supported for Transcript Chunks");
+  }
+
+  async saveMeetingSummary(data: InsertMeetingSummary): Promise<MeetingSummary> {
+    throw new Error("MemStorage not supported for Meeting Summaries");
+  }
+
+  async getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null> {
+    throw new Error("MemStorage not supported for Meeting Summaries");
   }
 }
 
@@ -2299,6 +2314,25 @@ export class DbStorage implements IStorage {
       .onConflictDoNothing({
         target: [transcriptChunksTable.transcriptId, transcriptChunksTable.chunkIndex],
       });
+  }
+
+  // Meeting Summaries - thin helpers for persisting RAG artifacts
+  async saveMeetingSummary(data: InsertMeetingSummary): Promise<MeetingSummary> {
+    const [result] = await this.db
+      .insert(meetingSummariesTable)
+      .values(data)
+      .returning();
+    return result;
+  }
+
+  async getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null> {
+    const [result] = await this.db
+      .select()
+      .from(meetingSummariesTable)
+      .where(eq(meetingSummariesTable.companyId, companyId))
+      .orderBy(drizzleSql`${meetingSummariesTable.meetingTimestamp} DESC`)
+      .limit(1);
+    return result ?? null;
   }
 }
 
