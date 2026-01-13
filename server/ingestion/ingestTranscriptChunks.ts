@@ -44,28 +44,70 @@ function normalizeName(s: string) {
   return s.trim().toLowerCase();
 }
 
+/**
+ * Generate name variants for matching.
+ * For "Julia Conn" → ["julia conn", "julia", "conn"]
+ * For "Eric" → ["eric"]
+ */
+function generateNameVariants(fullName: string): string[] {
+  const normalized = normalizeName(fullName);
+  if (!normalized) return [];
+
+  const variants = new Set<string>();
+  variants.add(normalized); // full name
+
+  // Split into tokens (handles multiple spaces, hyphens)
+  const tokens = normalized.split(/[\s\-]+/).filter(Boolean);
+  tokens.forEach((t) => variants.add(t));
+
+  return Array.from(variants);
+}
+
+/**
+ * Check if speaker matches any variant using exact token matching.
+ * "julia" matches "julia conn" (exact first name)
+ * "julia conn" matches "julia conn" (exact full name)
+ * "al" does NOT match "alan" (no substring matching)
+ */
+function speakerMatchesAttendee(speaker: string, attendeeVariants: string[]): boolean {
+  const speakerNorm = normalizeName(speaker);
+  const speakerTokens = speakerNorm.split(/[\s\-]+/).filter(Boolean);
+
+  for (const variant of attendeeVariants) {
+    // Exact match on full normalized names
+    if (speakerNorm === variant) return true;
+
+    // Check if any speaker token exactly matches any attendee variant
+    if (speakerTokens.some((t) => t === variant)) return true;
+  }
+
+  return false;
+}
+
 function assignSpeakerRole(
   speakerName: string,
   leverageTeam?: string | null,
   customerNames?: string | null
 ): "customer" | "leverege" | "unknown" {
-  const speaker = normalizeName(speakerName);
-
-  const leverege = (leverageTeam ?? "")
+  // Parse attendee lists and generate variants for each
+  const leverageNames = (leverageTeam ?? "")
     .split(",")
-    .map(normalizeName)
+    .map((n) => n.trim())
     .filter(Boolean);
 
-  const customers = (customerNames ?? "")
+  const customerNamesList = (customerNames ?? "")
     .split(",")
-    .map(normalizeName)
+    .map((n) => n.trim())
     .filter(Boolean);
 
-  const matches = (list: string[]) =>
-    list.some((n) => n && (speaker.includes(n) || n.includes(speaker)));
+  // Generate variants for each attendee
+  const leverageVariants = leverageNames.flatMap(generateNameVariants);
+  const customerVariants = customerNamesList.flatMap(generateNameVariants);
 
-  if (matches(leverege)) return "leverege";
-  if (matches(customers)) return "customer";
+  // Match speaker against variants
+  if (speakerMatchesAttendee(speakerName, leverageVariants)) return "leverege";
+  if (speakerMatchesAttendee(speakerName, customerVariants)) return "customer";
+
   return "unknown";
 }
 

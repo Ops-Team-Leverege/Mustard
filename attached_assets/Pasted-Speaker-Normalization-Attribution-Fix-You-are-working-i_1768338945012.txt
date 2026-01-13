@@ -1,0 +1,172 @@
+Speaker Normalization + Attribution Fix
+
+You are working in an existing TypeScript backend with a deliberately layered architecture.
+
+Context (do not change):
+
+Ingestion is deterministic and write-only
+
+Composer is LLM-based interpretation
+
+Storage is persistence only
+
+MCP is routing only
+
+Slack is presentation / transport only
+
+This task fixes speaker attribution issues caused by name mismatches between structured attendee metadata and raw transcript text.
+
+Problem
+
+In the transcripts table, attendee information is stored in structured fields:
+
+leverage_team (comma-separated full names)
+
+customer_names (comma-separated full names)
+
+However, in the transcript text, speakers often appear as:
+
+first names only (Julia)
+
+nicknames or initials (RJ)
+
+partial names (Eric vs Eric Conn)
+
+This causes the ingestion logic to incorrectly assign speakerRole = "unknown", leading to:
+
+misattributed or suppressed quotes
+
+missing attendees in summaries
+
+lower quote confidence
+
+degraded next-step extraction
+
+This is not an LLM problem.
+It must be fixed deterministically during ingestion.
+
+Goal
+
+Improve speaker role assignment by deterministically normalizing and matching speaker names against known attendees.
+
+After this change:
+
+Julia → correctly matches Julia Conn
+
+Eric → correctly matches Eric Conn
+
+Truly ambiguous speakers (e.g. RJ) may remain unknown
+
+No guessing, no LLM usage, no hallucination
+
+In Scope ✅
+1️⃣ Improve name matching logic in ingestion
+
+Location:
+
+server/ingestion/ingestTranscriptChunks.ts
+
+Update the assignSpeakerRole logic to:
+
+Generate name variants for each attendee:
+
+full name
+
+first name
+
+last name
+
+Normalize all names:
+
+lowercase
+
+trimmed
+
+Match a speaker if any variant matches via containment
+
+Example intent (not exact code):
+
+"Julia" → matches "julia conn"
+"Eric" → matches "eric conn"
+
+
+Rules:
+
+Deterministic only
+
+No fuzzy thresholds
+
+No LLM calls
+
+No guessing identities
+
+2️⃣ Preserve raw speaker names
+
+Do not modify:
+
+how speakerName is extracted from the transcript
+
+how transcript text is stored
+
+We must preserve:
+
+speakerName = raw (e.g. "Julia")
+
+speakerRole = resolved (leverege | customer | unknown)
+
+3️⃣ Do NOT change composer logic
+
+Explicitly out of scope:
+
+No changes to LLM prompts
+
+No identity inference in the composer
+
+No quote selection changes
+
+No summary changes
+
+This task is purely about fixing the input data quality so downstream logic works as intended.
+
+4️⃣ Backward safety
+
+If no match is found, keep speakerRole = "unknown"
+
+Do not reduce correctness for existing clean Gemini transcripts
+
+Avoid over-matching (e.g., “Al” ≠ “Alan” unless exact token match)
+
+Out of Scope ❌
+
+❌ No new database tables
+
+❌ No alias tables (future work)
+
+❌ No changes to Slack
+
+❌ No changes to MCP routing
+
+❌ No re-ingestion of all data (manual reruns are fine)
+
+❌ No LLM usage
+
+Acceptance Criteria
+
+After implementation:
+
+Ingestion correctly assigns roles when transcript speakers use first names
+
+“Unknown” speakers are reduced meaningfully
+
+Existing confidence gate for quotes behaves better without modification
+
+No new abstractions introduced
+
+Diff is small and localized
+
+Architectural Principle (do not violate)
+
+Identity resolution is deterministic.
+Interpretation belongs to the LLM.
+
+Do not blur these responsibilities.
