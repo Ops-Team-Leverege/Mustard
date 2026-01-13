@@ -390,14 +390,16 @@ WHAT TO IGNORE:
 RULES:
 1. Only extract EXPLICIT commitments spoken in the meeting
 2. Each commitment must have a clear owner (name or role)
-3. Include a supporting quote as evidence
+3. Include a supporting quote as evidence (verbatim or close paraphrase)
 4. Assign confidence score (0-1):
-   - 1.0 = explicit "I will do X"
-   - 0.9 = clear agreement to do something
-   - 0.8 = implied agreement with clear action
-   - Below 0.8 = too uncertain, do NOT include
-5. Extract deadlines only if explicitly mentioned
-6. Phrase tasks as actionable verbs
+   - 1.0 = explicit "I will do X" statement
+   - 0.9 = clear verbal agreement to a request
+   - 0.8 = "We will..." or team-level commitment
+   - 0.7 = implied agreement with clear action context
+   - Below 0.7 = too uncertain, do NOT include
+5. Extract deadlines only if explicitly mentioned (e.g., "this afternoon", "by Friday")
+6. Phrase tasks as specific, actionable verbs (Send X, Review Y, Discuss Z)
+7. Combine related micro-commitments into single coherent action items
 
 Return valid JSON only as an array:
 [
@@ -434,7 +436,7 @@ ${transcript}
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
   const parsed = JSON.parse(jsonStr) as MeetingCommitment[];
 
-  // Filter to high-confidence commitments only (≥0.8)
-  // False positives are worse than omissions
-  return parsed.filter((c) => c.confidence >= 0.8);
+  // Filter to high-confidence commitments only (≥0.7)
+  // False positives are worse than omissions, but 0.7 is permissive enough for good coverage
+  return parsed.filter((c) => c.confidence >= 0.7);
 }

@@ -94,24 +94,67 @@ function isSpecificQuestion(question: string): boolean {
 }
 
 /**
+ * Strip MCP scaffolding to extract the core user question.
+ * MCP wraps questions with prefixes like "Plan:", "Tool instructions:", etc.
+ */
+function stripMcpScaffolding(question: string): string {
+  // Remove common MCP prefixes/wrappers
+  let cleaned = question
+    .replace(/^plan:\s*/i, "")
+    .replace(/^tool instructions?:\s*/i, "")
+    .replace(/^context:\s*/i, "")
+    .replace(/^query:\s*/i, "")
+    .replace(/^user question:\s*/i, "")
+    .replace(/^question:\s*/i, "");
+  
+  // Also try to find quoted user question if present
+  const quotedMatch = cleaned.match(/"([^"]+)"/);
+  if (quotedMatch) {
+    cleaned = quotedMatch[1];
+  }
+  
+  return cleaned.trim();
+}
+
+/**
  * Detect if the user is asking for action items / next steps / commitments.
+ * 
+ * First strips MCP scaffolding, then applies precise patterns with word boundaries
+ * to avoid false positives on generic questions.
  */
 function isCommitmentRequest(question: string): boolean {
-  const q = question.toLowerCase();
+  const stripped = stripMcpScaffolding(question);
+  const q = stripped.toLowerCase();
+  
+  // Also check full question in case stripping missed something
+  const fullQ = question.toLowerCase();
+  
   const commitmentPatterns = [
-    /\bnext steps?\b/,
-    /\baction items?\b/,
-    /\bto-?dos?\b/,
-    /\bwhat did we agree/,
-    /\bwhat was agreed/,
-    /\bcommitments?\b/,
-    /\bfollow.?ups?\b/,
-    /\bwho is doing what/,
-    /\bwho.?s responsible/,
-    /\bwhat needs to happen/,
-    /\bwhat.?s next/,
+    // Core patterns with word boundaries to avoid false positives
+    /\bnext\s*steps?\b/,       // "next steps", "next step"
+    /\baction\s*items?\b/,     // "action items", "action item"
+    /\bto-?dos?\b/,            // "todos", "to-dos", "todo"
+    /\bfollow[\s-]*ups?\b/,    // "follow ups", "follow-ups", "followups"
+    /\bcommitments?\b/,        // "commitment", "commitments"
+    /\baction\s*points?\b/,    // "action points"
+    
+    // Question patterns - commitment-specific
+    /what did we agree/,
+    /what was agreed/,
+    /what were the agreements/,
+    /who is doing what/,
+    /who'?s responsible/,
+    /what needs to happen/,
+    /what'?s next\b/,          // word boundary to avoid "what's next door"
+    /what do we need to do/,
+    /agreed to do/,
+    /supposed to do/,
+    /who will\b/,              // "who will send..."
+    /what will .* do/,         // "what will Corey do?"
   ];
-  return commitmentPatterns.some((p) => p.test(q));
+  
+  // Check both stripped and full question
+  return commitmentPatterns.some((p) => p.test(q) || p.test(fullQ));
 }
 
 export const getLastMeeting: Capability = {
@@ -127,6 +170,12 @@ export const getLastMeeting: Capability = {
     const wantsQuotes = detectQuoteIntent(question);
     const wantsSpecificAnswer = isSpecificQuestion(question);
     const wantsCommitments = isCommitmentRequest(question);
+
+    // Debug logging for intent routing
+    const strippedQ = stripMcpScaffolding(question);
+    console.log(`[getLastMeeting] Raw question (${question.length} chars): "${question.substring(0, 200)}${question.length > 200 ? '...' : ''}"`);
+    console.log(`[getLastMeeting] Stripped question: "${strippedQ.substring(0, 150)}"`);
+    console.log(`[getLastMeeting] Intent: wantsCommitments=${wantsCommitments}, wantsSpecificAnswer=${wantsSpecificAnswer}, wantsQuotes=${wantsQuotes}`);
 
     // Step 1: Resolve company name with case-insensitive partial match
     const companyRows = await db.query(
