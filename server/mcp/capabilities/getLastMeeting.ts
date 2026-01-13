@@ -5,6 +5,7 @@ import {
   composeMeetingSummary,
   selectRepresentativeQuotes,
   answerMeetingQuestion,
+  extractMeetingCommitments,
   type TranscriptChunk as ComposerChunk,
   type QuoteSelectionResult,
 } from "../../rag/composer";
@@ -92,6 +93,27 @@ function isSpecificQuestion(question: string): boolean {
   return specificPatterns.some((p) => p.test(q));
 }
 
+/**
+ * Detect if the user is asking for action items / next steps / commitments.
+ */
+function isCommitmentRequest(question: string): boolean {
+  const q = question.toLowerCase();
+  const commitmentPatterns = [
+    /\bnext steps?\b/,
+    /\baction items?\b/,
+    /\bto-?dos?\b/,
+    /\bwhat did we agree/,
+    /\bwhat was agreed/,
+    /\bcommitments?\b/,
+    /\bfollow.?ups?\b/,
+    /\bwho is doing what/,
+    /\bwho.?s responsible/,
+    /\bwhat needs to happen/,
+    /\bwhat.?s next/,
+  ];
+  return commitmentPatterns.some((p) => p.test(q));
+}
+
 export const getLastMeeting: Capability = {
   name: "get_last_meeting",
   description:
@@ -104,6 +126,7 @@ export const getLastMeeting: Capability = {
     // Detect intent
     const wantsQuotes = detectQuoteIntent(question);
     const wantsSpecificAnswer = isSpecificQuestion(question);
+    const wantsCommitments = isCommitmentRequest(question);
 
     // Step 1: Resolve company name with case-insensitive partial match
     const companyRows = await db.query(
@@ -148,6 +171,36 @@ export const getLastMeeting: Capability = {
       speakerName: c.speaker_name,
       text: c.content,
     }));
+
+    // ─────────────────────────────────────────────────────────────────
+    // ROUTE: Commitment request → Action items / Next steps
+    // ─────────────────────────────────────────────────────────────────
+    if (wantsCommitments) {
+      const commitments = await extractMeetingCommitments(composerChunks);
+
+      const lines: string[] = [];
+      lines.push(`*[${resolvedName}] Next Steps*`);
+      lines.push(`_Meeting: ${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
+
+      if (commitments.length === 0) {
+        lines.push("\nNo explicit action items were committed to in this meeting.");
+      } else {
+        lines.push("");
+        commitments.forEach((c) => {
+          let item = `• ${c.task} — ${c.owner}`;
+          if (c.deadline) {
+            item += ` _(${c.deadline})_`;
+          }
+          lines.push(item);
+          lines.push(`  _"${c.evidence}"_`);
+        });
+      }
+
+      return {
+        answer: lines.join("\n"),
+        citations: [],
+      };
+    }
 
     // ─────────────────────────────────────────────────────────────────
     // ROUTE: Specific question → Extractive Q&A
