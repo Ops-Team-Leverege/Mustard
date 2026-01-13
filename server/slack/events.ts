@@ -85,9 +85,20 @@ export async function slackEventsHandler(req: Request, res: Response) {
     try {
       const result = await mcp.runFromText(text);
 
+      // Format result - handle both string and object responses
+      let responseText: string;
+      if (typeof result === "string") {
+        responseText = result;
+      } else if (result && typeof result === "object") {
+        // RAG responses have { answer, citations }
+        responseText = result.answer || JSON.stringify(result, null, 2);
+      } else {
+        responseText = String(result);
+      }
+
       await postSlackMessage({
         channel,
-        text: String(result),
+        text: responseText,
         thread_ts: threadTs,
       });
     } catch (err) {
