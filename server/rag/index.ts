@@ -1,4 +1,21 @@
 import { getLastMeetingChunks } from "./retriever";
+import { storage } from "../storage";
+
+/**
+ * Format speaker role for display in Slack.
+ * - leverege → [leverege]
+ * - customer → [customer]
+ * - unknown → [customer – <Company Name>]
+ */
+function formatSpeakerRole(
+  role: string | null | undefined,
+  companyName: string
+): string {
+  if (role === "leverege") return "[leverege]";
+  if (role === "customer") return "[customer]";
+  // unknown or null → show as customer with company name for context
+  return `[customer – ${companyName}]`;
+}
 
 export async function answerQuestion(params: {
   question: string;
@@ -17,9 +34,14 @@ export async function answerQuestion(params: {
       };
     }
 
+    // Look up company name for display (use "PitCrew" as default product)
+    const company = await storage.getCompany("PitCrew", params.companyId);
+    const companyName = company?.name ?? "Unknown Company";
+
     const lines = chunks.slice(0, 15).map((c) => {
-      const role = c.speaker_role ? `[${c.speaker_role}]` : "";
-      return `${role} ${c.speaker_name ?? "Unknown"}: ${c.content}`;
+      const roleDisplay = formatSpeakerRole(c.speaker_role, companyName);
+      const speakerName = c.speaker_name ?? "Unknown";
+      return `${roleDisplay} ${speakerName}: ${c.content}`;
     });
 
     return {
