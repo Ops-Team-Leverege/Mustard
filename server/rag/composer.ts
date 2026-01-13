@@ -60,6 +60,34 @@ export type SelectedQuote = {
   reason: string; // why this quote matters
 };
 
+export type QuoteSelectionResult = {
+  quotes: SelectedQuote[];
+  quoteNotice?: string; // Friendly disclosure when quotes are suppressed
+};
+
+/**
+ * Confidence gate for quote selection.
+ * 
+ * Epistemic safety: We only generate quotes when speaker attribution is reliable.
+ * A chunk is considered "attributed" if speakerName is non-null OR speakerRole !== "unknown".
+ * If < 70% of chunks are attributed, confidence is low and quotes are suppressed.
+ */
+function computeSpeakerAttributionConfidence(chunks: TranscriptChunk[]): {
+  isHigh: boolean;
+  ratio: number;
+} {
+  if (chunks.length === 0) {
+    return { isHigh: false, ratio: 0 };
+  }
+
+  const attributedCount = chunks.filter(
+    (c) => c.speakerName != null || c.speakerRole !== "unknown"
+  ).length;
+
+  const ratio = attributedCount / chunks.length;
+  return { isHigh: ratio >= 0.7, ratio };
+}
+
 function formatTranscript(chunks: TranscriptChunk[]): string {
   return chunks
     .map(c => {
@@ -144,11 +172,32 @@ ${transcript}
  * - follow-up emails
  * - sales context
  * - internal alignment
+ * 
+ * Includes confidence gate: quotes are only generated when speaker attribution is reliable.
  */
 export async function selectRepresentativeQuotes(
   chunks: TranscriptChunk[],
+  contentType: "transcript" | "notes",
   maxQuotes = 5,
-): Promise<SelectedQuote[]> {
+): Promise<QuoteSelectionResult> {
+  // Gate 1: Notes don't have reliable speaker attribution
+  if (contentType !== "transcript") {
+    return {
+      quotes: [],
+      quoteNotice: "I didn't include direct quotes because this was meeting notes rather than a transcript, which makes speaker attribution unreliable.",
+    };
+  }
+
+  // Gate 2: Check speaker attribution confidence
+  const confidence = computeSpeakerAttributionConfidence(chunks);
+  if (!confidence.isHigh) {
+    return {
+      quotes: [],
+      quoteNotice: "I didn't include direct quotes from this meeting because the transcript doesn't consistently label speakers, which makes quotes hard to interpret out of context.",
+    };
+  }
+
+  // Confidence is high - proceed with LLM quote selection
   const transcript = formatTranscript(chunks);
 
   const response = await openai.chat.completions.create({
@@ -196,5 +245,5 @@ ${transcript}
 
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  return JSON.parse(jsonStr) as SelectedQuote[];
+  return { quotes: JSON.parse(jsonStr) as SelectedQuote[] };
 }

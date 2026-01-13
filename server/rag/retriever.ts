@@ -21,6 +21,7 @@ export type LastMeetingResult = {
   chunks: TranscriptChunk[];
   transcriptId: string;
   transcriptCreatedAt: Date;
+  contentType: "transcript" | "notes";
 } | null;
 
 /**
@@ -58,5 +59,6 @@ export async function getLastMeetingChunks(
     chunks: mappedChunks,
     transcriptId: transcriptInfo.id,
     transcriptCreatedAt: transcriptInfo.createdAt,
+    contentType: transcriptInfo.contentType as "transcript" | "notes",
   };
 }

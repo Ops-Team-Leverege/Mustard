@@ -1,0 +1,166 @@
+Composer-Side Quote Confidence Gate + User Disclosure
+Context
+
+You are working in an existing TypeScript backend with a deliberate architecture:
+
+MCP → routing only
+
+RAG
+
+retriever.ts → deterministic data access
+
+composer.ts → LLM-based interpretation + quote selection
+
+Slack / capabilities → presentation only
+
+Ingestion → deterministic parsing into speaker turns
+
+Important facts about the system:
+
+Transcripts are already ingested per speaker turn
+
+Each chunk may have:
+
+speakerName
+
+speakerRole (customer | leverege | unknown)
+
+content_type already exists on transcripts:
+
+"transcript"
+
+"notes"
+
+Some records are marked as transcript but do not reliably support speaker attribution (hybrid / mixed transcripts).
+
+Goal
+
+Add a composer-side confidence gate so that:
+
+Representative quotes are only generated when it is epistemically safe
+
+When quotes are requested but confidence is low, the user is informed in a friendly, transparent way
+
+The system should prefer honesty over forced output.
+
+In Scope ✅
+1️⃣ Speaker Attribution Confidence Gate (Composer)
+
+Implement a deterministic confidence check inside rag/composer.ts:
+
+A chunk is considered attributed if:
+
+speakerName is non-null, OR
+
+speakerRole !== "unknown"
+
+Compute:
+
+attributedTurns / totalTurns
+
+
+If ≥ 70% → confidence is high
+
+Otherwise → confidence is low
+
+2️⃣ Quote Gating Rules
+
+Update quote selection behavior as follows:
+
+If content_type !== "transcript" → do not generate quotes
+
+If content_type === "transcript" AND confidence is low → do not generate quotes
+
+If content_type === "transcript" AND confidence is high → allow quote selection (existing LLM logic)
+
+Meeting summaries must still be generated in all cases.
+
+3️⃣ Friendly Disclosure When Quotes Are Suppressed
+
+If quotes are requested (e.g. last meeting summary) and quote confidence is low:
+
+Return no quotes
+
+Provide a human-readable explanation indicating why quotes were omitted
+
+The message should be:
+
+Friendly
+
+Non-technical
+
+Honest
+
+Reassuring
+
+Example tone (do not hardcode verbatim unless appropriate):
+
+“I didn’t include direct quotes from this meeting because the transcript doesn’t consistently label speakers, which makes quotes hard to interpret out of context.”
+
+This message should be surfaced alongside the summary (e.g. returned metadata or a separate field), not embedded inside the summary text itself.
+
+Explicitly Out of Scope ❌
+
+❌ Do NOT modify ingestion logic
+
+❌ Do NOT reclassify transcripts
+
+❌ Do NOT infer or guess speakers
+
+❌ Do NOT change Slack formatting directly
+
+❌ Do NOT add new database fields
+
+❌ Do NOT use LLMs for confidence detection
+
+Implementation Guidance
+
+Keep the diff small
+
+Prefer explicit logic over abstraction
+
+Add a short comment explaining why the confidence gate exists
+
+Do not change function signatures unless necessary
+
+If needed, return something like:
+
+{
+  quotes: Quote[],
+  quoteNotice?: string
+}
+
+
+…but only if this aligns with existing patterns.
+
+Expected Outcome
+
+Clean transcripts → quotes behave as before
+
+Hybrid transcripts → summaries only, with a clear explanation
+
+Notes → summaries only, no quotes
+
+No more unattributed or misleading quotes
+
+User trust increases
+
+Architectural Principle (do not violate)
+
+Ingestion = what exists in the data
+
+Composer = what is safe to say given the data
+
+Presentation = how it’s shown
+
+This change is about epistemic safety, not parsing.
+
+When finished
+
+Summarize briefly:
+
+Where the confidence gate lives
+
+The exact confidence rule used
+
+How the user-facing disclosure is triggered

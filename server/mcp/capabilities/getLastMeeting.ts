@@ -52,7 +52,7 @@ export const getLastMeeting: Capability = {
       };
     }
 
-    const { chunks: rawChunks, transcriptId, transcriptCreatedAt } = result;
+    const { chunks: rawChunks, transcriptId, transcriptCreatedAt, contentType } = result;
 
     // Map retriever's snake_case to composer's camelCase format
     const composerChunks: ComposerChunk[] = rawChunks.map((c) => ({
@@ -64,7 +64,7 @@ export const getLastMeeting: Capability = {
 
     // Step 3: Compose structured outputs (LLM-only)
     const summary = await composeMeetingSummary(composerChunks);
-    const quotes = await selectRepresentativeQuotes(composerChunks);
+    const quoteResult = await selectRepresentativeQuotes(composerChunks, contentType);
 
     // Step 4: Persist the artifact for later reuse
     // Use transcript.created_at as the meeting timestamp (meeting time, not processing time)
@@ -72,7 +72,7 @@ export const getLastMeeting: Capability = {
       companyId,
       transcriptId,
       meetingTimestamp: transcriptCreatedAt,
-      artifact: { summary, quotes },
+      artifact: { summary, quotes: quoteResult.quotes },
     });
 
     // Step 5: Render response (presentation logic stays here)
@@ -106,11 +106,14 @@ export const getLastMeeting: Capability = {
       summary.recommendedNextSteps.forEach((n) => lines.push(`• ${n}`));
     }
 
-    if (quotes.length) {
+    if (quoteResult.quotes.length) {
       lines.push("\n*Representative Quotes*");
-      quotes.forEach((q) => {
+      quoteResult.quotes.forEach((q) => {
         lines.push(`• "${q.quote}" — ${q.speakerRole}`);
       });
+    } else if (quoteResult.quoteNotice) {
+      // Friendly disclosure when quotes are suppressed
+      lines.push(`\n_${quoteResult.quoteNotice}_`);
     }
 
     return {
