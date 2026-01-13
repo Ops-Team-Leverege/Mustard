@@ -1,0 +1,151 @@
+Slack Ack + Customer-Only Quotes
+Context
+
+You are working in an existing TypeScript backend with a deliberate architecture:
+
+Slack layer → transport + UX only
+
+MCP → routing + capability selection
+
+RAG
+
+retriever.ts → deterministic data access
+
+composer.ts → LLM-based interpretation (summaries, quotes)
+
+Ingestion → deterministic transcript parsing (speaker turns)
+
+Important existing behavior:
+
+Meeting summaries are generated reliably
+
+Quote confidence gating already exists
+
+Attendees are stored in the transcripts table and passed through
+
+Quotes are currently shown even when not explicitly requested
+
+Quotes may include Leverege speakers (this is incorrect)
+
+Goals
+
+Implement two improvements:
+
+1️⃣ Send an immediate Slack acknowledgment message to reduce perceived latency
+2️⃣ Restrict “Representative Quotes” to customer speakers only, and only when explicitly requested
+
+In Scope ✅
+1️⃣ Immediate Slack Acknowledgment (UX improvement)
+
+As soon as a Slack request is received:
+
+Post a short acknowledgment message immediately
+
+Then continue processing the request asynchronously
+
+Post the final response when ready
+
+Tone: assistant-y, friendly, neutral
+Example copy (use this or something equivalent):
+
+“On it, @username — let me check that for you.”
+
+Rules
+
+This logic must live only in the Slack layer
+
+Do NOT modify MCP, RAG, or composer behavior for this
+
+Do NOT wait for the result before sending the ack
+
+2️⃣ Customer-Only Quotes
+
+Update quote behavior so that:
+
+Only customer quotes are eligible
+
+Exclude all:
+
+speakerRole === "leverege"
+
+speakerRole === "unknown"
+
+This applies inside selectRepresentativeQuotes.
+
+If no customer quotes remain:
+
+Return no quotes
+
+Let the existing friendly disclosure handle the explanation (already implemented)
+
+3️⃣ Quotes Are Opt-In (Reinforce behavior)
+
+Ensure that:
+
+Quotes are generated only when explicitly requested
+
+e.g. “What did the customer say…”
+
+e.g. “Any notable quotes?”
+
+Default “last meeting” requests should return:
+
+Summary
+
+Attendees
+
+NO quotes
+
+This logic belongs in:
+
+getLastMeeting.ts (intent detection / presentation)
+
+Do not change the composer’s responsibility here beyond customer-only filtering.
+
+Explicitly Out of Scope ❌
+
+❌ Do NOT modify ingestion logic
+
+❌ Do NOT infer speakers
+
+❌ Do NOT add new database fields
+
+❌ Do NOT change confidence threshold logic
+
+❌ Do NOT add emojis unless already used elsewhere
+
+❌ Do NOT refactor unrelated code
+
+Architectural Constraints (do not violate)
+
+Slack layer handles UX and responsiveness
+
+Composer decides what is safe to say
+
+Ingestion remains deterministic and conservative
+
+Keep changes minimal, explicit, and well-scoped.
+
+Expected Outcome
+
+After this change:
+
+Slack feels responsive immediately
+
+Users never see Leverege quotes labeled as customer quotes
+
+Quotes feel intentional, not noisy
+
+Long responses no longer feel “slow”
+
+Trust increases
+
+When finished
+
+Briefly summarize:
+
+Where the Slack ack was added
+
+How customer-only quotes are enforced
+
+How quote intent is detected

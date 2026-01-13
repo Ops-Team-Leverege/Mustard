@@ -197,8 +197,17 @@ export async function selectRepresentativeQuotes(
     };
   }
 
-  // Confidence is high - proceed with LLM quote selection
-  const transcript = formatTranscript(chunks);
+  // Gate 3: Filter to customer-only chunks for quote selection
+  const customerChunks = chunks.filter((c) => c.speakerRole === "customer");
+  if (customerChunks.length === 0) {
+    return {
+      quotes: [],
+      quoteNotice: "I didn't include direct quotes because no customer statements were clearly attributed in this transcript.",
+    };
+  }
+
+  // Confidence is high and we have customer chunks - proceed with LLM quote selection
+  const transcript = formatTranscript(customerChunks);
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -206,12 +215,11 @@ export async function selectRepresentativeQuotes(
       {
         role: "system",
         content: `
-You select representative quotes from a customer meeting.
+You select representative quotes from customer speakers in a meeting.
 
 Rules:
-- Use ONLY the provided transcript.
-- Prefer customer quotes when possible.
-- Select quotes that capture priorities, concerns, or decisions.
+- Use ONLY the provided transcript (which contains only customer statements).
+- Select quotes that capture customer priorities, concerns, pain points, or decisions.
 - Do NOT rewrite quotes; use exact phrasing.
 - Be neutral and factual.
         `.trim(),
@@ -219,13 +227,13 @@ Rules:
       {
         role: "user",
         content: `
-Select up to ${maxQuotes} representative quotes.
+Select up to ${maxQuotes} representative customer quotes.
 
 Return valid JSON only as an array with this shape:
 [
   {
     "chunkIndex": number,
-    "speakerRole": "customer" | "leverege" | "unknown",
+    "speakerRole": "customer",
     "quote": string,
     "reason": string
   }

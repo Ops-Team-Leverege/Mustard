@@ -5,8 +5,30 @@ import {
   composeMeetingSummary,
   selectRepresentativeQuotes,
   type TranscriptChunk as ComposerChunk,
+  type QuoteSelectionResult,
 } from "../../rag/composer";
 import { storage } from "../../storage";
+
+/**
+ * Detect if the user explicitly requested quotes.
+ * Quotes are opt-in: only shown when user asks for them.
+ */
+function detectQuoteIntent(question: string): boolean {
+  const q = question.toLowerCase();
+  const quotePatterns = [
+    /\bquote/,
+    /\bsaid\b/,
+    /\bsay\b/,
+    /\bwhat did .* say/,
+    /\bwhat were .* words/,
+    /\bexact words/,
+    /\btheir words/,
+    /\bcustomer feedback/,
+    /\bnotable .* said/,
+    /\bdirect .* statement/,
+  ];
+  return quotePatterns.some((p) => p.test(q));
+}
 
 export const getLastMeeting: Capability = {
   name: "get_last_meeting",
@@ -16,7 +38,9 @@ export const getLastMeeting: Capability = {
     companyName: z.string().describe("The name of the company to get the last meeting for"),
     question: z.string().describe("The specific question about the meeting"),
   }),
-  handler: async ({ db }, { companyName /* question intentionally unused */ }) => {
+  handler: async ({ db }, { companyName, question }) => {
+    // Detect if user explicitly requested quotes
+    const wantsQuotes = detectQuoteIntent(question);
     // Step 1: Resolve company name with case-insensitive partial match
     const companyRows = await db.query(
       `SELECT id, name FROM companies WHERE name ILIKE $1`,
@@ -64,7 +88,12 @@ export const getLastMeeting: Capability = {
 
     // Step 3: Compose structured outputs (LLM-only)
     const summary = await composeMeetingSummary(composerChunks);
-    const quoteResult = await selectRepresentativeQuotes(composerChunks, contentType);
+
+    // Quotes are opt-in: only fetch if user explicitly requested them
+    let quoteResult: QuoteSelectionResult = { quotes: [] };
+    if (wantsQuotes) {
+      quoteResult = await selectRepresentativeQuotes(composerChunks, contentType);
+    }
 
     // Step 4: Persist the artifact for later reuse
     // Use transcript.created_at as the meeting timestamp (meeting time, not processing time)
@@ -106,14 +135,17 @@ export const getLastMeeting: Capability = {
       summary.recommendedNextSteps.forEach((n) => lines.push(`• ${n}`));
     }
 
-    if (quoteResult.quotes.length) {
-      lines.push("\n*Representative Quotes*");
-      quoteResult.quotes.forEach((q) => {
-        lines.push(`• "${q.quote}" — ${q.speakerRole}`);
-      });
-    } else if (quoteResult.quoteNotice) {
-      // Friendly disclosure when quotes are suppressed
-      lines.push(`\n_${quoteResult.quoteNotice}_`);
+    // Only show quotes section if user explicitly requested them
+    if (wantsQuotes) {
+      if (quoteResult.quotes.length) {
+        lines.push("\n*Representative Quotes*");
+        quoteResult.quotes.forEach((q) => {
+          lines.push(`• "${q.quote}" — customer`);
+        });
+      } else if (quoteResult.quoteNotice) {
+        // Friendly disclosure when quotes were requested but suppressed
+        lines.push(`\n_${quoteResult.quoteNotice}_`);
+      }
     }
 
     return {

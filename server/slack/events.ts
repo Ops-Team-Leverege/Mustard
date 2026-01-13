@@ -75,10 +75,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const channel = String(event.channel);
     const threadTs = String(event.ts);
     const text = cleanMention(String(event.text || ""));
+    const userId = String(event.user || "");
 
     console.log(`Processing mention: "${text}" in channel ${channel}`);
 
-    // 6. Process with MCP
+    // 6. Send immediate acknowledgment (UX improvement - reduces perceived latency)
+    const ackMessage = userId
+      ? `On it, <@${userId}> — let me check that for you.`
+      : `On it — let me check that for you.`;
+
+    await postSlackMessage({
+      channel,
+      text: ackMessage,
+      thread_ts: threadTs,
+    });
+
+    // 7. Process with MCP (async after ack)
     const ctx = makeMCPContext();
     const mcp = createMCP(ctx);
 
