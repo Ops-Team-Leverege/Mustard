@@ -1,42 +1,40 @@
-// server/rag/index.ts
 import { getLastMeetingChunks } from "./retriever";
 
 export async function answerQuestion(params: {
   question: string;
   companyId: string;
-  mode?: "summary" | "last_meeting";
+  mode?: "last_meeting" | "summary";
 }) {
-  const mode = params.mode ?? "summary";
+  const mode = params.mode ?? "last_meeting";
 
-  if (mode === "last_meeting" || mode === "summary") {
-    const chunks = await getLastMeetingChunks(params.companyId, 120);
+  if (mode === "last_meeting") {
+    const chunks = await getLastMeetingChunks(params.companyId, 50);
 
-    if (!chunks.length) {
+    if (chunks.length === 0) {
       return {
-        answer: "I couldn't find any transcript chunks for that company yet. (Have we run ingestion?)",
+        answer: "No transcript data found for the most recent meeting.",
         citations: [],
       };
     }
 
-    // Deterministic “summary”: first N customer + leverege turns
-    const key = chunks.slice(0, 20).map((c) => {
-      const who = c.speaker_role ? `[${c.speaker_role}]` : "";
-      return `${who} ${c.speaker_name ?? "Unknown"}: ${c.content}`;
+    const lines = chunks.slice(0, 15).map((c) => {
+      const role = c.speakerRole ? `[${c.speakerRole}]` : "";
+      return `${role} ${c.speakerName ?? "Unknown"}: ${c.content}`;
     });
-
-    const citations = chunks.slice(0, 10).map((c) => ({
-      chunkId: c.id,
-      transcriptId: c.transcript_id,
-      chunkIndex: c.chunk_index,
-    }));
 
     return {
       answer:
-        `Here are the first discussion turns from the most recent meeting:\n\n` +
-        key.join("\n"),
-      citations,
+        "Here are the first discussion turns from the most recent meeting:\n\n" +
+        lines.join("\n"),
+      citations: chunks.slice(0, 10).map((c) => ({
+        transcriptId: c.transcriptId,
+        chunkIndex: c.chunkIndex,
+      })),
     };
   }
 
-  return { answer: "Mode not implemented yet.", citations: [] };
+  return {
+    answer: "Mode not implemented yet.",
+    citations: [],
+  };
 }
