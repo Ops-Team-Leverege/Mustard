@@ -83,7 +83,17 @@ export type MeetingCommitment = {
   owner: string;
   deadline?: string;
   evidence: string;
-  confidence: number; // 0-1, only ≥0.8 surfaced
+  confidence: number; // 0-1
+};
+
+/**
+ * Two-tier result from commitment extraction.
+ * Confirmed (≥0.8) are high-confidence explicit commitments.
+ * FollowUps (0.65-0.8) are softer but real commitments worth tracking.
+ */
+export type CommitmentExtractionResult = {
+  confirmed: MeetingCommitment[];
+  followUps: MeetingCommitment[];
 };
 
 /**
@@ -357,13 +367,13 @@ ${transcript}
  * 
  * Principles:
  * - Commitments are extracted, not inferred
- * - Must have clear ownership
+ * - Must have clear ownership (prefer people over organizations)
  * - Must have transcript grounding
- * - High confidence threshold (≥0.8) to avoid false positives
+ * - Two-tier confidence: confirmed (≥0.8) and follow-ups (0.65-0.8)
  */
 export async function extractMeetingCommitments(
   chunks: TranscriptChunk[],
-): Promise<MeetingCommitment[]> {
+): Promise<CommitmentExtractionResult> {
   const transcript = formatTranscript(chunks);
 
   const response = await openai.chat.completions.create({
@@ -379,6 +389,7 @@ WHAT COUNTS AS A COMMITMENT:
 - "We will..." → team/company is owner
 - "Can you do X?" followed by "Yes" or agreement → responder is owner
 - "Let's..." followed by agreement → participants are owners
+- "We'll look into that" or "I'll check on that" → investigation follow-up
 
 WHAT TO IGNORE:
 - Hypotheticals: "we could...", "we might..."
@@ -389,16 +400,17 @@ WHAT TO IGNORE:
 
 RULES:
 1. Only extract EXPLICIT commitments spoken in the meeting
-2. Each commitment must have a clear owner (name or role)
-3. Include a supporting quote as evidence (verbatim or close paraphrase)
+2. OWNER ASSIGNMENT: Prefer a specific person's name over a company or team name when the speaker can be identified. Use "Corey Redd" not "Leverege" if Corey spoke.
+3. EVIDENCE QUOTES: Remove filler words such as "um", "uh", "like", or repeated false starts, without changing the meaning or intent. Do NOT paraphrase or summarize.
 4. Assign confidence score (0-1):
    - 1.0 = explicit "I will do X" statement
    - 0.9 = clear verbal agreement to a request
    - 0.8 = "We will..." or team-level commitment
-   - 0.7 = implied agreement with clear action context
-   - Below 0.7 = too uncertain, do NOT include
+   - 0.7 = "We'll look into that" or investigation commitment
+   - 0.65 = softer follow-up worth tracking
+   - Below 0.65 = too uncertain, do NOT include
 5. Extract deadlines only if explicitly mentioned (e.g., "this afternoon", "by Friday")
-6. Phrase tasks as specific, actionable verbs (Send X, Review Y, Discuss Z)
+6. Phrase tasks as specific, actionable verbs (Send X, Review Y, Discuss Z, Investigate Y)
 7. Combine related micro-commitments into single coherent action items
 
 Return valid JSON only as an array:
@@ -436,7 +448,12 @@ ${transcript}
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
   const parsed = JSON.parse(jsonStr) as MeetingCommitment[];
 
-  // Filter to high-confidence commitments only (≥0.7)
-  // False positives are worse than omissions, but 0.7 is permissive enough for good coverage
-  return parsed.filter((c) => c.confidence >= 0.7);
+  // Two-tier confidence filtering:
+  // - Confirmed (≥0.8): High-confidence explicit commitments
+  // - FollowUps (0.65-0.8): Softer but real commitments worth tracking
+  // - Below 0.65: Omit entirely (false positives worse than omissions)
+  const confirmed = parsed.filter((c) => c.confidence >= 0.8);
+  const followUps = parsed.filter((c) => c.confidence >= 0.65 && c.confidence < 0.8);
+
+  return { confirmed, followUps };
 }

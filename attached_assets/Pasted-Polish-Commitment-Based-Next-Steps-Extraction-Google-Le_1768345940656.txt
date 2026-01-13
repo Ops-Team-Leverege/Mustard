@@ -1,0 +1,143 @@
+Polish Commitment-Based Next Steps Extraction (Google-Level)
+
+You are working in an existing TypeScript backend with a layered architecture.
+
+Do NOT change architecture or flow.
+This task is a polish pass on the existing commitment-based next steps extraction to match Google Meet–level quality.
+
+Context (Already Implemented — Do Not Rebuild)
+
+Commitment-based next steps extraction exists
+
+Uses extractive LLM logic (not summarization)
+
+Requires explicit verbal commitments
+
+Assigns owners
+
+Includes evidence quotes
+
+Uses a confidence threshold to suppress false positives
+
+This task only refines output quality and heuristics.
+
+Goals
+
+Improve the readability, actionability, and completeness of extracted next steps while preserving strict correctness.
+
+Changes to Implement (Only These)
+1️⃣ Clean Evidence Quotes (Dysfluency Removal)
+
+Problem
+Evidence quotes currently include speech artifacts such as:
+
+“um”
+
+“uh”
+
+false starts
+
+repeated words
+
+This reduces readability compared to Google Meet.
+
+Change
+Update the commitment extraction prompt to include:
+
+“When including the evidence quote, remove filler words such as ‘um’, ‘uh’, ‘like’, or repeated false starts, without changing the meaning or intent.”
+
+Rules
+
+Do NOT paraphrase
+
+Do NOT summarize
+
+Do NOT change intent
+
+Only clean obvious filler words
+
+2️⃣ Prefer People Over Organizations for Owners
+
+Problem
+Some next steps are assigned to organizations (e.g. “Leverege”) even when a specific person spoke.
+
+Change
+Bias owner assignment toward specific people when identifiable.
+
+Add instruction to the prompt:
+
+“When assigning an owner, prefer a specific person’s name over a company or team name if the speaker can be identified.”
+
+Expected Outcome
+
+“Send login information — Corey Redd”
+
+not “Send login information — Leverege”
+
+3️⃣ Two-Tier Confidence Threshold (Capture Soft Follow-Ups)
+
+Problem
+Some valid “investigation” or “follow-up” commitments (e.g. “We’ll look into that”) are missed because the confidence threshold is too strict.
+
+Change
+Implement two tiers:
+
+confidence ≥ 0.8
+→ Confirmed Next Steps
+
+0.65 ≤ confidence < 0.8
+→ Follow-Ups to Track
+
+confidence < 0.65
+→ omit entirely
+
+Rules
+
+Do NOT merge tiers
+
+Do NOT lower standards for confirmed items
+
+False positives remain worse than omissions
+
+Output Structure (Slack-Friendly)
+
+Example:
+
+*Next Steps*
+• Send login information to all attendees — Corey Redd (this afternoon)
+  _“Everyone will be sent login information this afternoon…”_
+
+*Follow-Ups to Track*
+• Investigate DTIQ high-definition camera issue — Calum McClelland / Robert Colongo
+  _“We’ll take a look and get back to you…”_
+
+Out of Scope ❌
+
+❌ No new extraction logic
+
+❌ No vector search
+
+❌ No persistence changes
+
+❌ No Slack UX refactors
+
+❌ No new intent detection
+
+❌ No cross-meeting logic
+
+Acceptance Criteria
+
+After implementation:
+
+Evidence quotes read cleanly
+
+Owners are people, not companies, when possible
+
+Soft but real follow-ups are captured separately
+
+Output quality matches or exceeds Google Meet’s “Next Steps”
+
+Architectural Principle (Do Not Violate)
+
+We extract commitments; we do not infer intent.
+Polish must not introduce hallucination.

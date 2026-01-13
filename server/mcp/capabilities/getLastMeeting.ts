@@ -225,24 +225,40 @@ export const getLastMeeting: Capability = {
     // ROUTE: Commitment request → Action items / Next steps
     // ─────────────────────────────────────────────────────────────────
     if (wantsCommitments) {
-      const commitments = await extractMeetingCommitments(composerChunks);
+      const { confirmed, followUps } = await extractMeetingCommitments(composerChunks);
 
       const lines: string[] = [];
       lines.push(`*[${resolvedName}] Next Steps*`);
       lines.push(`_Meeting: ${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
 
-      if (commitments.length === 0) {
+      if (confirmed.length === 0 && followUps.length === 0) {
         lines.push("\nNo explicit action items were committed to in this meeting.");
       } else {
-        lines.push("");
-        commitments.forEach((c) => {
-          let item = `• ${c.task} — ${c.owner}`;
-          if (c.deadline) {
-            item += ` _(${c.deadline})_`;
-          }
-          lines.push(item);
-          lines.push(`  _"${c.evidence}"_`);
-        });
+        // Confirmed next steps (high confidence ≥0.8)
+        if (confirmed.length > 0) {
+          lines.push("");
+          confirmed.forEach((c) => {
+            let item = `• ${c.task} — ${c.owner}`;
+            if (c.deadline) {
+              item += ` _(${c.deadline})_`;
+            }
+            lines.push(item);
+            lines.push(`  _"${c.evidence}"_`);
+          });
+        }
+
+        // Follow-ups to track (confidence 0.65-0.8)
+        if (followUps.length > 0) {
+          lines.push("\n*Follow-Ups to Track*");
+          followUps.forEach((c) => {
+            let item = `• ${c.task} — ${c.owner}`;
+            if (c.deadline) {
+              item += ` _(${c.deadline})_`;
+            }
+            lines.push(item);
+            lines.push(`  _"${c.evidence}"_`);
+          });
+        }
       }
 
       return {
