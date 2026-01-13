@@ -1,3 +1,6 @@
+/*Shared types for RAG transcript chunks and outputs.
+Important note: Uses camelCase to match Drizzle output*/
+
 export type TranscriptChunk = {
   id: string
   transcript_id: string

@@ -157,6 +157,16 @@ export const transcriptChunks = pgTable("transcript_chunks", {
   uniqueIndex("transcript_chunks_transcript_chunk_idx").on(table.transcriptId, table.chunkIndex),
 ]);
 
+// Meeting summaries - persists composed artifacts from RAG layer
+export const meetingSummaries = pgTable("meeting_summaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull(),
+  transcriptId: varchar("transcript_id"),
+  meetingTimestamp: timestamp("meeting_timestamp").notNull(),
+  artifact: jsonb("artifact").notNull(), // { summary: MeetingSummary, quotes: SelectedQuote[] }
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 // Session storage table - mandatory for Replit Auth
 export const sessions = pgTable(
@@ -349,3 +359,7 @@ export type User = typeof users.$inferSelect;
 // TranscriptChunk type for RAG
 export type TranscriptChunk = typeof transcriptChunks.$inferSelect;
 export type InsertTranscriptChunk = Omit<typeof transcriptChunks.$inferInsert, 'id' | 'createdAt'>;
+
+// MeetingSummary type for persisted RAG artifacts
+export type MeetingSummary = typeof meetingSummaries.$inferSelect;
+export type InsertMeetingSummary = Omit<typeof meetingSummaries.$inferInsert, 'id' | 'createdAt'>;

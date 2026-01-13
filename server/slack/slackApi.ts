@@ -1,3 +1,19 @@
+/**
+ * Slack integration layer.
+ *
+ * Responsibilities:
+ * - Receive and verify Slack events
+ * - Invoke MCP capabilities
+ * - Format responses for Slack UI
+ *
+ * This file MUST NOT:
+ * - Contain business logic
+ * - Perform data retrieval
+ * - Call LLMs directly
+ *
+ * Layer: Integration (I/O only)
+ */
+
 type PostMessageParams = {
   channel: string;
   text: string;

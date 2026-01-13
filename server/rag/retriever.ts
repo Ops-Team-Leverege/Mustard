@@ -1,7 +1,18 @@
 /**
- * Retriever module for RAG pipeline.
- * Uses storage abstraction methods only - no raw SQL.
+ * Transcript retrieval logic for RAG.
+ *
+ * Responsibilities:
+ * - Select the correct transcript (e.g. most recent meeting)
+ * - Retrieve speaker-turn chunks in deterministic order
+ *
+ * This file MUST NOT:
+ * - Call LLMs
+ * - Perform summarization or formatting
+ * - Modify or infer speaker roles
+ *
+ * Layer: RAG – Retrieval (deterministic)
  */
+
 
 import { storage } from "../storage";
 import type { TranscriptChunk } from "./types";

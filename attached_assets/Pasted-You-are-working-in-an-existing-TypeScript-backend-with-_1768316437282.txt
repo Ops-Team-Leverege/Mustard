@@ -1,0 +1,165 @@
+You are working in an existing TypeScript backend with a clear, intentional architecture:
+
+MCP → routing and capability dispatch (LLM for routing only)
+
+RAG
+
+retriever.ts → deterministic retrieval
+
+composer.ts → LLM-based interpretation (meeting summaries + quotes)
+
+Slack → transport only
+
+Ingestion → transcript chunking only
+
+The system already has:
+
+rag/composer.ts that produces:
+
+a structured meeting summary
+
+a list of representative quotes (from the same meeting)
+
+getLastMeeting.ts capability that:
+
+resolves a company
+
+retrieves last meeting transcript chunks
+
+calls the composer
+
+Your task is to add lightweight persistence for the composer output.
+
+Goal
+
+Persist the meeting summary + its representative quotes so they can be reused later, without changing user-visible behavior.
+
+In Scope ✅
+
+Create a database table to store meeting artifacts
+
+Store both:
+
+the structured meeting summary
+
+the representative quotes
+
+Add minimal storage helper functions
+
+Add a minimal call site to persist the artifact
+
+Explicitly Out of Scope ❌ (do NOT do these)
+
+❌ Do NOT create a separate “BD quotes” or “sales quotes” table
+
+❌ Do NOT integrate Airtable
+
+❌ Do NOT change ingestion logic
+
+❌ Do NOT change Slack logic
+
+❌ Do NOT change MCP routing (decideCapability, createMCP)
+
+❌ Do NOT move or refactor LLM logic
+
+❌ Do NOT introduce new abstractions unless strictly necessary
+
+Anything related to cross-meeting, sales-curated quotes is explicitly backlog.
+
+Data Model
+
+Create one table to store meeting artifacts.
+
+Suggested shape (adjust to repo conventions as needed):
+
+meeting_summaries
+
+id
+
+company_id
+
+meeting_timestamp
+
+artifact (JSON / JSONB)
+
+{ summary, quotes }
+
+created_at
+
+Notes:
+
+Store the artifact as opaque JSON
+
+Do not normalize quotes into a separate table
+
+No indexing or optimization yet
+
+Storage Helpers
+
+Add thin, explicit helpers (no business logic), e.g.:
+
+saveMeetingSummary(db, { companyId, meetingTimestamp, artifact })
+
+getLatestMeetingSummary(db, companyId)
+
+Rules:
+
+Accept db as a parameter
+
+Use db.query(...)
+
+Do not call LLMs
+
+Do not interpret data
+
+Integration Point
+
+In getLastMeeting.ts:
+
+After calling the composer and getting:
+
+summary
+
+quotes
+
+Persist { summary, quotes } using the helper
+
+This should be 1–2 lines max
+
+If no reliable meeting timestamp exists yet:
+
+use now() temporarily
+
+document the assumption with a short comment
+
+Constraints
+
+Keep the diff small
+
+Prefer explicit code over abstraction
+
+Follow existing file structure and naming conventions
+
+Add comments only when they clarify architectural intent
+
+Output Expected
+
+Migration / SQL for the new table
+
+Storage helper functions
+
+Minimal integration in getLastMeeting.ts
+
+Short comments explaining why (not how)
+
+Architectural Principle (do not violate)
+
+LLM responsibilities are already separated:
+
+MCP → routing
+
+RAG composer → interpretation
+
+Storage → persistence only
+
+Do not blur these boundaries.

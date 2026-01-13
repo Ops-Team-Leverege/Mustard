@@ -1,3 +1,17 @@
+/**
+* Ingests raw transcript records into speaker-turn–based transcript chunks.
+*
+* Responsibilities:
+* - Parse transcript text into speaker turns
+* - Assign speaker roles conservatively (leverege | customer | unknown)
+* - Insert chunks idempotently into the database
+*
+* This file MUST NOT:
+* - Call LLMs
+* - Perform summarization
+* - Guess speaker identities
+*/
+
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE EXTENSION IF NOT EXISTS vector;

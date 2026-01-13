@@ -1,3 +1,20 @@
+/**
+ * Transcript ingestion pipeline.
+ *
+ * Responsibilities:
+ * - Parse raw transcript text into speaker-turn chunks
+ * - Assign speaker roles conservatively (leverege | customer | unknown)
+ * - Insert transcript chunks idempotently into the database
+ *
+ * This file MUST NOT:
+ * - Call LLMs
+ * - Perform summarization or analysis
+ * - Guess speaker identities
+ *
+ * Layer: Ingestion (deterministic, write-only)
+ */
+
+
 // server/ingestion/ingestTranscriptChunks.ts
 import { storage } from "../storage";
 

@@ -1,3 +1,31 @@
+/**
+ * LLM ROUTING MODULE (MCP ONLY)
+ *
+ * Purpose:
+ * This file uses an LLM strictly to ROUTE user requests to the correct MCP capability
+ * and extract structured arguments for that capability.
+ *
+ * What this file IS:
+ * - An orchestration helper for MCP
+ * - Responsible only for intent classification and parameter extraction
+ * - Allowed to use LLM tool/function calling for control flow
+ *
+ * What this file is NOT:
+ * - NOT responsible for summarization, analysis, or interpretation
+ * - NOT a RAG composer
+ * - NOT allowed to reason over domain data or retrieved content
+ *
+ * Important architectural rule:
+ * - LLM usage here is limited to "decide what capability to call"
+ * - Any LLM-based interpretation of retrieved data MUST live in the RAG composer layer
+ *   (see server/rag/composers.ts)
+ *
+ * Rationale:
+ * Separating LLM-for-routing (MCP) from LLM-for-reasoning (RAG)
+ * keeps responsibilities clear, prevents accidental coupling,
+ * and allows each use of the LLM to evolve independently.
+ */
+
 import { OpenAI } from "openai";
 import { zodToJsonSchema } from "zod-to-json-schema";
 import { z } from "zod";
