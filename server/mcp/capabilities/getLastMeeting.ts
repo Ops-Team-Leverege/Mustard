@@ -79,8 +79,6 @@ export const getLastMeeting: Capability = {
     const lines: string[] = [];
 
     lines.push(`*[${resolvedName}] ${summary.title}*`);
-    
-    lines.push(`*[${resolvedName}] ${summary.title}*`);
     lines.push(`_${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
 
     if (summary.purpose) {

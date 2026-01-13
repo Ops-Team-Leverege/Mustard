@@ -134,7 +134,9 @@ ${transcript}
     throw new Error("LLM returned empty meeting summary");
   }
 
-  return JSON.parse(content) as MeetingSummary;
+  // Strip markdown code fences if present
+  const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  return JSON.parse(jsonStr) as MeetingSummary;
 }
 
 /**
@@ -192,5 +194,7 @@ ${transcript}
     throw new Error("LLM returned empty quote selection");
   }
 
-  return JSON.parse(content) as SelectedQuote[];
+  // Strip markdown code fences if present
+  const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  return JSON.parse(jsonStr) as SelectedQuote[];
 }
