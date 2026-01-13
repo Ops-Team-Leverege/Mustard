@@ -66,6 +66,15 @@ export type QuoteSelectionResult = {
 };
 
 /**
+ * Result from extractive Q&A.
+ */
+export type ExtractiveAnswer = {
+  answer: string;
+  evidence?: string; // Supporting quote or reference from transcript
+  wasFound: boolean; // True if answer was found in transcript
+};
+
+/**
  * Confidence gate for quote selection.
  * 
  * Epistemic safety: We only generate quotes when speaker attribution is reliable.
@@ -254,4 +263,76 @@ ${transcript}
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
   return { quotes: JSON.parse(jsonStr) as SelectedQuote[] };
+}
+
+/**
+ * Extractive Q&A from a single meeting transcript.
+ * 
+ * This is NOT RAG - we answer from already-retrieved content.
+ * Designed to match Google Meet's post-meeting Q&A quality.
+ * 
+ * Behavior:
+ * - Answers only if supported by the transcript
+ * - Returns "not mentioned" if answer is not clearly present
+ * - Provides supporting evidence when found
+ */
+export async function answerMeetingQuestion(
+  chunks: TranscriptChunk[],
+  question: string,
+): Promise<ExtractiveAnswer> {
+  const transcript = formatTranscript(chunks);
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: `
+You are answering specific questions about a meeting transcript.
+
+STRICT RULES:
+1. Only answer if the transcript EXPLICITLY supports the answer.
+2. If the information was NOT mentioned, say: "This wasn't mentioned in the meeting."
+3. Do NOT guess, infer, or extrapolate beyond what was said.
+4. Prefer exact quantities, names, locations, and decisions when present.
+5. Keep answers concise and factual (1-3 sentences).
+6. If you find supporting evidence, include a brief quote or reference.
+
+Return valid JSON only with this shape:
+{
+  "answer": string,
+  "evidence": string | null,
+  "wasFound": boolean
+}
+
+Set wasFound=true only if the answer is explicitly supported by the transcript.
+Set wasFound=false and answer="This wasn't mentioned in the meeting." if not found.
+        `.trim(),
+      },
+      {
+        role: "user",
+        content: `
+Question: ${question}
+
+Transcript:
+${transcript}
+        `.trim(),
+      },
+    ],
+  });
+
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    throw new Error("LLM returned empty extractive answer");
+  }
+
+  // Strip markdown code fences if present
+  const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+  const parsed = JSON.parse(jsonStr) as { answer: string; evidence?: string | null; wasFound: boolean };
+  
+  return {
+    answer: parsed.answer,
+    evidence: parsed.evidence ?? undefined,
+    wasFound: parsed.wasFound,
+  };
 }

@@ -1,0 +1,195 @@
+Extractive Q&A from a Single Meeting
+
+You are working in an existing TypeScript backend with a layered architecture:
+
+Ingestion → deterministic transcript chunking
+
+Retriever → fetches the last meeting deterministically
+
+Composer → LLM-based interpretation
+
+MCP → capability routing
+
+Slack → presentation only
+
+This task introduces extractive Q&A for meeting details, comparable in quality to Google Meet’s post-meeting Q&A.
+
+Problem
+
+Users are unlikely to ask:
+
+“What was the last meeting about?”
+
+They are much more likely to ask specific, semantic questions, such as:
+
+“How many cameras did they say they have?”
+
+“Where did they want to start the pilot?”
+
+“How many stores does the customer operate?”
+
+“What metrics did they care most about?”
+
+“What did they say about data accuracy?”
+
+These answers already exist in the transcript, but are buried in long discussions.
+
+We need a grounded, extractive Q&A flow that:
+
+Answers only from the meeting content
+
+Does not hallucinate
+
+Explicitly says when something was not mentioned
+
+Goal
+
+Add a single-meeting extractive Q&A path that:
+
+Uses the full transcript of the last meeting
+
+Extracts answers only if supported by the transcript
+
+Returns:
+
+a concise answer
+
+a short supporting quote or reference
+
+Matches the behavior users expect from Google Meet summaries
+
+This is not RAG (no vector search yet).
+
+In Scope ✅
+1️⃣ Add an extractive Q&A composer function
+
+Location:
+
+server/rag/composer.ts
+
+Add a function, for example:
+
+answerMeetingQuestion(
+  chunks: TranscriptChunk[],
+  question: string
+): {
+  answer: string;
+  evidence?: string;
+}
+
+
+Behavior:
+
+Treat the transcript as the single source of truth
+
+Do not invent information
+
+If the answer is not clearly present, return:
+
+“This wasn’t mentioned in the meeting.”
+
+2️⃣ Use a strict extractive prompt (low hallucination)
+
+The LLM prompt must:
+
+Emphasize grounded extraction
+
+Penalize guessing
+
+Prefer exact quantities, locations, decisions
+
+Prompt intent (not exact text):
+
+You are answering questions about a meeting transcript.
+
+Only answer if the transcript explicitly supports it.
+
+If not mentioned, say so clearly.
+
+Prefer factual answers over summaries.
+
+3️⃣ Wire this into getLastMeeting.ts
+
+Logic:
+
+If the user asks a specific question (not “summary”):
+
+Skip the summary composer
+
+Call answerMeetingQuestion
+
+Return:
+
+Answer
+
+Optional short supporting quote
+
+No quotes section unless explicitly requested
+
+Do not change:
+
+MCP routing
+
+Slack transport
+
+Ingestion
+
+4️⃣ No vector search (important)
+
+This task must:
+
+Use the already-retrieved meeting transcript
+
+Not introduce embeddings
+
+Not add a retriever step
+
+Reason:
+We already know which meeting we are answering about.
+
+Out of Scope ❌
+
+❌ No cross-meeting Q&A
+
+❌ No vector databases
+
+❌ No “best guess” answers
+
+❌ No summarization reuse
+
+❌ No changes to existing summary output
+
+❌ No next-steps extraction (separate task)
+
+Acceptance Criteria
+
+After implementation:
+
+Questions like:
+
+“How many stores did they mention?”
+return a grounded answer or “not mentioned”
+
+Answers feel Google-like:
+
+factual
+
+concise
+
+supported
+
+No hallucinated numbers or decisions
+
+Architecture remains clean and incremental
+
+Architectural Principle (do not violate)
+
+This is extraction, not reasoning across documents.
+
+One meeting
+
+One context
+
+One answer
+
+RAG will come later.

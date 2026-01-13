@@ -4,6 +4,7 @@ import { getLastMeetingChunks } from "../../rag/retriever";
 import {
   composeMeetingSummary,
   selectRepresentativeQuotes,
+  answerMeetingQuestion,
   type TranscriptChunk as ComposerChunk,
   type QuoteSelectionResult,
 } from "../../rag/composer";
@@ -30,6 +31,67 @@ function detectQuoteIntent(question: string): boolean {
   return quotePatterns.some((p) => p.test(q));
 }
 
+/**
+ * Detect if the question is a specific extractive question vs a summary request.
+ * Specific questions route to extractive Q&A for grounded answers.
+ */
+function isSpecificQuestion(question: string): boolean {
+  const q = question.toLowerCase();
+  
+  // Summary-style requests (return false = use summary)
+  const summaryPatterns = [
+    /\bsummar/,           // summary, summarize
+    /\boverview/,
+    /\bwhat was .* about/,
+    /\bwhat happened/,
+    /\bwhat did we discuss/,
+    /\bkey takeaways/,
+    /\bhighlights/,
+    /\bbrief me/,
+    /\bcatch me up/,
+    /\blast meeting$/,    // just "last meeting" with no specific question
+  ];
+  
+  if (summaryPatterns.some((p) => p.test(q))) {
+    return false;
+  }
+
+  // Specific extractive questions (return true = use extractive Q&A)
+  const specificPatterns = [
+    /\bhow many/,
+    /\bhow much/,
+    /\bwhere did/,
+    /\bwhere do/,
+    /\bwhen did/,
+    /\bwhen do/,
+    /\bwhat .* did they/,
+    /\bwhat .* do they/,
+    /\bwhat metrics/,
+    /\bwhat data/,
+    /\bwhat system/,
+    /\bwhat software/,
+    /\bwhat pos/,
+    /\bwhat timeline/,
+    /\bwhat budget/,
+    /\bwhat price/,
+    /\bwhat cost/,
+    /\bdid they mention/,
+    /\bdid they say/,
+    /\bany mention of/,
+    /\bwhat about/,
+    /\b\d+/,              // contains numbers (often specific)
+    /\bpilot/,
+    /\brollout/,
+    /\bstores?/,
+    /\blocations?/,
+    /\bcameras?/,
+    /\bsensors?/,
+    /\bdevices?/,
+  ];
+  
+  return specificPatterns.some((p) => p.test(q));
+}
+
 export const getLastMeeting: Capability = {
   name: "get_last_meeting",
   description:
@@ -39,8 +101,10 @@ export const getLastMeeting: Capability = {
     question: z.string().describe("The specific question about the meeting"),
   }),
   handler: async ({ db }, { companyName, question }) => {
-    // Detect if user explicitly requested quotes
+    // Detect intent
     const wantsQuotes = detectQuoteIntent(question);
+    const wantsSpecificAnswer = isSpecificQuestion(question);
+
     // Step 1: Resolve company name with case-insensitive partial match
     const companyRows = await db.query(
       `SELECT id, name FROM companies WHERE name ILIKE $1`,
@@ -66,7 +130,6 @@ export const getLastMeeting: Capability = {
     const resolvedName = companyRows[0].name;
 
     // Step 2: Retrieve last meeting transcript chunks (deterministic)
-    // getLastMeetingChunks uses storage abstraction internally
     const result = await getLastMeetingChunks(companyId);
 
     if (!result || result.chunks.length === 0) {
@@ -86,7 +149,31 @@ export const getLastMeeting: Capability = {
       text: c.content,
     }));
 
-    // Step 3: Compose structured outputs (LLM-only)
+    // ─────────────────────────────────────────────────────────────────
+    // ROUTE: Specific question → Extractive Q&A
+    // ─────────────────────────────────────────────────────────────────
+    if (wantsSpecificAnswer) {
+      const extractive = await answerMeetingQuestion(composerChunks, question);
+
+      const lines: string[] = [];
+      lines.push(`*[${resolvedName}]*`);
+      lines.push(`_Meeting: ${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
+      lines.push("");
+      lines.push(extractive.answer);
+
+      if (extractive.wasFound && extractive.evidence) {
+        lines.push(`\n_"${extractive.evidence}"_`);
+      }
+
+      return {
+        answer: lines.join("\n"),
+        citations: [],
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // ROUTE: Summary request → Full meeting summary
+    // ─────────────────────────────────────────────────────────────────
     const summary = await composeMeetingSummary(composerChunks);
 
     // Quotes are opt-in: only fetch if user explicitly requested them
@@ -95,8 +182,7 @@ export const getLastMeeting: Capability = {
       quoteResult = await selectRepresentativeQuotes(composerChunks, contentType);
     }
 
-    // Step 4: Persist the artifact for later reuse
-    // Use transcript.created_at as the meeting timestamp (meeting time, not processing time)
+    // Persist the artifact for later reuse
     await storage.saveMeetingSummary({
       companyId,
       transcriptId,
@@ -104,7 +190,7 @@ export const getLastMeeting: Capability = {
       artifact: { summary, quotes: quoteResult.quotes },
     });
 
-    // Step 5: Render response (presentation logic stays here)
+    // Render response
     const lines: string[] = [];
 
     lines.push(`*[${resolvedName}] ${summary.title}*`);
@@ -143,7 +229,6 @@ export const getLastMeeting: Capability = {
           lines.push(`• "${q.quote}" — customer`);
         });
       } else if (quoteResult.quoteNotice) {
-        // Friendly disclosure when quotes were requested but suppressed
         lines.push(`\n_${quoteResult.quoteNotice}_`);
       }
     }
