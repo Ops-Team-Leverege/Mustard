@@ -4,7 +4,9 @@ import { getLastMeetingChunks } from "../../rag/retriever";
 import {
   composeMeetingSummary,
   selectRepresentativeQuotes,
+  type TranscriptChunk as ComposerChunk,
 } from "../../rag/composer";
+import { storage } from "../../storage";
 
 export const getLastMeeting: Capability = {
   name: "get_last_meeting",
@@ -14,7 +16,7 @@ export const getLastMeeting: Capability = {
     companyName: z.string().describe("The name of the company to get the last meeting for"),
     question: z.string().describe("The specific question about the meeting"),
   }),
-  handler: async ({ db }, { companyName /* question intentionally unused */ }) => { 
+  handler: async ({ db }, { companyName /* question intentionally unused */ }) => {
     // Step 1: Resolve company name with case-insensitive partial match
     const companyRows = await db.query(
       `SELECT id, name FROM companies WHERE name ILIKE $1`,
@@ -40,49 +42,70 @@ export const getLastMeeting: Capability = {
     const resolvedName = companyRows[0].name;
 
     // Step 2: Retrieve last meeting transcript chunks (deterministic)
-    const chunks = await getLastMeetingChunks(db, companyId);
+    // getLastMeetingChunks uses storage abstraction internally
+    const rawChunks = await getLastMeetingChunks(companyId);
 
-    if (!chunks || chunks.length === 0) {
+    if (!rawChunks || rawChunks.length === 0) {
       return {
         answer: `I couldn't find any meeting transcripts for ${resolvedName}.`,
         citations: [],
       };
     }
 
-    // Step 3: Compose structured outputs (LLM-only)
-    const summary = await composeMeetingSummary(chunks);
-    const quotes = await selectRepresentativeQuotes(chunks);
+    // Map retriever's snake_case to composer's camelCase format
+    const composerChunks: ComposerChunk[] = rawChunks.map((c) => ({
+      chunkIndex: c.chunk_index,
+      speakerRole: c.speaker_role,
+      speakerName: c.speaker_name,
+      text: c.content,
+    }));
 
-    // Step 4: Render response (presentation logic stays here)
+    // Step 3: Compose structured outputs (LLM-only)
+    const summary = await composeMeetingSummary(composerChunks);
+    const quotes = await selectRepresentativeQuotes(composerChunks);
+
+    // Step 4: Persist the artifact for later reuse
+    // NOTE: Using now() as meeting timestamp; ideally would use chunk's meeting_date
+    const meetingTimestamp = rawChunks[0]?.meeting_date ?? new Date();
+    const transcriptId = rawChunks[0]?.transcript_id ?? null;
+    
+    await storage.saveMeetingSummary({
+      companyId,
+      transcriptId,
+      meetingTimestamp,
+      artifact: { summary, quotes },
+    });
+
+    // Step 5: Render response (presentation logic stays here)
     const lines: string[] = [];
 
     lines.push(`*[${resolvedName}] ${summary.title}*`);
 
     if (summary.keyTakeaways.length) {
       lines.push("\n*Key Takeaways*");
-      summary.keyTakeaways.forEach(t => lines.push(`• ${t}`));
+      summary.keyTakeaways.forEach((t) => lines.push(`• ${t}`));
     }
 
     if (summary.risksOrOpenQuestions.length) {
       lines.push("\n*Risks / Open Questions*");
-      summary.risksOrOpenQuestions.forEach(r => lines.push(`• ${r}`));
+      summary.risksOrOpenQuestions.forEach((r) => lines.push(`• ${r}`));
     }
 
     if (summary.recommendedNextSteps.length) {
       lines.push("\n*Recommended Next Steps*");
-      summary.recommendedNextSteps.forEach(n => lines.push(`• ${n}`));
+      summary.recommendedNextSteps.forEach((n) => lines.push(`• ${n}`));
     }
 
     if (quotes.length) {
       lines.push("\n*Representative Quotes*");
-      quotes.forEach(q => {
+      quotes.forEach((q) => {
         lines.push(`• "${q.quote}" — ${q.speakerRole}`);
       });
     }
 
     return {
       answer: lines.join("\n"),
-      citations: [], // citations can later map to chunkIndex if desired
+      citations: [],
     };
   },
 };
