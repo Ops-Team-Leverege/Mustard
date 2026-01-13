@@ -79,6 +79,19 @@ export const getLastMeeting: Capability = {
     const lines: string[] = [];
 
     lines.push(`*[${resolvedName}] ${summary.title}*`);
+    
+    lines.push(`*[${resolvedName}] ${summary.title}*`);
+    lines.push(`_${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
+
+    if (summary.purpose) {
+      lines.push("\n*Purpose*");
+      lines.push(`• ${summary.purpose}`);
+    }
+
+    if (summary.focusAreas?.length) {
+      lines.push("\n*Focus Areas*");
+      summary.focusAreas.forEach((f) => lines.push(`• ${f}`));
+    }
 
     if (summary.keyTakeaways.length) {
       lines.push("\n*Key Takeaways*");
