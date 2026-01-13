@@ -4,6 +4,7 @@ import { getCompanyQuestions } from "./getCompanyQuestions";
 import { searchCompanyFeedback } from "./searchCompanyFeedback";
 import { searchQuestions } from "./searchQuestions";
 import { countCompaniesByTopic } from "./countCompaniesByTopic";
+import { getLastMeeting } from "./getLastMeeting";
 
 export const capabilities = [
   getCompanyOverview,
@@ -12,4 +13,5 @@ export const capabilities = [
   searchCompanyFeedback,
   searchQuestions,
   countCompaniesByTopic,
+  getLastMeeting,
 ];
