@@ -22,6 +22,10 @@ export type LastMeetingResult = {
   transcriptId: string;
   transcriptCreatedAt: Date;
   contentType: "transcript" | "notes";
+  attendees: {
+    leverageTeam: string | null;
+    customerNames: string | null;
+  };
 } | null;
 
 /**
@@ -60,5 +64,9 @@ export async function getLastMeetingChunks(
     transcriptId: transcriptInfo.id,
     transcriptCreatedAt: transcriptInfo.createdAt,
     contentType: transcriptInfo.contentType as "transcript" | "notes",
+    attendees: {
+      leverageTeam: transcriptInfo.leverageTeam,
+      customerNames: transcriptInfo.customerNames,
+    },
   };
 }

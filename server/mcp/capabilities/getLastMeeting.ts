@@ -211,7 +211,7 @@ export const getLastMeeting: Capability = {
       };
     }
 
-    const { chunks: rawChunks, transcriptId, transcriptCreatedAt, contentType } = result;
+    const { chunks: rawChunks, transcriptId, transcriptCreatedAt, contentType, attendees } = result;
 
     // Map retriever's snake_case to composer's camelCase format
     const composerChunks: ComposerChunk[] = rawChunks.map((c) => ({
@@ -225,7 +225,11 @@ export const getLastMeeting: Capability = {
     // ROUTE: Commitment request → Action items / Next steps
     // ─────────────────────────────────────────────────────────────────
     if (wantsCommitments) {
-      const { confirmed, followUps } = await extractMeetingCommitments(composerChunks);
+      // Pass attendee names for speaker normalization
+      const { confirmed, followUps } = await extractMeetingCommitments(composerChunks, {
+        leverageTeam: attendees.leverageTeam ?? undefined,
+        customerNames: attendees.customerNames ?? undefined,
+      });
 
       const lines: string[] = [];
       lines.push(`*[${resolvedName}] Next Steps*`);

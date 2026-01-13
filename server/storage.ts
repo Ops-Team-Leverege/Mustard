@@ -2242,7 +2242,7 @@ export class DbStorage implements IStorage {
     return system;
   }
 
-  async getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date; contentType: string } | null> {
+  async getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date; contentType: string; leverageTeam: string | null; customerNames: string | null } | null> {
     // First find the most recent transcript ID from chunks
     const [chunkResult] = await this.db
       .select({ transcriptId: transcriptChunksTable.transcriptId })
@@ -2255,9 +2255,14 @@ export class DbStorage implements IStorage {
       return null;
     }
 
-    // Then fetch the transcript's created_at and contentType
+    // Then fetch the transcript's created_at, contentType, and attendee info
     const [transcript] = await this.db
-      .select({ createdAt: transcriptsTable.createdAt, contentType: transcriptsTable.contentType })
+      .select({ 
+        createdAt: transcriptsTable.createdAt, 
+        contentType: transcriptsTable.contentType,
+        leverageTeam: transcriptsTable.leverageTeam,
+        customerNames: transcriptsTable.customerNames,
+      })
       .from(transcriptsTable)
       .where(eq(transcriptsTable.id, chunkResult.transcriptId))
       .limit(1);
@@ -2266,7 +2271,13 @@ export class DbStorage implements IStorage {
       return null;
     }
 
-    return { id: chunkResult.transcriptId, createdAt: transcript.createdAt, contentType: transcript.contentType };
+    return { 
+      id: chunkResult.transcriptId, 
+      createdAt: transcript.createdAt, 
+      contentType: transcript.contentType,
+      leverageTeam: transcript.leverageTeam,
+      customerNames: transcript.customerNames,
+    };
   }
 
   async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {

@@ -122,13 +122,11 @@ function computeSpeakerAttributionConfidence(chunks: TranscriptChunk[]): {
 function formatTranscript(chunks: TranscriptChunk[]): string {
   return chunks
     .map(c => {
-      const role =
-        c.speakerRole === "customer"
-          ? "Customer"
-          : c.speakerRole === "leverege"
-          ? "Leverege"
-          : "Unknown";
-      return `[${c.chunkIndex}] ${role}: ${c.text}`;
+      // Include speaker name if available for proper attribution
+      const speaker = c.speakerName && c.speakerName !== "Unknown" 
+        ? c.speakerName 
+        : (c.speakerRole === "customer" ? "Customer" : c.speakerRole === "leverege" ? "Leverege" : "Unknown");
+      return `[${c.chunkIndex}] ${speaker}: ${c.text}`;
     })
     .join("\n");
 }
@@ -370,11 +368,28 @@ ${transcript}
  * - Must have clear ownership (prefer people over organizations)
  * - Must have transcript grounding
  * - Two-tier confidence: confirmed (≥0.8) and follow-ups (0.65-0.8)
+ * - Speaker names normalized to canonical attendee list when provided
  */
 export async function extractMeetingCommitments(
   chunks: TranscriptChunk[],
+  attendees?: { leverageTeam?: string; customerNames?: string },
 ): Promise<CommitmentExtractionResult> {
   const transcript = formatTranscript(chunks);
+
+  // Build canonical attendee list for name normalization
+  let attendeeList = "";
+  if (attendees) {
+    const names: string[] = [];
+    if (attendees.leverageTeam) {
+      names.push(...attendees.leverageTeam.split(",").map((n) => n.trim()).filter(Boolean));
+    }
+    if (attendees.customerNames) {
+      names.push(...attendees.customerNames.split(",").map((n) => n.trim()).filter(Boolean));
+    }
+    if (names.length > 0) {
+      attendeeList = `\nCANONICAL ATTENDEES (use these exact spellings for owners):\n${names.join(", ")}`;
+    }
+  }
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
@@ -400,7 +415,11 @@ WHAT TO IGNORE:
 
 RULES:
 1. Only extract EXPLICIT commitments spoken in the meeting
-2. OWNER ASSIGNMENT: Prefer a specific person's name over a company or team name when the speaker can be identified. Use "Corey Redd" not "Leverege" if Corey spoke.
+2. OWNER ASSIGNMENT: 
+   - Prefer a specific person's name over a company or team name when the speaker can be identified
+   - The owner is the person who SPOKE the commitment (said "I will" or agreed to do something)
+   - If a canonical attendee list is provided, normalize names to match those exact spellings
+   - Pay attention to WHO is speaking, not who is mentioned
 3. EVIDENCE QUOTES: Remove filler words such as "um", "uh", "like", or repeated false starts, without changing the meaning or intent. Do NOT paraphrase or summarize.
 4. Assign confidence score (0-1):
    - 1.0 = explicit "I will do X" statement
@@ -431,6 +450,7 @@ If no clear commitments exist, return an empty array: []
         role: "user",
         content: `
 Extract action item commitments from this meeting transcript.
+${attendeeList}
 
 Transcript:
 ${transcript}
