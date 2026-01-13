@@ -18,8 +18,8 @@ export async function answerQuestion(params: {
     }
 
     const lines = chunks.slice(0, 15).map((c) => {
-      const role = c.speakerRole ? `[${c.speakerRole}]` : "";
-      return `${role} ${c.speakerName ?? "Unknown"}: ${c.content}`;
+      const role = c.speaker_role ? `[${c.speaker_role}]` : "";
+      return `${role} ${c.speaker_name ?? "Unknown"}: ${c.content}`;
     });
 
     return {
@@ -27,8 +27,8 @@ export async function answerQuestion(params: {
         "Here are the first discussion turns from the most recent meeting:\n\n" +
         lines.join("\n"),
       citations: chunks.slice(0, 10).map((c) => ({
-        transcriptId: c.transcriptId,
-        chunkIndex: c.chunkIndex,
+        transcriptId: c.transcript_id,
+        chunkIndex: c.chunk_index,
       })),
     };
   }
