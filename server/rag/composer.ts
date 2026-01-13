@@ -119,8 +119,30 @@ function computeSpeakerAttributionConfidence(chunks: TranscriptChunk[]): {
   return { isHigh: ratio >= 0.7, ratio };
 }
 
+/**
+ * INVARIANT: Speaker identity must be preserved in transcript formatting.
+ * 
+ * This is a hard contract: if speakerName exists in chunks, it MUST appear 
+ * in the formatted output. Dropping speaker names causes mis-attribution bugs.
+ * 
+ * @throws Error if speakerNames exist but would be dropped
+ */
+function assertSpeakerNamesPreserved(chunks: TranscriptChunk[], formatted: string): void {
+  for (const chunk of chunks) {
+    if (chunk.speakerName && chunk.speakerName !== "Unknown") {
+      if (!formatted.includes(chunk.speakerName)) {
+        throw new Error(
+          `INVARIANT VIOLATION: Speaker name "${chunk.speakerName}" exists in chunk ${chunk.chunkIndex} ` +
+          `but was not preserved in formatted transcript. ` +
+          `See replit.md "Speaker Identity Preservation" for context.`
+        );
+      }
+    }
+  }
+}
+
 function formatTranscript(chunks: TranscriptChunk[]): string {
-  return chunks
+  const formatted = chunks
     .map(c => {
       // Include speaker name if available for proper attribution
       const speaker = c.speakerName && c.speakerName !== "Unknown" 
@@ -129,6 +151,11 @@ function formatTranscript(chunks: TranscriptChunk[]): string {
       return `[${c.chunkIndex}] ${speaker}: ${c.text}`;
     })
     .join("\n");
+  
+  // Regression check: ensure speaker names are preserved
+  assertSpeakerNamesPreserved(chunks, formatted);
+  
+  return formatted;
 }
 
 /**

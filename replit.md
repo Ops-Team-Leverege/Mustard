@@ -89,3 +89,17 @@ Preferred communication style: Simple, everyday language.
 ### Integrations
 - **Replit Auth**: User authentication system.
 - **Jira Integration**: Integration supporting linking product insights to Jira tickets by posting comments via Jira REST API, with automatic credential management through Replit's secure connection system.
+
+## Architectural Invariants
+
+### Speaker Identity Preservation (CRITICAL)
+**Transcript formatting must never drop speaker identity.**
+
+This is a hard contract between ingestion → composer:
+- Transcript chunks MUST include `speakerName` when available
+- `formatTranscript()` MUST preserve speaker names in the output sent to LLMs
+- Generic role labels ("Leverege", "Customer") are fallbacks ONLY when speakerName is missing
+
+Rationale: Without speaker names, the LLM cannot correctly attribute commitments, quotes, or statements to specific individuals. This caused mis-attribution bugs where "Corey Redd" commitments were assigned to "Calum" because both appeared as "Leverege".
+
+Enforcement: `assertSpeakerNamesPreserved()` in `server/rag/composer.ts` validates this invariant at runtime.
