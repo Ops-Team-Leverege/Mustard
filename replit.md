@@ -131,6 +131,19 @@ Priority heuristic (imperative detection):
 - Imperative instructions = Command: "You need to chat with Randy" → Chat with Randy
 - Enablement grants = Command: "Feel free to let them know" → Inform them
 
+Obligation triggers (HIGH-CONFIDENCE when directed at a specific person):
+- "You/We need to..." → Extract as commitment (0.95)
+- "You/We have to..." → Extract as commitment (0.95)
+- "You/We must..." → Extract as commitment (0.95)
+- Example: "You need to figure out the pricing" → [Action: Determine pricing strategy]
+
+System features vs. human tasks (critical anti-pattern):
+- Do NOT extract tasks where a user describes what the SOFTWARE will do
+- Anti-Pattern: "The system provides daily reports" → NOT a task
+- Anti-Pattern: "Every user will have their own login" → NOT a task
+- Pattern: "I will email you the report" → Extract (human action)
+- Explaining what software does is NOT a task for the person explaining it
+
 Consolidation rules:
 - Merge micro-actions when same owner + same timeframe + same operational goal
 - Never merge across different owners

@@ -525,10 +525,16 @@ ACTION TYPES TO EXTRACT:
 4. plan: "The plan is to..." / "Next we'll..." / decided course of action
 5. scheduling: Meeting coordination, follow-up calls, timeline decisions
 
-PRIORITY HEURISTIC (treat these as actionable commands):
-- "Permission to proceed" = Command: "You've got the green light to share X" → Action: Share X
-- Imperative instructions = Command: "You need to chat with Randy" → Action: Chat with Randy
-- Enablement grants = Command: "Feel free to let them know" → Action: Inform them
+PRIORITY HEURISTIC (treat these as HIGH-CONFIDENCE actionable commands):
+- Permission grants: "You've got the green light to share X" → Action: Share X (0.95)
+- Imperative instructions: "You need to chat with Randy" → Action: Chat with Randy (0.95)
+- Enablement grants: "Feel free to let them know" → Action: Inform them (0.90)
+
+OBLIGATION TRIGGERS (extract as HIGH-CONFIDENCE tasks when directed at a specific person):
+- "You/We need to..." → Extract as commitment (0.95)
+- "You/We have to..." → Extract as commitment (0.95)
+- "You/We must..." → Extract as commitment (0.95)
+- Example: "You need to figure out the pricing" → [Action: Determine pricing strategy, Owner: the person addressed]
 
 WHAT TO IGNORE:
 - Hypotheticals: "we could...", "we might..."
@@ -537,6 +543,15 @@ WHAT TO IGNORE:
 - Questions without confirmed agreement
 - Ideas that weren't committed to
 - Advisory or "should" statements
+
+SYSTEM FEATURES vs. HUMAN TASKS (critical anti-pattern):
+Do NOT extract tasks where a user describes what the SOFTWARE will do.
+- Anti-Pattern: "The system provides daily reports" → NOT a task (software feature)
+- Anti-Pattern: "Every user will have their own login" → NOT a task (software feature)
+- Anti-Pattern: "It generates alerts automatically" → NOT a task (software feature)
+- Pattern: "I will email you the daily report manually" → Extract (human action)
+- Pattern: "I will set up the login for everyone" → Extract (human action)
+Explaining what software does is NOT a task for the person explaining it.
 
 EXTRACTION PROCESS (two phases, internal reasoning only):
 
