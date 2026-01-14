@@ -566,44 +566,28 @@ Do NOT extract tasks where a user describes what the SOFTWARE will do.
 - Pattern: "I will set up the login for everyone" → Extract (human action)
 Explaining what software does is NOT a task for the person explaining it.
 
-EXTRACTION PROCESS (three phases, internal reasoning only):
+EXTRACTION PROCESS:
 
-## PHASE 1: Scratchpad Analysis & Filtering (CRITICAL STEP)
-Before extracting any tasks, perform these filters in your scratchpad:
-
-### 1. Meeting Start Detection (The "Green Room" Filter):
-- Scan the transcript for when the ACTUAL meeting begins (e.g., "Hi everyone," "Let's get started," "Thanks for joining," or when external guests are greeted).
-- **RULE:** Any text PRIOR to this point is "Pre-Meeting Chatter" (e.g., "Can you hear me?", "I'll share my screen", "Waiting for Bob", "Let me admit them").
-- **ACTION:** Completely IGNORE any commitments made in Pre-Meeting Chatter. These are NOT next steps.
-
-### 2. Immediate Resolution Check (The "Just Now" Filter):
-ONLY discard an action if it is CLEARLY completed within the next 10 turns. Examples:
-- "I'll hand it off to Ryan" → Ryan speaks next → DISCARD (immediate handoff)
-- "I'll admit them" → "They're in" → DISCARD (done immediately)
-- "I'll send the link" → "Just pasted it" → DISCARD (done immediately)
-- "I'll share my screen" → Currently sharing → DISCARD (in-progress)
-
-**IMPORTANT:** Most actions are NOT resolved in-call. Only discard if you see CLEAR evidence of completion.
-If uncertain whether an action was completed, KEEP IT as a next step.
-
-### 3. Participant Filter:
-If transcript metadata identifies "Leverege" vs. "Customer" participants, prioritize tasks:
-- Promised TO external participants (customer requests)
-- Promised BY internal team to deliver something external
-
-## PHASE 2 — Identify candidate action states:
-After applying Phase 1 filters, scan for REMAINING actions. These are VALID next steps:
-- "I'll send you the proposal" (future deliverable) → KEEP
-- "We'll schedule a follow-up call" (future meeting) → KEEP
-- "I need to check with my team and get back to you" (future follow-up) → KEEP
-- "We'll get you access to the dashboard" (future setup) → KEEP
-- "Can you send me the pricing?" (request for future action) → KEEP
-- "We'll look into that integration" (investigation commitment) → KEEP
+## STEP 1 — Scan for action items:
+Look for these patterns throughout the transcript:
+- "I'll send you..." / "I'll email you..." / "I'll share..." → KEEP (future deliverable)
+- "We'll schedule..." / "Let's set up a call..." → KEEP (follow-up meeting)
+- "I need to check with my team..." / "I'll get back to you..." → KEEP (pending follow-up)
+- "We'll get you access..." / "I'll set up login..." → KEEP (future setup)
+- "Can you send me...?" / "Could you share...?" → KEEP (request)
+- "We'll look into that..." / "We'll investigate..." → KEEP (investigation)
 - Permission grants for future sharing → KEEP
+- "In terms of next steps..." → DEFINITELY KEEP (explicit next step)
 
-Most business meetings have 3-10 legitimate next steps. If you're finding zero, you may be over-filtering.
+## STEP 2 — Filter only OBVIOUS in-call completions:
+ONLY remove an action if there is EXPLICIT EVIDENCE it was completed during the call:
+- "I'll paste the link" followed by "Got it, thanks!" → Remove
+- "Let me share my screen" while actively presenting → Remove
+- Everything else: KEEP IT
 
-## PHASE 3 — Normalize and consolidate:
+**IMPORTANT:** When in doubt, KEEP the action. Most actions are NOT resolved in-call.
+
+## STEP 3 — Normalize and consolidate:
 Clean up and merge related micro-actions when:
 - Same owner(s)
 - Same timeframe
