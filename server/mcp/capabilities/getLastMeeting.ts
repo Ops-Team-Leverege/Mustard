@@ -5,9 +5,10 @@ import {
   composeMeetingSummary,
   selectRepresentativeQuotes,
   answerMeetingQuestion,
-  extractMeetingCommitments,
+  extractMeetingActionStates,
   type TranscriptChunk as ComposerChunk,
   type QuoteSelectionResult,
+  type MeetingActionItem,
 } from "../../rag/composer";
 import { storage } from "../../storage";
 
@@ -226,7 +227,7 @@ export const getLastMeeting: Capability = {
     // ─────────────────────────────────────────────────────────────────
     if (wantsCommitments) {
       // Pass attendee names for speaker normalization
-      const { confirmed, followUps } = await extractMeetingCommitments(composerChunks, {
+      const { primary, secondary } = await extractMeetingActionStates(composerChunks, {
         leverageTeam: attendees.leverageTeam ?? undefined,
         customerNames: attendees.customerNames ?? undefined,
       });
@@ -235,32 +236,34 @@ export const getLastMeeting: Capability = {
       lines.push(`*[${resolvedName}] Next Steps*`);
       lines.push(`_Meeting: ${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
 
-      if (confirmed.length === 0 && followUps.length === 0) {
-        lines.push("\nNo explicit action items were committed to in this meeting.");
+      // Helper to format a single action item
+      const formatActionItem = (a: MeetingActionItem): string[] => {
+        const formatted: string[] = [];
+        let item = `• ${a.action} — ${a.owner}`;
+        if (a.deadline && a.deadline !== "Not specified") {
+          item += ` _(${a.deadline})_`;
+        }
+        formatted.push(item);
+        formatted.push(`  _"${a.evidence}"_`);
+        return formatted;
+      };
+
+      if (primary.length === 0 && secondary.length === 0) {
+        lines.push("\nNo explicit action items were identified in this meeting.");
       } else {
-        // Confirmed next steps (high confidence ≥0.8)
-        if (confirmed.length > 0) {
+        // Primary actions (high confidence ≥0.85)
+        if (primary.length > 0) {
           lines.push("");
-          confirmed.forEach((c) => {
-            let item = `• ${c.task} — ${c.owner}`;
-            if (c.deadline) {
-              item += ` _(${c.deadline})_`;
-            }
-            lines.push(item);
-            lines.push(`  _"${c.evidence}"_`);
+          primary.forEach((a) => {
+            lines.push(...formatActionItem(a));
           });
         }
 
-        // Follow-ups to track (confidence 0.65-0.8)
-        if (followUps.length > 0) {
+        // Secondary actions (confidence 0.70-0.85)
+        if (secondary.length > 0) {
           lines.push("\n*Follow-Ups to Track*");
-          followUps.forEach((c) => {
-            let item = `• ${c.task} — ${c.owner}`;
-            if (c.deadline) {
-              item += ` _(${c.deadline})_`;
-            }
-            lines.push(item);
-            lines.push(`  _"${c.evidence}"_`);
+          secondary.forEach((a) => {
+            lines.push(...formatActionItem(a));
           });
         }
       }

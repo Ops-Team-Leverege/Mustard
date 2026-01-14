@@ -1,0 +1,196 @@
+Goal: Upgrade “Next Steps” extraction to Action-State quality (Google Meet–level, but higher precision)
+
+You are working in an existing TypeScript backend with a strict, intentional architecture:
+
+Architecture constraints (do not violate):
+
+Ingestion is deterministic (no LLMs)
+
+LLMs are used only for interpretation
+
+Single-meeting analysis uses full transcript context (NO RAG)
+
+RAG is reserved for cross-meeting queries only
+
+Every response maps to a bounded capability (no free-form chat)
+
+Precision > recall (false positives are worse than omissions)
+
+Context
+
+We already have:
+
+Speaker-turn transcript ingestion
+
+Correct speaker names available in chunks
+
+Commitment-based next steps extraction (working, but incomplete)
+
+Canonical attendee lists (Leverege + Customer)
+
+Slack capability: getLastMeeting routing to:
+
+summary
+
+extractive Q&A
+
+next steps
+
+Current gaps (from real user testing + Gemini / Claude review):
+
+Next steps miss implied actions (requests, blockers, plans)
+
+Tasks are sometimes fragmented instead of consolidated
+
+Evidence quotes include filler words (“uh”, “um”)
+
+Owner attribution can degrade when actions are implicit
+
+Quality is below Google Meet’s “Suggested next steps”
+
+Your Task
+1. Replace “Commitment-only” extraction with Action-State Next Steps Extraction
+
+In server/rag/composer.ts:
+
+Replace or evolve the existing next-steps function into action-state extraction, not just linguistic commissives.
+
+A next step may originate from:
+
+Explicit commitments (“I’ll send…”, “We will…”)
+
+Requests that imply follow-up (“Can you send…”, “Please share…”)
+
+Blockers or dependencies (“We can’t proceed until…”)
+
+Plans or decisions (“The plan is to…”, “Next we’ll…”)
+
+Scheduling or follow-up coordination
+
+2. Two-phase reasoning inside ONE LLM call (prompted, not coded)
+
+Design the prompt so the model:
+
+Identifies candidate action states (raw, messy)
+
+Normalizes + consolidates them into clean tasks
+
+You may instruct the model to do this stepwise in the prompt, but:
+
+Do NOT expose chain-of-thought in the final output
+
+Return only structured JSON
+
+3. Output format (strict)
+
+Each task must include:
+
+action: Verb + object (clean, professional)
+
+owner: Person name(s), NOT company names
+
+Prefer named individuals
+
+Use "Unassigned" only if unavoidable
+
+type: one of
+commitment | request | blocker | plan | scheduling
+
+deadline: extracted if stated, else "Not specified"
+
+confidence: 0.0–1.0
+
+≥0.85 only if owner + action are explicit
+
+0.7–0.84 for strong implied actions
+
+evidence: short quote from transcript
+
+Remove filler words (“uh”, “um”, “like”)
+
+Do NOT change meaning
+
+4. Consolidation rules (important)
+
+Merge micro-actions when:
+
+Same owner(s)
+
+Same objective
+
+Clearly part of one commitment
+
+Example:
+
+“Send login info”, “make sure you can access stores”, “get dashboards on TV”
+→ One task, not three.
+
+5. Speaker & Name Handling
+
+Ensure transcript formatting includes actual speaker names, not just roles.
+
+Pass canonical attendee names into the prompt to help normalization.
+
+After LLM output, apply deterministic name normalization:
+
+Map near-matches to canonical attendee names
+
+Do not rely on the LLM alone to fix spelling
+
+6. Routing & Behavior (do not change intent logic)
+
+Keep existing intent routing:
+
+“next steps”, “action items” → this extractor
+
+summaries remain unchanged
+
+extractive Q&A remains unchanged
+
+No new MCP capabilities unless strictly required
+
+Explicit Non-Goals (do NOT do these)
+
+❌ Do NOT introduce RAG
+
+❌ Do NOT mix product database knowledge into meeting facts
+
+❌ Do NOT generate speculative or advisory tasks
+
+❌ Do NOT relax the “must be supported by evidence” rule
+
+❌ Do NOT add free-form chat behavior
+
+Definition of Done
+
+Next steps output is:
+
+Comparable or better than Google Meet’s “Suggested next steps”
+
+Cleaner phrasing
+
+Correct attribution
+
+Fewer but higher-quality tasks
+
+Tasks are suitable to be persisted later as first-class entities
+
+No regressions in summary or Q&A behavior
+
+Mental Model to Use
+
+Think like a senior operations assistant:
+
+“What actions now exist in the world because of this meeting?”
+
+Not “What was discussed?”
+
+Not “What sounds important?”
+
+If you need to choose between:
+
+extracting fewer tasks correctly
+
+extracting more tasks with uncertainty
+
+Choose fewer, higher-confidence tasks.
