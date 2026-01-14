@@ -557,6 +557,12 @@ WHAT TO IGNORE:
 - Social niceties: "Let's grab a beer," "Let's catch up soon"
   EXCEPTION: Do NOT filter out "Chats" if they are explicitly about settings, configurations, or approvals (e.g., "Chat with Randy about alert thresholds" is VALID)
 
+META-COMMENTARY / INTERNAL PLANNING (ignore these):
+- "I'm going to say..." or "I'll mention..." → This is planning what to say IN the meeting, not a follow-up
+- "Just to remind them..." or "Remind the team that..." → In-meeting reminder, not a post-meeting action
+- "We'll discuss..." or "We'll cover..." without a future timeframe → Agenda items for THIS call
+- Example to IGNORE: "I'm going to say, 'Hey, just to remind you, they have this system...'" → Internal planning, NOT an action item
+
 SYSTEM FEATURES vs. HUMAN TASKS (critical anti-pattern):
 Do NOT extract tasks where a user describes what the SOFTWARE will do.
 - Anti-Pattern: "The system provides daily reports" → NOT a task (software feature)
@@ -715,6 +721,15 @@ ${transcript}
     /\bsharing\s+(my\s+)?screen\b/i,
     /\bgive\s+(you|them)\s+a\s+(little\s+)?background\b/i,
     /\bname\s*drop\b/i,
+    // Meta-commentary about what to say IN the meeting
+    /\bi'm going to say\b/i,
+    /\bjust to remind (you|them|the team)\b/i,
+    /\bremind (you|them|the team) that\b/i,
+    /\bi('ll| will) mention\b/i,
+    /\bi('ll| will) bring up\b/i,
+    /\bwe('ll| will) talk about\b/i,
+    /\bwe('ll| will) discuss\b/i,
+    /\bwe('ll| will) cover\b/i,
   ];
   
   // Patterns indicating legitimate future actions (boost these)
