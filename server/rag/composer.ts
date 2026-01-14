@@ -655,7 +655,7 @@ WHAT NOT TO DO:
 - Do NOT use "should" or "recommended" language
 - Do NOT include speculative or advisory items
 
-If choosing between extracting more actions with uncertainty vs. fewer with confidence, choose fewer.
+BALANCE: Aim for 3-10 actions per typical business meeting. If you're returning 0 items, re-check the transcript for legitimate future commitments.
 
 Return valid JSON only (no chain-of-thought):
 [
@@ -690,9 +690,22 @@ ${transcript}
     throw new Error("LLM returned empty action extraction");
   }
 
+  // Debug logging
+  console.log(`[extractMeetingActionStates] LLM response length: ${content.length} chars`);
+  console.log(`[extractMeetingActionStates] Raw response preview: ${content.substring(0, 500)}`);
+
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  const parsed = JSON.parse(jsonStr) as MeetingActionItem[];
+  
+  let parsed: MeetingActionItem[];
+  try {
+    parsed = JSON.parse(jsonStr) as MeetingActionItem[];
+    console.log(`[extractMeetingActionStates] Parsed ${parsed.length} action items`);
+  } catch (e) {
+    console.error(`[extractMeetingActionStates] JSON parse error: ${e}`);
+    console.error(`[extractMeetingActionStates] JSON string: ${jsonStr.substring(0, 300)}`);
+    throw e;
+  }
 
   // Post-process: Deterministic name normalization + deadline normalization
   const normalized = parsed.map(item => ({
