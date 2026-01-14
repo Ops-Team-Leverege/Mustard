@@ -536,6 +536,17 @@ OBLIGATION TRIGGERS (extract as HIGH-CONFIDENCE tasks when directed at a specifi
 - "You/We must..." → Extract as commitment (0.95)
 - Example: "You need to figure out the pricing" → [Action: Determine pricing strategy, Owner: the person addressed]
 
+DECISION DEPENDENCIES (always extract these):
+- A "Chat," "Sync," or "Discussion" is a MANDATORY NEXT STEP if the goal is to make a decision or configure settings.
+- Trigger: "You need to chat with [Person] about [Topic]"
+- Rule: If the outcome affects business logic (like "alert settings"), it is NOT a social nicety.
+- Example: "Chat with Randy about alert thresholds" → Extract (decision required)
+
+DISTINCT DELIVERABLES (do not over-merge):
+- If a speaker promises multiple distinct assets in one statement, extract them as SEPARATE tasks.
+- Example: "I'll send the login AND the PDF guide" → TWO separate tasks
+- Example: "Send login info" + "Send instructions for TV setup" → TWO separate tasks if mentioned separately
+
 WHAT TO IGNORE:
 - Hypotheticals: "we could...", "we might..."
 - Vague intentions: "we should think about..."
@@ -543,6 +554,8 @@ WHAT TO IGNORE:
 - Questions without confirmed agreement
 - Ideas that weren't committed to
 - Advisory or "should" statements
+- Social niceties: "Let's grab a beer," "Let's catch up soon"
+  EXCEPTION: Do NOT filter out "Chats" if they are explicitly about settings, configurations, or approvals (e.g., "Chat with Randy about alert thresholds" is VALID)
 
 SYSTEM FEATURES vs. HUMAN TASKS (critical anti-pattern):
 Do NOT extract tasks where a user describes what the SOFTWARE will do.
@@ -578,6 +591,14 @@ Clean up and merge related micro-actions when:
 - Same operational goal
 Return only the consolidated, clean output.
 
+DE-MERGING CHECK (before finalizing):
+- Did a speaker promise multiple distinct items? (e.g., "Login info" AND "Start Guide")
+- If yes, keep them as SEPARATE tasks, do NOT merge into one
+
+OBLIGATION CHECK (before finalizing):
+- Scan specifically for "Need to" / "Have to" phrases
+- Does "You need to chat..." imply a decision? If yes, extract it as a task
+
 RULES:
 1. OWNER ASSIGNMENT:
    - Use specific person names, NOT company names
@@ -587,7 +608,9 @@ RULES:
    - If canonical attendees provided, normalize spelling
 
 2. EVIDENCE QUOTES (MANDATORY):
-   Remove filler words ("um", "uh", "like", repeated words) for readability.
+   ALWAYS remove these filler words: "um", "uh", "like", "you know", "I mean", repeated words.
+   Clean the quote for readability but preserve the exact meaning.
+   Example: "you've got the uh the green light" → "you've got the green light"
    Do NOT change meaning or paraphrase facts.
 
 3. CONFIDENCE SCORING:

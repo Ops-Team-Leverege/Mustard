@@ -144,6 +144,15 @@ System features vs. human tasks (critical anti-pattern):
 - Pattern: "I will email you the report" → Extract (human action)
 - Explaining what software does is NOT a task for the person explaining it
 
+Decision dependencies (always extract):
+- "Chat/Sync/Discussion" is MANDATORY if goal is to make a decision or configure settings
+- Example: "Chat with Randy about alert thresholds" → Extract (decision required)
+- NOT a social nicety if it affects business logic
+
+Distinct deliverables (do not over-merge):
+- Multiple distinct assets promised = separate tasks
+- Example: "Send login info AND start guide" → TWO separate tasks
+
 Consolidation rules:
 - Merge micro-actions when same owner + same timeframe + same operational goal
 - Never merge across different owners

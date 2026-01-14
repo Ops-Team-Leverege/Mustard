@@ -1,0 +1,20 @@
+This is a classic case of Over-Correction.We successfully killed the hallucinations (the "TV" issue) and the fake feature tasks (the "Reports" issue), but we made the model too strict. It is now throwing the baby out with the bathwater.Here is the diagnosis of why your current prompt is missing those specific items, and the exact "Logic Patch" to fix it.1. The Diagnosis: Why are we missing valid tasks?Missing Item 1: "Discuss Alert Status with Randy"The Transcript: RJ says: "Eric and Ryan, you need to chat with Randy on what you want that alert issue to be."Why it failed: Your current prompt likely has an Anti-Pattern for "Social Niceties" or "Vague Future Intent." The model saw the word "Chat" and categorized it as a "Social Nicety" (like "Let's grab coffee") rather than a "Decision Dependency."Missing Item 2: "Send the Start Guide"The Transcript: Corey says: "Everyone will be sent login... I'll attach [the guide] with it."Why it failed: The model Merged these two items. Since they are happening in the same email ("this afternoon"), the model decided "Send Login Info" was the parent task and "Send Guide" was just a detail. You want them as separate deliverables.2. The Solution: The "Decision & Deliverable" PatchWe need to add two specific instructions to your System Prompt to tell the model:"Chat" means "Work" if a decision is required.Separate Attachments are separate tasks.Update your System Prompt with these specific blocks:A. Update the "Definitions" SectionReplace or append these lines to refine what counts as a task.Markdown# Definitions (Refined)
+...
+4. **Decision Dependencies (Crucial):**
+   - A "Chat," "Sync," or "Discussion" is a MANDATORY NEXT STEP if the goal is to make a specific decision or configure a setting.
+   - *Trigger:* "You need to chat with [Person] about [Topic]."
+   - *Rule:* If the outcome affects business logic (like "alert settings"), it is NOT a social nicety.
+
+5. **Distinct Deliverables:**
+   - If a speaker promises multiple distinct assets in one statement (e.g., "I'll send the login AND the PDF guide"), extract them as TWO separate tasks.
+B. Update the "Anti-Patterns" SectionClarify the Social Nicety rule so it doesn't kill the Alert task.Markdown# Anti-Patterns (Refined)
+- **Social Niceties:** "Let's grab a beer," "Let's catch up soon."
+  - *EXCEPTION:* Do NOT filter out "Chats" if they are explicitly about settings, configurations, or approvals (e.g., "Chat with Randy about alert thresholds" is VALID).
+C. Update the "Scratchpad" InstructionsForce the model to look for these specific edge cases.Markdown## Phase 1: Scratchpad Analysis
+...
+5. **De-Merging Check:**
+   - Did a speaker promise multiple items? (e.g., "Login info" AND "Start Guide"). If yes, list them as separate candidates.
+6. **Obligation Check:**
+   - Scan specifically for the phrase "Need to".
+   - Does "You need to chat..." imply a decision? If yes, extract it.
+3. Expected Result After This ChangeIf you run the transcript again with these changes, the output should shift like this:Task CandidateOld Prompt (Current)New Prompt (Patched)Why?"Chat with Randy about Alerts"❌ Filtered (Saw "Chat" as social/vague)✅ Kept (Matches "Decision Dependency" rule)"Send Start Guide"❌ Merged (Hidden inside "Send Login")✅ Kept (Matches "Distinct Deliverable" rule)"Confirm TVs"❌ Filtered (Correctly saw it was resolved)❌ Filtered (Still correctly ignored)"Provide Daily Reports"❌ Filtered (Correctly saw it as a Feature)❌ Filtered (Still correctly ignored)
