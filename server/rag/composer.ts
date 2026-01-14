@@ -424,7 +424,7 @@ export async function extractMeetingCommitments(
       {
         role: "system",
         content: `
-You extract explicit action item commitments from meeting transcripts.
+You extract and consolidate action item commitments from meeting transcripts.
 
 WHAT COUNTS AS A COMMITMENT:
 - "I will..." or "I'll..." → speaker is owner
@@ -432,6 +432,9 @@ WHAT COUNTS AS A COMMITMENT:
 - "Can you do X?" followed by "Yes" or agreement → responder is owner
 - "Let's..." followed by agreement → participants are owners
 - "We'll look into that" or "I'll check on that" → investigation follow-up
+- Instructions to a group: "you guys should..." → group members are owners
+- Statements of operational change: "we'll start using..." → team commitment
+- Promises of enablement: "we'll make sure you have access..." → speaker is owner
 
 WHAT TO IGNORE:
 - Hypotheticals: "we could...", "we might..."
@@ -440,14 +443,29 @@ WHAT TO IGNORE:
 - Questions without confirmed agreement
 - Ideas that weren't committed to
 
+EXTRACTION PROCESS (two stages):
+
+STEP A — Extract atomic commitments:
+First, identify all individual commitments with:
+- Clear owner (who spoke or agreed)
+- Concrete action
+- Evidence from transcript
+
+STEP B — Consolidate into final output:
+If multiple commitments by the same owner occur in the same time window and contribute to a single outcome, consolidate them into one action item.
+
+Example consolidation:
+- "send login info" + "get dashboards up on TV" (same owner, same timeframe, same goal)
+→ One task: "Enable store access and dashboards for pilot stores"
+
 RULES:
 1. Only extract EXPLICIT commitments spoken in the meeting
 2. OWNER ASSIGNMENT: 
-   - Prefer a specific person's name over a company or team name when the speaker can be identified
-   - The owner is the person who SPOKE the commitment (said "I will" or agreed to do something)
+   - Prefer a specific person's name over a company or team name
+   - The owner is the person who SPOKE the commitment
    - If a canonical attendee list is provided, normalize names to match those exact spellings
    - Pay attention to WHO is speaking, not who is mentioned
-3. EVIDENCE QUOTES: Remove filler words such as "um", "uh", "like", or repeated false starts, without changing the meaning or intent. Do NOT paraphrase or summarize.
+3. EVIDENCE QUOTES (MANDATORY): When including evidence quotes, rewrite them for readability by removing filler words (e.g., "um", "uh", "like", repeated words) without changing meaning. Do not paraphrase facts.
 4. Assign confidence score (0-1):
    - 1.0 = explicit "I will do X" statement
    - 0.9 = clear verbal agreement to a request
@@ -455,9 +473,15 @@ RULES:
    - 0.7 = "We'll look into that" or investigation commitment
    - 0.65 = softer follow-up worth tracking
    - Below 0.65 = too uncertain, do NOT include
-5. Extract deadlines only if explicitly mentioned (e.g., "this afternoon", "by Friday")
-6. Phrase tasks as specific, actionable verbs (Send X, Review Y, Discuss Z, Investigate Y)
-7. Combine related micro-commitments into single coherent action items
+5. Extract deadlines only if explicitly mentioned
+6. Phrase tasks as complete sentences describing the outcome, not fragments
+7. After consolidation, each task should represent one coherent deliverable
+
+WHAT NOT TO DO:
+- Do NOT merge tasks across different owners
+- Do NOT paraphrase evidence into new facts
+- Do NOT infer commitments that weren't said
+- Do NOT use "should" or "recommended" language
 
 Return valid JSON only as an array:
 [
@@ -476,7 +500,7 @@ If no clear commitments exist, return an empty array: []
       {
         role: "user",
         content: `
-Extract action item commitments from this meeting transcript.
+Extract and consolidate action item commitments from this meeting transcript.
 ${attendeeList}
 
 Transcript:
