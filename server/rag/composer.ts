@@ -577,13 +577,14 @@ Before extracting any tasks, perform these filters in your scratchpad:
 - **ACTION:** Completely IGNORE any commitments made in Pre-Meeting Chatter. These are NOT next steps.
 
 ### 2. Immediate Resolution Check (The "Just Now" Filter):
-If a speaker says "I will [Action]" or "Let me [Action]", scan the IMMEDIATE next 10 turns:
-- **Presentation handoffs:** "I'll hand it off to Ryan" followed by Ryan speaking → DISCARD (immediate handoff, not a future task)
-- **Screen sharing:** "I'll share my screen" followed by "Can you see it?" → DISCARD (done immediately)
-- **Admitting participants:** "I'll admit them" followed by "They're in" → DISCARD (done immediately)
-- **Sending links/files:** "I'll send the link" followed by "Just pasted it" or "Sent!" → DISCARD (done immediately)
-- **Slide navigation:** "I'll click through the slides" while presenting → DISCARD (in-progress action, not a future task)
-- **RULE:** If the action is performed within the call context, it is NOT a next step.
+ONLY discard an action if it is CLEARLY completed within the next 10 turns. Examples:
+- "I'll hand it off to Ryan" → Ryan speaks next → DISCARD (immediate handoff)
+- "I'll admit them" → "They're in" → DISCARD (done immediately)
+- "I'll send the link" → "Just pasted it" → DISCARD (done immediately)
+- "I'll share my screen" → Currently sharing → DISCARD (in-progress)
+
+**IMPORTANT:** Most actions are NOT resolved in-call. Only discard if you see CLEAR evidence of completion.
+If uncertain whether an action was completed, KEEP IT as a next step.
 
 ### 3. Participant Filter:
 If transcript metadata identifies "Leverege" vs. "Customer" participants, prioritize tasks:
@@ -591,19 +592,16 @@ If transcript metadata identifies "Leverege" vs. "Customer" participants, priori
 - Promised BY internal team to deliver something external
 
 ## PHASE 2 — Identify candidate action states:
-After applying Phase 1 filters, scan for remaining potential actions:
-- Explicit commitments that remain OPEN at meeting end
-- Requests that imply FUTURE follow-up action
-- Blockers or dependencies that require FUTURE resolution
-- Plans or decisions that require FUTURE execution
-- Scheduling coordination for FUTURE meetings
-- Permission grants and imperative instructions for FUTURE actions
+After applying Phase 1 filters, scan for REMAINING actions. These are VALID next steps:
+- "I'll send you the proposal" (future deliverable) → KEEP
+- "We'll schedule a follow-up call" (future meeting) → KEEP
+- "I need to check with my team and get back to you" (future follow-up) → KEEP
+- "We'll get you access to the dashboard" (future setup) → KEEP
+- "Can you send me the pricing?" (request for future action) → KEEP
+- "We'll look into that integration" (investigation commitment) → KEEP
+- Permission grants for future sharing → KEEP
 
-Additional examples to DISCARD (immediate in-meeting actions):
-- "Let me hand off to [Person]" → They speak next → DISCARD
-- "I'll remind them about X" → They say it immediately → DISCARD
-- "I'll pull up the deck" → Deck is shown → DISCARD
-- "Let me reshare" → Screen is reshared → DISCARD
+Most business meetings have 3-10 legitimate next steps. If you're finding zero, you may be over-filtering.
 
 ## PHASE 3 — Normalize and consolidate:
 Clean up and merge related micro-actions when:
