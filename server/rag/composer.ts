@@ -530,6 +530,14 @@ PRIORITY HEURISTIC (treat these as HIGH-CONFIDENCE actionable commands):
 - Imperative instructions: "You need to chat with Randy" → Action: Chat with Randy (0.95)
 - Enablement grants: "Feel free to let them know" → Action: Inform them (0.90)
 
+FUTURE MEETING REQUESTS (HIGH-CONFIDENCE - these are legitimate next steps):
+- "We probably need to discuss..." → Extract as scheduling (0.90)
+- "We need to discuss in an additional call..." → Extract as scheduling (0.95)
+- "I'd love to connect more on that..." → Extract as scheduling (0.90)
+- "Let's schedule a follow-up..." → Extract as scheduling (0.95)
+- "Can we set up another call to..." → Extract as scheduling (0.90)
+- Example: "We probably need to discuss it in an additional call... tandem workflows" → [Action: Schedule follow-up call to discuss tandem workflows, Owner: the person who suggested it, Type: scheduling]
+
 OBLIGATION TRIGGERS (extract as HIGH-CONFIDENCE tasks when directed at a specific person):
 - "You/We need to..." → Extract as commitment (0.95)
 - "You/We have to..." → Extract as commitment (0.95)
