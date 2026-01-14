@@ -116,10 +116,16 @@ Action types captured:
 - `scheduling`: Meeting coordination, follow-up calls
 
 Processing pipeline:
-1. Two-phase LLM reasoning: Extract atomic actions → Consolidate by owner/timeframe/goal
-2. Resolution check ("Just Now" filter): Discard actions resolved during the call
-3. Deterministic post-processing: Name normalization against canonical attendee list
-4. Two-tier confidence output: Primary (≥0.85) + Secondary (0.70-0.85)
+1. Three-phase LLM reasoning: Green Room Filter → Extract atomic actions → Consolidate
+2. Meeting Start Detection ("Green Room" filter): Ignore pre-meeting chatter
+3. Immediate Resolution Check ("Just Now" filter): Discard actions resolved during the call
+4. Deterministic post-processing: Name normalization against canonical attendee list
+5. Two-tier confidence output: Primary (≥0.85) + Secondary (0.70-0.85)
+
+Green Room filter (Meeting Start Detection):
+- Scan for actual meeting start (e.g., "Hi everyone," "Let's get started")
+- IGNORE any commitments made before this point (pre-meeting chatter)
+- Examples of pre-meeting chatter to ignore: "Can you hear me?", "I'll admit them", "Waiting for Bob"
 
 Resolution check:
 - Before adding a candidate, scan subsequent ~20 turns

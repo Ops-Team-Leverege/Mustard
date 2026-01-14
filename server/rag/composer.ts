@@ -566,25 +566,46 @@ Do NOT extract tasks where a user describes what the SOFTWARE will do.
 - Pattern: "I will set up the login for everyone" → Extract (human action)
 Explaining what software does is NOT a task for the person explaining it.
 
-EXTRACTION PROCESS (two phases, internal reasoning only):
+EXTRACTION PROCESS (three phases, internal reasoning only):
 
-PHASE 1 — Identify candidate action states:
-Scan for all potential actions (messy, raw). Include:
-- Explicit commitments
-- Requests that imply follow-up
-- Blockers or dependencies
-- Plans or decisions
-- Scheduling coordination
-- Permission grants and imperative instructions
+## PHASE 1: Scratchpad Analysis & Filtering (CRITICAL STEP)
+Before extracting any tasks, perform these filters in your scratchpad:
 
-RESOLUTION CHECK (The "Just Now" Filter):
-BEFORE adding a candidate, scan the SUBSEQUENT ~20 turns of conversation:
-- Did someone answer the question? (e.g., "Are the TVs installed?" → "Yes, all installed.")
-- Did someone perform the action? (e.g., "Send me the link" → "Just pasted it in chat.")
-- If the state changed from "Needed" to "Done" DURING the call, DISCARD the task.
-- Only include actions that remain OPEN at the end of the meeting.
+### 1. Meeting Start Detection (The "Green Room" Filter):
+- Scan the transcript for when the ACTUAL meeting begins (e.g., "Hi everyone," "Let's get started," "Thanks for joining," or when external guests are greeted).
+- **RULE:** Any text PRIOR to this point is "Pre-Meeting Chatter" (e.g., "Can you hear me?", "I'll share my screen", "Waiting for Bob", "Let me admit them").
+- **ACTION:** Completely IGNORE any commitments made in Pre-Meeting Chatter. These are NOT next steps.
 
-PHASE 2 — Normalize and consolidate:
+### 2. Immediate Resolution Check (The "Just Now" Filter):
+If a speaker says "I will [Action]" or "Let me [Action]", scan the IMMEDIATE next 10 turns:
+- **Presentation handoffs:** "I'll hand it off to Ryan" followed by Ryan speaking → DISCARD (immediate handoff, not a future task)
+- **Screen sharing:** "I'll share my screen" followed by "Can you see it?" → DISCARD (done immediately)
+- **Admitting participants:** "I'll admit them" followed by "They're in" → DISCARD (done immediately)
+- **Sending links/files:** "I'll send the link" followed by "Just pasted it" or "Sent!" → DISCARD (done immediately)
+- **Slide navigation:** "I'll click through the slides" while presenting → DISCARD (in-progress action, not a future task)
+- **RULE:** If the action is performed within the call context, it is NOT a next step.
+
+### 3. Participant Filter:
+If transcript metadata identifies "Leverege" vs. "Customer" participants, prioritize tasks:
+- Promised TO external participants (customer requests)
+- Promised BY internal team to deliver something external
+
+## PHASE 2 — Identify candidate action states:
+After applying Phase 1 filters, scan for remaining potential actions:
+- Explicit commitments that remain OPEN at meeting end
+- Requests that imply FUTURE follow-up action
+- Blockers or dependencies that require FUTURE resolution
+- Plans or decisions that require FUTURE execution
+- Scheduling coordination for FUTURE meetings
+- Permission grants and imperative instructions for FUTURE actions
+
+Additional examples to DISCARD (immediate in-meeting actions):
+- "Let me hand off to [Person]" → They speak next → DISCARD
+- "I'll remind them about X" → They say it immediately → DISCARD
+- "I'll pull up the deck" → Deck is shown → DISCARD
+- "Let me reshare" → Screen is reshared → DISCARD
+
+## PHASE 3 — Normalize and consolidate:
 Clean up and merge related micro-actions when:
 - Same owner(s)
 - Same timeframe
