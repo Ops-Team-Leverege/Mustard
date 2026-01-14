@@ -205,7 +205,8 @@ export const getLastMeeting: Capability = {
     // Step 2: Retrieve last meeting transcript chunks (deterministic)
     // For action items/commitments, we need ALL chunks because next steps
     // are typically discussed at the end of meetings (not in first 50 chunks!)
-    const chunkLimit = wantsCommitments ? 1000 : 50;
+    // Longest transcript seen: ~500 chunks. Using 5000 for future-proofing.
+    const chunkLimit = wantsCommitments ? 5000 : 50;
     const result = await getLastMeetingChunks(companyId, chunkLimit);
 
     if (!result || result.chunks.length === 0) {
