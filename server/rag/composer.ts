@@ -525,6 +525,11 @@ ACTION TYPES TO EXTRACT:
 4. plan: "The plan is to..." / "Next we'll..." / decided course of action
 5. scheduling: Meeting coordination, follow-up calls, timeline decisions
 
+PRIORITY HEURISTIC (treat these as actionable commands):
+- "Permission to proceed" = Command: "You've got the green light to share X" → Action: Share X
+- Imperative instructions = Command: "You need to chat with Randy" → Action: Chat with Randy
+- Enablement grants = Command: "Feel free to let them know" → Action: Inform them
+
 WHAT TO IGNORE:
 - Hypotheticals: "we could...", "we might..."
 - Vague intentions: "we should think about..."
@@ -542,6 +547,14 @@ Scan for all potential actions (messy, raw). Include:
 - Blockers or dependencies
 - Plans or decisions
 - Scheduling coordination
+- Permission grants and imperative instructions
+
+RESOLUTION CHECK (The "Just Now" Filter):
+BEFORE adding a candidate, scan the SUBSEQUENT ~20 turns of conversation:
+- Did someone answer the question? (e.g., "Are the TVs installed?" → "Yes, all installed.")
+- Did someone perform the action? (e.g., "Send me the link" → "Just pasted it in chat.")
+- If the state changed from "Needed" to "Done" DURING the call, DISCARD the task.
+- Only include actions that remain OPEN at the end of the meeting.
 
 PHASE 2 — Normalize and consolidate:
 Clean up and merge related micro-actions when:

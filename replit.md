@@ -86,3 +86,57 @@ Preferred communication style: Simple, everyday language.
 ### Integrations
 - **Replit Auth**
 - **Jira Integration**
+
+## Architectural Invariants
+
+### Speaker Identity Preservation (CRITICAL)
+**Transcript formatting must never drop speaker identity.**
+
+This is a hard contract between ingestion → composer:
+- Transcript chunks MUST include `speakerName` when available
+- `formatTranscript()` MUST preserve speaker names in the output sent to LLMs
+- Generic role labels ("Leverege", "Customer") are fallbacks ONLY when speakerName is missing
+
+Enforcement: `assertSpeakerNamesPreserved()` in `server/rag/composer.ts` validates this invariant at runtime.
+
+### Action-State Next Steps Extraction (Quality Standard)
+**Next steps extraction targets Google Meet "Suggested next steps" quality or better.**
+
+Design principles:
+- Think like a senior operations assistant: "What actions now exist in the world because of this meeting?"
+- Precision > recall (false positives are worse than omissions)
+- Actions are extracted, not inferred
+- All actions must be grounded in transcript evidence
+
+Action types captured:
+- `commitment`: Explicit "I will" / "We will" statements
+- `request`: "Can you..." / "Please..." that imply follow-up
+- `blocker`: "We can't proceed until..." dependencies
+- `plan`: "The plan is to..." / decided course of action
+- `scheduling`: Meeting coordination, follow-up calls
+
+Processing pipeline:
+1. Two-phase LLM reasoning: Extract atomic actions → Consolidate by owner/timeframe/goal
+2. Resolution check ("Just Now" filter): Discard actions resolved during the call
+3. Deterministic post-processing: Name normalization against canonical attendee list
+4. Two-tier confidence output: Primary (≥0.85) + Secondary (0.70-0.85)
+
+Resolution check:
+- Before adding a candidate, scan subsequent ~20 turns
+- Discard if question was answered or action completed during the call
+- Example: "Are TVs installed?" → "Yep" = resolved in-call, not a next step
+
+Priority heuristic (imperative detection):
+- "Permission to proceed" = Command: "You've got the green light to share X" → Share X
+- Imperative instructions = Command: "You need to chat with Randy" → Chat with Randy
+- Enablement grants = Command: "Feel free to let them know" → Inform them
+
+Consolidation rules:
+- Merge micro-actions when same owner + same timeframe + same operational goal
+- Never merge across different owners
+- Never paraphrase evidence into new facts
+- Never infer unspoken commitments
+
+Evidence cleanup (mandatory):
+- Remove filler words ("um", "uh", "like") for readability
+- Do NOT change meaning or paraphrase facts
