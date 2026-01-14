@@ -699,12 +699,63 @@ ${transcript}
     deadline: item.deadline && item.deadline.trim() !== "" ? item.deadline.trim() : "Not specified",
   }));
 
+  // ─────────────────────────────────────────────────────────────────
+  // GREEN ROOM FILTER: Remove in-call/immediate actions
+  // ─────────────────────────────────────────────────────────────────
+  
+  // Patterns indicating present-tense/in-meeting actions (not next steps)
+  const inCallPatterns = [
+    /\bintroduce\s+(you|ryan|them|everyone)\b/i,
+    /\b(walk|take)\s+(you|them)\s+through\b/i,
+    /\bshow\s+(you|them)\b/i,
+    /\bdo\s+a\s+(quick\s+)?(intro|demo|overview)\b/i,
+    /\bjump(ing)?\s+(right\s+)?in\b/i,
+    /\blet('s|s)\s+(get\s+)?started\b/i,
+    /\bpulling\s+up\b/i,
+    /\bsharing\s+(my\s+)?screen\b/i,
+    /\bgive\s+(you|them)\s+a\s+(little\s+)?background\b/i,
+    /\bname\s*drop\b/i,
+  ];
+  
+  // Patterns indicating legitimate future actions (boost these)
+  const futurePatterns = [
+    /\bafter\s+the\s+call\b/i,
+    /\bnext\s+step/i,
+    /\bfollow[\s-]*up\b/i,
+    /\bcircle\s+back\b/i,
+    /\bget\s+back\s+to\s+you\b/i,
+    /\bsend\s+(you|them)\s+.*\b(after|later|tomorrow|next\s+week)\b/i,
+    /\bschedule\s+a\s+(follow[\s-]*up|call|meeting)\b/i,
+    /\bwork\s+with\s+.*\s+on\s+identifying\b/i,
+  ];
+
+  const greenRoomFiltered = normalized.filter(item => {
+    const evidence = item.evidence.toLowerCase();
+    const action = item.action.toLowerCase();
+    
+    // Check if it's clearly an in-call action
+    const isInCallAction = inCallPatterns.some(p => p.test(evidence) || p.test(action));
+    
+    // Check if it has future-oriented markers (protect from filtering)
+    const hasFutureMarkers = futurePatterns.some(p => p.test(evidence) || p.test(action));
+    
+    // Filter out in-call actions UNLESS they have explicit future markers
+    if (isInCallAction && !hasFutureMarkers) {
+      console.log(`[GreenRoom] Filtered: "${item.action}" (in-call pattern detected)`);
+      return false;
+    }
+    
+    return true;
+  });
+
+  console.log(`[extractMeetingActionStates] After Green Room filter: ${greenRoomFiltered.length} items (removed ${normalized.length - greenRoomFiltered.length})`);
+
   // Two-tier confidence filtering:
   // - Primary (≥0.85): High-confidence explicit actions
   // - Secondary (0.70-0.85): Implied but real actions worth tracking
   // - Below 0.70: Omit entirely (precision > recall)
-  const primary = normalized.filter((a) => a.confidence >= 0.85);
-  const secondary = normalized.filter((a) => a.confidence >= 0.70 && a.confidence < 0.85);
+  const primary = greenRoomFiltered.filter((a) => a.confidence >= 0.85);
+  const secondary = greenRoomFiltered.filter((a) => a.confidence >= 0.70 && a.confidence < 0.85);
 
   return { primary, secondary };
 }
