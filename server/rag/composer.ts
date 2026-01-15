@@ -516,7 +516,7 @@ export async function extractMeetingActionStates(
     : "";
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-4o", // Higher quality model for action extraction
     temperature: 0, // Deterministic extraction - same input = same output
     top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
