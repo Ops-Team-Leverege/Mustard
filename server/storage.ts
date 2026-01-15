@@ -2297,6 +2297,12 @@ export class DbStorage implements IStorage {
     conditions.push(drizzleSql`${transcriptsTable.transcript} IS NOT NULL`);
     conditions.push(drizzleSql`${transcriptsTable.companyId} IS NOT NULL`);
     
+    // Only include transcripts that haven't been chunked yet
+    conditions.push(drizzleSql`NOT EXISTS (
+      SELECT 1 FROM ${transcriptChunksTable} 
+      WHERE ${transcriptChunksTable.transcriptId} = ${transcriptsTable.id}
+    )`);
+    
     if (transcriptId) {
       conditions.push(eq(transcriptsTable.id, transcriptId));
     }
