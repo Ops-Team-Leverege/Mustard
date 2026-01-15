@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
 import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
+import { ingestTranscriptChunks } from "./ingestion/ingestTranscriptChunks";
 import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
@@ -230,6 +231,13 @@ async function processTranscriptInBackground(
     await storage.updateProcessingStep(transcriptId, "complete");
     await storage.updateTranscriptProcessingStatus(transcriptId, "completed");
     console.log(`Successfully processed transcript ${transcriptId}`);
+
+    // Chunk transcript for RAG/MCP queries (non-blocking, fire-and-forget)
+    ingestTranscriptChunks({ transcriptId }).then((result) => {
+      console.log(`Chunked transcript ${transcriptId}: ${result.chunksPrepared} chunks created`);
+    }).catch((err) => {
+      console.error(`Failed to chunk transcript ${transcriptId}:`, err);
+    });
   } catch (error) {
     // Mark as failed - partial data remains linked to failed transcript for manual review/cleanup
     const errorMessage =
