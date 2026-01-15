@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Capability } from "../types";
+import type { Capability, CapabilityResult } from "../types";
 import { getLastMeetingChunks } from "../../rag/retriever";
 import {
   composeMeetingSummary,
@@ -11,6 +11,11 @@ import {
   type MeetingActionItem,
 } from "../../rag/composer";
 import { storage } from "../../storage";
+
+type MeetingResult = {
+  answer: string;
+  citations: unknown[];
+};
 
 /**
  * Detect if the user explicitly requested quotes.
@@ -166,7 +171,7 @@ export const getLastMeeting: Capability = {
     companyName: z.string().describe("The name of the company to get the last meeting for"),
     question: z.string().describe("The specific question about the meeting"),
   }),
-  handler: async ({ db }, { companyName, question }) => {
+  handler: async ({ db }, { companyName, question }): Promise<CapabilityResult<MeetingResult>> => {
     // Detect intent
     const wantsQuotes = detectQuoteIntent(question);
     const wantsSpecificAnswer = isSpecificQuestion(question);
@@ -186,16 +191,20 @@ export const getLastMeeting: Capability = {
 
     if (!companyRows || companyRows.length === 0) {
       return {
-        answer: `I couldn't find a company matching "${companyName}". Please check the spelling or try a different name.`,
-        citations: [],
+        result: {
+          answer: `I couldn't find a company matching "${companyName}". Please check the spelling or try a different name.`,
+          citations: [],
+        },
       };
     }
 
     if (companyRows.length > 1) {
       const names = companyRows.map((c: { name: string }) => c.name).join(", ");
       return {
-        answer: `I found multiple companies matching "${companyName}": ${names}. Please be more specific about which company you mean.`,
-        citations: [],
+        result: {
+          answer: `I found multiple companies matching "${companyName}": ${names}. Please be more specific about which company you mean.`,
+          citations: [],
+        },
       };
     }
 
@@ -211,8 +220,11 @@ export const getLastMeeting: Capability = {
 
     if (!result || result.chunks.length === 0) {
       return {
-        answer: `I couldn't find any meeting transcripts for ${resolvedName}.`,
-        citations: [],
+        result: {
+          answer: `I couldn't find any meeting transcripts for ${resolvedName}.`,
+          citations: [],
+        },
+        resolvedEntities: { companyId },
       };
     }
 
@@ -273,8 +285,11 @@ export const getLastMeeting: Capability = {
       }
 
       return {
-        answer: lines.join("\n"),
-        citations: [],
+        result: {
+          answer: lines.join("\n"),
+          citations: [],
+        },
+        resolvedEntities: { companyId, meetingId: transcriptId },
       };
     }
 
@@ -295,8 +310,11 @@ export const getLastMeeting: Capability = {
       }
 
       return {
-        answer: lines.join("\n"),
-        citations: [],
+        result: {
+          answer: lines.join("\n"),
+          citations: [],
+        },
+        resolvedEntities: { companyId, meetingId: transcriptId },
       };
     }
 
@@ -363,8 +381,11 @@ export const getLastMeeting: Capability = {
     }
 
     return {
-      answer: lines.join("\n"),
-      citations: [],
+      result: {
+        answer: lines.join("\n"),
+        citations: [],
+      },
+      resolvedEntities: { companyId, meetingId: transcriptId },
     };
   },
 };

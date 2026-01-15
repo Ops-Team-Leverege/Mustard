@@ -33,9 +33,28 @@ export type MCPContext = {
   threadContext?: ThreadContext;
 }
 
+/**
+ * Resolved entities that capabilities can return for thread context.
+ * These are captured and stored for follow-up questions in Slack threads.
+ */
+export type ResolvedEntities = {
+  companyId?: string;
+  meetingId?: string;
+  people?: string[];
+};
+
+/**
+ * Result format for capabilities that need to return resolved entities.
+ * Capabilities can return either a raw result or this structured format.
+ */
+export type CapabilityResult<T = unknown> = {
+  result: T;
+  resolvedEntities?: ResolvedEntities;
+};
+
 export type Capability = {
   name: string;
   description: string;
   inputSchema: z.ZodType<any>;
-  handler: (ctx: MCPContext, input: any) => Promise<any>;
+  handler: (ctx: MCPContext, input: any) => Promise<any | CapabilityResult<any>>;
 }

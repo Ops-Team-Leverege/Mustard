@@ -1,16 +1,24 @@
-import type { MCPContext } from "./types";
+import type { MCPContext, CapabilityResult, ResolvedEntities } from "./types";
 import { decideCapability } from "./llm";
 import { capabilities } from "./capabilities";
 
 export type MCPResult = {
   capabilityName: string;
   result: unknown;
-  resolvedEntities?: {
-    companyId?: string;
-    meetingId?: string;
-    people?: string[];
-  };
+  resolvedEntities?: ResolvedEntities;
 };
+
+/**
+ * Check if a capability result is in the structured format with resolvedEntities.
+ */
+function isCapabilityResult(result: unknown): result is CapabilityResult<unknown> {
+  return (
+    typeof result === "object" &&
+    result !== null &&
+    "result" in result &&
+    (result as Record<string, unknown>).result !== undefined
+  );
+}
 
 /**
  * Merge thread context into capability args if they weren't explicitly provided.
@@ -48,19 +56,39 @@ export function createMCP(ctx: MCPContext) {
     if (!capability) throw new Error(`Unknown capability: ${name}`);
 
     const parsedInput = capability.inputSchema.parse(input);
-    const result = await capability.handler(ctx, parsedInput);
+    const rawResult = await capability.handler(ctx, parsedInput);
     
-    // Extract resolved entities from input args if available
-    // Note: Only capture actual IDs, not slugs - slugs are not IDs
-    const resolvedEntities: MCPResult["resolvedEntities"] = {};
+    // Initialize resolved entities from input args
+    const resolvedEntities: ResolvedEntities = {};
     if (typeof input === "object" && input !== null) {
       const args = input as Record<string, unknown>;
       if (args.companyId) resolvedEntities.companyId = String(args.companyId);
       if (args.meetingId) resolvedEntities.meetingId = String(args.meetingId);
-      // companySlug is intentionally NOT captured as companyId - they are different things
     }
     
-    return { capabilityName: name, result, resolvedEntities };
+    // Check if capability returned structured result with resolvedEntities
+    // Capabilities can return { result, resolvedEntities } to provide IDs they resolved internally
+    let finalResult: unknown;
+    if (isCapabilityResult(rawResult)) {
+      finalResult = rawResult.result;
+      // Merge capability's resolved entities (capability takes precedence)
+      if (rawResult.resolvedEntities) {
+        if (rawResult.resolvedEntities.companyId) {
+          resolvedEntities.companyId = rawResult.resolvedEntities.companyId;
+        }
+        if (rawResult.resolvedEntities.meetingId) {
+          resolvedEntities.meetingId = rawResult.resolvedEntities.meetingId;
+        }
+        if (rawResult.resolvedEntities.people) {
+          resolvedEntities.people = rawResult.resolvedEntities.people;
+        }
+      }
+    } else {
+      // Raw result - use as-is
+      finalResult = rawResult;
+    }
+    
+    return { capabilityName: name, result: finalResult, resolvedEntities };
   }
 
   async function runFromText(text: string): Promise<MCPResult> {
