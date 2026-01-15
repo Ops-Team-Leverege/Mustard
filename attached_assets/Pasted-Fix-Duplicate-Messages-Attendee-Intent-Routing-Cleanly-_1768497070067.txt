@@ -1,0 +1,173 @@
+Fix Duplicate Messages + Attendee Intent Routing (Cleanly)
+Context (read carefully)
+
+We have a Slack-based assistant with bounded MCP capabilities and deterministic routing.
+
+Recent changes introduced two issues:
+
+Duplicate Slack responses
+
+Slack sends both app_mention and message.channels when a bot is @mentioned inside a thread.
+
+The bot responds twice.
+
+“Who attended the meeting?” returns the wrong capability
+
+The system routes this question to a summary capability instead of returning the attendee list.
+
+This is not a one-off fix problem — we need a clean intent boundary, not special-case hacks.
+
+Design Constraints (DO NOT VIOLATE)
+
+❌ Do NOT add a high-priority rule for every possible question
+❌ Do NOT introduce free-form chat
+❌ Do NOT feed prior answers into the LLM
+❌ Do NOT introduce RAG or embeddings
+❌ Do NOT solve this with regex spaghetti
+
+✅ Keep capabilities bounded
+✅ Keep intent detection explicit but minimal
+✅ Prefer capability-level routing, not question-level rules
+
+What to Implement
+1️⃣ Fix Duplicate Slack Messages (Deterministically)
+
+Problem
+When a user @mentions the bot inside a thread, Slack sends:
+
+app_mention
+
+message.channels
+
+Both are currently being processed.
+
+Fix (required)
+
+In the Slack events handler:
+
+If handling a message.channels event AND the message contains an @bot mention:
+
+Ignore it
+
+Let app_mention handle the response
+
+This ensures:
+
+One response per user message
+
+No race conditions
+
+No Slack-side hacks
+
+👉 This logic must live before routing, not after.
+
+2️⃣ Add an Attendee Capability (Not a Priority Rule)
+
+Key insight:
+“Who attended the meeting?” is not a summary variant — it’s a data retrieval capability.
+
+Do not treat this as a special-case override. Treat it as a first-class intent.
+
+Add a new capability:
+
+Capability name: getMeetingAttendees
+
+Purpose:
+Return the list of attendees for a resolved meeting:
+
+Leverege team
+
+Customer attendees
+
+Input:
+
+meetingId (preferred)
+
+companyId (fallback)
+
+companyName (last resort)
+
+Output:
+
+Simple, structured attendee list
+
+No LLM reasoning required
+
+3️⃣ Minimal Intent Classification (One New Intent Class)
+
+Add a small intent detector:
+
+isAttendeeQuestion(messageText): boolean
+
+
+Triggers on:
+
+“who attended”
+
+“who was in the meeting”
+
+“participants”
+
+“attendees”
+
+That’s it.
+No hierarchy explosion.
+No per-question logic.
+
+4️⃣ Routing Order (Very Important)
+
+Routing should follow this order:
+
+Attendee questions → getMeetingAttendees
+
+Next steps / action items → commitment extraction
+
+Specific factual questions → extractive Q&A
+
+Summary requests → meeting summary
+
+This is capability precedence, not question-by-question rules.
+
+Add a comment explaining this order and why.
+
+5️⃣ Thread Context Reuse (Already Implemented — Just Ensure It Works)
+
+Confirm that:
+
+meetingId and companyId injected from thread context
+
+Input schemas accept these optional IDs (Zod must not strip them)
+
+Attendee capability uses IDs directly if present
+
+No new logic needed — just make sure the attendee capability honors seeded context.
+
+6️⃣ Logging (No Changes)
+
+Log attendee questions like any other interaction
+
+Record:
+
+capability name
+
+resolved meetingId
+
+question + answer
+
+No special casing.
+
+Explicit Non-Goals (Do NOT Implement)
+
+❌ No “high-priority rule for every question”
+❌ No conversation memory
+❌ No LLM deciding which capability to call
+❌ No RAG
+❌ No summary fallback for attendee questions
+
+Expected Behavior After This Change
+
+✅ One response per Slack message
+✅ “Who attended the meeting?” returns attendees — not a summary
+✅ Thread follow-ups reuse meeting context correctly
+✅ Capability set stays small, auditable, and extensible
+✅ No explosion of intent rules

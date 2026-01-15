@@ -123,14 +123,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
       return;
     }
     
-    // IMPORTANT: When user @mentions in a thread, Slack sends BOTH app_mention AND message events
+    // IMPORTANT: When user @mentions the bot in a thread, Slack sends BOTH app_mention AND message events
     // We only want to process app_mention when both are present to avoid duplicates
+    // But we MUST still process messages that mention OTHER users (not the bot)
     const rawThreadTs = event.thread_ts ? String(event.thread_ts) : null;
-    const textContainsMention = String(event.text || "").includes("<@");
+    const botUserId = payload.authorizations?.[0]?.user_id;
+    const textContainsBotMention = botUserId && String(event.text || "").includes(`<@${botUserId}>`);
     
-    // Skip message events that contain @mentions (app_mention will handle those)
-    if (isMessage && textContainsMention) {
-      console.log("[Slack] Skipping message event - contains @mention, app_mention event will handle");
+    // Skip message events that @mention the bot specifically (app_mention will handle those)
+    if (isMessage && textContainsBotMention) {
+      console.log("[Slack] Skipping message event - contains @bot mention, app_mention event will handle");
       return;
     }
     
