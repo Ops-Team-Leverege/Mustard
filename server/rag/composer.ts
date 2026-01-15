@@ -199,6 +199,8 @@ export async function composeMeetingSummary(
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    temperature: 0, // Deterministic extraction
+    top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
       {
         role: "system",
@@ -297,6 +299,8 @@ export async function selectRepresentativeQuotes(
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    temperature: 0, // Deterministic extraction
+    top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
       {
         role: "system",
@@ -361,6 +365,8 @@ export async function answerMeetingQuestion(
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    temperature: 0, // Deterministic extraction
+    top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
       {
         role: "system",
@@ -511,6 +517,8 @@ export async function extractMeetingActionStates(
 
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
+    temperature: 0, // Deterministic extraction - same input = same output
+    top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
       {
         role: "system",
