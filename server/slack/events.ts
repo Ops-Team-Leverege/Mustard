@@ -263,12 +263,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.error("Failed to log interaction:", err);
       });
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const errorStack = err instanceof Error ? err.stack : undefined;
-      console.error("MCP execution failed:", errorMessage);
-      if (errorStack) {
-        console.error("Stack trace:", errorStack);
-      }
+      console.error("MCP execution failed:", err);
 
       await postSlackMessage({
         channel,
