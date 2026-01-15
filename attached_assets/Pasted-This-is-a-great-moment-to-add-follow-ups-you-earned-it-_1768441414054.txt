@@ -1,0 +1,168 @@
+This is a great moment to add follow-ups — you earned it by stabilizing Next Steps first.
+And you’re doing it in the right order: use the table, don’t invent memory.
+
+Below is a clean, scoped Replit prompt that adds follow-up support without breaking any of your guarantees.
+
+Replit Prompt — Thread-Safe Follow-Up Using Interaction Logs
+Context (read carefully)
+
+We already have:
+
+A stable set of intent classes (summary, next steps, extractive Q&A)
+
+A new interaction_logs table that records:
+
+slackThreadId
+
+capability used
+
+resolved entities (meetingId, companyId, etc.)
+
+question + answer
+
+NO RAG
+
+NO LLM access to prior answers
+
+NO free-form chat
+
+Now we want to support follow-up questions in Slack threads in a safe, deterministic way.
+
+Goal
+
+Enable follow-up questions in Slack threads by reusing previously resolved context (e.g. meetingId), without:
+
+changing how capabilities reason
+
+feeding past answers to LLMs
+
+introducing conversational memory
+
+introducing RAG
+
+This is context reuse, not conversation.
+
+What “follow-up” means (definition)
+
+A follow-up is:
+
+A new user message in the same Slack thread that refers to the same meeting or customer context as a previous message.
+
+Examples:
+
+“What are the next steps?” → “Who owns the first one?”
+
+“What did we agree on?” → “And what’s still open?”
+
+“What should I cover?” → “Anything unresolved?”
+
+Implementation Requirements
+1️⃣ Add thread context resolution (deterministic)
+
+When a Slack message arrives:
+
+If thread_ts exists:
+
+Look up getLastInteractionByThread(thread_ts)
+
+If found:
+
+Extract resolvedEntities (especially meetingId, companyId)
+
+Pass these entities explicitly into the capability handler
+
+Skip entity re-resolution only if:
+
+the user did not explicitly override context
+
+the previous interaction had high confidence
+
+⚠️ Important:
+
+Do NOT reuse the prior answer
+
+Do NOT pass prior answers to LLMs
+
+Only reuse resolved IDs
+
+2️⃣ No new capabilities
+
+Follow-ups must reuse existing intent classes:
+
+Intent	Capability
+“Who owns that?”	Next steps
+“What did they say about X?”	Extractive Q&A
+“Anything else I should cover?”	Derived view
+
+This means:
+
+Routing logic stays the same
+
+Only context resolution changes
+
+3️⃣ Explicit override rules
+
+If the user message includes:
+
+a different customer name
+
+“in a different meeting”
+
+“last quarter”
+
+“another call”
+
+→ Ignore thread context and resolve fresh.
+
+Add a small helper like:
+
+shouldReuseThreadContext(messageText): boolean
+
+4️⃣ Log follow-ups normally
+
+After responding:
+
+Insert a new row into interaction_logs
+
+Include:
+
+reused meetingId
+
+capability name
+
+question + answer
+
+No special casing for follow-ups
+
+This preserves a full audit trail.
+
+5️⃣ Add a clarifying comment (important)
+
+Add a comment in the Slack handler explaining:
+
+“Thread follow-ups reuse resolved entity context only.
+LLMs never see prior answers or interaction history.”
+
+This documents the architectural boundary.
+
+Explicit Non-Goals (DO NOT IMPLEMENT)
+
+❌ No RAG
+❌ No embeddings
+❌ No conversation history to LLM
+❌ No “continue the conversation” logic
+❌ No model changes
+
+Expected Outcome
+
+After this change:
+
+Users can ask natural follow-ups in Slack threads
+
+Context is reused safely and deterministically
+
+Capabilities remain bounded and auditable
+
+No hallucination risk is introduced
+
+You unlock better UX without sacrificing trust
