@@ -34,6 +34,35 @@ function shouldReuseThreadContext(messageText: string): boolean {
 // Simple in-memory dedupe
 const seenEventIds = new Set<string>();
 
+// Track threads where bot is active (in-memory for fast lookups)
+// Persisted interactions serve as source of truth; this is a performance cache
+const botActiveThreads = new Set<string>();
+
+/**
+ * Check if this is a message event in a bot-active thread.
+ * This enables follow-up questions without @mentioning the bot.
+ */
+async function isBotActiveThread(threadTs: string): Promise<boolean> {
+  // Fast path: check in-memory cache
+  if (botActiveThreads.has(threadTs)) {
+    return true;
+  }
+  
+  // Slow path: check database for prior interactions
+  try {
+    const priorInteraction = await storage.getLastInteractionByThread(threadTs);
+    if (priorInteraction) {
+      // Cache for future lookups
+      botActiveThreads.add(threadTs);
+      return true;
+    }
+  } catch (err) {
+    console.error("[Slack] Failed to check bot-active thread:", err);
+  }
+  
+  return false;
+}
+
 export async function slackEventsHandler(req: Request, res: Response) {
   console.log("[Slack] Received event request");
   try {
@@ -81,20 +110,50 @@ export async function slackEventsHandler(req: Request, res: Response) {
       return;
     }
 
-    console.log("Event type:", payload.event?.type);
+    const event = payload.event;
+    console.log("Event type:", event?.type);
 
-    if (payload.event?.type !== "app_mention") {
-      console.log("Not an app_mention");
+    // 5. Handle both app_mention AND message events (for thread follow-ups)
+    const eventType = event?.type;
+    const isAppMention = eventType === "app_mention";
+    const isMessage = eventType === "message" && !event?.subtype; // Ignore edited/deleted/etc
+    
+    if (!isAppMention && !isMessage) {
+      console.log("Not an app_mention or message event");
       return;
     }
-    // 5. Dedupe events
+    
+    // For message events, only respond if in a bot-active thread
+    const rawThreadTs = event.thread_ts ? String(event.thread_ts) : null;
+    if (isMessage && !isAppMention) {
+      // Ignore messages that aren't thread replies
+      if (!rawThreadTs) {
+        console.log("[Slack] Ignoring non-threaded message event");
+        return;
+      }
+      
+      // Ignore messages from bots (including ourselves)
+      if (event.bot_id) {
+        console.log("[Slack] Ignoring message from bot");
+        return;
+      }
+      
+      // Check if this is a bot-active thread
+      const isActive = await isBotActiveThread(rawThreadTs);
+      if (!isActive) {
+        console.log("[Slack] Ignoring message in non-bot-active thread");
+        return;
+      }
+      
+      console.log(`[Slack] Processing follow-up in bot-active thread: ${rawThreadTs}`);
+    }
+
+    // 6. Dedupe events
     const eventId = String(payload.event_id || "");
     if (eventId && seenEventIds.has(eventId)) return;
     if (eventId) seenEventIds.add(eventId);
 
-    const event = payload.event;
-    if (!event || event.type !== "app_mention") return;
-
+    // Extract message details
     const channel = String(event.channel);
     // For thread replies, use thread_ts (parent message); otherwise use ts (this message starts a thread)
     const threadTs = String(event.thread_ts || event.ts);
@@ -103,9 +162,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const userId = String(event.user || "");
     const isReply = Boolean(event.thread_ts); // True if this is a reply in an existing thread
 
-    console.log(`Processing mention: "${text}" in channel ${channel}`);
+    console.log(`Processing: "${text}" in channel ${channel} (isAppMention=${isAppMention}, isReply=${isReply})`);
 
-    // 6. Send immediate acknowledgment (UX improvement - reduces perceived latency)
+    // 7. Send immediate acknowledgment (UX improvement - reduces perceived latency)
     const ackMessage = userId
       ? `On it, <@${userId}> — let me check that for you.`
       : `On it — let me check that for you.`;
@@ -116,7 +175,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
       thread_ts: threadTs,
     });
 
-    // 7. Thread context resolution (deterministic follow-up support)
+    // Mark this thread as bot-active (for future follow-ups without @mention)
+    botActiveThreads.add(threadTs);
+
+    // 8. Thread context resolution (deterministic follow-up support)
     // 
     // IMPORTANT ARCHITECTURAL BOUNDARY:
     // Thread follow-ups reuse resolved entity context only.
@@ -145,7 +207,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] User explicitly overriding context - resolving fresh");
     }
 
-    // 8. Process with MCP (async after ack)
+    // 9. Process with MCP (async after ack)
     const ctx = makeMCPContext(threadContext);
     const mcp = createMCP(ctx);
 
