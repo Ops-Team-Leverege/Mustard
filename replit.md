@@ -6,6 +6,23 @@ The PitCrew Customer Transcript Analyzer is a SaaS application designed to lever
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+### OpenAI Integration Changes (CRITICAL)
+**Always ask where the impact should be reflected before making OpenAI-related changes.**
+
+This application has multiple features using OpenAI with different models and settings:
+
+| Feature | File | Model | Temperature | Purpose |
+|---------|------|-------|-------------|---------|
+| Transcript Analyzer | `server/transcriptAnalyzer.ts` | gpt-5 | default (1) | Extract insights/Q&A from transcripts |
+| MCP Router | `server/mcp/llm.ts` | gpt-4o-mini | 0 | Route Slack questions to capabilities |
+| RAG Composer | `server/rag/composer.ts` | gpt-4o-mini / gpt-4o | 0 | Extract answers, commitments, quotes |
+
+**Model constraints:**
+- gpt-5 does NOT support temperature=0 (only default value of 1)
+- gpt-4o-mini and gpt-4o support temperature=0 for deterministic output
+
+**Before changing any LLM settings, confirm with the user which features should be affected.**
+
 ## System Architecture
 
 ### Core Design Principles
