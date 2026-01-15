@@ -263,11 +263,40 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.error("Failed to log interaction:", err);
       });
     } catch (err) {
-      console.error("MCP execution failed:", err);
+      // Detect specific error types for better user messaging
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const errorCode = (err as any)?.code || (err as any)?.status;
+      
+      let userMessage: string;
+      let logPrefix: string;
+      
+      // OpenAI quota/rate limit errors
+      if (errorCode === 'insufficient_quota' || errorCode === 429 || 
+          errorMessage.includes('exceeded your current quota') ||
+          errorMessage.includes('rate limit')) {
+        logPrefix = "[OpenAI Quota Error]";
+        userMessage = "I can't process this right now — the AI service quota has been exceeded. Please contact an admin to check the OpenAI billing settings.";
+      } 
+      // OpenAI API key errors
+      else if (errorCode === 401 || errorMessage.includes('Incorrect API key') || 
+               errorMessage.includes('invalid_api_key')) {
+        logPrefix = "[OpenAI Auth Error]";
+        userMessage = "I can't process this right now — there's an issue with the AI service configuration. Please contact an admin.";
+      }
+      // Generic errors
+      else {
+        logPrefix = "[MCP Error]";
+        userMessage = "Sorry — I hit an internal error while processing that request.";
+      }
+      
+      console.error(`${logPrefix} ${errorMessage}`);
+      if (err instanceof Error && err.stack) {
+        console.error(`${logPrefix} Stack:`, err.stack);
+      }
 
       await postSlackMessage({
         channel,
-        text: "Sorry — I hit an internal error while processing that request.",
+        text: userMessage,
         thread_ts: threadTs,
       });
     }
