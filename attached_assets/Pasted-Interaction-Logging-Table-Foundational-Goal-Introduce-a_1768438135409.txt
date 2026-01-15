@@ -1,0 +1,100 @@
+Interaction Logging Table (Foundational)
+
+Goal
+Introduce a persistent Interaction Log that records user questions and system responses, without changing any existing behavior yet. This table will later support thread continuity, analytics, and evaluation.
+
+Important constraints
+
+This table is metadata only, not a knowledge source.
+
+LLMs must never reason over past answers.
+
+No thread logic yet — only logging + safe retrieval helpers.
+
+1. Create a new table (or model) for interactions
+
+Add a new persistence layer entity, e.g. interaction_logs (or similar), with fields:
+
+id
+
+slackThreadId (nullable)
+
+slackMessageTs
+
+slackChannelId
+
+userId
+
+companyId
+
+meetingId (nullable)
+
+capabilityName
+
+questionText
+
+answerText
+
+resolvedEntities (JSON)
+
+meetingId
+
+people
+
+topics (optional, leave empty for now)
+
+confidence (optional, nullable)
+
+createdAt
+
+This table represents what the system decided, not ground truth.
+
+2. Add storage helpers (no business logic)
+
+In the storage layer, add methods:
+
+insertInteractionLog(log)
+
+getLastInteractionByThread(slackThreadId)
+
+These should be deterministic and simple.
+
+3. Write-only integration (no behavior change)
+
+Update the MCP / Slack response flow so that:
+
+After a capability successfully responds
+
+An interaction log row is written
+
+No existing logic is altered
+
+No interaction data is read yet (except via helper methods)
+
+4. Explicit non-goals (do NOT implement yet)
+
+❌ No thread-based context reuse
+
+❌ No LLM access to interaction history
+
+❌ No RAG or embeddings
+
+❌ No follow-up inference
+
+This is a foundational persistence step only.
+
+5. Add a short comment explaining intent
+
+At the table or model level, add a comment like:
+
+“This table records resolved user interactions for auditability, evaluation, and future context recovery. It is not a knowledge source and must not be used as input to LLM reasoning.”
+
+Expected outcome
+
+A clean interaction log exists
+
+All future behavior changes can rely on it
+
+No risk of circular reasoning
+
+No change in user-visible behavior yet
