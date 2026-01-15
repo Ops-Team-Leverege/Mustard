@@ -20,7 +20,11 @@ type PostMessageParams = {
   thread_ts?: string;
 };
 
-export async function postSlackMessage(params: PostMessageParams) {
+type PostMessageResponse = {
+  ts: string; // Message timestamp (unique ID)
+};
+
+export async function postSlackMessage(params: PostMessageParams): Promise<PostMessageResponse> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     throw new Error("Missing SLACK_BOT_TOKEN");
@@ -35,9 +39,11 @@ export async function postSlackMessage(params: PostMessageParams) {
     body: JSON.stringify(params),
   });
 
-  const data = (await response.json()) as { ok: boolean; error?: string };
+  const data = (await response.json()) as { ok: boolean; error?: string; ts?: string };
 
   if (!data.ok) {
     throw new Error(`Slack API error: ${data.error}`);
   }
+
+  return { ts: data.ts || "" };
 }

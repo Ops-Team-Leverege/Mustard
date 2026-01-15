@@ -363,3 +363,37 @@ export type InsertTranscriptChunk = Omit<typeof transcriptChunks.$inferInsert, '
 // MeetingSummary type for persisted RAG artifacts
 export type MeetingSummary = typeof meetingSummaries.$inferSelect;
 export type InsertMeetingSummary = Omit<typeof meetingSummaries.$inferInsert, 'id' | 'createdAt'>;
+
+/**
+ * Interaction Logs
+ * 
+ * This table records resolved user interactions for auditability, evaluation, and future context recovery.
+ * It is NOT a knowledge source and must NOT be used as input to LLM reasoning.
+ * 
+ * Future use cases:
+ * - Thread continuity (resuming conversations)
+ * - Analytics (usage patterns, capability distribution)
+ * - Evaluation (answer quality assessment)
+ */
+export const interactionLogs = pgTable("interaction_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slackThreadId: varchar("slack_thread_id"), // Thread TS for thread grouping (nullable for non-threaded)
+  slackMessageTs: varchar("slack_message_ts").notNull(), // Unique message timestamp
+  slackChannelId: varchar("slack_channel_id").notNull(),
+  userId: varchar("user_id"), // Slack user ID who asked
+  companyId: varchar("company_id"), // Resolved company if applicable
+  meetingId: varchar("meeting_id"), // Resolved transcript/meeting ID if applicable
+  capabilityName: varchar("capability_name").notNull(), // Which MCP capability handled this
+  questionText: text("question_text").notNull(), // User's original question
+  answerText: text("answer_text").notNull(), // System's response
+  resolvedEntities: jsonb("resolved_entities"), // { meetingId, people, topics, etc. }
+  confidence: text("confidence"), // Optional confidence indicator
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("interaction_logs_thread_idx").on(table.slackThreadId),
+  index("interaction_logs_company_idx").on(table.companyId),
+  index("interaction_logs_created_idx").on(table.createdAt),
+]);
+
+export type InteractionLog = typeof interactionLogs.$inferSelect;
+export type InsertInteractionLog = Omit<typeof interactionLogs.$inferInsert, 'id' | 'createdAt'>;

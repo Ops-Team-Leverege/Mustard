@@ -1,8 +1,9 @@
 import type { Request, Response } from "express";
 import { verifySlackSignature } from "./verify";
 import { postSlackMessage } from "./slackApi";
-import { createMCP } from "../mcp/createMCP";
+import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext } from "../mcp/context";
+import { storage } from "../storage";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -95,23 +96,43 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const mcp = createMCP(ctx);
 
     try {
-      const result = await mcp.runFromText(text);
+      const mcpResult: MCPResult = await mcp.runFromText(text);
 
       // Format result - handle both string and object responses
       let responseText: string;
-      if (typeof result === "string") {
-        responseText = result;
-      } else if (result && typeof result === "object") {
+      const rawResult = mcpResult.result;
+      if (typeof rawResult === "string") {
+        responseText = rawResult;
+      } else if (rawResult && typeof rawResult === "object") {
         // RAG responses have { answer, citations }
-        responseText = result.answer || JSON.stringify(result, null, 2);
+        const objResult = rawResult as Record<string, unknown>;
+        responseText = (objResult.answer as string) || JSON.stringify(rawResult, null, 2);
       } else {
-        responseText = String(result);
+        responseText = String(rawResult);
       }
 
-      await postSlackMessage({
+      const botReply = await postSlackMessage({
         channel,
         text: responseText,
         thread_ts: threadTs,
+      });
+
+      // Log interaction (write-only, non-blocking)
+      // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
+      storage.insertInteractionLog({
+        slackThreadId: threadTs,
+        slackMessageTs: botReply.ts, // Actual bot reply message timestamp
+        slackChannelId: channel,
+        userId: userId || null,
+        companyId: mcpResult.resolvedEntities?.companyId || null,
+        meetingId: mcpResult.resolvedEntities?.meetingId || null,
+        capabilityName: mcpResult.capabilityName,
+        questionText: text,
+        answerText: responseText,
+        resolvedEntities: mcpResult.resolvedEntities || null,
+        confidence: null,
+      }).catch(err => {
+        console.error("Failed to log interaction:", err);
       });
     } catch (err) {
       console.error("MCP execution failed:", err);

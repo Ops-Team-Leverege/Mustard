@@ -30,6 +30,8 @@ import {
   type InsertTranscriptChunk,
   type MeetingSummary,
   type InsertMeetingSummary,
+  type InteractionLog,
+  type InsertInteractionLog,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -42,6 +44,7 @@ import {
   posSystemCompanies as posSystemCompaniesTable,
   transcriptChunks as transcriptChunksTable,
   meetingSummaries as meetingSummariesTable,
+  interactionLogs as interactionLogsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -141,6 +144,10 @@ export interface IStorage {
   // Meeting Summaries (for persisting RAG artifacts)
   saveMeetingSummary(data: InsertMeetingSummary): Promise<MeetingSummary>;
   getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null>;
+
+  // Interaction Logs (for auditability/evaluation, NOT LLM input)
+  insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
+  getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null>;
 }
 
 export class MemStorage implements IStorage {
@@ -1102,6 +1109,14 @@ export class MemStorage implements IStorage {
 
   async getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null> {
     throw new Error("MemStorage not supported for Meeting Summaries");
+  }
+
+  async insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog> {
+    throw new Error("MemStorage not supported for Interaction Logs");
+  }
+
+  async getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null> {
+    throw new Error("MemStorage not supported for Interaction Logs");
   }
 }
 
@@ -2364,6 +2379,25 @@ export class DbStorage implements IStorage {
       .from(meetingSummariesTable)
       .where(eq(meetingSummariesTable.companyId, companyId))
       .orderBy(drizzleSql`${meetingSummariesTable.meetingTimestamp} DESC`)
+      .limit(1);
+    return result ?? null;
+  }
+
+  // Interaction Logs - thin helpers for auditability/evaluation, NOT LLM input
+  async insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog> {
+    const [result] = await this.db
+      .insert(interactionLogsTable)
+      .values(log)
+      .returning();
+    return result;
+  }
+
+  async getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null> {
+    const [result] = await this.db
+      .select()
+      .from(interactionLogsTable)
+      .where(eq(interactionLogsTable.slackThreadId, slackThreadId))
+      .orderBy(drizzleSql`${interactionLogsTable.createdAt} DESC`)
       .limit(1);
     return result ?? null;
   }
