@@ -123,8 +123,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
       return;
     }
     
-    // For message events, only respond if in a bot-active thread
+    // IMPORTANT: When user @mentions in a thread, Slack sends BOTH app_mention AND message events
+    // We only want to process app_mention when both are present to avoid duplicates
     const rawThreadTs = event.thread_ts ? String(event.thread_ts) : null;
+    const textContainsMention = String(event.text || "").includes("<@");
+    
+    // Skip message events that contain @mentions (app_mention will handle those)
+    if (isMessage && textContainsMention) {
+      console.log("[Slack] Skipping message event - contains @mention, app_mention event will handle");
+      return;
+    }
+    
+    // For pure message events (no @mention), only respond if in a bot-active thread
     if (isMessage && !isAppMention) {
       // Ignore messages that aren't thread replies
       if (!rawThreadTs) {

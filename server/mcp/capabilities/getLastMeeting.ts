@@ -18,6 +18,25 @@ type MeetingResult = {
 };
 
 /**
+ * Detect if user is asking about meeting attendees/participants.
+ */
+function isAttendeeQuestion(question: string): boolean {
+  const q = question.toLowerCase();
+  const patterns = [
+    /\bwho attended\b/,
+    /\bwho was (?:at|in|on)\b/,
+    /\bwho (?:was|were) (?:there|present)\b/,
+    /\battendees?\b/,
+    /\bparticipants?\b/,
+    /\bwho (?:joined|participated)\b/,
+    /\bwho was on the call\b/,
+    /\bwho was in the meeting\b/,
+    /\blist (?:of )?(?:attendees|participants|people)\b/,
+  ];
+  return patterns.some((p) => p.test(q));
+}
+
+/**
  * Detect if the user explicitly requested quotes.
  * Quotes are opt-in: only shown when user asks for them.
  */
@@ -179,12 +198,13 @@ export const getLastMeeting: Capability = {
     const wantsQuotes = detectQuoteIntent(question);
     const wantsSpecificAnswer = isSpecificQuestion(question);
     const wantsCommitments = isCommitmentRequest(question);
+    const wantsAttendees = isAttendeeQuestion(question);
 
     // Debug logging for intent routing
     const strippedQ = stripMcpScaffolding(question);
     console.log(`[getLastMeeting] Raw question (${question.length} chars): "${question.substring(0, 200)}${question.length > 200 ? '...' : ''}"`);
     console.log(`[getLastMeeting] Stripped question: "${strippedQ.substring(0, 150)}"`);
-    console.log(`[getLastMeeting] Intent: wantsCommitments=${wantsCommitments}, wantsSpecificAnswer=${wantsSpecificAnswer}, wantsQuotes=${wantsQuotes}`);
+    console.log(`[getLastMeeting] Intent: wantsCommitments=${wantsCommitments}, wantsAttendees=${wantsAttendees}, wantsSpecificAnswer=${wantsSpecificAnswer}, wantsQuotes=${wantsQuotes}`);
     console.log(`[getLastMeeting] Context: providedCompanyId=${providedCompanyId}, providedMeetingId=${providedMeetingId}, companyName=${companyName}`);
 
     // Step 1: Resolve company - use provided ID or resolve from name
@@ -233,7 +253,7 @@ export const getLastMeeting: Capability = {
       // No company context available - ask user to provide it
       return {
         result: {
-          answer: `Could you please provide the name of the company for which you would like to know the attendees of the meeting?`,
+          answer: `Could you please provide the name of the company you're asking about?`,
           citations: [],
         },
       };
@@ -265,6 +285,46 @@ export const getLastMeeting: Capability = {
       speakerName: c.speaker_name,
       text: c.content,
     }));
+
+    // ─────────────────────────────────────────────────────────────────
+    // ROUTE: Attendee request → List of meeting participants
+    // ─────────────────────────────────────────────────────────────────
+    if (wantsAttendees) {
+      const lines: string[] = [];
+      lines.push(`*[${resolvedName}] Meeting Attendees*`);
+      lines.push(`_Meeting: ${new Date(transcriptCreatedAt).toLocaleDateString()}_`);
+      lines.push("");
+
+      // Parse attendees (stored as pipe-delimited strings)
+      const leverageTeamList = attendees.leverageTeam?.split("|").filter(Boolean) || [];
+      const customerNamesList = attendees.customerNames?.split("|").filter(Boolean) || [];
+
+      // Leverege team attendees
+      if (leverageTeamList.length > 0) {
+        lines.push("*Leverege Team*");
+        leverageTeamList.forEach((name) => lines.push(`• ${name.trim()}`));
+      }
+
+      // Customer attendees
+      if (customerNamesList.length > 0) {
+        lines.push("");
+        lines.push(`*${resolvedName} Team*`);
+        customerNamesList.forEach((name) => lines.push(`• ${name.trim()}`));
+      }
+
+      // Handle case where we don't have attendee info
+      if (leverageTeamList.length === 0 && customerNamesList.length === 0) {
+        lines.push("_Attendee information was not recorded for this meeting._");
+      }
+
+      return {
+        result: {
+          answer: lines.join("\n"),
+          citations: [],
+        },
+        resolvedEntities: { companyId, meetingId: transcriptId },
+      };
+    }
 
     // ─────────────────────────────────────────────────────────────────
     // ROUTE: Commitment request → Action items / Next steps
