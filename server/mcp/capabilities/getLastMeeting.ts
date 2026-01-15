@@ -168,10 +168,13 @@ export const getLastMeeting: Capability = {
   description:
     "Get information about the last/most recent meeting with a company. Use this when asked about what was discussed in the last meeting, recent meeting topics, or latest conversation with a company.",
   inputSchema: z.object({
-    companyName: z.string().describe("The name of the company to get the last meeting for"),
+    companyName: z.string().optional().describe("The name of the company to get the last meeting for"),
     question: z.string().describe("The specific question about the meeting"),
+    // Thread context injection: these are seeded from prior interactions in the same thread
+    companyId: z.string().optional().describe("Pre-resolved company ID from thread context"),
+    meetingId: z.string().optional().describe("Pre-resolved meeting/transcript ID from thread context"),
   }),
-  handler: async ({ db }, { companyName, question }): Promise<CapabilityResult<MeetingResult>> => {
+  handler: async ({ db }, { companyName, question, companyId: providedCompanyId, meetingId: providedMeetingId }): Promise<CapabilityResult<MeetingResult>> => {
     // Detect intent
     const wantsQuotes = detectQuoteIntent(question);
     const wantsSpecificAnswer = isSpecificQuestion(question);
@@ -182,34 +185,59 @@ export const getLastMeeting: Capability = {
     console.log(`[getLastMeeting] Raw question (${question.length} chars): "${question.substring(0, 200)}${question.length > 200 ? '...' : ''}"`);
     console.log(`[getLastMeeting] Stripped question: "${strippedQ.substring(0, 150)}"`);
     console.log(`[getLastMeeting] Intent: wantsCommitments=${wantsCommitments}, wantsSpecificAnswer=${wantsSpecificAnswer}, wantsQuotes=${wantsQuotes}`);
+    console.log(`[getLastMeeting] Context: providedCompanyId=${providedCompanyId}, providedMeetingId=${providedMeetingId}, companyName=${companyName}`);
 
-    // Step 1: Resolve company name with case-insensitive partial match
-    const companyRows = await db.query(
-      `SELECT id, name FROM companies WHERE name ILIKE $1`,
-      [`%${companyName}%`]
-    );
+    // Step 1: Resolve company - use provided ID or resolve from name
+    let companyId: string;
+    let resolvedName: string;
 
-    if (!companyRows || companyRows.length === 0) {
+    if (providedCompanyId) {
+      // Use provided company ID from thread context
+      companyId = providedCompanyId;
+      // Look up company name for display purposes
+      const companyRow = await db.query(
+        `SELECT name FROM companies WHERE id = $1`,
+        [providedCompanyId]
+      );
+      resolvedName = companyRow?.[0]?.name || "Unknown Company";
+      console.log(`[getLastMeeting] Using thread context companyId=${companyId}, name=${resolvedName}`);
+    } else if (companyName) {
+      // Resolve company name with case-insensitive partial match
+      const companyRows = await db.query(
+        `SELECT id, name FROM companies WHERE name ILIKE $1`,
+        [`%${companyName}%`]
+      );
+
+      if (!companyRows || companyRows.length === 0) {
+        return {
+          result: {
+            answer: `I couldn't find a company matching "${companyName}". Please check the spelling or try a different name.`,
+            citations: [],
+          },
+        };
+      }
+
+      if (companyRows.length > 1) {
+        const names = companyRows.map((c: { name: string }) => c.name).join(", ");
+        return {
+          result: {
+            answer: `I found multiple companies matching "${companyName}": ${names}. Please be more specific about which company you mean.`,
+            citations: [],
+          },
+        };
+      }
+
+      companyId = companyRows[0].id;
+      resolvedName = companyRows[0].name;
+    } else {
+      // No company context available - ask user to provide it
       return {
         result: {
-          answer: `I couldn't find a company matching "${companyName}". Please check the spelling or try a different name.`,
+          answer: `Could you please provide the name of the company for which you would like to know the attendees of the meeting?`,
           citations: [],
         },
       };
     }
-
-    if (companyRows.length > 1) {
-      const names = companyRows.map((c: { name: string }) => c.name).join(", ");
-      return {
-        result: {
-          answer: `I found multiple companies matching "${companyName}": ${names}. Please be more specific about which company you mean.`,
-          citations: [],
-        },
-      };
-    }
-
-    const companyId = companyRows[0].id;
-    const resolvedName = companyRows[0].name;
 
     // Step 2: Retrieve last meeting transcript chunks (deterministic)
     // For action items/commitments, we need ALL chunks because next steps
