@@ -51,6 +51,13 @@ function seedArgsFromThreadContext(
 }
 
 export function createMCP(ctx: MCPContext) {
+  // Debug: Log thread context at MCP creation time
+  if (ctx.threadContext) {
+    console.log(`[MCP] Created with thread context: companyId=${ctx.threadContext.companyId}, meetingId=${ctx.threadContext.meetingId}`);
+  } else {
+    console.log(`[MCP] Created without thread context`);
+  }
+
   async function run(name: string, input: unknown): Promise<MCPResult> {
     const capability = capabilities.find(c => c.name === name);
     if (!capability) throw new Error(`Unknown capability: ${name}`);
@@ -103,8 +110,11 @@ export function createMCP(ctx: MCPContext) {
       capabilities: descriptors,
     });
 
+    console.log(`[MCP] Router selected capability: ${name}, args: ${JSON.stringify(args)}`);
+
     // Handle fallback when no capability was selected
     if (name === "__fallback__") {
+      console.log(`[MCP] Fallback response (no capability matched)`);
       return {
         capabilityName: "__fallback__",
         result: args.response,
@@ -113,6 +123,7 @@ export function createMCP(ctx: MCPContext) {
 
     // Seed args from thread context if available (enables follow-up questions)
     const seededArgs = seedArgsFromThreadContext(args, ctx);
+    console.log(`[MCP] After seeding, args: ${JSON.stringify(seededArgs)}`);
 
     return run(name, seededArgs);
   }
