@@ -196,8 +196,7 @@ IMPORTANT:
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-      temperature: 0, // Deterministic extraction - same input = same output
-      top_p: 0.1, // Restrict vocabulary for consistency
+      // Note: gpt-5 only supports temperature=1 (default), so we don't override temperature/top_p here
       messages: [
         {
           role: "system",
