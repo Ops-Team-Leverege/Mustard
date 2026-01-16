@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
 import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
 import { ingestTranscriptChunks } from "./ingestion/ingestTranscriptChunks";
+import { extractCustomerQuestions } from "./extraction/extractCustomerQuestions";
 import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
@@ -55,6 +56,68 @@ async function getUserAndProduct(
 
 // In-memory lock to prevent concurrent processing of the same transcript
 const processingLocks = new Set<string>();
+
+/**
+ * Customer Questions Extraction (High-Trust, Evidence-Based Layer)
+ * 
+ * This function orchestrates customer question extraction for a transcript.
+ * It runs AFTER transcript chunking, asynchronously and independently.
+ * 
+ * Characteristics:
+ * - Uses gpt-4o at temperature 0 for deterministic output
+ * - Fails independently without affecting other extractors
+ * - Retryable - cleans up existing questions before re-extraction
+ * - Does NOT affect existing Q&A pairs (qa_pairs table)
+ */
+async function extractCustomerQuestionsForTranscript(
+  transcriptId: string,
+  product: Product,
+): Promise<void> {
+  console.log(`[CustomerQuestions] Starting extraction for transcript ${transcriptId}`);
+  
+  // Get transcript chunks (these have speaker attribution)
+  const chunks = await storage.getChunksForTranscript(transcriptId, 1000);
+  
+  if (chunks.length === 0) {
+    console.log(`[CustomerQuestions] No chunks found for transcript ${transcriptId}, skipping`);
+    return;
+  }
+  
+  // Idempotent: Clear any existing customer questions from previous runs
+  await storage.deleteCustomerQuestionsByTranscript(transcriptId);
+  
+  // Get transcript for companyId
+  const transcript = await storage.getTranscript(product, transcriptId);
+  if (!transcript) {
+    console.log(`[CustomerQuestions] Transcript ${transcriptId} not found, skipping`);
+    return;
+  }
+  
+  // Run extraction
+  const extractedQuestions = await extractCustomerQuestions(chunks);
+  
+  if (extractedQuestions.length === 0) {
+    console.log(`[CustomerQuestions] No customer questions found in transcript ${transcriptId}`);
+    return;
+  }
+  
+  // Save to database
+  await storage.createCustomerQuestions(
+    extractedQuestions.map((q) => ({
+      product,
+      transcriptId,
+      companyId: transcript.companyId,
+      questionText: q.question_text,
+      askedByName: q.asked_by_name,
+      questionTurnIndex: q.question_turn_index,
+      status: q.status,
+      answerEvidence: q.answer_evidence,
+      answeredByName: q.answered_by_name,
+    })),
+  );
+  
+  console.log(`[CustomerQuestions] Saved ${extractedQuestions.length} customer questions for transcript ${transcriptId}`);
+}
 
 // Background processing function for transcript AI analysis
 async function processTranscriptInBackground(
@@ -233,8 +296,18 @@ async function processTranscriptInBackground(
     console.log(`Successfully processed transcript ${transcriptId}`);
 
     // Chunk transcript for RAG/MCP queries (non-blocking, fire-and-forget)
-    ingestTranscriptChunks({ transcriptId }).then((result) => {
+    // Then run customer questions extraction after chunking (async, independent, retryable)
+    ingestTranscriptChunks({ transcriptId }).then(async (result) => {
       console.log(`Chunked transcript ${transcriptId}: ${result.chunksPrepared} chunks created`);
+      
+      // Customer Questions Extraction (High-Trust Layer)
+      // Runs AFTER chunking, uses gpt-4o temp=0, fails independently
+      try {
+        await extractCustomerQuestionsForTranscript(transcriptId, product);
+      } catch (err) {
+        // Non-fatal: log and continue - does not affect transcript or Q&A processing
+        console.error(`[CustomerQuestions] Extraction failed for transcript ${transcriptId}:`, err);
+      }
     }).catch((err) => {
       console.error(`Failed to chunk transcript ${transcriptId}:`, err);
     });

@@ -16,6 +16,7 @@ This application has multiple features using OpenAI with different models and se
 | Transcript Analyzer | `server/transcriptAnalyzer.ts` | gpt-5 | default (1) | Extract insights/Q&A from transcripts |
 | MCP Router | `server/mcp/llm.ts` | gpt-4o-mini | 0 | Route Slack questions to capabilities |
 | RAG Composer | `server/rag/composer.ts` | gpt-4o-mini / gpt-4o | 0 | Extract answers, commitments, quotes |
+| Customer Questions | `server/extraction/extractCustomerQuestions.ts` | gpt-4o | 0 | Extract verbatim customer questions |
 
 **Model constraints:**
 - gpt-5 does NOT support temperature=0 (only default value of 1)
@@ -44,7 +45,7 @@ This application has multiple features using OpenAI with different models and se
 - **Data Layer**: PostgreSQL with Drizzle ORM, Zod for schema validation. Neon for production.
 - **AI Integration**: OpenAI API (GPT-5) for transcript analysis, structured prompt engineering for insight/Q&A extraction and categorization. Handles large transcripts via batching.
 - **Authentication**: Replit Auth (OpenID Connect) with session-based PostgreSQL store. Access restricted to `@leverege.com` emails.
-- **Database Schema**: Includes tables for `transcripts`, `categories`, `product_insights`, `qa_pairs`, `companies`, `contacts`, `users`, `sessions`, `features`, `pos_systems`, `pos_system_companies`.
+- **Database Schema**: Includes tables for `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, `companies`, `contacts`, `users`, `sessions`, `features`, `pos_systems`, `pos_system_companies`.
 
 ### Key Features
 - **Transcript Detail View**: Dedicated page for individual transcripts showing filtered insights/Q&A.
@@ -185,3 +186,44 @@ Consolidation rules:
 Evidence cleanup (mandatory):
 - Remove filler words ("um", "uh", "like") for readability
 - Do NOT change meaning or paraphrase facts
+
+### Customer Questions (High-Trust, Evidence-Based Layer)
+
+**CRITICAL: This is an architectural trust boundary, NOT just a feature.**
+
+The application has TWO distinct question-tracking systems that must NEVER be merged or confused:
+
+| Table | Nature | Evidence Required | Inference Allowed | Use Case |
+|-------|--------|-------------------|-------------------|----------|
+| `qa_pairs` | Interpreted | No | Yes | Browsing, analytics |
+| `customer_questions` | Extractive | Yes | No | Meeting intelligence |
+
+**Why both exist:**
+- `qa_pairs` (existing): AI-interpreted Q&A pairs. Questions and answers are summarized, paraphrased, and categorized. Useful for searchable analytics but NOT suitable for high-trust applications.
+- `customer_questions` (new): Verbatim extraction with strict evidence requirements. Questions must closely match transcript text. Answers require exact quotes. Suitable for compliance, legal, and evidence-based workflows.
+
+**Extraction timing:**
+- Customer questions extraction runs AFTER transcript ingestion and chunking
+- Runs asynchronously and independently from other extractors
+- Fails independently - does NOT affect transcript analysis or Q&A extraction
+- Retryable without affecting other processing
+
+**Model usage:**
+- Uses `gpt-4o` at `temperature: 0` for deterministic output
+- This setting does NOT affect other OpenAI-powered features
+- GPT-5 must NOT be used (temperature cannot be set to 0)
+
+**Output schema:**
+```json
+{
+  "question_text": string,      // Verbatim from transcript
+  "asked_by_name": string,      // Speaker name
+  "question_turn_index": number,// Position in transcript
+  "status": "ANSWERED" | "OPEN" | "DEFERRED",
+  "answer_evidence": string | null,  // Exact quote if answered
+  "answered_by_name": string | null
+}
+```
+
+**Hard warning:**
+These tables must NOT be merged or treated as interchangeable. Future contributors should treat this as a trust boundary - `customer_questions` has stricter guarantees that `qa_pairs` cannot provide.

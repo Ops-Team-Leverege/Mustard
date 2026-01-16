@@ -32,6 +32,8 @@ import {
   type InsertMeetingSummary,
   type InteractionLog,
   type InsertInteractionLog,
+  type CustomerQuestion,
+  type InsertCustomerQuestion,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -45,6 +47,7 @@ import {
   transcriptChunks as transcriptChunksTable,
   meetingSummaries as meetingSummariesTable,
   interactionLogs as interactionLogsTable,
+  customerQuestions as customerQuestionsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -148,6 +151,12 @@ export interface IStorage {
   // Interaction Logs (for auditability/evaluation, NOT LLM input)
   insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
   getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null>;
+
+  // Customer Questions (High-Trust, Evidence-Based Layer)
+  // IMPORTANT: These are INDEPENDENT from qa_pairs - do NOT merge or treat as interchangeable
+  getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]>;
+  createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]>;
+  deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -1117,6 +1126,18 @@ export class MemStorage implements IStorage {
 
   async getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null> {
     throw new Error("MemStorage not supported for Interaction Logs");
+  }
+
+  async getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]> {
+    throw new Error("MemStorage not supported for Customer Questions");
+  }
+
+  async createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]> {
+    throw new Error("MemStorage not supported for Customer Questions");
+  }
+
+  async deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean> {
+    throw new Error("MemStorage not supported for Customer Questions");
   }
 }
 
@@ -2400,6 +2421,33 @@ export class DbStorage implements IStorage {
       .orderBy(drizzleSql`${interactionLogsTable.createdAt} DESC`)
       .limit(1);
     return result ?? null;
+  }
+
+  // Customer Questions (High-Trust, Evidence-Based Layer)
+  // IMPORTANT: These are INDEPENDENT from qa_pairs - do NOT merge or treat as interchangeable
+  async getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]> {
+    return await this.db
+      .select()
+      .from(customerQuestionsTable)
+      .where(eq(customerQuestionsTable.transcriptId, transcriptId))
+      .orderBy(customerQuestionsTable.questionTurnIndex);
+  }
+
+  async createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]> {
+    if (questions.length === 0) return [];
+    const results = await this.db
+      .insert(customerQuestionsTable)
+      .values(questions)
+      .returning();
+    return results;
+  }
+
+  async deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean> {
+    const results = await this.db
+      .delete(customerQuestionsTable)
+      .where(eq(customerQuestionsTable.transcriptId, transcriptId))
+      .returning();
+    return results.length > 0;
   }
 }
 

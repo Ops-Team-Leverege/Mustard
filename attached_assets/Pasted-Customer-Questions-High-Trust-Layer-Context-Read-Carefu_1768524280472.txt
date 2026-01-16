@@ -1,0 +1,190 @@
+Customer Questions (High-Trust Layer)
+Context (Read Carefully)
+
+We are adding a new, parallel extraction layer for customer-asked questions only.
+
+This does NOT replace the existing qa_pairs table or logic currently used by the application.
+The goal is to introduce a high-precision, evidence-based layer with stricter guarantees.
+
+This work includes both implementation and documentation updates.
+They must ship together.
+
+1. What to Build (Implementation)
+A. New Table (DO NOT reuse existing Q&A)
+
+Create a new PostgreSQL table:
+
+Table name: customer_questions
+
+Purpose:
+
+Store only questions asked by customers
+
+Preserve verbatim transcript evidence
+
+Allow unanswered and deferred questions explicitly
+
+This table must remain fully independent from qa_pairs.
+
+B. New Extraction Capability
+
+Create a new capability:
+
+server/mcp/capabilities/extractCustomerQuestions.ts
+
+
+Responsibilities:
+
+Extract real, information-seeking questions
+
+ONLY when the speaker is a customer
+
+Do NOT infer, paraphrase, or summarize
+
+Do NOT force question → answer pairing
+
+Input:
+
+Speaker-attributed transcript chunks
+
+Chronological order preserved
+
+Speaker role available (customer | leverege | unknown)
+
+Output schema (exact):
+
+{
+  "question_text": string,
+  "asked_by_name": string,
+  "question_turn_index": number,
+  "status": "ANSWERED" | "OPEN" | "DEFERRED",
+  "answer_evidence": string | null,
+  "answered_by_name": string | null
+}
+
+
+Returning an empty array is valid.
+
+C. When Extraction Runs (IMPORTANT)
+
+Customer Question extraction must run:
+
+After transcript ingestion
+
+After transcript chunking
+
+Alongside existing async transcript analysis
+
+NOT inside or replacing the current Transcript Analyzer
+
+This job must:
+
+Be asynchronous
+
+Fail independently
+
+Be retryable without affecting other extractors
+
+D. OpenAI Model (Locked)
+
+For extractCustomerQuestions:
+
+Model: gpt-4o
+
+Temperature: 0
+
+Usage: Extraction only (no summarization)
+
+Notes:
+
+GPT-5 must NOT be used (temperature cannot be set to 0)
+
+This model choice must not affect:
+
+Transcript Analyzer
+
+Existing Q&A extraction
+
+RAG Composer
+
+E. Prompt to Use (Extraction)
+
+Use the following system prompt verbatim:
+
+You are a strict extraction engine operating on meeting transcripts.
+
+Your task is to extract REAL, INFORMATION-SEEKING QUESTIONS
+that were asked BY CUSTOMERS during the meeting.
+
+You must operate conservatively. When in doubt, extract nothing.
+
+RULES:
+1. Extract ONLY customer-asked questions. Ignore internal team questions.
+2. Questions must be genuine information-seeking questions.
+3. The question_text must closely match what was actually said.
+4. Do NOT summarize, rewrite, or infer.
+5. Mark ANSWERED only if you can quote the exact answer sentence.
+6. If follow-up is promised, mark DEFERRED.
+7. If unanswered, mark OPEN.
+8. Use only the provided transcript text.
+9. Returning no questions is valid.
+
+Return ONLY valid JSON using the provided schema.
+
+2. Documentation Changes (REQUIRED)
+
+Update the Replit internal documentation to include a new section:
+
+Customer Questions (High-Precision, Evidence-Based)
+
+The documentation must explicitly state:
+
+Why this exists
+
+Existing qa_pairs are AI-interpreted and paraphrased
+
+customer_questions is high-trust and evidence-based
+
+Clear distinction between tables
+
+Table	Nature	Evidence Required	Inference Allowed	Use Case
+qa_pairs	Interpreted	No	Yes	Browsing, analytics
+customer_questions	Extractive	Yes	No	Meeting intelligence
+
+Extraction timing
+
+Runs after transcript ingestion and chunking
+
+Async and independent from other extractors
+
+Model usage
+
+Uses gpt-4o at temperature 0
+
+Does NOT affect other OpenAI-powered features
+
+Hard warning
+
+These tables must NOT be merged or treated as interchangeable
+
+This documentation update is part of the deliverable.
+
+3. Acceptance Criteria
+
+This task is complete only when:
+
+customer_questions exists and is populated
+
+Extraction runs independently and deterministically
+
+Existing Q&A functionality remains untouched
+
+Internal documentation clearly explains the distinction
+
+Future contributors cannot confuse the two systems
+
+Final Note
+
+This is an architectural trust boundary, not a UI feature.
+
+Correctness, evidence, and explicit uncertainty are more important than recall.
