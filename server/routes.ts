@@ -101,7 +101,7 @@ async function extractCustomerQuestionsForTranscript(
     return;
   }
   
-  // Save to database
+  // Save to database (including Context Anchoring fields)
   await storage.createCustomerQuestions(
     extractedQuestions.map((q) => ({
       product,
@@ -113,6 +113,8 @@ async function extractCustomerQuestionsForTranscript(
       status: q.status,
       answerEvidence: q.answer_evidence,
       answeredByName: q.answered_by_name,
+      requiresContext: q.requires_context,
+      contextBefore: q.context_before,
     })),
   );
   
