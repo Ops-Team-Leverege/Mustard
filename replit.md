@@ -218,12 +218,35 @@ The application has TWO distinct question-tracking systems that must NEVER be me
 {
   "question_text": string,      // Verbatim from transcript
   "asked_by_name": string,      // Speaker name
-  "question_turn_index": number,// Position in transcript
+  "question_turn_index": number,// Position in transcript (REQUIRED for context)
   "status": "ANSWERED" | "OPEN" | "DEFERRED",
   "answer_evidence": string | null,  // Exact quote if answered
-  "answered_by_name": string | null
+  "answered_by_name": string | null,
+  "requires_context": boolean,  // Deterministic: has "this", "that", "it", etc.
+  "context_before": string | null  // Verbatim preceding turns
 }
 ```
+
+**Context Anchoring (Lost Referential Context Fix):**
+Many valid customer questions rely on immediately preceding transcript turns. For example:
+- "Is that compatible?" (What is "that"?)
+- "Can you explain this feature?" (Which feature?)
+
+Context Anchoring restores verbatim adjacency without rewriting the question:
+
+1. **Deterministic Detection** (in code, NOT LLM):
+   - `requires_context` is set to `true` if question contains: "this", "that", "those", "these", "it", "the same", "above", "mentioned", "earlier", "what you said", "what you described"
+   - This ensures consistency - the LLM does NOT decide if context is needed
+
+2. **Context Building** (sliding window):
+   - When `requires_context` is true and turn index is valid
+   - Include up to 2 preceding transcript turns (N-1 and N-2)
+   - Format: `[SpeakerName]: verbatim text`
+   - Do NOT include the question turn itself
+
+3. **Fallback** (raw text extraction):
+   - When chunks unavailable, `context_before` is null
+   - `requires_context` is still detected deterministically
 
 **Hard warning:**
 These tables must NOT be merged or treated as interchangeable. Future contributors should treat this as a trust boundary - `customer_questions` has stricter guarantees that `qa_pairs` cannot provide.

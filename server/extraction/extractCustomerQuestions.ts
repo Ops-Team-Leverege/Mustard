@@ -58,8 +58,23 @@ RULES:
 8. Use only the provided transcript text.
 9. Returning no questions is valid.
 10. IGNORE questions from pre-meeting chatter (Green Room).
+11. CRITICAL: For question_turn_index, use the EXACT [Turn N] number from the transcript.
+    This is required for context anchoring. Do NOT return -1.
 
-Return ONLY valid JSON using the provided schema.`;
+Return ONLY valid JSON with a "questions" array.
+
+Example output format:
+{
+  "questions": [
+    {
+      "question_text": "Is that compatible with our system?",
+      "asked_by_name": "John Smith",
+      "question_turn_index": 15,
+      "status": "ANSWERED",
+      "answer_evidence": "Yes, it's fully compatible with Oracle and SAP systems."
+    }
+  ]
+}`;
 
 export const CustomerQuestionResultSchema = z.object({
   question_text: z.string(),
