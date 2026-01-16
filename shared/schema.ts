@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, jsonb, index, uniqueIndex, integer, customType } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, jsonb, index, uniqueIndex, integer, boolean, customType } from "drizzle-orm/pg-core";
 
 const vector = customType<{ data: number[]; driverData: string }>({
   dataType() {
@@ -155,6 +155,9 @@ export const customerQuestions = pgTable("customer_questions", {
   status: text("status").notNull(), // "ANSWERED" | "OPEN" | "DEFERRED"
   answerEvidence: text("answer_evidence"), // Exact quote if answered
   answeredByName: text("answered_by_name"), // Who answered (if applicable)
+  // Context Anchoring fields - restores verbatim adjacency for context-dependent questions
+  requiresContext: boolean("requires_context").default(false).notNull(), // Deterministic: has "this", "that", "it", etc.
+  contextBefore: text("context_before"), // Verbatim preceding transcript turns (speaker + text only)
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

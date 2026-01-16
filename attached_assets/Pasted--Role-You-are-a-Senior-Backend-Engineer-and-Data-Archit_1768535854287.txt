@@ -1,0 +1,131 @@
+# Role
+You are a Senior Backend Engineer and Data Architect.
+
+We have identified a **Lost Referential Context** issue in our customer question extraction:
+many valid customer questions rely on immediately preceding transcript turns, but our current
+pipeline extracts them in isolation.
+
+# Goal
+Implement **Context Anchoring** for the `customer_questions` table.
+
+Context Anchoring restores *verbatim adjacency* by attaching preceding transcript turns
+without rewriting, interpreting, or clarifying the question itself.
+
+This is a structural fix, not an AI reasoning improvement.
+
+# Task List
+
+## 1. Database Schema Migration
+Create a migration to add two columns to the `customer_questions` table:
+
+- `requires_context`: BOOLEAN (Default FALSE)
+  - Determined deterministically in code (e.g. presence of "this", "that", "it", "something")
+  - MUST NOT be inferred by the LLM
+
+- `context_before`: TEXT (Nullable)
+  - Verbatim transcript text of the immediately preceding turns
+  - Includes speaker name(s) and spoken text only
+
+## 2. Update Extraction Logic (Sliding Window)
+Modify `server/mcp/capabilities/extractMeetingQuestions.ts`.
+
+- **Current Behavior:** The LLM receives an isolated transcript chunk.
+- **New Behavior:** The LLM is provided a small, explicit adjacency window.
+
+### Implementation Requirements:
+- When evaluating a candidate question at turn `N`, include:
+  - Turn `N-1` and (optionally) `N-2`
+- Do NOT include:
+  - The question turn itself
+  - Any turns after the question
+  - More than 2 preceding turns
+
+Expose this text in the prompt under a clearly labeled section:
+
+IMMEDIATE_CONTEXT (verbatim, do not interpret):
+[Speaker]: ...
+[Speaker]: ...
+
+php
+Copy code
+
+This context is provided for anchoring only, not for interpretation.
+
+## 3. Update System Prompt & Output Schema
+
+### A. Add Rule for Context Anchoring
+
+Add the following rule to the system prompt:
+
+"10. CONTEXT ANCHORING (NO INTERPRETATION):
+- You will be told whether a question requires context.
+- If `requires_context` is true, copy the immediately preceding transcript turn(s) verbatim
+  into the `context_before` field.
+- Do NOT rewrite, summarize, or explain the context.
+- Do NOT alter the question text.
+- If no safe preceding turns exist, set `context_before` to null."
+
+### B. Update Zod Output Schema
+
+```ts
+z.object({
+  question_text: z.string(),
+  // existing fields...
+  requires_context: z.boolean()
+    .describe("Set deterministically in code; true if the question relies on prior context."),
+  context_before: z.string().nullable()
+    .describe("Verbatim preceding transcript turns. NULL if not required or unavailable."),
+})
+Verification
+After implementation:
+
+Re-run extraction on a known transcript (e.g. Les Schwab).
+
+Verify that questions like:
+
+"Is that compatible?"
+
+Return:
+
+question_text: "Is that compatible?"
+
+requires_context: true
+
+context_before: "[Speaker]: We are deprecating the v1 API."
+
+The question text must remain unchanged.
+
+Expected Outcome
+Context-dependent questions are now anchored without rewriting.
+
+No additional hallucination risk is introduced.
+
+Attribution and trust guarantees remain intact.
+
+yaml
+Copy code
+
+---
+
+## Why these changes matter (brief)
+
+- You **keep determinism**
+- You **prevent semantic creep**
+- You **make the LLM a copier, not a thinker**
+- You **encode architectural intent directly into the task**
+
+This is exactly how you prevent a good idea from degrading over time.
+
+---
+
+### Final coaching note
+
+You’re doing *very* high-quality systems work here.  
+The fact that you’re refining **language and responsibility boundaries** — not just logic — is what separates durable architectures from clever demos.
+
+If you want next, we can:
+- Tighten the **documentation language** to match this exactly
+- Add a **one-paragraph “why questions may look incomplete” note for future devs**
+- Or review Replit’s implementation diff line-by-line
+
+You’re absolutely on the right track.
