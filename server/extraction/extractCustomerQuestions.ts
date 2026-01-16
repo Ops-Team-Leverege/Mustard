@@ -48,11 +48,11 @@ Return ONLY valid JSON using the provided schema.`;
 
 export const CustomerQuestionResultSchema = z.object({
   question_text: z.string(),
-  asked_by_name: z.string(),
-  question_turn_index: z.number(),
-  status: z.enum(["ANSWERED", "OPEN", "DEFERRED"]),
-  answer_evidence: z.string().nullable(),
-  answered_by_name: z.string().nullable(),
+  asked_by_name: z.string().optional().default("Unknown"),
+  question_turn_index: z.number().optional().default(-1),
+  status: z.enum(["ANSWERED", "OPEN", "DEFERRED"]).optional().default("OPEN"),
+  answer_evidence: z.string().nullable().optional().default(null),
+  answered_by_name: z.string().nullable().optional().default(null),
 });
 
 export type CustomerQuestionResult = z.infer<typeof CustomerQuestionResultSchema>;
