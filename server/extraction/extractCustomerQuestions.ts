@@ -68,6 +68,9 @@ export const CustomerQuestionResultSchema = z.object({
   status: z.enum(["ANSWERED", "OPEN", "DEFERRED"]).optional().default("OPEN"),
   answer_evidence: z.string().nullable().optional().default(null),
   answered_by_name: z.string().nullable().optional().default(null),
+  // Context Anchoring fields - added post-extraction deterministically
+  requires_context: z.boolean().optional().default(false),
+  context_before: z.string().nullable().optional().default(null),
 });
 
 export type CustomerQuestionResult = z.infer<typeof CustomerQuestionResultSchema>;
@@ -81,6 +84,63 @@ interface TranscriptTurn {
   speakerName: string;
   speakerRole: "customer" | "leverege" | "unknown";
   content: string;
+}
+
+/**
+ * Context-requiring words (deterministic detection).
+ * These pronouns/demonstratives indicate a question references prior context.
+ * Detection is done in CODE, not by the LLM, to ensure consistency.
+ */
+const CONTEXT_TRIGGERS = [
+  /\bthis\b/i,
+  /\bthat\b/i,
+  /\bthose\b/i,
+  /\bthese\b/i,
+  /\bit\b/i,
+  /\bthe same\b/i,
+  /\babove\b/i,
+  /\bmentioned\b/i,
+  /\bearlier\b/i,
+  /\bwhat you (just )?said\b/i,
+  /\bwhat you (just )?described\b/i,
+];
+
+/**
+ * Deterministically detect if a question requires context.
+ * This is done in code, NOT by the LLM, to ensure consistency.
+ */
+export function requiresContext(questionText: string): boolean {
+  return CONTEXT_TRIGGERS.some(pattern => pattern.test(questionText));
+}
+
+/**
+ * Build context_before from preceding chunks.
+ * Returns verbatim speaker + text for up to 2 preceding turns.
+ */
+function buildContextBefore(
+  chunks: TranscriptChunk[],
+  questionChunkIndex: number
+): string | null {
+  const precedingChunks: TranscriptChunk[] = [];
+  
+  // Get up to 2 preceding turns (N-1 and N-2)
+  for (let i = questionChunkIndex - 1; i >= Math.max(0, questionChunkIndex - 2); i--) {
+    if (chunks[i]) {
+      precedingChunks.unshift(chunks[i]);
+    }
+  }
+  
+  if (precedingChunks.length === 0) {
+    return null;
+  }
+  
+  // Format as verbatim transcript turns (speaker + text only)
+  const lines = precedingChunks.map(chunk => {
+    const speaker = chunk.speakerName || "Unknown";
+    return `[${speaker}]: ${chunk.content}`;
+  });
+  
+  return lines.join("\n");
 }
 
 /**
@@ -104,11 +164,12 @@ function formatChunksForExtraction(chunks: TranscriptChunk[]): string {
  * 
  * This function:
  * - Uses gpt-4o at temperature 0 for deterministic extraction
+ * - Applies Context Anchoring post-extraction (deterministic, not LLM-driven)
  * - Returns an empty array if no valid questions are found
  * - Fails independently and is retryable
  * 
  * @param chunks - Speaker-attributed transcript chunks in chronological order
- * @returns Array of extracted customer questions with evidence
+ * @returns Array of extracted customer questions with evidence and context anchoring
  */
 export async function extractCustomerQuestions(
   chunks: TranscriptChunk[]
@@ -119,6 +180,12 @@ export async function extractCustomerQuestions(
   }
   
   const formattedTranscript = formatChunksForExtraction(chunks);
+  
+  // Build a map of chunk index to array position for context lookup
+  const chunkIndexMap = new Map<number, number>();
+  chunks.forEach((chunk, arrayIndex) => {
+    chunkIndexMap.set(chunk.chunkIndex, arrayIndex);
+  });
   
   console.log(`[CustomerQuestions] Extracting from ${chunks.length} chunks using gpt-4o temp=0`);
   
@@ -145,9 +212,30 @@ export async function extractCustomerQuestions(
     const parsed = JSON.parse(content);
     const validated = ExtractionOutputSchema.parse(parsed);
     
-    console.log(`[CustomerQuestions] Extracted ${validated.questions.length} customer questions`);
+    // Apply Context Anchoring post-extraction (deterministic)
+    const questionsWithContext = validated.questions.map(q => {
+      const needsContext = requiresContext(q.question_text);
+      
+      let contextBefore: string | null = null;
+      if (needsContext && q.question_turn_index >= 0) {
+        // Find the array position of this chunk
+        const arrayPos = chunkIndexMap.get(q.question_turn_index);
+        if (arrayPos !== undefined) {
+          contextBefore = buildContextBefore(chunks, arrayPos);
+        }
+      }
+      
+      return {
+        ...q,
+        requires_context: needsContext,
+        context_before: contextBefore,
+      };
+    });
     
-    return validated.questions;
+    const contextCount = questionsWithContext.filter(q => q.requires_context).length;
+    console.log(`[CustomerQuestions] Extracted ${validated.questions.length} questions (${contextCount} require context)`);
+    
+    return questionsWithContext;
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       if (error.status === 429 || error.code === "insufficient_quota") {

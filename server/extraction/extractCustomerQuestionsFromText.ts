@@ -6,7 +6,7 @@
  */
 
 import OpenAI from "openai";
-import { CustomerQuestionResultSchema, ExtractionOutputSchema, type CustomerQuestionResult } from "./extractCustomerQuestions";
+import { CustomerQuestionResultSchema, ExtractionOutputSchema, type CustomerQuestionResult, requiresContext } from "./extractCustomerQuestions";
 
 const openai = new OpenAI();
 
@@ -84,9 +84,17 @@ export async function extractCustomerQuestionsFromText(
     const parsed = JSON.parse(content);
     const validated = ExtractionOutputSchema.parse(parsed);
 
-    console.log(`[CustomerQuestions] Extracted ${validated.questions.length} customer questions from raw text`);
+    // Apply Context Anchoring detection (context_before unavailable without chunks)
+    const questionsWithContext = validated.questions.map(q => ({
+      ...q,
+      requires_context: requiresContext(q.question_text),
+      context_before: null, // Cannot provide context without chunks
+    }));
 
-    return validated.questions;
+    const contextCount = questionsWithContext.filter(q => q.requires_context).length;
+    console.log(`[CustomerQuestions] Extracted ${validated.questions.length} questions from raw text (${contextCount} require context, context unavailable without chunks)`);
+
+    return questionsWithContext;
   } catch (error) {
     if (error instanceof OpenAI.APIError) {
       if (error.status === 429 || error.code === "insufficient_quota") {
