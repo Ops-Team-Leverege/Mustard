@@ -230,19 +230,25 @@ The application has TWO distinct question-tracking systems that must NEVER be me
 **Context Anchoring (Lost Referential Context Fix):**
 Many valid customer questions rely on immediately preceding transcript turns. For example:
 - "Is that compatible?" (What is "that"?)
-- "Can you explain this feature?" (Which feature?)
+- "Does it support multiple locations?" (What is "it"?)
 
 Context Anchoring restores verbatim adjacency without rewriting the question:
 
 1. **Deterministic Detection** (in code, NOT LLM):
-   - `requires_context` is set to `true` if question contains: "this", "that", "those", "these", "it", "the same", "above", "mentioned", "earlier", "what you said", "what you described"
+   - `requires_context` is set to `true` if question contains STRUCTURAL referential words:
+     - Demonstrative pronouns: "this", "that", "those", "these"
+     - Referential pronoun: "it"
+     - Comparative reference: "the same"
+   - IMPORTANT: Keep triggers STRUCTURAL, not semantic (avoid "mentioned", "what you said")
    - This ensures consistency - the LLM does NOT decide if context is needed
 
 2. **Context Building** (sliding window):
    - When `requires_context` is true and turn index is valid
-   - Include up to 2 preceding transcript turns (N-1 and N-2)
+   - Include up to 2 PRECEDING transcript turns only (N-1 and N-2)
    - Format: `[SpeakerName]: verbatim text`
-   - Do NOT include the question turn itself
+   - MUST NOT include the question turn itself
+   - MUST NOT include any turns AFTER the question
+   - Only includes turns from the same meeting segment (post-meeting start)
 
 3. **Fallback** (raw text extraction):
    - When chunks unavailable, `context_before` is null

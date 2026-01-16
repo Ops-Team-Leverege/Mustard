@@ -102,22 +102,22 @@ interface TranscriptTurn {
 }
 
 /**
- * Context-requiring words (deterministic detection).
- * These pronouns/demonstratives indicate a question references prior context.
+ * Context-requiring words (deterministic, STRUCTURAL detection).
+ * 
+ * These are pronouns and demonstratives that grammatically require a referent.
  * Detection is done in CODE, not by the LLM, to ensure consistency.
+ * 
+ * IMPORTANT: Keep this list STRUCTURAL, not semantic.
+ * - GOOD: "this", "that", "it" (grammatical pronouns/demonstratives)
+ * - BAD: "mentioned", "what you said" (semantic/interpretive)
  */
 const CONTEXT_TRIGGERS = [
-  /\bthis\b/i,
-  /\bthat\b/i,
-  /\bthose\b/i,
-  /\bthese\b/i,
-  /\bit\b/i,
-  /\bthe same\b/i,
-  /\babove\b/i,
-  /\bmentioned\b/i,
-  /\bearlier\b/i,
-  /\bwhat you (just )?said\b/i,
-  /\bwhat you (just )?described\b/i,
+  /\bthis\b/i,       // demonstrative pronoun
+  /\bthat\b/i,       // demonstrative pronoun
+  /\bthose\b/i,      // demonstrative pronoun
+  /\bthese\b/i,      // demonstrative pronoun
+  /\bit\b/i,         // pronoun (referential)
+  /\bthe same\b/i,   // comparative reference
 ];
 
 /**
@@ -130,7 +130,13 @@ export function requiresContext(questionText: string): boolean {
 
 /**
  * Build context_before from preceding chunks.
- * Returns verbatim speaker + text for up to 2 preceding turns.
+ * 
+ * Constraints (Safe Context Architecture):
+ * - Returns verbatim speaker + text for up to 2 PRECEDING turns only
+ * - NEVER includes turns AFTER the question
+ * - Only includes turns from the same meeting segment (post-meeting start)
+ *   (Green Room filtering happens at extraction time, so chunks are already clean)
+ * - Does NOT include the question turn itself
  */
 function buildContextBefore(
   chunks: TranscriptChunk[],
