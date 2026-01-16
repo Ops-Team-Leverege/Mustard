@@ -1,8 +1,8 @@
 /**
  * Backfill Customer Questions for Existing Transcripts
  * 
- * This script processes existing transcripts that have chunks but haven't
- * been processed for customer questions extraction.
+ * This script processes existing transcripts and extracts customer questions.
+ * It uses chunks when available, or falls back to raw transcript text.
  * 
  * Usage:
  *   npx tsx server/scripts/backfill-customer-questions.ts [--dry-run]
@@ -13,17 +13,19 @@
 
 import { storage } from "../storage";
 import { extractCustomerQuestions } from "../extraction/extractCustomerQuestions";
+import { extractCustomerQuestionsFromText } from "../extraction/extractCustomerQuestionsFromText";
 import type { Product } from "@shared/schema";
 
 const BATCH_SIZE = 5;
 const DELAY_BETWEEN_BATCHES_MS = 2000;
-const MIN_CHUNKS_REQUIRED = 10;
+const MIN_TRANSCRIPT_LENGTH = 500;
 
 interface TranscriptToProcess {
   id: string;
   product: Product;
   companyName: string | null;
   chunkCount: number;
+  transcriptLength: number;
   existingQuestionCount: number;
 }
 
@@ -34,30 +36,46 @@ async function getTranscriptsToProcess(): Promise<TranscriptToProcess[]> {
       t.product,
       t.company_name as "companyName",
       COUNT(DISTINCT tc.id)::int as "chunkCount",
+      COALESCE(LENGTH(t.transcript), 0)::int as "transcriptLength",
       COUNT(DISTINCT cq.id)::int as "existingQuestionCount"
     FROM transcripts t
     LEFT JOIN transcript_chunks tc ON t.id = tc.transcript_id
     LEFT JOIN customer_questions cq ON t.id = cq.transcript_id
     WHERE t.processing_status = 'completed'
-    GROUP BY t.id, t.product, t.company_name
-    HAVING COUNT(DISTINCT tc.id) >= ${MIN_CHUNKS_REQUIRED}
+    GROUP BY t.id, t.product, t.company_name, t.transcript
+    HAVING COUNT(DISTINCT tc.id) >= 1 OR COALESCE(LENGTH(t.transcript), 0) >= ${MIN_TRANSCRIPT_LENGTH}
     ORDER BY t.product, t.created_at DESC
   `);
 
   return results as TranscriptToProcess[];
 }
 
-async function processTranscript(transcript: TranscriptToProcess): Promise<{ success: boolean; questionsFound: number; error?: string }> {
+async function getTranscriptText(transcriptId: string): Promise<string | null> {
+  const results = await storage.rawQuery(`
+    SELECT transcript FROM transcripts WHERE id = '${transcriptId}'
+  `);
+  return results[0]?.transcript || null;
+}
+
+async function processTranscript(transcript: TranscriptToProcess): Promise<{ success: boolean; questionsFound: number; method: string; error?: string }> {
   try {
-    const chunks = await storage.getChunksForTranscript(transcript.id, 1000);
-
-    if (chunks.length === 0) {
-      return { success: false, questionsFound: 0, error: "No chunks found" };
-    }
-
     await storage.deleteCustomerQuestionsByTranscript(transcript.id);
 
-    const questions = await extractCustomerQuestions(chunks);
+    let questions;
+    let method: string;
+
+    if (transcript.chunkCount >= 10) {
+      const chunks = await storage.getChunksForTranscript(transcript.id, 1000);
+      questions = await extractCustomerQuestions(chunks);
+      method = "chunks";
+    } else {
+      const transcriptText = await getTranscriptText(transcript.id);
+      if (!transcriptText || transcriptText.length < MIN_TRANSCRIPT_LENGTH) {
+        return { success: false, questionsFound: 0, method: "none", error: "Transcript too short" };
+      }
+      questions = await extractCustomerQuestionsFromText(transcriptText);
+      method = "raw text";
+    }
 
     if (questions.length > 0) {
       await storage.createCustomerQuestions(
@@ -74,10 +92,10 @@ async function processTranscript(transcript: TranscriptToProcess): Promise<{ suc
       );
     }
 
-    return { success: true, questionsFound: questions.length };
+    return { success: true, questionsFound: questions.length, method };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return { success: false, questionsFound: 0, error: errorMessage };
+    return { success: false, questionsFound: 0, method: "error", error: errorMessage };
   }
 }
 
@@ -92,14 +110,14 @@ async function main() {
   console.log("Customer Questions Backfill Script");
   console.log("=".repeat(60));
   console.log(`Mode: ${isDryRun ? "DRY RUN (no changes will be made)" : "LIVE"}`);
-  console.log(`Minimum chunks required: ${MIN_CHUNKS_REQUIRED}`);
+  console.log(`Minimum transcript length: ${MIN_TRANSCRIPT_LENGTH} chars`);
   console.log();
 
   const allTranscripts = await getTranscriptsToProcess();
   const toProcess = allTranscripts.filter(t => t.existingQuestionCount === 0);
   const alreadyProcessed = allTranscripts.filter(t => t.existingQuestionCount > 0);
 
-  console.log(`Total transcripts with sufficient chunks: ${allTranscripts.length}`);
+  console.log(`Total eligible transcripts: ${allTranscripts.length}`);
   console.log(`Already have customer questions: ${alreadyProcessed.length}`);
   console.log(`Need processing: ${toProcess.length}`);
   console.log();
@@ -108,7 +126,8 @@ async function main() {
     console.log("Transcripts that would be processed:");
     console.log("-".repeat(60));
     for (const t of toProcess) {
-      console.log(`  [${t.product}] ${t.companyName || "(no company)"} - ${t.chunkCount} chunks`);
+      const method = t.chunkCount >= 10 ? `${t.chunkCount} chunks` : `raw text (${t.transcriptLength} chars)`;
+      console.log(`  [${t.product}] ${t.companyName || "(no company)"} - ${method}`);
     }
     console.log();
     console.log("Run without --dry-run to process these transcripts.");
@@ -134,7 +153,7 @@ async function main() {
       if (result.success) {
         succeeded++;
         totalQuestions += result.questionsFound;
-        console.log(`OK (${result.questionsFound} questions)`);
+        console.log(`OK (${result.questionsFound} questions via ${result.method})`);
       } else {
         failed++;
         console.log(`FAILED: ${result.error}`);
