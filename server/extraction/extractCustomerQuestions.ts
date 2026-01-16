@@ -33,6 +33,20 @@ that were asked BY CUSTOMERS during the meeting.
 
 You must operate conservatively. When in doubt, extract nothing.
 
+GREEN ROOM FILTER (CRITICAL):
+First, identify where the ACTUAL MEETING starts. Ignore all pre-meeting chatter.
+Pre-meeting chatter includes:
+- "Can you hear me?"
+- "Is my audio working?"
+- "Waiting for others to join"
+- "I'll admit them"
+- "Let me share my screen"
+- Technical setup discussions
+- Small talk before introductions
+
+Only extract questions that occur AFTER the meeting actually begins
+(e.g., after greetings like "Hi everyone", "Let's get started", formal introductions).
+
 RULES:
 1. Extract ONLY customer-asked questions. Ignore internal team questions.
 2. Questions must be genuine information-seeking questions.
@@ -43,6 +57,7 @@ RULES:
 7. If unanswered, mark OPEN.
 8. Use only the provided transcript text.
 9. Returning no questions is valid.
+10. IGNORE questions from pre-meeting chatter (Green Room).
 
 Return ONLY valid JSON using the provided schema.`;
 
