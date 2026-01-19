@@ -225,6 +225,36 @@ async function getMeetingActionItems(
 }
 
 /**
+ * Search action items for keyword matches.
+ * Used when user asks about a specific fact that may be documented in commitments.
+ * Example: "what was the application issue Brian experienced?" → matches action item about Brian's issue
+ */
+async function searchActionItemsForFact(
+  meetingId: string,
+  query: string
+): Promise<string[]> {
+  const actionItems = await getMeetingActionItems(meetingId);
+  
+  if (actionItems.length === 0) {
+    return [];
+  }
+  
+  const q = query.toLowerCase();
+  // Extract meaningful keywords (length > 3, not common stop words)
+  const stopWords = new Set(["what", "when", "where", "which", "that", "this", "from", "with", "about", "were", "have", "been", "does", "friday", "monday", "tuesday", "wednesday", "thursday", "saturday", "sunday"]);
+  const keywords = q.split(/\s+/)
+    .filter(w => w.length > 3 && !stopWords.has(w));
+  
+  // Match action items that contain at least one keyword
+  const matches = actionItems.filter(item => {
+    const itemLower = item.toLowerCase();
+    return keywords.some(kw => itemLower.includes(kw));
+  });
+  
+  return matches;
+}
+
+/**
  * Search transcript chunks for verbatim evidence.
  * Returns raw transcript snippets only - no summarization.
  */
@@ -348,11 +378,31 @@ async function handleExtractiveIntent(
     };
   }
   
+  // Search action items for relevant matches (even if not explicitly asking for "next steps")
+  // This handles questions like "what was the application issue Brian experienced?"
+  // where the answer may be documented in a commitment/action item
+  const matchingActionItems = await searchActionItemsForFact(ctx.meetingId, question);
+  
+  if (matchingActionItems.length > 0) {
+    const lines: string[] = [];
+    lines.push(`*From the meeting with ${ctx.companyName}:*`);
+    matchingActionItems.forEach(item => {
+      lines.push(`\n• ${item}`);
+    });
+    
+    return {
+      answer: lines.join("\n"),
+      intent: "extractive",
+      dataSource: "action_items",
+      evidence: matchingActionItems[0],
+    };
+  }
+  
   const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
   
   if (snippets.length > 0) {
     const lines: string[] = [];
-    lines.push(`*Relevant mentions from the meeting:*`);
+    lines.push(`*From the meeting with ${ctx.companyName}:*`);
     snippets.forEach(s => {
       lines.push(`\n"${s.content.substring(0, 200)}${s.content.length > 200 ? '...' : ''}"`);
       lines.push(`— ${s.speakerName}`);
