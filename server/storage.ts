@@ -161,6 +161,15 @@ export interface IStorage {
   getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]>;
   createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]>;
   deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean>;
+  updateCustomerQuestionResolution(
+    id: string,
+    resolution: {
+      status: "ANSWERED" | "DEFERRED" | "OPEN";
+      answerEvidence: string | null;
+      answeredByName: string | null;
+      resolutionTurnIndex: number | null;
+    }
+  ): Promise<CustomerQuestion | null>;
 
   // Meeting Action Items (Tier-1, materialized at ingestion)
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
@@ -1150,6 +1159,18 @@ export class MemStorage implements IStorage {
   }
 
   async deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean> {
+    throw new Error("MemStorage not supported for Customer Questions");
+  }
+
+  async updateCustomerQuestionResolution(
+    id: string,
+    resolution: {
+      status: "ANSWERED" | "DEFERRED" | "OPEN";
+      answerEvidence: string | null;
+      answeredByName: string | null;
+      resolutionTurnIndex: number | null;
+    }
+  ): Promise<CustomerQuestion | null> {
     throw new Error("MemStorage not supported for Customer Questions");
   }
 
@@ -2482,6 +2503,28 @@ export class DbStorage implements IStorage {
       .where(eq(customerQuestionsTable.transcriptId, transcriptId))
       .returning();
     return results.length > 0;
+  }
+
+  async updateCustomerQuestionResolution(
+    id: string,
+    resolution: {
+      status: "ANSWERED" | "DEFERRED" | "OPEN";
+      answerEvidence: string | null;
+      answeredByName: string | null;
+      resolutionTurnIndex: number | null;
+    }
+  ): Promise<CustomerQuestion | null> {
+    const [result] = await this.db
+      .update(customerQuestionsTable)
+      .set({
+        status: resolution.status,
+        answerEvidence: resolution.answerEvidence,
+        answeredByName: resolution.answeredByName,
+        resolutionTurnIndex: resolution.resolutionTurnIndex,
+      })
+      .where(eq(customerQuestionsTable.id, id))
+      .returning();
+    return result ?? null;
   }
 
   async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {

@@ -5,6 +5,7 @@ import { analyzeTranscript } from "./transcriptAnalyzer";
 import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
 import { ingestTranscriptChunks } from "./ingestion/ingestTranscriptChunks";
 import { extractCustomerQuestions } from "./extraction/extractCustomerQuestions";
+import { resolveCustomerQuestionAnswers } from "./ingestion/resolveCustomerQuestionAnswers";
 import { extractMeetingActionStates, type MeetingActionItem as ComposerActionItem, type TranscriptChunk as ComposerChunk } from "./rag/composer";
 import multer from "multer";
 import { createMCP } from "./mcp";
@@ -103,7 +104,8 @@ async function extractCustomerQuestionsForTranscript(
   }
   
   // Save to database (including Context Anchoring fields)
-  await storage.createCustomerQuestions(
+  // Initially save with status from extraction (may be overwritten by Resolution Pass)
+  const savedQuestions = await storage.createCustomerQuestions(
     extractedQuestions.map((q) => ({
       product,
       transcriptId,
@@ -119,7 +121,35 @@ async function extractCustomerQuestionsForTranscript(
     })),
   );
   
-  console.log(`[CustomerQuestions] Saved ${extractedQuestions.length} customer questions for transcript ${transcriptId}`);
+  console.log(`[CustomerQuestions] Saved ${savedQuestions.length} customer questions for transcript ${transcriptId}`);
+  
+  // Resolution Pass: Verify if questions were answered in transcript
+  // This is a separate verifier-only pass that runs AFTER extraction
+  // It uses a focused search window and strictly quotes verbatim evidence
+  console.log(`[Resolution] Starting Resolution Pass for ${savedQuestions.length} questions`);
+  
+  const questionsToResolve = savedQuestions.map(q => ({
+    id: q.id,
+    questionText: q.questionText,
+    questionTurnIndex: q.questionTurnIndex,
+  }));
+  
+  const resolvedQuestions = await resolveCustomerQuestionAnswers(questionsToResolve, chunks);
+  
+  // Update each question with resolution results
+  for (const resolved of resolvedQuestions) {
+    await storage.updateCustomerQuestionResolution(resolved.id, {
+      status: resolved.status,
+      answerEvidence: resolved.answerEvidence,
+      answeredByName: resolved.answeredByName,
+      resolutionTurnIndex: resolved.resolutionTurnIndex,
+    });
+  }
+  
+  const answered = resolvedQuestions.filter(r => r.status === "ANSWERED").length;
+  const deferred = resolvedQuestions.filter(r => r.status === "DEFERRED").length;
+  const open = resolvedQuestions.filter(r => r.status === "OPEN").length;
+  console.log(`[Resolution] Complete: ${answered} answered, ${deferred} deferred, ${open} open`);
 }
 
 /**
