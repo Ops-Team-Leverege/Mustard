@@ -24,9 +24,9 @@ export type MeetingResolutionResult =
   | { resolved: false; needsClarification: true; message: string; options?: Array<{ meetingId: string; date: Date; companyName: string }> }
   | { resolved: false; needsClarification: false; reason: string };
 
-export type ThreadContext = {
-  meetingId: string | null;
-  companyId: string | null;
+export type MeetingResolverThreadContext = {
+  meetingId?: string | null;
+  companyId?: string | null;
 };
 
 /**
@@ -255,7 +255,7 @@ function formatDate(date: Date): string {
  */
 export async function resolveMeetingFromSlackMessage(
   message: string,
-  threadContext?: ThreadContext
+  threadContext?: MeetingResolverThreadContext
 ): Promise<MeetingResolutionResult> {
   console.log(`[MeetingResolver] Resolving meeting from message: "${message.substring(0, 50)}..."`);
   

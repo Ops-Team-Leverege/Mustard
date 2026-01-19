@@ -90,6 +90,31 @@ Key functionalities include a transcript detail view, meeting date support, and 
 - Uncertainty must be communicated honestly
 - Only Tier-1 capabilities allowed for single-meeting answers
 
+**Step 0: Meeting Resolution (runs before intent classification)**
+
+Deterministically resolves the target meeting without LLMs. File: `server/mcp/meetingResolver.ts`
+
+Resolution Order (Strict):
+1. **Thread context** (highest priority) - always wins, ignores temporal language
+2. **Explicit meeting reference** - meeting ID or transcript link in message
+3. **Temporal language** (new threads only):
+   - "last meeting", "latest meeting", "most recent meeting" → ORDER BY meetingDate DESC
+   - "meeting on <date>" → Match meetingDate on that calendar date
+   - "meeting last week/month" → Filter within date range
+
+Clarification Behavior:
+- If multiple meetings match → Ask user to choose (no intent classification runs)
+- If no company mentioned with temporal ref → Ask which company
+- If zero matches → Say "I don't see any meetings..."
+
+Example clarification:
+```
+I see multiple Les Schwab meetings that match your request:
+• Aug 7, 2025
+• Sep 11, 2025
+Which one should I use?
+```
+
 **Capability Trust Matrix:**
 
 | Tier | Capabilities | Usage |

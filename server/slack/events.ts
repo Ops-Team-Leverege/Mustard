@@ -5,6 +5,7 @@ import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
+import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "../mcp/meetingResolver";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -149,16 +150,91 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] User explicitly overriding context - resolving fresh");
     }
 
-    // 9. Process request
+    // 9. STEP 0: Meeting Resolution (runs before intent classification)
+    // 
+    // Resolution Order (Strict):
+    // 1. Thread context (highest priority) - always wins
+    // 2. Explicit meeting ID/link in message
+    // 3. Explicit temporal language (new threads only)
+    //    - "last meeting", "latest meeting", "most recent meeting"
+    //    - "meeting on <date>"
+    //    - "meeting last week", "meeting last month"
+    //
+    // If ambiguous → ask for clarification (no intent classification runs)
+    // If resolved → proceed to single-meeting mode
+    //
+    let resolvedMeeting: { meetingId: string; companyId: string; companyName: string } | null = null;
+    
+    // Only attempt temporal resolution if:
+    // - No thread context exists, OR
+    // - Message explicitly uses temporal language
+    const hasTemporalRef = hasTemporalMeetingReference(text);
+    
+    if (!threadContext?.meetingId || hasTemporalRef) {
+      console.log(`[Slack] Step 0: Meeting resolution (hasTemporalRef=${hasTemporalRef})`);
+      
+      const resolution = await resolveMeetingFromSlackMessage(text, threadContext);
+      
+      if (resolution.resolved) {
+        resolvedMeeting = {
+          meetingId: resolution.meetingId,
+          companyId: resolution.companyId,
+          companyName: resolution.companyName,
+        };
+        console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
+      } else if (resolution.needsClarification) {
+        // Clarification needed - respond and stop processing
+        console.log(`[Slack] Clarification needed: ${resolution.message}`);
+        
+        await postSlackMessage({
+          channel,
+          text: resolution.message,
+          thread_ts: threadTs,
+        });
+        
+        // Log interaction for clarification
+        storage.insertInteractionLog({
+          slackThreadId: threadTs,
+          slackMessageTs: messageTs,
+          slackChannelId: channel,
+          userId: userId || null,
+          companyId: null,
+          meetingId: null,
+          capabilityName: "meeting_resolution_clarification",
+          questionText: text,
+          answerText: resolution.message,
+          resolvedEntities: { needsClarification: true },
+          confidence: null,
+        }).catch(err => {
+          console.error("Failed to log interaction:", err);
+        });
+        
+        return; // Stop processing - clarification required
+      }
+      // If not resolved and no clarification needed, proceed to MCP router
+    } else if (threadContext?.meetingId && threadContext?.companyId) {
+      // Thread context exists - use it
+      const companyRows = await storage.rawQuery(
+        `SELECT name FROM companies WHERE id = $1`,
+        [threadContext.companyId]
+      );
+      resolvedMeeting = {
+        meetingId: threadContext.meetingId,
+        companyId: threadContext.companyId,
+        companyName: (companyRows?.[0]?.name as string) || "Unknown Company",
+      };
+    }
+
+    // 10. Process request
     // 
     // SINGLE-MEETING MODE:
-    // When thread has resolved meetingId, use SingleMeetingOrchestrator
-    // for strict Tier-1-only routing and intent-safe responses.
+    // When meeting is resolved (from thread or temporal language),
+    // use SingleMeetingOrchestrator for strict Tier-1-only routing.
     // 
     // MULTI-CONTEXT MODE:
     // Otherwise, use MCP router for cross-meeting and analytics capabilities.
     //
-    const isSingleMeetingMode = Boolean(threadContext?.meetingId && threadContext?.companyId);
+    const isSingleMeetingMode = Boolean(resolvedMeeting);
 
     try {
       let responseText: string;
@@ -168,28 +244,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let intentClassification: string | null = null;
       let dataSource: string | null = null;
 
-      if (isSingleMeetingMode) {
+      if (isSingleMeetingMode && resolvedMeeting) {
         // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
-        console.log(`[Slack] Single-meeting mode activated for meeting ${threadContext!.meetingId}`);
-        
-        // Resolve company name for context
-        let companyName = "Unknown Company";
-        try {
-          const companyRows = await storage.rawQuery(
-            `SELECT name FROM companies WHERE id = $1`,
-            [threadContext!.companyId]
-          );
-          if (companyRows?.[0]?.name) {
-            companyName = companyRows[0].name;
-          }
-        } catch (err) {
-          console.error("[Slack] Failed to lookup company name:", err);
-        }
+        console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
         
         const singleMeetingContext: SingleMeetingContext = {
-          meetingId: threadContext!.meetingId!,
-          companyId: threadContext!.companyId!,
-          companyName,
+          meetingId: resolvedMeeting.meetingId,
+          companyId: resolvedMeeting.companyId,
+          companyName: resolvedMeeting.companyName,
         };
         
         const result = await handleSingleMeetingQuestion(singleMeetingContext, text);
