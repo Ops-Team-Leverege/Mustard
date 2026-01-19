@@ -58,6 +58,7 @@ export interface IStorage {
   // Transcripts
   getTranscripts(product: Product): Promise<Transcript[]>;
   getTranscript(product: Product, id: string): Promise<Transcript | undefined>;
+  getTranscriptById(id: string): Promise<Transcript | undefined>;
   getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
   createTranscript(transcript: InsertTranscript): Promise<Transcript>;
   updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined>;
@@ -214,6 +215,10 @@ export class MemStorage implements IStorage {
   async getTranscript(product: Product, id: string): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     return transcript?.product === product ? transcript : undefined;
+  }
+
+  async getTranscriptById(id: string): Promise<Transcript | undefined> {
+    return this.transcripts.get(id);
   }
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
@@ -1174,6 +1179,15 @@ export class DbStorage implements IStorage {
       .select()
       .from(transcriptsTable)
       .where(and(eq(transcriptsTable.product, product), eq(transcriptsTable.id, id)))
+      .limit(1);
+    return results[0];
+  }
+
+  async getTranscriptById(id: string): Promise<Transcript | undefined> {
+    const results = await this.db
+      .select()
+      .from(transcriptsTable)
+      .where(eq(transcriptsTable.id, id))
       .limit(1);
     return results[0];
   }

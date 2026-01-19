@@ -1,7 +1,7 @@
 # PitCrew Customer Transcript Analyzer
 
 ## Overview
-The PitCrew Customer Transcript Analyzer is a SaaS application designed to leverage AI for analyzing Business Development call transcripts. Its core purpose is to extract, categorize, and organize product insights and customer Q&A into searchable tables. This provides sales and product teams with actionable intelligence, streamlining insight discovery from customer interactions, enhancing product development, and refining sales strategies. The application features a dark-mode-first UI and real-time categorization.
+The PitCrew Customer Transcript Analyzer is a SaaS application that uses AI to analyze Business Development call transcripts. Its primary goal is to extract, categorize, and organize product insights and customer Q&A into searchable tables. This empowers sales and product teams with actionable intelligence, improving product development and refining sales strategies. The application features a dark-mode-first UI and real-time categorization. The project aims to provide a streamlined way for businesses to derive value from customer interactions, enhancing decision-making and market responsiveness.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -27,42 +27,16 @@ This application has multiple features using OpenAI with different models and se
 ## System Architecture
 
 ### Core Design Principles
-- **Single-Page Application (SPA)**: Client-side routing with Wouter.
-- **Asynchronous Transcript Processing**: Transcripts are uploaded and immediately marked pending. AI analysis runs in the background with status updates, allowing users to track progress and retry failed analyses.
-- **Type Safety**: End-to-end type safety achieved with shared schema definitions and Zod.
-- **Multi-Product Architecture**: Supports four distinct products (PitCrew, AutoTrace, WorkWatch, ExpressLane) with complete data separation using a `product` column for isolation within a single database.
+The system is built as a Single-Page Application (SPA) using React and Vite, featuring client-side routing with Wouter. It emphasizes asynchronous transcript processing, where AI analysis runs in the background, allowing users to track progress. End-to-end type safety is achieved using Zod and shared schema definitions. The architecture supports a multi-product environment (PitCrew, AutoTrace, WorkWatch, ExpressLane) with complete data separation via a `product` column in the database.
 
 ### Frontend
-- **Framework**: React with TypeScript (Vite).
-- **UI/UX**: Shadcn/ui (New York style), Radix UI, Tailwind CSS, CVA. Dark-mode-first with light mode support, inspired by Linear/Notion aesthetics.
-- **State Management**: TanStack Query for server state; React hooks for local state.
-- **Navigation**: Tab navigation with dropdowns for "Databases" (Product Insights, Q&A Database, Transcripts).
-- **Design System**: Custom CSS variables for color, Inter font.
+The frontend is built with React and TypeScript, leveraging Shadcn/ui (New York style), Radix UI, and Tailwind CSS for a dark-mode-first UI inspired by Linear/Notion aesthetics. State management is handled by TanStack Query for server state and React hooks for local state. Custom CSS variables and the Inter font define the design system.
 
 ### Backend
-- **Framework**: Express.js with TypeScript.
-- **API**: RESTful JSON API (`/api`), centralized error handling.
-- **Data Layer**: PostgreSQL with Drizzle ORM, Zod for schema validation. Neon for production.
-- **AI Integration**: OpenAI API (GPT-5) for transcript analysis, structured prompt engineering for insight/Q&A extraction and categorization. Handles large transcripts via batching.
-- **Authentication**: Replit Auth (OpenID Connect) with session-based PostgreSQL store. Access restricted to `@leverege.com` emails.
-- **Database Schema**: Includes tables for `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, `companies`, `contacts`, `users`, `sessions`, `features`, `pos_systems`, `pos_system_companies`.
+The backend uses Express.js with TypeScript, providing a RESTful JSON API. Data is managed with PostgreSQL and Drizzle ORM, with Zod for schema validation. OpenAI API (GPT-5) is integrated for AI tasks, utilizing structured prompt engineering for analysis and categorization, with batching for large transcripts. Authentication is handled via Replit Auth (OpenID Connect), restricting access to specific email domains. The database schema supports various entities including `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, and `users`.
 
 ### Key Features
-- **Transcript Detail View**: Dedicated page for individual transcripts showing filtered insights/Q&A.
-- **Meeting Date Support**: Optional meeting date input during transcript upload.
-- **Dashboard Analytics**: Companies page shows recent meetings and "Companies by Stage" pie chart. Categories page shows bar charts of insights/Q&A by unique company mentions.
-- **Contact Management**: Smart duplicate prevention and a "Merge Duplicates" feature for contacts.
-- **Transcript Management**: Full list view, search, edit, delete with cascade for associated data.
-- **Service Tagging**: Companies can be tagged with service categories.
-- **Company Stage Management**: Tracks company progression through stages (Prospect, Pilot, Rollout, Scale).
-- **Temporal Context**: Product insights and Q&A tables include "Transcript Date."
-- **Features Management**: CRUD operations for tracking product features, linking them to categories, and displaying related insights.
-- **Rich Text Support**: `mainMeetingTakeaways` field supports multi-line text and bullet points.
-- **Q&A Star Feature**: Q&A pairs can be starred/favorited for quick reference.
-- **POS Systems Database**: Tracks Point of Sale systems with company relationships.
-- **Automatic POS System Detection**: AI automatically identifies and links POS systems mentioned in transcripts to companies.
-- **Meeting Notes Support**: Toggle for "Add Meeting Notes" mode, optimizing AI prompts for condensed notes.
-- **Supporting Materials**: Optional section in upload form for file references or URLs for supplementary materials.
+Key functionalities include a transcript detail view, meeting date support, and dashboard analytics for companies and categories. Contact management includes smart duplicate prevention, while transcript management offers full list views, search, edit, and delete options. The system supports company stage management, service tagging, and tracking of POS systems, including automatic detection from transcripts. It also allows for meeting notes and supporting materials during upload. A critical architectural invariant is the preservation of speaker identity in transcripts. The system differentiates between `qa_pairs` (interpreted Q&A) and `customer_questions` (verbatim, evidence-based extraction) to ensure data trust and integrity. The Slack Single-Meeting Orchestrator handles user questions scoped to a single meeting, with strict rules for capabilities and uncertainty communication, ensuring no inference or hallucination.
 
 ## External Dependencies
 
@@ -104,155 +78,3 @@ This application has multiple features using OpenAI with different models and se
 ### Integrations
 - **Replit Auth**
 - **Jira Integration**
-
-## Architectural Invariants
-
-### Speaker Identity Preservation (CRITICAL)
-**Transcript formatting must never drop speaker identity.**
-
-This is a hard contract between ingestion → composer:
-- Transcript chunks MUST include `speakerName` when available
-- `formatTranscript()` MUST preserve speaker names in the output sent to LLMs
-- Generic role labels ("Leverege", "Customer") are fallbacks ONLY when speakerName is missing
-
-Enforcement: `assertSpeakerNamesPreserved()` in `server/rag/composer.ts` validates this invariant at runtime.
-
-### Action-State Next Steps Extraction (Quality Standard)
-**Next steps extraction targets Google Meet "Suggested next steps" quality or better.**
-
-Design principles:
-- Think like a senior operations assistant: "What actions now exist in the world because of this meeting?"
-- Precision > recall (false positives are worse than omissions)
-- Actions are extracted, not inferred
-- All actions must be grounded in transcript evidence
-
-Action types captured:
-- `commitment`: Explicit "I will" / "We will" statements
-- `request`: "Can you..." / "Please..." that imply follow-up
-- `blocker`: "We can't proceed until..." dependencies
-- `plan`: "The plan is to..." / decided course of action
-- `scheduling`: Meeting coordination, follow-up calls
-
-Processing pipeline:
-1. Three-phase LLM reasoning: Green Room Filter → Extract atomic actions → Consolidate
-2. Meeting Start Detection ("Green Room" filter): Ignore pre-meeting chatter
-3. Immediate Resolution Check ("Just Now" filter): Discard actions resolved during the call
-4. Deterministic post-processing: Name normalization against canonical attendee list
-5. Two-tier confidence output: Primary (≥0.85) + Secondary (0.70-0.85)
-
-Green Room filter (Meeting Start Detection):
-- Scan for actual meeting start (e.g., "Hi everyone," "Let's get started")
-- IGNORE any commitments made before this point (pre-meeting chatter)
-- Examples of pre-meeting chatter to ignore: "Can you hear me?", "I'll admit them", "Waiting for Bob"
-
-Resolution check:
-- Before adding a candidate, scan subsequent ~20 turns
-- Discard if question was answered or action completed during the call
-- Example: "Are TVs installed?" → "Yep" = resolved in-call, not a next step
-
-Priority heuristic (imperative detection):
-- "Permission to proceed" = Command: "You've got the green light to share X" → Share X
-- Imperative instructions = Command: "You need to chat with Randy" → Chat with Randy
-- Enablement grants = Command: "Feel free to let them know" → Inform them
-
-Obligation triggers (HIGH-CONFIDENCE when directed at a specific person):
-- "You/We need to..." → Extract as commitment (0.95)
-- "You/We have to..." → Extract as commitment (0.95)
-- "You/We must..." → Extract as commitment (0.95)
-- Example: "You need to figure out the pricing" → [Action: Determine pricing strategy]
-
-System features vs. human tasks (critical anti-pattern):
-- Do NOT extract tasks where a user describes what the SOFTWARE will do
-- Anti-Pattern: "The system provides daily reports" → NOT a task
-- Anti-Pattern: "Every user will have their own login" → NOT a task
-- Pattern: "I will email you the report" → Extract (human action)
-- Explaining what software does is NOT a task for the person explaining it
-
-Decision dependencies (always extract):
-- "Chat/Sync/Discussion" is MANDATORY if goal is to make a decision or configure settings
-- Example: "Chat with Randy about alert thresholds" → Extract (decision required)
-- NOT a social nicety if it affects business logic
-
-Distinct deliverables (do not over-merge):
-- Multiple distinct assets promised = separate tasks
-- Example: "Send login info AND start guide" → TWO separate tasks
-
-Consolidation rules:
-- Merge micro-actions when same owner + same timeframe + same operational goal
-- Never merge across different owners
-- Never paraphrase evidence into new facts
-- Never infer unspoken commitments
-
-Evidence cleanup (mandatory):
-- Remove filler words ("um", "uh", "like") for readability
-- Do NOT change meaning or paraphrase facts
-
-### Customer Questions (High-Trust, Evidence-Based Layer)
-
-**CRITICAL: This is an architectural trust boundary, NOT just a feature.**
-
-The application has TWO distinct question-tracking systems that must NEVER be merged or confused:
-
-| Table | Nature | Evidence Required | Inference Allowed | Use Case |
-|-------|--------|-------------------|-------------------|----------|
-| `qa_pairs` | Interpreted | No | Yes | Browsing, analytics |
-| `customer_questions` | Extractive | Yes | No | Meeting intelligence |
-
-**Why both exist:**
-- `qa_pairs` (existing): AI-interpreted Q&A pairs. Questions and answers are summarized, paraphrased, and categorized. Useful for searchable analytics but NOT suitable for high-trust applications.
-- `customer_questions` (new): Verbatim extraction with strict evidence requirements. Questions must closely match transcript text. Answers require exact quotes. Suitable for compliance, legal, and evidence-based workflows.
-
-**Extraction timing:**
-- Customer questions extraction runs AFTER transcript ingestion and chunking
-- Runs asynchronously and independently from other extractors
-- Fails independently - does NOT affect transcript analysis or Q&A extraction
-- Retryable without affecting other processing
-
-**Model usage:**
-- Uses `gpt-4o` at `temperature: 0` for deterministic output
-- This setting does NOT affect other OpenAI-powered features
-- GPT-5 must NOT be used (temperature cannot be set to 0)
-
-**Output schema:**
-```json
-{
-  "question_text": string,      // Verbatim from transcript
-  "asked_by_name": string,      // Speaker name
-  "question_turn_index": number,// Position in transcript (REQUIRED for context)
-  "status": "ANSWERED" | "OPEN" | "DEFERRED",
-  "answer_evidence": string | null,  // Exact quote if answered
-  "answered_by_name": string | null,
-  "requires_context": boolean,  // Deterministic: has "this", "that", "it", etc.
-  "context_before": string | null  // Verbatim preceding turns
-}
-```
-
-**Context Anchoring (Lost Referential Context Fix):**
-Many valid customer questions rely on immediately preceding transcript turns. For example:
-- "Is that compatible?" (What is "that"?)
-- "Does it support multiple locations?" (What is "it"?)
-
-Context Anchoring restores verbatim adjacency without rewriting the question:
-
-1. **Deterministic Detection** (in code, NOT LLM):
-   - `requires_context` is set to `true` if question contains STRUCTURAL referential words:
-     - Demonstrative pronouns: "this", "that", "those", "these"
-     - Referential pronoun: "it"
-     - Comparative reference: "the same"
-   - IMPORTANT: Keep triggers STRUCTURAL, not semantic (avoid "mentioned", "what you said")
-   - This ensures consistency - the LLM does NOT decide if context is needed
-
-2. **Context Building** (sliding window):
-   - When `requires_context` is true and turn index is valid
-   - Include up to 2 PRECEDING transcript turns only (N-1 and N-2)
-   - Format: `[SpeakerName]: verbatim text`
-   - MUST NOT include the question turn itself
-   - MUST NOT include any turns AFTER the question
-   - Only includes turns from the same meeting segment (post-meeting start)
-
-3. **Fallback** (raw text extraction):
-   - When chunks unavailable, `context_before` is null
-   - `requires_context` is still detected deterministically
-
-**Hard warning:**
-These tables must NOT be merged or treated as interchangeable. Future contributors should treat this as a trust boundary - `customer_questions` has stricter guarantees that `qa_pairs` cannot provide.

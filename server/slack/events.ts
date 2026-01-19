@@ -4,6 +4,7 @@ import { postSlackMessage } from "./slackApi";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
+import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -148,24 +149,75 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] User explicitly overriding context - resolving fresh");
     }
 
-    // 9. Process with MCP (async after ack)
-    const ctx = makeMCPContext(threadContext);
-    const mcp = createMCP(ctx);
+    // 9. Process request
+    // 
+    // SINGLE-MEETING MODE:
+    // When thread has resolved meetingId, use SingleMeetingOrchestrator
+    // for strict Tier-1-only routing and intent-safe responses.
+    // 
+    // MULTI-CONTEXT MODE:
+    // Otherwise, use MCP router for cross-meeting and analytics capabilities.
+    //
+    const isSingleMeetingMode = threadContext?.meetingId && threadContext?.companyId;
 
     try {
-      const mcpResult: MCPResult = await mcp.runFromText(text);
-
-      // Format result - handle both string and object responses
       let responseText: string;
-      const rawResult = mcpResult.result;
-      if (typeof rawResult === "string") {
-        responseText = rawResult;
-      } else if (rawResult && typeof rawResult === "object") {
-        // RAG responses have { answer, citations }
-        const objResult = rawResult as Record<string, unknown>;
-        responseText = (objResult.answer as string) || JSON.stringify(rawResult, null, 2);
+      let capabilityName: string;
+      let resolvedCompanyId: string | null = null;
+      let resolvedMeetingId: string | null = null;
+
+      if (isSingleMeetingMode) {
+        // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
+        console.log(`[Slack] Single-meeting mode activated for meeting ${threadContext!.meetingId}`);
+        
+        // Resolve company name for context
+        let companyName = "Unknown Company";
+        try {
+          const companyRows = await storage.rawQuery(
+            `SELECT name FROM companies WHERE id = $1`,
+            [threadContext!.companyId]
+          );
+          if (companyRows?.[0]?.name) {
+            companyName = companyRows[0].name;
+          }
+        } catch (err) {
+          console.error("[Slack] Failed to lookup company name:", err);
+        }
+        
+        const singleMeetingContext: SingleMeetingContext = {
+          meetingId: threadContext!.meetingId!,
+          companyId: threadContext!.companyId!,
+          companyName,
+        };
+        
+        const result = await handleSingleMeetingQuestion(singleMeetingContext, text);
+        responseText = result.answer;
+        capabilityName = `single_meeting_${result.intent}`;
+        resolvedCompanyId = singleMeetingContext.companyId;
+        resolvedMeetingId = singleMeetingContext.meetingId;
+        
+        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}`);
       } else {
-        responseText = String(rawResult);
+        // MULTI-CONTEXT MODE: Use MCP router
+        const ctx = makeMCPContext(threadContext);
+        const mcp = createMCP(ctx);
+        const mcpResult: MCPResult = await mcp.runFromText(text);
+
+        // Format result - handle both string and object responses
+        const rawResult = mcpResult.result;
+        if (typeof rawResult === "string") {
+          responseText = rawResult;
+        } else if (rawResult && typeof rawResult === "object") {
+          // RAG responses have { answer, citations }
+          const objResult = rawResult as Record<string, unknown>;
+          responseText = (objResult.answer as string) || JSON.stringify(rawResult, null, 2);
+        } else {
+          responseText = String(rawResult);
+        }
+        
+        capabilityName = mcpResult.capabilityName;
+        resolvedCompanyId = mcpResult.resolvedEntities?.companyId || null;
+        resolvedMeetingId = mcpResult.resolvedEntities?.meetingId || null;
       }
 
       const botReply = await postSlackMessage({
@@ -181,12 +233,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
         slackMessageTs: botReply.ts, // Actual bot reply message timestamp
         slackChannelId: channel,
         userId: userId || null,
-        companyId: mcpResult.resolvedEntities?.companyId || null,
-        meetingId: mcpResult.resolvedEntities?.meetingId || null,
-        capabilityName: mcpResult.capabilityName,
+        companyId: resolvedCompanyId,
+        meetingId: resolvedMeetingId,
+        capabilityName,
         questionText: text,
         answerText: responseText,
-        resolvedEntities: mcpResult.resolvedEntities || null,
+        resolvedEntities: { companyId: resolvedCompanyId, meetingId: resolvedMeetingId },
         confidence: null,
       }).catch(err => {
         console.error("Failed to log interaction:", err);
