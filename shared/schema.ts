@@ -155,6 +155,7 @@ export const customerQuestions = pgTable("customer_questions", {
   status: text("status").notNull(), // "ANSWERED" | "OPEN" | "DEFERRED"
   answerEvidence: text("answer_evidence"), // Exact quote if answered
   answeredByName: text("answered_by_name"), // Who answered (if applicable)
+  resolutionTurnIndex: integer("resolution_turn_index"), // Turn where answer was found (Resolution Pass)
   // Context Anchoring fields - restores verbatim adjacency for context-dependent questions
   requiresContext: boolean("requires_context").default(false).notNull(), // Deterministic: has "this", "that", "it", etc.
   contextBefore: text("context_before"), // Verbatim preceding transcript turns (speaker + text only)

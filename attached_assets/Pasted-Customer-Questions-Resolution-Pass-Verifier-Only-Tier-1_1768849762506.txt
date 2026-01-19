@@ -1,0 +1,238 @@
+Customer Questions — Resolution Pass (Verifier-Only, Tier-1)
+Context
+
+We have a high-quality customer_questions table that captures verbatim questions asked by customers during a meeting, including contextual anchoring.
+
+Current state:
+
+Questions are accurate and hallucination-free
+
+However, the system does not yet record whether a question was explicitly answered during the meeting
+
+Important clarification:
+
+This task applies only to customer_questions
+
+This does not affect Slack user questions
+
+This does not affect Slack routing or live Q&A behavior
+
+This is offline meeting enrichment, not interactive answering.
+
+Goal
+
+Add a Resolution Pass that determines whether each customer question was:
+
+explicitly answered
+
+deferred
+
+left open
+
+based strictly on the transcript, and stores the result as Tier-1 data.
+
+This pass must be verifier-only:
+
+no summarization
+
+no inference
+
+no synthesis
+
+Architectural Invariants (Must Hold)
+
+Applies only to customer_questions
+
+Runs offline (ingestion or post-ingestion job)
+
+Slack Q&A remains read-only
+
+No LLM calls on the Slack request path
+
+Answers must be quoted from transcript, not paraphrased
+
+Absence must be explicit (OPEN is a valid outcome)
+
+High-Level Design
+
+This Resolution Pass is a second phase that runs after question extraction.
+
+Phase 1 (existing):
+
+Identify customer questions
+
+Capture:
+
+question_text
+
+asker
+
+context_before
+
+question_turn_index
+
+Phase 2 (new):
+
+For each customer question:
+
+Look at transcript turns after the question
+
+Verify whether the question received an explicit answer
+
+Store the result with evidence
+
+Implementation Tasks
+1️⃣ Database Changes
+
+Extend the existing customer_questions table (or related table) with:
+
+answer_text (TEXT, nullable)
+→ Direct quote or lightly cleaned quote from transcript
+
+answered_by_name (TEXT, nullable)
+
+resolution_status (ENUM or TEXT):
+ANSWERED | DEFERRED | OPEN
+
+answer_evidence_quote (TEXT, nullable)
+
+resolution_turn_index (INT, nullable)
+
+These fields must represent verification, not interpretation.
+
+2️⃣ Resolution Pass Logic
+
+Create a new resolver module, e.g.:
+
+server/ingestion/resolveCustomerQuestionAnswers.ts
+
+
+This module must:
+
+Input
+
+question_text
+
+question_turn_index
+
+Transcript turns with:
+
+speaker name
+
+turn index
+
+text
+
+Search Window
+
+Start: immediately after question_turn_index
+
+End: first of:
+
+explicit answer found
+
+explicit deferral (“I’ll follow up”, “we’ll check”)
+
+clear topic shift
+
+hard limit (e.g. 10 turns)
+
+Do not blindly scan the full transcript.
+
+3️⃣ LLM Prompt (Verifier-Only)
+
+Use gpt-4o with temperature: 0.
+
+System Prompt:
+
+You are a strict transcript verifier.
+
+Your task is NOT to summarize or infer.
+Your task is ONLY to verify whether a specific customer question
+received an explicit answer in the transcript.
+
+Rules:
+1. Use ONLY the provided transcript turns.
+2. Quote answers verbatim or with minimal cleanup (remove filler words only).
+3. If the speaker says they will follow up later, classify as DEFERRED.
+4. If no explicit answer is given, classify as OPEN.
+5. Do NOT infer answers.
+6. Do NOT combine multiple turns into a new answer.
+7. If uncertain, choose OPEN.
+
+
+Input:
+
+Customer question (verbatim)
+
+Transcript turns N+1 → N+10
+
+Output JSON:
+
+{
+  "resolution_status": "ANSWERED | DEFERRED | OPEN",
+  "answer_text": string | null,
+  "answered_by_name": string | null,
+  "evidence_quote": string | null,
+  "resolution_turn_index": number | null
+}
+
+4️⃣ Storage
+
+Persist the resolution result back onto the corresponding customer_questions row.
+
+Rules:
+
+If status is OPEN → all answer fields must be NULL
+
+If status is DEFERRED → answer_text may contain the deferral quote
+
+If status is ANSWERED → evidence_quote is mandatory
+
+5️⃣ Execution Timing
+
+This Resolution Pass should run:
+
+After customer questions are extracted
+
+During ingestion or as an async post-ingestion job
+
+Exactly once per question (idempotent)
+
+Slack user questions must never trigger this logic.
+
+Explicit Non-Goals (Do NOT do these)
+
+Do NOT use this logic to answer Slack user questions
+
+Do NOT generate summaries
+
+Do NOT infer “implied” answers
+
+Do NOT search beyond the bounded window
+
+Do NOT mix multiple answers into one
+
+Acceptance Criteria
+
+This task is complete when:
+
+Each customer question clearly indicates ANSWERED / DEFERRED / OPEN
+
+All answers are backed by transcript quotes
+
+Unanswered questions remain explicitly OPEN
+
+Slack behavior is unchanged
+
+Tier-1 / Tier-2 / Tier-3 boundaries remain intact
+
+Why This Matters
+
+This preserves the architectural separation:
+
+Meeting intelligence is enriched offline
+
+User interaction remains deterministic and honest
+
+This avoids repeating past hallucination issues while improving the usefulness of meeting records.
