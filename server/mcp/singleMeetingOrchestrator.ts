@@ -25,6 +25,11 @@
 
 import { storage } from "../storage";
 import { OpenAI } from "openai";
+import { 
+  extractMeetingActionStates, 
+  type TranscriptChunk as ComposerChunk,
+  type MeetingActionItem 
+} from "../rag/composer";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -211,17 +216,38 @@ async function getMeetingAttendees(
 
 /**
  * Get action items/commitments for a meeting.
- * Uses the next_steps field from transcripts table.
+ * Dynamically extracts action items using the RAG composer for high-quality results.
+ * Returns formatted action items with owner information.
  */
 async function getMeetingActionItems(
   meetingId: string
-): Promise<string[]> {
-  const transcript = await storage.getTranscriptById(meetingId);
-  if (!transcript || !transcript.nextSteps) {
+): Promise<MeetingActionItem[]> {
+  // Get transcript chunks for extraction
+  const chunks = await storage.getChunksForTranscript(meetingId, 5000);
+  
+  if (chunks.length === 0) {
     return [];
   }
   
-  return transcript.nextSteps.split("\n").map(s => s.trim()).filter(Boolean);
+  // Get attendee info for speaker normalization
+  const { leverageTeam, customerNames } = await getMeetingAttendees(meetingId);
+  
+  // Map to composer format
+  const composerChunks: ComposerChunk[] = chunks.map(c => ({
+    chunkIndex: c.chunkIndex,
+    speakerRole: (c.speakerRole || "unknown") as "leverege" | "customer" | "unknown",
+    speakerName: c.speakerName || undefined,
+    text: c.content,
+  }));
+  
+  // Extract action items using the same pipeline as the main capability
+  const { primary, secondary } = await extractMeetingActionStates(composerChunks, {
+    leverageTeam: leverageTeam.length > 0 ? leverageTeam.join(", ") : undefined,
+    customerNames: customerNames.length > 0 ? customerNames.join(", ") : undefined,
+  });
+  
+  // Return all action items (primary + secondary)
+  return [...primary, ...secondary];
 }
 
 /**
@@ -236,7 +262,7 @@ async function getMeetingActionItems(
 async function searchActionItemsForRelevantIssues(
   meetingId: string,
   query: string
-): Promise<string[]> {
+): Promise<MeetingActionItem[]> {
   const actionItems = await getMeetingActionItems(meetingId);
   
   if (actionItems.length === 0) {
@@ -249,10 +275,10 @@ async function searchActionItemsForRelevantIssues(
   const keywords = q.split(/\s+/)
     .filter(w => w.length > 3 && !stopWords.has(w));
   
-  // Match action items that contain at least one keyword
+  // Match action items that contain at least one keyword in action text or evidence
   const matches = actionItems.filter(item => {
-    const itemLower = item.toLowerCase();
-    return keywords.some(kw => itemLower.includes(kw));
+    const searchText = `${item.action} ${item.evidence} ${item.owner}`.toLowerCase();
+    return keywords.some(kw => searchText.includes(kw));
   });
   
   return matches;
@@ -349,7 +375,14 @@ async function handleExtractiveIntent(
     
     const lines: string[] = [];
     lines.push(`*Next Steps (${ctx.companyName})*`);
-    actionItems.forEach(item => lines.push(`• ${item}`));
+    actionItems.forEach(item => {
+      let formattedItem = `• ${item.action} — ${item.owner}`;
+      if (item.deadline && item.deadline !== "Not specified") {
+        formattedItem += ` _(${item.deadline})_`;
+      }
+      lines.push(formattedItem);
+      lines.push(`  _"${item.evidence}"_`);
+    });
     
     return {
       answer: lines.join("\n"),
@@ -394,8 +427,13 @@ async function handleExtractiveIntent(
     // We should not imply the issue was fully diagnosed if it wasn't discussed in detail
     const lines: string[] = [];
     lines.push(`The meeting notes include a follow-up related to this:`);
-    matchingActionItems.forEach((item: string) => {
-      lines.push(`\n• ${item}`);
+    matchingActionItems.forEach((item) => {
+      let formattedItem = `• ${item.action} — ${item.owner}`;
+      if (item.deadline && item.deadline !== "Not specified") {
+        formattedItem += ` _(${item.deadline})_`;
+      }
+      lines.push(`\n${formattedItem}`);
+      lines.push(`  _"${item.evidence}"_`);
     });
     lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
     
@@ -403,7 +441,7 @@ async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "action_items",
-      evidence: matchingActionItems[0],
+      evidence: matchingActionItems[0].evidence,
     };
   }
   
