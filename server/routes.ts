@@ -173,7 +173,7 @@ async function extractActionItemsForTranscript(
   const allItems = [...primary, ...secondary];
   
   if (allItems.length === 0) {
-    console.log(`[ActionItems] No action items found in transcript ${transcriptId}`);
+    console.log(`[ActionItems] Extraction complete for transcript ${transcriptId}: 0 items found (success=true)`);
     return;
   }
   
@@ -193,7 +193,7 @@ async function extractActionItemsForTranscript(
     })),
   );
   
-  console.log(`[ActionItems] Saved ${allItems.length} action items (${primary.length} primary, ${secondary.length} secondary) for transcript ${transcriptId}`);
+  console.log(`[ActionItems] Extraction complete for transcript ${transcriptId}: ${allItems.length} items (${primary.length} primary, ${secondary.length} secondary) (success=true)`);
 }
 
 // Background processing function for transcript AI analysis

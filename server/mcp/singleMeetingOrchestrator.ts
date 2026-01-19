@@ -225,14 +225,16 @@ async function getMeetingAttendees(
 /**
  * Get action items/commitments for a meeting.
  * 
- * TIER-1 READ-ONLY: Reads from meeting_action_items table.
- * Action items are materialized during transcript ingestion.
- * NO LLM calls occur on this path.
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * INVARIANT: meeting_action_items are Tier-1 artifacts materialized at ingestion.
+ * Slack paths must NEVER trigger action item extraction (extractMeetingActionStates).
+ * This function is READ-ONLY - it queries the database, no LLM calls.
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 async function getMeetingActionItems(
   meetingId: string
 ): Promise<OrchestratorActionItem[]> {
-  console.log(`[SingleMeetingOrchestrator] Reading action items for meeting ${meetingId} from database`);
+  console.log(`[SingleMeetingOrchestrator] Reading action items for meeting ${meetingId} from database (READ-ONLY, no LLM)`);
   
   const dbItems = await storage.getMeetingActionItemsByTranscript(meetingId);
   
