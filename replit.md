@@ -112,6 +112,22 @@ Key functionalities include a transcript detail view, meeting date support, and 
    - Examples: "Summarize the meeting", "Give me an overview"
    - Behavior: Generate summary using GPT-5 (only when explicitly requested)
 
+**Extractive Search Order (LOCKED):**
+
+| Priority | Source | What it answers |
+|----------|--------|-----------------|
+| 1 | Attendees | Who was present |
+| 2 | Customer questions | What customers asked (high-trust, verbatim) |
+| 3 | Action items / commitments | Explicit issues, follow-ups, and named events |
+| 4 | Transcript snippets | Last resort, verbatim evidence |
+
+**RULE:** Action items are checked whenever the question asks about issues, problems, blockers, errors, or incidents — regardless of whether the user says "next steps".
+
+**Answer Framing for Action Items:**
+When the answer comes from an action item, the response must be honest about what was documented vs. what was discussed:
+- Good: "The meeting notes include a follow-up to investigate X (owned by Y), but the specific cause wasn't discussed."
+- Bad: "The issue was X because Y." (overclaiming)
+
 **Uncertainty Response:**
 When no extractive or aggregative answer is found:
 ```

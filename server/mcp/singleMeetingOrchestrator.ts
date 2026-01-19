@@ -225,11 +225,15 @@ async function getMeetingActionItems(
 }
 
 /**
- * Search action items for keyword matches.
- * Used when user asks about a specific fact that may be documented in commitments.
- * Example: "what was the application issue Brian experienced?" → matches action item about Brian's issue
+ * Search action items for explicitly named issues or events relevant to the question.
+ * 
+ * RULE: Action items are checked whenever the question asks about an issue, problem,
+ * blocker, error, or incident — regardless of whether the user says "next steps".
+ * 
+ * This ensures that documented follow-ups and commitments are surfaced when users
+ * ask fact-seeking questions about specific events or issues discussed in the meeting.
  */
-async function searchActionItemsForFact(
+async function searchActionItemsForRelevantIssues(
   meetingId: string,
   query: string
 ): Promise<string[]> {
@@ -290,13 +294,16 @@ async function searchTranscriptSnippets(
 /**
  * Handle extractive intent (specific fact questions).
  * 
- * Routing order:
- * 1. Attendees (if attendee question)
- * 2. Customer questions (high-trust extractive)
- * 3. Action items/commitments
- * 4. Transcript snippets (verbatim evidence)
+ * EXTRACTIVE SEARCH ORDER (LOCKED):
+ * 1. Attendees — who was present (if attendee question)
+ * 2. Customer questions — what customers asked (high-trust, verbatim)
+ * 3. Action items / commitments — explicit issues, follow-ups, and named events
+ * 4. Transcript snippets — last resort, verbatim evidence
  * 
  * If not found → Return uncertainty response
+ * 
+ * NOTE: Action items are checked whenever the question asks about issues, problems,
+ * blockers, errors, or incidents — regardless of whether user says "next steps".
  */
 async function handleExtractiveIntent(
   ctx: SingleMeetingContext,
@@ -378,17 +385,19 @@ async function handleExtractiveIntent(
     };
   }
   
-  // Search action items for relevant matches (even if not explicitly asking for "next steps")
-  // This handles questions like "what was the application issue Brian experienced?"
-  // where the answer may be documented in a commitment/action item
-  const matchingActionItems = await searchActionItemsForFact(ctx.meetingId, question);
+  // RULE: Action items are checked whenever the question asks about issues, problems,
+  // blockers, errors, or incidents — regardless of whether user says "next steps"
+  const matchingActionItems = await searchActionItemsForRelevantIssues(ctx.meetingId, question);
   
   if (matchingActionItems.length > 0) {
+    // Frame the answer honestly: action items document follow-ups, not diagnoses
+    // We should not imply the issue was fully diagnosed if it wasn't discussed in detail
     const lines: string[] = [];
-    lines.push(`*From the meeting with ${ctx.companyName}:*`);
-    matchingActionItems.forEach(item => {
+    lines.push(`The meeting notes include a follow-up related to this:`);
+    matchingActionItems.forEach((item: string) => {
       lines.push(`\n• ${item}`);
     });
+    lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
     
     return {
       answer: lines.join("\n"),
