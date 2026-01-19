@@ -34,6 +34,8 @@ import {
   type InsertInteractionLog,
   type CustomerQuestion,
   type InsertCustomerQuestion,
+  type MeetingActionItem,
+  type InsertMeetingActionItem,
   transcripts as transcriptsTable,
   productInsights as productInsightsTable,
   qaPairs as qaPairsTable,
@@ -48,6 +50,7 @@ import {
   meetingSummaries as meetingSummariesTable,
   interactionLogs as interactionLogsTable,
   customerQuestions as customerQuestionsTable,
+  meetingActionItems as meetingActionItemsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -158,6 +161,11 @@ export interface IStorage {
   getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]>;
   createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]>;
   deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean>;
+
+  // Meeting Action Items (Tier-1, materialized at ingestion)
+  getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
+  createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]>;
+  deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -1143,6 +1151,18 @@ export class MemStorage implements IStorage {
 
   async deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean> {
     throw new Error("MemStorage not supported for Customer Questions");
+  }
+
+  async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {
+    throw new Error("MemStorage not supported for Meeting Action Items");
+  }
+
+  async createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]> {
+    throw new Error("MemStorage not supported for Meeting Action Items");
+  }
+
+  async deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean> {
+    throw new Error("MemStorage not supported for Meeting Action Items");
   }
 }
 
@@ -2460,6 +2480,30 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .delete(customerQuestionsTable)
       .where(eq(customerQuestionsTable.transcriptId, transcriptId))
+      .returning();
+    return results.length > 0;
+  }
+
+  async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {
+    return await this.db
+      .select()
+      .from(meetingActionItemsTable)
+      .where(eq(meetingActionItemsTable.transcriptId, transcriptId));
+  }
+
+  async createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]> {
+    if (items.length === 0) return [];
+    const results = await this.db
+      .insert(meetingActionItemsTable)
+      .values(items)
+      .returning();
+    return results;
+  }
+
+  async deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean> {
+    const results = await this.db
+      .delete(meetingActionItemsTable)
+      .where(eq(meetingActionItemsTable.transcriptId, transcriptId))
       .returning();
     return results.length > 0;
   }
