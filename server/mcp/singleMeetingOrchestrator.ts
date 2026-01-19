@@ -25,23 +25,23 @@
 
 import { storage } from "../storage";
 import { OpenAI } from "openai";
-import { 
-  extractMeetingActionStates, 
-  type TranscriptChunk as ComposerChunk,
-  type MeetingActionItem 
-} from "../rag/composer";
+import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// Cache for extracted action items per meeting (avoids re-extraction on every question)
-// Key: meetingId, Value: { items, extractedAt }
-const actionItemsCache = new Map<string, { 
-  items: MeetingActionItem[], 
-  extractedAt: number 
-}>();
-const ACTION_ITEMS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+// Orchestrator action item type (maps from DB schema)
+// Tier-1: Read-only from materialized ingestion data
+type OrchestratorActionItem = {
+  action: string;
+  owner: string;
+  type: string;
+  deadline: string | null;
+  evidence: string;
+  confidence: number;
+  isPrimary: boolean;
+};
 
 export type SingleMeetingIntent = "extractive" | "aggregative" | "summary";
 
@@ -224,54 +224,28 @@ async function getMeetingAttendees(
 
 /**
  * Get action items/commitments for a meeting.
- * Dynamically extracts action items using the RAG composer for high-quality results.
- * Results are cached to avoid re-extraction on every question.
+ * 
+ * TIER-1 READ-ONLY: Reads from meeting_action_items table.
+ * Action items are materialized during transcript ingestion.
+ * NO LLM calls occur on this path.
  */
 async function getMeetingActionItems(
   meetingId: string
-): Promise<MeetingActionItem[]> {
-  // Check cache first
-  const cached = actionItemsCache.get(meetingId);
-  if (cached && Date.now() - cached.extractedAt < ACTION_ITEMS_CACHE_TTL_MS) {
-    console.log(`[SingleMeetingOrchestrator] Using cached action items for meeting ${meetingId}`);
-    return cached.items;
-  }
+): Promise<OrchestratorActionItem[]> {
+  console.log(`[SingleMeetingOrchestrator] Reading action items for meeting ${meetingId} from database`);
   
-  console.log(`[SingleMeetingOrchestrator] Extracting action items for meeting ${meetingId}...`);
+  const dbItems = await storage.getMeetingActionItemsByTranscript(meetingId);
   
-  // Get transcript chunks for extraction
-  const chunks = await storage.getChunksForTranscript(meetingId, 5000);
-  
-  if (chunks.length === 0) {
-    // Cache empty result to avoid re-querying
-    actionItemsCache.set(meetingId, { items: [], extractedAt: Date.now() });
-    return [];
-  }
-  
-  // Get attendee info for speaker normalization
-  const { leverageTeam, customerNames } = await getMeetingAttendees(meetingId);
-  
-  // Map to composer format
-  const composerChunks: ComposerChunk[] = chunks.map(c => ({
-    chunkIndex: c.chunkIndex,
-    speakerRole: (c.speakerRole || "unknown") as "leverege" | "customer" | "unknown",
-    speakerName: c.speakerName || undefined,
-    text: c.content,
+  // Map from DB schema to orchestrator format
+  return dbItems.map(item => ({
+    action: item.actionText,
+    owner: item.ownerName,
+    type: item.actionType,
+    deadline: item.deadline,
+    evidence: item.evidenceQuote,
+    confidence: item.confidence,
+    isPrimary: item.isPrimary,
   }));
-  
-  // Extract action items using the same pipeline as the main capability
-  const { primary, secondary } = await extractMeetingActionStates(composerChunks, {
-    leverageTeam: leverageTeam.length > 0 ? leverageTeam.join(", ") : undefined,
-    customerNames: customerNames.length > 0 ? customerNames.join(", ") : undefined,
-  });
-  
-  const allItems = [...primary, ...secondary];
-  
-  // Cache the results
-  actionItemsCache.set(meetingId, { items: allItems, extractedAt: Date.now() });
-  console.log(`[SingleMeetingOrchestrator] Cached ${allItems.length} action items for meeting ${meetingId}`);
-  
-  return allItems;
 }
 
 /**
@@ -286,7 +260,7 @@ async function getMeetingActionItems(
 async function searchActionItemsForRelevantIssues(
   meetingId: string,
   query: string
-): Promise<MeetingActionItem[]> {
+): Promise<OrchestratorActionItem[]> {
   const actionItems = await getMeetingActionItems(meetingId);
   
   if (actionItems.length === 0) {
