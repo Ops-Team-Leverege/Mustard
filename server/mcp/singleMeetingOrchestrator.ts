@@ -170,11 +170,49 @@ function isActionItemQuestion(question: string): boolean {
   return patterns.some(p => p.test(q));
 }
 
+// Common stop words to exclude from keyword matching
+const STOP_WORDS = new Set([
+  "what", "when", "where", "which", "that", "this", "from", "with", "about",
+  "were", "have", "been", "does", "will", "would", "could", "should", "there",
+  "their", "they", "your", "just", "some", "into", "more", "also", "than",
+  "only", "other", "then", "after", "before", "being", "very", "like", "over",
+  // Days of week
+  "friday", "monday", "tuesday", "wednesday", "thursday", "saturday", "sunday",
+  // Common question words
+  "issue", "issues", "problem", "problems", "experienced", "happening",
+]);
+
+/**
+ * Extract meaningful keywords from a query.
+ * Filters out stop words and short words.
+ * Prioritizes proper nouns (capitalized words in original query).
+ */
+function extractKeywords(query: string): { keywords: string[]; properNouns: string[] } {
+  const words = query.split(/\s+/);
+  
+  // Find proper nouns (capitalized words that aren't at sentence start)
+  const properNouns = words
+    .filter((w, i) => i > 0 && /^[A-Z][a-z]+$/.test(w))
+    .map(w => w.toLowerCase());
+  
+  // Extract general keywords
+  const keywords = query.toLowerCase()
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+  
+  return { keywords, properNouns };
+}
+
 /**
  * Lookup customer questions for a specific meeting.
  * Returns questions from the high-trust customer_questions table only.
  * 
  * This is strictly meeting-scoped and does NOT use searchQuestions or cross-meeting logic.
+ * 
+ * SEARCH STRATEGY:
+ * 1. Prioritize matches containing proper nouns from the query
+ * 2. Fall back to general keyword matches (excluding stop words)
+ * 3. Return empty if no meaningful matches found
  */
 async function lookupCustomerQuestions(
   meetingId: string,
@@ -193,11 +231,28 @@ async function lookupCustomerQuestions(
     return questions;
   }
   
-  const q = userQuestion.toLowerCase();
+  const { keywords, properNouns } = extractKeywords(userQuestion);
+  
+  // If we have proper nouns, prioritize questions mentioning them
+  if (properNouns.length > 0) {
+    const properNounMatches = questions.filter(cq => {
+      const text = cq.questionText.toLowerCase();
+      return properNouns.some(noun => text.includes(noun));
+    });
+    
+    if (properNounMatches.length > 0) {
+      return properNounMatches;
+    }
+  }
+  
+  // Fall back to general keyword matching
+  if (keywords.length === 0) {
+    return [];
+  }
+  
   return questions.filter(cq => {
     const text = cq.questionText.toLowerCase();
-    const words = q.split(/\s+/).filter(w => w.length > 3);
-    return words.some(w => text.includes(w));
+    return keywords.some(kw => text.includes(kw));
   });
 }
 
@@ -269,11 +324,24 @@ async function searchActionItemsForRelevantIssues(
     return [];
   }
   
-  const q = query.toLowerCase();
-  // Extract meaningful keywords (length > 3, not common stop words)
-  const stopWords = new Set(["what", "when", "where", "which", "that", "this", "from", "with", "about", "were", "have", "been", "does", "friday", "monday", "tuesday", "wednesday", "thursday", "saturday", "sunday"]);
-  const keywords = q.split(/\s+/)
-    .filter(w => w.length > 3 && !stopWords.has(w));
+  const { keywords, properNouns } = extractKeywords(query);
+  
+  // Prioritize action items mentioning proper nouns
+  if (properNouns.length > 0) {
+    const properNounMatches = actionItems.filter(item => {
+      const searchText = `${item.action} ${item.evidence} ${item.owner}`.toLowerCase();
+      return properNouns.some(noun => searchText.includes(noun));
+    });
+    
+    if (properNounMatches.length > 0) {
+      return properNounMatches;
+    }
+  }
+  
+  // Fall back to general keyword matching
+  if (keywords.length === 0) {
+    return [];
+  }
   
   // Match action items that contain at least one keyword in action text or evidence
   const matches = actionItems.filter(item => {
@@ -287,6 +355,11 @@ async function searchActionItemsForRelevantIssues(
 /**
  * Search transcript chunks for verbatim evidence.
  * Returns raw transcript snippets only - no summarization.
+ * 
+ * SEARCH STRATEGY:
+ * 1. Prioritize matches containing proper nouns (e.g., "Brian")
+ * 2. Fall back to general keyword matches
+ * 3. Require at least one meaningful keyword match
  */
 async function searchTranscriptSnippets(
   meetingId: string,
@@ -299,8 +372,28 @@ async function searchTranscriptSnippets(
 }>> {
   const chunks = await storage.getChunksForTranscript(meetingId, 1000);
   
-  const q = query.toLowerCase();
-  const keywords = q.split(/\s+/).filter(w => w.length > 3);
+  const { keywords, properNouns } = extractKeywords(query);
+  
+  // If we have proper nouns, prioritize chunks containing them
+  if (properNouns.length > 0) {
+    const properNounMatches = chunks.filter(chunk => {
+      const content = chunk.content.toLowerCase();
+      return properNouns.some(noun => content.includes(noun));
+    });
+    
+    if (properNounMatches.length > 0) {
+      return properNounMatches.slice(0, limit).map(chunk => ({
+        speakerName: chunk.speakerName || "Unknown",
+        content: chunk.content,
+        chunkIndex: chunk.chunkIndex,
+      }));
+    }
+  }
+  
+  // Fall back to general keyword matching (must match at least one keyword)
+  if (keywords.length === 0) {
+    return [];
+  }
   
   const matches = chunks
     .filter(chunk => {

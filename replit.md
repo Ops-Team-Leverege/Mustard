@@ -133,6 +133,12 @@ Key functionalities include a transcript detail view, meeting date support, and 
 | 3 | Action items | `meeting_action_items` | Explicit issues, follow-ups, and named events |
 | 4 | Transcript snippets | `transcript_chunks` | Last resort, verbatim evidence |
 
+**Keyword Search Strategy:**
+- **Proper nouns prioritized:** Names like "Brian", "Sarah" are matched first
+- **Stop words filtered:** Common words like "what", "issue", "problem", "Friday" are excluded
+- **Meeting-scoped only:** All searches are restricted to the resolved meetingId from thread context
+- If no relevant data found → Returns honest uncertainty response
+
 **RULE:** Action items are checked whenever the question asks about issues, problems, blockers, errors, or incidents — regardless of whether the user says "next steps".
 
 **Answer Framing for Action Items:**
