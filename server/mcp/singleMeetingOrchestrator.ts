@@ -330,13 +330,25 @@ async function searchTranscriptSnippets(
  * 
  * NOTE: Action items are checked whenever the question asks about issues, problems,
  * blockers, errors, or incidents — regardless of whether user says "next steps".
+ * 
+ * PERFORMANCE: Uses parallel fetching to minimize Neon round-trips.
+ * Only fetches what's needed based on question type detection.
  */
 async function handleExtractiveIntent(
   ctx: SingleMeetingContext,
   question: string
 ): Promise<SingleMeetingResult> {
-  if (isAttendeeQuestion(question)) {
+  const startTime = Date.now();
+  
+  // Detect question type FIRST to minimize unnecessary DB calls
+  const isAttendee = isAttendeeQuestion(question);
+  const isAction = isActionItemQuestion(question);
+  
+  // FAST PATH: Attendee questions only need transcript metadata
+  if (isAttendee) {
+    console.log(`[SingleMeetingOrchestrator] Fast path: attendee question`);
     const { leverageTeam, customerNames } = await getMeetingAttendees(ctx.meetingId);
+    console.log(`[SingleMeetingOrchestrator] Attendee fetch: ${Date.now() - startTime}ms`);
     
     if (leverageTeam.length === 0 && customerNames.length === 0) {
       return {
@@ -362,8 +374,11 @@ async function handleExtractiveIntent(
     };
   }
   
-  if (isActionItemQuestion(question)) {
+  // FAST PATH: Action item questions only need action items
+  if (isAction) {
+    console.log(`[SingleMeetingOrchestrator] Fast path: action item question`);
     const actionItems = await getMeetingActionItems(ctx.meetingId);
+    console.log(`[SingleMeetingOrchestrator] Action items fetch: ${Date.now() - startTime}ms`);
     
     if (actionItems.length === 0) {
       return {
@@ -391,8 +406,16 @@ async function handleExtractiveIntent(
     };
   }
   
-  const customerQuestions = await lookupCustomerQuestions(ctx.meetingId, question);
+  // GENERAL PATH: Fetch customer questions and action items in PARALLEL
+  // These are the two most common sources for general extractive questions
+  console.log(`[SingleMeetingOrchestrator] General path: parallel fetch`);
+  const [customerQuestions, actionItems] = await Promise.all([
+    lookupCustomerQuestions(ctx.meetingId, question),
+    getMeetingActionItems(ctx.meetingId),
+  ]);
+  console.log(`[SingleMeetingOrchestrator] Parallel fetch complete: ${Date.now() - startTime}ms`);
   
+  // Check customer questions first (priority 2)
   if (customerQuestions.length > 0) {
     const match = customerQuestions[0];
     const lines: string[] = [];
@@ -418,34 +441,46 @@ async function handleExtractiveIntent(
     };
   }
   
+  // Check action items for relevant issues (priority 3)
   // RULE: Action items are checked whenever the question asks about issues, problems,
   // blockers, errors, or incidents — regardless of whether user says "next steps"
-  const matchingActionItems = await searchActionItemsForRelevantIssues(ctx.meetingId, question);
-  
-  if (matchingActionItems.length > 0) {
-    // Frame the answer honestly: action items document follow-ups, not diagnoses
-    // We should not imply the issue was fully diagnosed if it wasn't discussed in detail
-    const lines: string[] = [];
-    lines.push(`The meeting notes include a follow-up related to this:`);
-    matchingActionItems.forEach((item) => {
-      let formattedItem = `• ${item.action} — ${item.owner}`;
-      if (item.deadline && item.deadline !== "Not specified") {
-        formattedItem += ` _(${item.deadline})_`;
-      }
-      lines.push(`\n${formattedItem}`);
-      lines.push(`  _"${item.evidence}"_`);
-    });
-    lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
+  if (actionItems.length > 0) {
+    const q = question.toLowerCase();
+    const stopWords = new Set(["what", "when", "where", "which", "that", "this", "from", "with", "about", "were", "have", "been", "does", "friday", "monday", "tuesday", "wednesday", "thursday", "saturday", "sunday"]);
+    const keywords = q.split(/\s+/)
+      .filter(w => w.length > 3 && !stopWords.has(w));
     
-    return {
-      answer: lines.join("\n"),
-      intent: "extractive",
-      dataSource: "action_items",
-      evidence: matchingActionItems[0].evidence,
-    };
+    const matchingActionItems = actionItems.filter(item => {
+      const searchText = `${item.action} ${item.evidence} ${item.owner}`.toLowerCase();
+      return keywords.some(kw => searchText.includes(kw));
+    });
+    
+    if (matchingActionItems.length > 0) {
+      const lines: string[] = [];
+      lines.push(`The meeting notes include a follow-up related to this:`);
+      matchingActionItems.forEach((item) => {
+        let formattedItem = `• ${item.action} — ${item.owner}`;
+        if (item.deadline && item.deadline !== "Not specified") {
+          formattedItem += ` _(${item.deadline})_`;
+        }
+        lines.push(`\n${formattedItem}`);
+        lines.push(`  _"${item.evidence}"_`);
+      });
+      lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
+      
+      return {
+        answer: lines.join("\n"),
+        intent: "extractive",
+        dataSource: "action_items",
+        evidence: matchingActionItems[0].evidence,
+      };
+    }
   }
   
+  // FALLBACK: Transcript snippets (only fetch if needed - priority 4)
+  console.log(`[SingleMeetingOrchestrator] Fallback: transcript search`);
   const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
+  console.log(`[SingleMeetingOrchestrator] Transcript fetch: ${Date.now() - startTime}ms`);
   
   if (snippets.length > 0) {
     const lines: string[] = [];
@@ -473,15 +508,25 @@ async function handleExtractiveIntent(
 /**
  * Handle aggregative intent (general but directed questions).
  * Returns curated lists from Tier-1 data, no narrative summary.
+ * 
+ * PERFORMANCE: Detects question type first, fetches only what's needed.
  */
 async function handleAggregativeIntent(
   ctx: SingleMeetingContext,
   question: string
 ): Promise<SingleMeetingResult> {
+  const startTime = Date.now();
   const q = question.toLowerCase();
   
-  if (/\bquestions?\b/.test(q) || /\bask/.test(q)) {
+  // Detect what type of aggregation is requested
+  const wantsQuestions = /\bquestions?\b/.test(q) || /\bask/.test(q);
+  const wantsConcerns = /\bissues?\b/.test(q) || /\bconcerns?\b/.test(q) || /\bproblems?\b/.test(q);
+  
+  // FAST PATH: Questions about customer questions - only fetch customer_questions
+  if (wantsQuestions) {
+    console.log(`[SingleMeetingOrchestrator] Aggregative: customer questions`);
     const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
+    console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
     
     if (customerQuestions.length === 0) {
       return {
@@ -521,8 +566,11 @@ async function handleAggregativeIntent(
     };
   }
   
-  if (/\bissues?\b/.test(q) || /\bconcerns?\b/.test(q) || /\bproblems?\b/.test(q)) {
+  // FAST PATH: Questions about issues/concerns - fetch customer_questions and filter
+  if (wantsConcerns) {
+    console.log(`[SingleMeetingOrchestrator] Aggregative: concerns/issues`);
     const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
+    console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
     
     const concernQuestions = customerQuestions.filter(cq => {
       const text = cq.questionText.toLowerCase();
@@ -550,12 +598,17 @@ async function handleAggregativeIntent(
     };
   }
   
+  // FALLBACK: General aggregative - only fetch action items
+  console.log(`[SingleMeetingOrchestrator] Aggregative: general (action items)`);
   const actionItems = await getMeetingActionItems(ctx.meetingId);
+  console.log(`[SingleMeetingOrchestrator] Action items fetch: ${Date.now() - startTime}ms`);
   
   if (actionItems.length > 0) {
     const lines: string[] = [];
     lines.push(`*Items from the meeting with ${ctx.companyName}:*`);
-    actionItems.forEach(item => lines.push(`• ${item}`));
+    actionItems.forEach(item => {
+      lines.push(`• ${item.action} — ${item.owner}`);
+    });
     
     return {
       answer: lines.join("\n"),
