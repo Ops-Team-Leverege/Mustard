@@ -1,0 +1,202 @@
+Implementation Prompt
+Slack User Questions — Single Meeting (Intent-Safe, Deterministic)
+Context
+
+We are updating how the Slack bot answers user questions about a single meeting, inside a Slack thread.
+
+Important distinctions:
+
+These are user questions asked after the meeting
+
+They are not customer questions asked during the meeting
+
+Each Slack thread represents exactly one meeting
+
+We already have:
+
+Thread ID → meeting resolution
+
+Structured extractions (attendees, customer_questions, next steps / commitments)
+
+Context-anchored, high-trust data
+
+Existing summary generation
+
+The remaining work is intent-safe routing and response behavior.
+
+Scope (IMPORTANT)
+
+This task applies only to:
+
+Slack user questions scoped to a single meeting
+
+Do not:
+
+Change ingestion logic
+
+Change extraction pipelines
+
+Change OpenAI model usage elsewhere in the system
+
+Modify cross-meeting, search, or analytics capabilities
+
+Core Invariants (Must Hold)
+
+One thread = one meeting
+
+Summaries are opt-in only (never a fallback)
+
+No inference or hallucination
+
+Uncertainty must be communicated honestly
+
+Only Tier-1 capabilities are allowed for single-meeting answers
+
+Capability Trust Matrix (Authoritative)
+Tier 1 — Allowed (Single-Meeting, High Trust)
+
+Meeting attendees (getMeetingAttendees)
+
+Customer questions (customer_questions)
+
+Next steps / commitments (explicit extraction)
+
+Raw transcript (extractive checks only)
+
+Tier 2 — Summary Only (Explicit Opt-In)
+
+meeting_summaries
+
+GPT-5
+
+Narrative only
+
+Never used as fallback
+
+Tier 3 — Not Allowed
+
+Must NOT be used in this flow:
+
+qa_pairs
+
+searchQuestions
+
+searchCompanyFeedback
+
+getCompanyInsights
+
+countCompaniesByTopic
+
+getCompanyOverview
+
+Any cross-meeting or analytics capability
+
+Intent Classification (Required)
+
+When a user asks a question in a Slack thread, classify it into one of three intents:
+
+1️⃣ Extractive (Specific Fact)
+
+Examples:
+
+“What issue did Brian experience?”
+
+“Who attended the meeting?”
+
+“Was pricing discussed?”
+
+Behavior
+
+Query Tier-1 sources only
+
+If evidence exists → answer with evidence
+
+If not found → respond with softened uncertainty (see below)
+
+Not allowed
+
+No inference
+
+No summarization
+
+2️⃣ Aggregative (General but Directed)
+
+Examples:
+
+“What issues came up?”
+
+“What concerns did the customer raise?”
+
+“What open questions are there?”
+
+Behavior
+
+Return a curated list of extracted items
+
+Each item must be grounded in Tier-1 data
+
+No narrative summary
+
+If nothing relevant is found → softened uncertainty
+
+3️⃣ Summary (Explicit Only)
+
+Examples:
+
+“Summarize the meeting”
+
+“Give me a meeting overview”
+
+“What were the key takeaways?”
+
+Behavior
+
+Generate a meeting summary
+
+Use existing summary implementation (GPT-5)
+
+This path must be entered only when explicitly requested
+
+Uncertainty Response (Standardized)
+
+When no extractive or aggregative answer is found, respond with exactly this pattern (or equivalent wording):
+
+“I don’t see this explicitly mentioned in the meeting.
+If you’d like, I can share what was discussed instead.”
+
+Rules:
+
+Do not generate a summary automatically
+
+Wait for explicit user follow-up before summarizing
+
+Slack Behavior Rules (Reminder)
+
+Bot responds only when explicitly tagged
+
+Bot replies in-thread only
+
+No proactive responses
+
+No cross-thread or cross-meeting context
+
+Acceptance Criteria
+
+This task is complete when:
+
+Specific questions never return summaries
+
+General questions return lists, not narratives
+
+Missing answers return softened uncertainty
+
+Summaries are generated only after explicit user intent
+
+GPT-5 is used only for summaries
+
+Only Tier-1 capabilities are used for single-meeting answers
+
+Final Note
+
+This is a behavioral contract, not just an implementation detail.
+Correctness, trust, and predictability matter more than “helpful-sounding” responses.
