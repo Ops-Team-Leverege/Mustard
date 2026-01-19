@@ -158,13 +158,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // MULTI-CONTEXT MODE:
     // Otherwise, use MCP router for cross-meeting and analytics capabilities.
     //
-    const isSingleMeetingMode = threadContext?.meetingId && threadContext?.companyId;
+    const isSingleMeetingMode = Boolean(threadContext?.meetingId && threadContext?.companyId);
 
     try {
       let responseText: string;
       let capabilityName: string;
       let resolvedCompanyId: string | null = null;
       let resolvedMeetingId: string | null = null;
+      let intentClassification: string | null = null;
+      let dataSource: string | null = null;
 
       if (isSingleMeetingMode) {
         // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
@@ -195,6 +197,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         capabilityName = `single_meeting_${result.intent}`;
         resolvedCompanyId = singleMeetingContext.companyId;
         resolvedMeetingId = singleMeetingContext.meetingId;
+        intentClassification = result.intent;
+        dataSource = result.dataSource;
         
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}`);
       } else {
@@ -228,6 +232,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Log interaction (write-only, non-blocking)
       // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
+      // For single-meeting mode, include intent classification and data source for monitoring
       storage.insertInteractionLog({
         slackThreadId: threadTs,
         slackMessageTs: botReply.ts, // Actual bot reply message timestamp
@@ -238,7 +243,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         capabilityName,
         questionText: text,
         answerText: responseText,
-        resolvedEntities: { companyId: resolvedCompanyId, meetingId: resolvedMeetingId },
+        resolvedEntities: { 
+          companyId: resolvedCompanyId, 
+          meetingId: resolvedMeetingId,
+          // Single-meeting mode tracking
+          intentClassification: intentClassification || undefined,
+          dataSource: dataSource || undefined,
+          isSingleMeetingMode: isSingleMeetingMode || false,
+        },
         confidence: null,
       }).catch(err => {
         console.error("Failed to log interaction:", err);

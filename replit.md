@@ -78,3 +78,56 @@ Key functionalities include a transcript detail view, meeting date support, and 
 ### Integrations
 - **Replit Auth**
 - **Jira Integration**
+
+## Slack Single-Meeting Orchestrator
+
+**Purpose:** Handles Slack user questions scoped to a single meeting with strict behavioral guarantees.
+
+**Core Invariants:**
+- One thread = one meeting
+- Summaries are opt-in only (never a fallback)
+- No inference or hallucination
+- Uncertainty must be communicated honestly
+- Only Tier-1 capabilities allowed for single-meeting answers
+
+**Capability Trust Matrix:**
+
+| Tier | Capabilities | Usage |
+|------|-------------|-------|
+| Tier 1 (Allowed) | attendees, customer_questions, next_steps/commitments, raw transcript | Single-meeting answers |
+| Tier 2 (Summary Only) | meeting_summaries, GPT-5 | Explicit opt-in only |
+| Tier 3 (Blocked) | qa_pairs, searchQuestions, searchCompanyFeedback, getCompanyInsights | NOT allowed in single-meeting flow |
+
+**Intent Classification:**
+
+1. **Extractive** (Specific Fact):
+   - Examples: "What issue did Brian experience?", "Who attended?", "Was pricing discussed?"
+   - Behavior: Query Tier-1 sources only, return with evidence
+
+2. **Aggregative** (General but Directed):
+   - Examples: "What issues came up?", "What concerns did the customer raise?"
+   - Behavior: Return curated list from Tier-1 data (no narrative)
+
+3. **Summary** (Explicit Only):
+   - Examples: "Summarize the meeting", "Give me an overview"
+   - Behavior: Generate summary using GPT-5 (only when explicitly requested)
+
+**Uncertainty Response:**
+When no extractive or aggregative answer is found:
+```
+I don't see this explicitly mentioned in the meeting.
+If you'd like, I can share what was discussed instead.
+```
+
+**Monitoring:**
+- All Slack interactions are logged to `interaction_logs` table
+- Single-meeting mode logs include additional fields in `resolvedEntities`:
+  - `intentClassification`: "extractive" | "aggregative" | "summary"
+  - `dataSource`: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "not_found"
+  - `isSingleMeetingMode`: boolean flag for filtering
+- Use these fields to monitor intent classification accuracy and identify patterns
+
+**Activation:**
+- Single-meeting mode activates when Slack thread has resolved `meetingId` + `companyId`
+- File: `server/mcp/singleMeetingOrchestrator.ts`
+- Integrated via: `server/slack/events.ts`
