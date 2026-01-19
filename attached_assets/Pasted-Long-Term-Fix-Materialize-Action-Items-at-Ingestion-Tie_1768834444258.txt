@@ -1,0 +1,187 @@
+Long-Term Fix: Materialize Action Items at Ingestion (Tier-1)
+Context
+
+We are finalizing the long-term architecture for Slack single-meeting Q&A.
+
+Currently, action items / commitments are extracted on demand during Slack question handling and cached as a workaround. While this works functionally, it violates a core architectural principle:
+
+Tier-1 artifacts must be fully materialized at ingestion time, not generated on the request path.
+
+Action items are Tier-1 data (single-meeting, extractive, deterministic) and must behave like:
+
+customer_questions
+
+meeting attendees
+
+Goal
+
+Move action item extraction to the transcript ingestion pipeline, store the results in the database, and update the Slack SingleMeetingOrchestrator to read only from persisted data.
+
+After this change:
+
+Slack single-meeting Q&A must never trigger LLM extraction
+
+No caching is required
+
+User question order must not affect correctness or latency
+
+Scope (IMPORTANT)
+
+This task applies only to:
+
+Action item extraction
+
+Ingestion pipeline
+
+Slack single-meeting read paths
+
+Do not:
+
+Change intent classification logic
+
+Change summary behavior
+
+Change OpenAI usage in other parts of the system
+
+Modify Tier-3 search or analytics capabilities
+
+Architectural Invariants (Must Hold)
+
+All Tier-1 artifacts are materialized during ingestion
+
+Slack single-meeting Q&A is read-only
+
+No LLM calls occur on the Slack request path
+
+Summaries remain explicit opt-in (GPT-5)
+
+Tier-3 capabilities remain blocked
+
+Implementation Tasks
+1️⃣ Create meeting_action_items Table
+
+Create a new database table to store extracted action items.
+
+Recommended schema (can be adjusted for existing conventions):
+
+id
+
+transcript_id
+
+action_text (verbatim)
+
+owner_name
+
+action_type
+(commitment | investigation | blocker | plan | scheduling)
+
+evidence_quote (verbatim transcript snippet)
+
+timestamp_start
+
+This table should provide the same trust guarantees as customer_questions.
+
+2️⃣ Move Action Item Extraction to Ingestion
+
+During transcript ingestion (where other Tier-1 extractions already occur):
+
+Run the existing extractMeetingActionStates() logic
+
+Persist results to meeting_action_items
+
+Ensure extraction runs once per transcript (async is fine)
+
+Important:
+
+This is where LLM cost belongs
+
+Slack should never trigger this extraction
+
+3️⃣ Add Storage & Retrieval Methods
+
+Implement storage helpers:
+
+createMeetingActionItems(transcript_id, items)
+
+getMeetingActionItems(transcript_id)
+
+deleteMeetingActionItemsByTranscript(transcript_id) (if needed)
+
+These should mirror how customer_questions is handled.
+
+4️⃣ Update Slack SingleMeetingOrchestrator
+
+Replace request-time extraction logic with DB reads:
+
+Before (temporary behavior):
+
+Extract action items dynamically
+
+Cache results
+
+After (target behavior):
+
+Read from meeting_action_items only
+
+No LLM calls
+
+No caching
+
+5️⃣ Maintain Extractive Search Order (Locked)
+
+Ensure the orchestrator uses the documented extractive precedence:
+
+Priority	Source	Purpose
+1	Attendees	Who was present
+2	customer_questions	What customers asked
+3	meeting_action_items	Explicit issues, follow-ups, named events
+4	Transcript snippets	Last resort, verbatim
+
+This order must remain explicit and documented.
+
+6️⃣ Remove Request-Time Action Item Extraction
+
+Once DB-backed reads are in place:
+
+Remove any remaining calls to extractMeetingActionStates() from Slack paths
+
+Remove caching logic related to action items
+
+Slack single-meeting Q&A must be fully deterministic and read-only.
+
+Acceptance Criteria
+
+This task is complete when:
+
+Action items are extracted exactly once per meeting (at ingestion)
+
+Slack single-meeting Q&A never triggers LLM extraction
+
+Direct questions like
+“What was the application issue Brian experienced?”
+are answered from stored action items
+
+No caching is required for correctness or performance
+
+Tier-1 / Tier-2 / Tier-3 boundaries remain intact
+
+Why This Matters
+
+This change:
+
+Eliminates unpredictable Slack latency
+
+Makes correctness independent of question order
+
+Reduces LLM cost
+
+Strengthens single-meeting guarantees
+
+Aligns action items with other Tier-1 artifacts
+
+This is an architectural maturity step, not a feature change.
+
+Final Note
+
+This replaces the temporary caching workaround with the correct long-term design.
+Please prioritize correctness, determinism, and clean separation of ingestion vs query paths.

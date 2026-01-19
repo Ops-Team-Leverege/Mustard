@@ -161,6 +161,34 @@ export const customerQuestions = pgTable("customer_questions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Meeting Action Items (Tier-1, Materialized at Ingestion)
+// 
+// This table stores action items extracted during transcript ingestion.
+// Like customer_questions, these are Tier-1 artifacts:
+// - Extracted once at ingestion time (not on query path)
+// - Verbatim evidence from transcript
+// - No inference or hallucination
+// - Deterministic extraction using gpt-4o at temperature 0
+//
+// Used by Slack Single-Meeting Orchestrator for extractive Q&A.
+export const ACTION_ITEM_TYPES = ["commitment", "request", "blocker", "plan", "scheduling"] as const;
+export type ActionItemType = typeof ACTION_ITEM_TYPES[number];
+
+export const meetingActionItems = pgTable("meeting_action_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  product: text("product").default("PitCrew").notNull(),
+  transcriptId: varchar("transcript_id").notNull(),
+  companyId: varchar("company_id"),
+  actionText: text("action_text").notNull(), // Verb + object (clean, professional)
+  ownerName: text("owner_name").notNull(), // Person name(s), NOT company names
+  actionType: text("action_type").notNull(), // "commitment" | "request" | "blocker" | "plan" | "scheduling"
+  deadline: text("deadline"), // null or "Not specified" if not stated
+  evidenceQuote: text("evidence_quote").notNull(), // Verbatim transcript snippet
+  confidence: real("confidence").notNull(), // 0-1 (≥0.85 explicit, 0.7-0.84 implied)
+  isPrimary: boolean("is_primary").default(true).notNull(), // Primary (high confidence) vs secondary
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const posSystems = pgTable("pos_systems", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   product: text("product").default("PitCrew").notNull(),
@@ -328,6 +356,14 @@ export const insertCustomerQuestionSchema = createInsertSchema(customerQuestions
   status: z.enum(CUSTOMER_QUESTION_STATUSES),
 });
 
+export const insertMeetingActionItemSchema = createInsertSchema(meetingActionItems).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  product: z.enum(PRODUCTS).default("PitCrew"),
+  actionType: z.enum(ACTION_ITEM_TYPES),
+});
+
 export type InsertTranscript = z.infer<typeof insertTranscriptSchema>;
 export type Transcript = typeof transcripts.$inferSelect;
 
@@ -354,6 +390,9 @@ export type POSSystem = typeof posSystems.$inferSelect;
 
 export type InsertCustomerQuestion = z.infer<typeof insertCustomerQuestionSchema>;
 export type CustomerQuestion = typeof customerQuestions.$inferSelect;
+
+export type InsertMeetingActionItem = z.infer<typeof insertMeetingActionItemSchema>;
+export type MeetingActionItem = typeof meetingActionItems.$inferSelect;
 
 export type POSSystemWithCompanies = POSSystem & {
   companies: Company[];
