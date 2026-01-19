@@ -5,6 +5,7 @@ import { analyzeTranscript } from "./transcriptAnalyzer";
 import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
 import { ingestTranscriptChunks } from "./ingestion/ingestTranscriptChunks";
 import { extractCustomerQuestions } from "./extraction/extractCustomerQuestions";
+import { extractMeetingActionStates, type MeetingActionItem as ComposerActionItem, type TranscriptChunk as ComposerChunk } from "./rag/composer";
 import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
@@ -119,6 +120,80 @@ async function extractCustomerQuestionsForTranscript(
   );
   
   console.log(`[CustomerQuestions] Saved ${extractedQuestions.length} customer questions for transcript ${transcriptId}`);
+}
+
+/**
+ * Meeting Action Items Extraction (Tier-1, Materialized at Ingestion)
+ * 
+ * This function extracts action items/commitments during transcript ingestion.
+ * Like customer questions, these are Tier-1 artifacts:
+ * - Extracted once at ingestion time (NOT on query path)
+ * - Uses extractMeetingActionStates from RAG composer
+ * - Fails independently without affecting other extractors
+ * - Retryable - cleans up existing items before re-extraction
+ */
+async function extractActionItemsForTranscript(
+  transcriptId: string,
+  product: Product,
+): Promise<void> {
+  console.log(`[ActionItems] Starting extraction for transcript ${transcriptId}`);
+  
+  // Get transcript chunks (up to 5000 for full coverage)
+  const chunks = await storage.getChunksForTranscript(transcriptId, 5000);
+  
+  if (chunks.length === 0) {
+    console.log(`[ActionItems] No chunks found for transcript ${transcriptId}, skipping`);
+    return;
+  }
+  
+  // Idempotent: Clear any existing action items from previous runs
+  await storage.deleteMeetingActionItemsByTranscript(transcriptId);
+  
+  // Get transcript for companyId and speaker info
+  const transcript = await storage.getTranscript(product, transcriptId);
+  if (!transcript) {
+    console.log(`[ActionItems] Transcript ${transcriptId} not found, skipping`);
+    return;
+  }
+  
+  // Map to composer format
+  const composerChunks: ComposerChunk[] = chunks.map(c => ({
+    chunkIndex: c.chunkIndex,
+    speakerRole: (c.speakerRole || "unknown") as "leverege" | "customer" | "unknown",
+    speakerName: c.speakerName || undefined,
+    text: c.content,
+  }));
+  
+  // Extract action items using the RAG composer
+  const { primary, secondary } = await extractMeetingActionStates(composerChunks, {
+    leverageTeam: transcript.leverageTeam || undefined,
+    customerNames: transcript.customerNames || undefined,
+  });
+  
+  const allItems = [...primary, ...secondary];
+  
+  if (allItems.length === 0) {
+    console.log(`[ActionItems] No action items found in transcript ${transcriptId}`);
+    return;
+  }
+  
+  // Save to database
+  await storage.createMeetingActionItems(
+    allItems.map((item, index) => ({
+      product,
+      transcriptId,
+      companyId: transcript.companyId,
+      actionText: item.action,
+      ownerName: item.owner,
+      actionType: item.type,
+      deadline: item.deadline === "Not specified" ? null : item.deadline,
+      evidenceQuote: item.evidence,
+      confidence: item.confidence,
+      isPrimary: index < primary.length, // First N items are primary
+    })),
+  );
+  
+  console.log(`[ActionItems] Saved ${allItems.length} action items (${primary.length} primary, ${secondary.length} secondary) for transcript ${transcriptId}`);
 }
 
 // Background processing function for transcript AI analysis
@@ -309,6 +384,15 @@ async function processTranscriptInBackground(
       } catch (err) {
         // Non-fatal: log and continue - does not affect transcript or Q&A processing
         console.error(`[CustomerQuestions] Extraction failed for transcript ${transcriptId}:`, err);
+      }
+      
+      // Meeting Action Items Extraction (Tier-1, Materialized)
+      // Runs AFTER chunking, fails independently, retryable
+      try {
+        await extractActionItemsForTranscript(transcriptId, product);
+      } catch (err) {
+        // Non-fatal: log and continue - does not affect other extractors
+        console.error(`[ActionItems] Extraction failed for transcript ${transcriptId}:`, err);
       }
     }).catch((err) => {
       console.error(`Failed to chunk transcript ${transcriptId}:`, err);
