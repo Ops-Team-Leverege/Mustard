@@ -55,7 +55,7 @@ import {
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
 import { neon } from "@neondatabase/serverless";
-import { eq, sql as drizzleSql, inArray, and } from "drizzle-orm";
+import { eq, sql as drizzleSql, inArray, and, gt } from "drizzle-orm";
 
 export interface IStorage {
   // Transcripts
@@ -2488,7 +2488,10 @@ export class DbStorage implements IStorage {
     return await this.db
       .select()
       .from(meetingActionItemsTable)
-      .where(eq(meetingActionItemsTable.transcriptId, transcriptId));
+      .where(and(
+        eq(meetingActionItemsTable.transcriptId, transcriptId),
+        gt(meetingActionItemsTable.confidence, 0) // Exclude sentinel rows from backfill
+      ));
   }
 
   async createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]> {

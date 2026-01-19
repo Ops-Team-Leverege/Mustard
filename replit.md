@@ -104,6 +104,12 @@ Key functionalities include a transcript detail view, meeting date support, and 
 - Tier-1 tables: `customer_questions`, `meeting_action_items`
 - Extraction runs in `server/routes.ts` after chunking completes
 
+**Backfill & Sentinel Row Contract:**
+- Backfill scripts (`server/scripts/backfill-action-items.ts`) use sentinel rows to track processed transcripts
+- Sentinel rows have `confidence = 0` and mark transcripts with no extractable items
+- Storage method `getMeetingActionItemsByTranscript` filters with `confidence > 0` to exclude sentinels
+- DO NOT remove this filter - it ensures Tier-1 data stays clean while maintaining idempotent backfills
+
 **Intent Classification:**
 
 1. **Extractive** (Specific Fact):
