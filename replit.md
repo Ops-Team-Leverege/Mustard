@@ -33,7 +33,7 @@ The system is built as a Single-Page Application (SPA) using React and Vite, fea
 The frontend is built with React and TypeScript, leveraging Shadcn/ui (New York style), Radix UI, and Tailwind CSS for a dark-mode-first UI inspired by Linear/Notion aesthetics. State management is handled by TanStack Query for server state and React hooks for local state. Custom CSS variables and the Inter font define the design system.
 
 ### Backend
-The backend uses Express.js with TypeScript, providing a RESTful JSON API. Data is managed with PostgreSQL and Drizzle ORM, with Zod for schema validation. OpenAI API (GPT-5) is integrated for AI tasks, utilizing structured prompt engineering for analysis and categorization, with batching for large transcripts. Authentication is handled via Replit Auth (OpenID Connect), restricting access to specific email domains. The database schema supports various entities including `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, and `users`.
+The backend uses Express.js with TypeScript, providing a RESTful JSON API. Data is managed with PostgreSQL and Drizzle ORM, with Zod for schema validation. OpenAI API (GPT-5) is integrated for AI tasks, utilizing structured prompt engineering for analysis and categorization, with batching for large transcripts. Authentication is handled via Replit Auth (OpenID Connect), restricting access to specific email domains. The database schema supports various entities including `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, `meeting_action_items`, and `users`.
 
 ### Key Features
 Key functionalities include a transcript detail view, meeting date support, and dashboard analytics for companies and categories. Contact management includes smart duplicate prevention, while transcript management offers full list views, search, edit, and delete options. The system supports company stage management, service tagging, and tracking of POS systems, including automatic detection from transcripts. It also allows for meeting notes and supporting materials during upload. A critical architectural invariant is the preservation of speaker identity in transcripts. The system differentiates between `qa_pairs` (interpreted Q&A) and `customer_questions` (verbatim, evidence-based extraction) to ensure data trust and integrity. The Slack Single-Meeting Orchestrator handles user questions scoped to a single meeting, with strict rules for capabilities and uncertainty communication, ensuring no inference or hallucination.
@@ -94,9 +94,15 @@ Key functionalities include a transcript detail view, meeting date support, and 
 
 | Tier | Capabilities | Usage |
 |------|-------------|-------|
-| Tier 1 (Allowed) | attendees, customer_questions, next_steps/commitments, raw transcript | Single-meeting answers |
+| Tier 1 (Allowed) | attendees, customer_questions, meeting_action_items, raw transcript | Single-meeting answers |
 | Tier 2 (Summary Only) | meeting_summaries, GPT-5 | Explicit opt-in only |
 | Tier 3 (Blocked) | qa_pairs, searchQuestions, searchCompanyFeedback, getCompanyInsights | NOT allowed in single-meeting flow |
+
+**Tier-1 Materialization (CRITICAL):**
+- All Tier-1 artifacts are extracted ONCE at transcript ingestion time
+- Slack single-meeting Q&A is READ-ONLY (no LLM calls on request path)
+- Tier-1 tables: `customer_questions`, `meeting_action_items`
+- Extraction runs in `server/routes.ts` after chunking completes
 
 **Intent Classification:**
 
@@ -114,12 +120,12 @@ Key functionalities include a transcript detail view, meeting date support, and 
 
 **Extractive Search Order (LOCKED):**
 
-| Priority | Source | What it answers |
-|----------|--------|-----------------|
-| 1 | Attendees | Who was present |
-| 2 | Customer questions | What customers asked (high-trust, verbatim) |
-| 3 | Action items / commitments | Explicit issues, follow-ups, and named events |
-| 4 | Transcript snippets | Last resort, verbatim evidence |
+| Priority | Source | Table | What it answers |
+|----------|--------|-------|-----------------|
+| 1 | Attendees | `transcripts.leverage_team/customer_names` | Who was present |
+| 2 | Customer questions | `customer_questions` | What customers asked (high-trust, verbatim) |
+| 3 | Action items | `meeting_action_items` | Explicit issues, follow-ups, and named events |
+| 4 | Transcript snippets | `transcript_chunks` | Last resort, verbatim evidence |
 
 **RULE:** Action items are checked whenever the question asks about issues, problems, blockers, errors, or incidents — regardless of whether the user says "next steps".
 
