@@ -35,6 +35,14 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+// Cache for extracted action items per meeting (avoids re-extraction on every question)
+// Key: meetingId, Value: { items, extractedAt }
+const actionItemsCache = new Map<string, { 
+  items: MeetingActionItem[], 
+  extractedAt: number 
+}>();
+const ACTION_ITEMS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
 export type SingleMeetingIntent = "extractive" | "aggregative" | "summary";
 
 export type SingleMeetingContext = {
@@ -217,15 +225,26 @@ async function getMeetingAttendees(
 /**
  * Get action items/commitments for a meeting.
  * Dynamically extracts action items using the RAG composer for high-quality results.
- * Returns formatted action items with owner information.
+ * Results are cached to avoid re-extraction on every question.
  */
 async function getMeetingActionItems(
   meetingId: string
 ): Promise<MeetingActionItem[]> {
+  // Check cache first
+  const cached = actionItemsCache.get(meetingId);
+  if (cached && Date.now() - cached.extractedAt < ACTION_ITEMS_CACHE_TTL_MS) {
+    console.log(`[SingleMeetingOrchestrator] Using cached action items for meeting ${meetingId}`);
+    return cached.items;
+  }
+  
+  console.log(`[SingleMeetingOrchestrator] Extracting action items for meeting ${meetingId}...`);
+  
   // Get transcript chunks for extraction
   const chunks = await storage.getChunksForTranscript(meetingId, 5000);
   
   if (chunks.length === 0) {
+    // Cache empty result to avoid re-querying
+    actionItemsCache.set(meetingId, { items: [], extractedAt: Date.now() });
     return [];
   }
   
@@ -246,8 +265,13 @@ async function getMeetingActionItems(
     customerNames: customerNames.length > 0 ? customerNames.join(", ") : undefined,
   });
   
-  // Return all action items (primary + secondary)
-  return [...primary, ...secondary];
+  const allItems = [...primary, ...secondary];
+  
+  // Cache the results
+  actionItemsCache.set(meetingId, { items: allItems, extractedAt: Date.now() });
+  console.log(`[SingleMeetingOrchestrator] Cached ${allItems.length} action items for meeting ${meetingId}`);
+  
+  return allItems;
 }
 
 /**
