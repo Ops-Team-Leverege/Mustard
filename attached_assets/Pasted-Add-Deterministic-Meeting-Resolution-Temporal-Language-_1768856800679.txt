@@ -1,0 +1,186 @@
+Add Deterministic Meeting Resolution (Temporal Language)
+Context
+
+Slack single-meeting Q&A currently assumes a meeting is already resolved (via thread context).
+However, in new threads, users may explicitly reference meetings using temporal language such as:
+
+“last meeting”
+
+“latest meeting”
+
+“meeting on Aug 7”
+
+“meeting last week”
+
+“meeting last month”
+
+We already store meeting dates in the transcripts table via meetingDate (with fallback to createdAt).
+We need to deterministically resolve the meeting before intent classification.
+
+This must be done without LLMs, without guessing, and without cross-meeting answers.
+
+Goal
+
+Introduce a Step 0: Meeting Resolution phase that runs before intent classification and determines whether:
+
+a single meeting can be resolved safely
+
+clarification is required
+
+Architectural Invariants (Do NOT break)
+
+Slack answers must always be scoped to exactly one meeting
+
+Thread-bound meeting context always wins
+
+Temporal language is only honored when explicitly stated
+
+If resolution is ambiguous → ask the user
+
+No LLM calls in meeting resolution
+
+No cross-meeting aggregation
+
+New Step 0 — Meeting Resolution Logic
+Resolution Order (Strict)
+1️⃣ Thread context (highest priority)
+
+If Slack thread already resolves to a meetingId
+
+Use it
+
+Ignore any temporal language in the question
+
+2️⃣ Explicit meeting reference
+
+If user provides:
+
+meeting ID
+
+transcript link
+
+Use it
+
+3️⃣ Explicit temporal language (new threads only)
+
+Trigger only if the user explicitly says one of:
+
+“last meeting”
+
+“latest meeting”
+
+“most recent meeting”
+
+“meeting on <date>”
+
+“meeting last week”
+
+“meeting last month”
+
+Do NOT infer time if not stated.
+
+Temporal Resolution Rules
+A. “Last / Latest / Most Recent meeting”
+
+Resolve as:
+
+ORDER BY meetingDate DESC
+
+
+(using meetingDate, falling back to createdAt if missing)
+
+If exactly one most recent meeting → use it
+
+If multiple meetings share the same most recent date → ask clarification
+
+B. “Meeting on <date>”
+
+Match meetings where meetingDate falls on that calendar date
+
+If:
+
+one match → use it
+
+multiple matches → ask clarification
+
+zero matches → say none found
+
+C. Relative time (“last week”, “last month”)
+
+Resolve as:
+
+Compute date range relative to today
+
+Filter meetings within range
+
+Then:
+
+if exactly one → use it
+
+if multiple → ask clarification
+
+if zero → say none found
+
+Clarification Behavior (Required)
+
+If multiple meetings match, respond instead of answering:
+
+“I see multiple Les Schwab meetings that match your request:
+• Aug 7, 2025
+• Sep 11, 2025
+Which one should I use?”
+
+No intent classification should run until resolved.
+
+Implementation Notes
+
+Add a deterministic helper, e.g.:
+
+resolveMeetingFromSlackMessage(...)
+
+
+This must run before:
+
+intent classification
+
+Tier-1 lookup
+
+Return either:
+
+{ meetingId }
+
+{ needsClarification: true, options: [...] }
+
+Explicit Non-Goals
+
+Do NOT search across meetings silently
+
+Do NOT reinterpret vague wording
+
+Do NOT fallback to “last created transcript” unless explicitly asked
+
+Do NOT use LLMs for resolution
+
+Acceptance Criteria
+
+This is complete when:
+
+“last meeting” in a new thread resolves correctly by meetingDate
+
+Ambiguous temporal queries ask for clarification
+
+Thread-scoped conversations are unaffected
+
+Slack never answers across multiple meetings
+
+No LLM calls are added
+
+Why This Matters
+
+This closes the final ambiguity gap:
+
+Users can explicitly ask for “last” or dated meetings
+
+The system stays deterministic and trustworthy
+
+Single-meeting guarantees remain intact
