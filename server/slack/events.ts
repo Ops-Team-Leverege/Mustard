@@ -246,9 +246,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let intentClassification: string | null = null;
       let dataSource: string | null = null;
 
+      // Track pending offer state for single-meeting confirmations
+      let pendingOffer: string | undefined;
+
       if (isSingleMeetingMode && resolvedMeeting) {
         // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
         console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
+        
+        // Check for pending summary offer from last interaction in this thread
+        let hasPendingOffer = false;
+        if (threadTs) {
+          const lastInteraction = await storage.getLastInteractionByThread(threadTs);
+          if (lastInteraction?.resolvedEntities) {
+            const entities = lastInteraction.resolvedEntities as Record<string, unknown>;
+            hasPendingOffer = entities.pendingOffer === "summary";
+            console.log(`[Slack] Thread has pending offer: ${hasPendingOffer}`);
+          }
+        }
         
         const singleMeetingContext: SingleMeetingContext = {
           meetingId: resolvedMeeting.meetingId,
@@ -257,15 +271,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
           meetingDate: resolvedMeeting.meetingDate,
         };
         
-        const result = await handleSingleMeetingQuestion(singleMeetingContext, text);
+        const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer);
         responseText = result.answer;
         capabilityName = `single_meeting_${result.intent}`;
         resolvedCompanyId = singleMeetingContext.companyId;
         resolvedMeetingId = singleMeetingContext.meetingId;
         intentClassification = result.intent;
         dataSource = result.dataSource;
+        pendingOffer = result.pendingOffer;
         
-        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}`);
+        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}`);
       } else {
         // MULTI-CONTEXT MODE: Use MCP router
         const ctx = makeMCPContext(threadContext);
@@ -297,7 +312,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Log interaction (write-only, non-blocking)
       // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
-      // For single-meeting mode, include intent classification and data source for monitoring
+      // For single-meeting mode, include intent classification, data source, and pending offer state
       storage.insertInteractionLog({
         slackThreadId: threadTs,
         slackMessageTs: botReply.ts, // Actual bot reply message timestamp
@@ -315,6 +330,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
           intentClassification: intentClassification || undefined,
           dataSource: dataSource || undefined,
           isSingleMeetingMode: isSingleMeetingMode || false,
+          // Pending offer state (for confirmation flow)
+          pendingOffer: pendingOffer || undefined,
         },
         confidence: null,
       }).catch(err => {

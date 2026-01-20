@@ -57,6 +57,7 @@ export type SingleMeetingResult = {
   intent: SingleMeetingIntent;
   dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "not_found";
   evidence?: string;
+  pendingOffer?: "summary"; // Indicates bot offered summary, awaiting user response
 };
 
 /**
@@ -82,7 +83,7 @@ function getMeetingDateSuffix(ctx: SingleMeetingContext): string {
 }
 
 const UNCERTAINTY_RESPONSE = `I don't see this explicitly mentioned in the meeting.
-If you'd like, I can share what was discussed instead.`;
+If you say "yes", I'll share a brief meeting summary.`;
 
 /**
  * Classify user question intent.
@@ -197,17 +198,35 @@ function isAttendeeQuestion(question: string): boolean {
 }
 
 /**
- * Detect if user is confirming a prior offer (e.g., "sure!", "yes", "ok").
- * This triggers summary generation when following an uncertainty response.
+ * Detect if user is accepting or declining a pending summary offer.
+ * 
+ * ACCEPTANCE: "yes", "sure", "ok", "please", "go ahead"
+ * DECLINE: "no", "never mind", "nope", "nah"
+ * 
+ * Returns: "accept" | "decline" | null
  */
-function isConfirmationResponse(question: string): boolean {
-  const q = question.toLowerCase().trim();
-  const confirmationPatterns = [
-    /^(sure|yes|yeah|yep|ok|okay|please|go ahead|do it|show me|tell me)\.?!?$/,
-    /^(sure thing|yes please|ok please|yeah please)\.?!?$/,
-    /^(yes,? please|yeah,? sure)\.?!?$/,
+function detectOfferResponse(question: string): "accept" | "decline" | null {
+  const q = question.toLowerCase().trim().replace(/[.!?,]+$/, "");
+  
+  // Acceptance patterns - kept simple and explicit
+  const acceptPatterns = [
+    /^(yes|sure|ok|okay|please|go ahead)$/,
+    /^yes\s*please$/,
+    /^sure\s*thing$/,
   ];
-  return confirmationPatterns.some(p => p.test(q));
+  if (acceptPatterns.some(p => p.test(q))) {
+    return "accept";
+  }
+  
+  // Decline patterns
+  const declinePatterns = [
+    /^(no|nope|nah|never\s*mind|no\s*thanks|cancel)$/,
+  ];
+  if (declinePatterns.some(p => p.test(q))) {
+    return "decline";
+  }
+  
+  return null;
 }
 
 /**
@@ -847,31 +866,58 @@ Format with Slack markdown (*bold* for headers, bullet points for lists).`,
  * 
  * Classifies intent and routes to appropriate handler.
  * Enforces Tier-1-only access for extractive/aggregative intents.
- * Summary is only used for explicit summary requests.
+ * Summary is only used for explicit summary requests OR when user accepts pending offer.
+ * 
+ * @param ctx - Single meeting context (meetingId, companyName, meetingDate)
+ * @param question - User's question text
+ * @param hasPendingOffer - Whether the previous interaction offered a summary (from interaction_logs)
  */
 export async function handleSingleMeetingQuestion(
   ctx: SingleMeetingContext,
-  question: string
+  question: string,
+  hasPendingOffer: boolean = false
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Processing question for meeting ${ctx.meetingId}`);
-  console.log(`[SingleMeetingOrchestrator] Question: "${question.substring(0, 100)}..."`);
+  console.log(`[SingleMeetingOrchestrator] Question: "${question.substring(0, 100)}..." | pendingOffer: ${hasPendingOffer}`);
   
-  // Check for confirmation responses first (e.g., "sure!", "yes", "ok")
-  // These indicate user is accepting a prior offer to share what was discussed
-  if (isConfirmationResponse(question)) {
-    console.log(`[SingleMeetingOrchestrator] Detected confirmation response - triggering summary`);
-    return handleSummaryIntent(ctx);
+  // Check for offer responses first (only if there's a pending offer)
+  if (hasPendingOffer) {
+    const offerResponse = detectOfferResponse(question);
+    if (offerResponse === "accept") {
+      console.log(`[SingleMeetingOrchestrator] User accepted pending offer - triggering summary`);
+      return handleSummaryIntent(ctx);
+    }
+    if (offerResponse === "decline") {
+      console.log(`[SingleMeetingOrchestrator] User declined pending offer`);
+      return {
+        answer: "No problem! Let me know if you have other questions about this meeting.",
+        intent: "extractive",
+        dataSource: "not_found",
+      };
+    }
   }
   
   const intent = classifyIntent(question);
   console.log(`[SingleMeetingOrchestrator] Classified intent: ${intent}`);
   
   switch (intent) {
-    case "extractive":
-      return handleExtractiveIntent(ctx, question);
+    case "extractive": {
+      const result = await handleExtractiveIntent(ctx, question);
+      // Add pendingOffer flag if we're returning uncertainty
+      if (result.dataSource === "not_found") {
+        return { ...result, pendingOffer: "summary" };
+      }
+      return result;
+    }
     
-    case "aggregative":
-      return handleAggregativeIntent(ctx, question);
+    case "aggregative": {
+      const result = await handleAggregativeIntent(ctx, question);
+      // Add pendingOffer flag if we're returning uncertainty
+      if (result.dataSource === "not_found") {
+        return { ...result, pendingOffer: "summary" };
+      }
+      return result;
+    }
     
     case "summary":
       return handleSummaryIntent(ctx);
@@ -881,6 +927,7 @@ export async function handleSingleMeetingQuestion(
         answer: UNCERTAINTY_RESPONSE,
         intent: "extractive",
         dataSource: "not_found",
+        pendingOffer: "summary",
       };
   }
 }
