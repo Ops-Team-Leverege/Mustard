@@ -190,8 +190,33 @@ export async function semanticAnswerSingleMeeting(
     });
     
     console.log(`[SemanticAnswer] LLM call: ${Date.now() - startTime}ms`);
+    console.log(`[SemanticAnswer] Response choices: ${response.choices?.length || 0}`);
+    console.log(`[SemanticAnswer] Response finish_reason: ${response.choices?.[0]?.finish_reason}`);
+    console.log(`[SemanticAnswer] Response message role: ${response.choices?.[0]?.message?.role}`);
+    console.log(`[SemanticAnswer] Response content length: ${response.choices?.[0]?.message?.content?.length || 0}`);
+    console.log(`[SemanticAnswer] Response refusal: ${response.choices?.[0]?.message?.refusal || 'none'}`);
     
-    const rawAnswer = response.choices[0]?.message?.content || "I couldn't generate an answer.";
+    // Check for refusal (GPT-5 safety feature)
+    const refusal = response.choices?.[0]?.message?.refusal;
+    if (refusal) {
+      console.log(`[SemanticAnswer] Model refused: ${refusal}`);
+      return {
+        answer: "I wasn't able to find a clear answer to that question in the meeting data.",
+        confidence: "low",
+        evidenceSources,
+      };
+    }
+    
+    const rawAnswer = response.choices[0]?.message?.content;
+    if (!rawAnswer) {
+      console.log(`[SemanticAnswer] Empty content - full response: ${JSON.stringify(response.choices?.[0])}`);
+      return {
+        answer: "I wasn't able to generate an answer from the meeting data.",
+        confidence: "low",
+        evidenceSources,
+      };
+    }
+    
     const { answer, confidence } = parseConfidence(rawAnswer);
     
     console.log(`[SemanticAnswer] Complete | confidence=${confidence} | sources=${evidenceSources.join(",")}`);
