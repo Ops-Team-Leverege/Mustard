@@ -158,20 +158,42 @@ export function classifyIntent(question: string): SingleMeetingIntent {
 
 /**
  * Detect if user is asking about meeting attendees.
+ * 
+ * Deterministic matcher using word combinations:
+ * - attend variants: attend|attended|attendee|attendees|attendance
+ * - question words: who|how|anyone|was|were
+ * - optional context: present|on the call|there|in the meeting
  */
 function isAttendeeQuestion(question: string): boolean {
   const q = question.toLowerCase();
-  const patterns = [
-    /\bwho attended\b/,
-    /\bhow attended\b/,  // Common typo
-    /\bwho was (?:there|present|in the meeting|on the call)\b/,
-    /\battendees\b/,
-    /\bparticipants\b/,
-    /\bwho joined\b/,
-    /\bwho was on\b/,
-    /\bpeople (?:in|on) the (?:meeting|call)\b/,
+  
+  // Direct patterns for explicit attendee keywords
+  const directPatterns = [
+    /\battendees?\b/,
+    /\battendance\b/,
+    /\bparticipants?\b/,
   ];
-  return patterns.some(p => p.test(q));
+  if (directPatterns.some(p => p.test(q))) {
+    return true;
+  }
+  
+  // Combination matcher: (who|how|anyone|was|were) + attend variants
+  const questionWords = /\b(who|how|anyone|was|were)\b/;
+  const attendVariants = /\b(attend|attended|attending)\b/;
+  if (questionWords.test(q) && attendVariants.test(q)) {
+    return true;
+  }
+  
+  // Presence patterns: (who|how|anyone) + (present|on the call|there|in the meeting|joined)
+  const presencePatterns = [
+    /\b(who|how|anyone)\b.*\b(present|there|joined)\b/,
+    /\b(who|how|anyone)\b.*\bon the call\b/,
+    /\b(who|how|anyone)\b.*\bin the meeting\b/,
+    /\b(who|how|anyone)\b.*\bwas on\b/,
+    /\bpeople\s+(?:in|on)\s+the\s+(?:meeting|call)\b/,
+  ];
+  
+  return presencePatterns.some(p => p.test(q));
 }
 
 /**
