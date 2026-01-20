@@ -1,0 +1,217 @@
+Single-Meeting Test Logging (Schema-Aligned)
+Context
+
+We are running an extensive Single-Meeting test plan (v2) and need to audit system behavior using the existing interaction_logs table.
+
+⚠️ Do NOT change the schema.
+The table already exists and is the SSOT for observability.
+
+All additional signals must be recorded inside resolved_entities (JSONB) using a consistent structure.
+
+Goal
+
+After running the test scenarios, we must be able to determine from logs alone:
+
+Which execution path was taken
+
+Whether clarification was triggered correctly
+
+Whether the system answered, refused, or asked to clarify
+
+Whether Tier-1 or semantic logic was used
+
+Whether an LLM was invoked unnecessarily
+
+Whether the answer shape matched the question
+
+No new tables. No new columns.
+
+Existing Table (Reference)
+
+We are logging into:
+
+interaction_logs
+
+Key existing columns (already correct):
+
+slack_thread_id
+
+slack_message_ts
+
+slack_channel_id
+
+user_id
+
+company_id
+
+meeting_id
+
+capability_name
+
+question_text
+
+answer_text
+
+resolved_entities (JSONB)
+
+confidence
+
+created_at
+
+Required Change
+Populate resolved_entities consistently with execution metadata for every interaction.
+
+This metadata is not user-visible and is only for testing, debugging, and regression analysis.
+
+Required resolved_entities Structure (v1)
+
+Use the following keys inside resolved_entities.
+
+Not all fields must be present in every interaction, but when applicable they should be logged consistently.
+
+{
+  "entry_point": "preflight | single_meeting | mcp_router",
+
+  "intent": "next_steps | summary | attendees | binary | prep | content | unknown",
+
+  "answer_shape": "single_value | yes_no | list | summary | none",
+
+  "ambiguity": {
+    "detected": true,
+    "clarification_asked": true,
+    "type": "next_steps_or_summary"
+  },
+
+  "clarification_state": {
+    "awaiting": true,
+    "resolved_with": "next_steps | summary | null"
+  },
+
+  "data_source": "tier1 | semantic | not_found",
+
+  "tier1_entity": "action_items | attendees | customer_questions | null",
+
+  "llm": {
+    "used": true,
+    "purpose": "semantic_answer | summary | routing | null"
+  },
+
+  "resolution": {
+    "company_source": "thread | extracted | explicit | none",
+    "meeting_source": "thread | last_meeting | explicit | none"
+  }
+}
+
+Logging Rules
+1. Every user message → one interaction_logs row
+
+Including:
+
+clarification prompts
+
+clarification responses (“Next steps”, “Summary”)
+
+binary answers
+
+not-found cases
+
+2. Clarification flows must be observable
+
+When the bot asks:
+
+“Next steps or summary?”
+
+Log:
+
+ambiguity.detected = true
+
+ambiguity.clarification_asked = true
+
+clarification_state.awaiting = true
+
+Extract and store company_id before asking
+
+When the user replies:
+
+Log clarification_state.resolved_with
+
+Route directly to Tier-1 if applicable
+
+Ensure llm.used = false
+
+3. Binary questions must be visible as fast paths
+
+For questions like:
+
+“Is there a meeting with Walmart?”
+
+Ensure logs show:
+
+answer_shape = "yes_no"
+
+entry_point = "preflight"
+
+llm.used = false
+
+data_source = "tier1"
+
+4. LLM usage must be explicit
+
+Any time an LLM is called:
+
+llm.used = true
+
+llm.purpose must be set
+
+This allows us to detect:
+
+accidental routing calls
+
+latency regressions
+
+Success Criteria
+
+After running the Single-Meeting Test Scenarios v2, we should be able to answer the following by querying interaction_logs only:
+
+Did this test:
+
+answer directly?
+
+ask for clarification?
+
+correctly refuse / say not found?
+
+Was the entry point correct (preflight vs single-meeting vs MCP)?
+
+Was the answer shape correct for the question?
+
+Was Tier-1 used where expected?
+
+Was an LLM invoked when it should not have been?
+
+If any of these cannot be determined from logs, logging is insufficient.
+
+Explicit Non-Goals
+
+❌ Do not modify the table schema
+
+❌ Do not add new columns
+
+❌ Do not change user-visible responses
+
+❌ Do not add new capabilities
+
+This task is observability only, using the existing logging model.
+
+Why This Matters
+
+We are done designing behavior.
+Now we need proof and regression safety.
+
+Structured resolved_entities lets us:
+
+validate Single-Meeting correctness
+
+debug issues quickly
+
+prevent future regressions
