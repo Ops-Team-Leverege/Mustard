@@ -581,7 +581,7 @@ async function handleExtractiveIntent(
   }
   
   // GENERAL PATH: Fetch customer questions and action items in PARALLEL
-  // These are the two most common sources for general extractive questions
+  // Treat as "term lookup" - prefer action items and customer questions (cleanest nouns)
   console.log(`[SingleMeetingOrchestrator] General path: parallel fetch`);
   const [customerQuestions, actionItems] = await Promise.all([
     lookupCustomerQuestions(ctx.meetingId, question),
@@ -592,12 +592,33 @@ async function handleExtractiveIntent(
   // Extract keywords for scoring
   const { keywords, properNouns } = extractKeywords(question);
   const allKeywords = Array.from(new Set([...properNouns, ...keywords]));
+  const hasProperNouns = properNouns.length > 0;
   
-  // Score function: count how many keywords match in the text
+  console.log(`[SingleMeetingOrchestrator] Keywords: ${keywords.join(", ")} | Proper nouns: ${properNouns.join(", ")}`);
+  
+  // Score function with STRONG MATCH requirement:
+  // If query contains proper nouns, candidate MUST match at least one proper noun
+  // Returns -1 if strong match requirement not met (filtered out)
   const scoreMatch = (text: string): number => {
     const lowerText = text.toLowerCase();
+    
+    // Strong match: If query has proper nouns, require at least one to match
+    if (hasProperNouns) {
+      const matchesProperNoun = properNouns.some(pn => lowerText.includes(pn));
+      if (!matchesProperNoun) {
+        return -1; // Reject - doesn't match any proper noun
+      }
+    }
+    
+    // Score by total keyword matches
     return allKeywords.filter(kw => lowerText.includes(kw)).length;
   };
+  
+  // Score action items FIRST (preferred for term lookups)
+  const scoredActionItems = actionItems.map(ai => ({
+    item: ai,
+    score: scoreMatch(`${ai.action} ${ai.evidence} ${ai.owner}`),
+  })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
   
   // Score customer questions
   const scoredCustomerQuestions = customerQuestions.map(cq => ({
@@ -605,27 +626,43 @@ async function handleExtractiveIntent(
     score: scoreMatch(cq.questionText + " " + (cq.answerEvidence || "")),
   })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
   
-  // Score action items
-  const scoredActionItems = actionItems.map(ai => ({
-    item: ai,
-    score: scoreMatch(`${ai.action} ${ai.evidence} ${ai.owner}`),
-  })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
-  
-  // Pick the best match across both sources (highest keyword match count wins)
-  const bestCQ = scoredCustomerQuestions[0];
+  // Pick the best match - action items win ties since they contain cleaner term definitions
   const bestAI = scoredActionItems[0];
+  const bestCQ = scoredCustomerQuestions[0];
   
-  // Compare scores - action items win ties since they're more specific
-  if (bestCQ && (!bestAI || bestCQ.score > bestAI.score)) {
-    const match = bestCQ.item;
+  // Action items preferred for term lookups (contain cleaner nouns)
+  if (bestAI && (!bestCQ || bestAI.score >= bestCQ.score)) {
+    // Tier-1 compliant framing: "In this meeting, X references..." + quote
+    const item = bestAI.item;
+    const dateSuffix = getMeetingDateSuffix(ctx);
     const lines: string[] = [];
-    lines.push(`*From the meeting with ${ctx.companyName}:*`);
-    lines.push(`\n"${match.questionText}"`);
+    lines.push(`In this meeting${dateSuffix}, the next steps reference the following:`);
+    lines.push(`\n_"${item.evidence}"_`);
+    let formattedItem = `\n• ${item.action} — ${item.owner}`;
+    if (item.deadline && item.deadline !== "Not specified") {
+      formattedItem += ` _(${item.deadline})_`;
+    }
+    lines.push(formattedItem);
+    
+    return {
+      answer: lines.join("\n"),
+      intent: "extractive",
+      dataSource: "action_items",
+      evidence: item.evidence,
+    };
+  }
+  
+  if (bestCQ) {
+    const match = bestCQ.item;
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    const lines: string[] = [];
+    lines.push(`In this meeting${dateSuffix}, a customer question referenced this:`);
+    lines.push(`\n_"${match.questionText}"_`);
     if (match.askedByName) {
       lines.push(`— ${match.askedByName}`);
     }
     if (match.status === "ANSWERED" && match.answerEvidence) {
-      lines.push(`\n*Answer:* ${match.answerEvidence}`);
+      lines.push(`\n*Answer provided:* ${match.answerEvidence}`);
       if (match.answeredByName) {
         lines.push(`— ${match.answeredByName}`);
       }
@@ -641,46 +678,38 @@ async function handleExtractiveIntent(
     };
   }
   
-  if (bestAI) {
-    // Return action item match
-    const lines: string[] = [];
-    lines.push(`The meeting notes include a follow-up related to this:`);
-    const item = bestAI.item;
-    let formattedItem = `• ${item.action} — ${item.owner}`;
-    if (item.deadline && item.deadline !== "Not specified") {
-      formattedItem += ` _(${item.deadline})_`;
-    }
-    lines.push(`\n${formattedItem}`);
-    lines.push(`  _"${item.evidence}"_`);
-    lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
-    
-    return {
-      answer: lines.join("\n"),
-      intent: "extractive",
-      dataSource: "action_items",
-      evidence: item.evidence,
-    };
-  }
-  
   // FALLBACK: Transcript snippets (only fetch if needed - priority 4)
-  console.log(`[SingleMeetingOrchestrator] Fallback: transcript search`);
-  const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
-  console.log(`[SingleMeetingOrchestrator] Transcript fetch: ${Date.now() - startTime}ms`);
-  
-  if (snippets.length > 0) {
-    const lines: string[] = [];
-    lines.push(`*From the meeting with ${ctx.companyName}:*`);
-    snippets.forEach(s => {
-      lines.push(`\n"${s.content.substring(0, 200)}${s.content.length > 200 ? '...' : ''}"`);
-      lines.push(`— ${s.speakerName}`);
+  // Only fall back to transcript if we have proper nouns to match
+  if (hasProperNouns) {
+    console.log(`[SingleMeetingOrchestrator] Fallback: transcript search (proper noun required)`);
+    const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
+    console.log(`[SingleMeetingOrchestrator] Transcript fetch: ${Date.now() - startTime}ms`);
+    
+    // Filter snippets to only those matching at least one proper noun
+    const matchingSnippets = snippets.filter(s => {
+      const lowerContent = s.content.toLowerCase();
+      return properNouns.some(pn => lowerContent.includes(pn));
     });
     
-    return {
-      answer: lines.join("\n"),
-      intent: "extractive",
-      dataSource: "transcript",
-      evidence: snippets[0].content,
-    };
+    if (matchingSnippets.length > 0) {
+      const dateSuffix = getMeetingDateSuffix(ctx);
+      const lines: string[] = [];
+      lines.push(`In this meeting${dateSuffix}, the transcript mentions:`);
+      matchingSnippets.slice(0, 2).forEach(s => {
+        lines.push(`\n_"${s.content.substring(0, 200)}${s.content.length > 200 ? '...' : ''}"_`);
+        lines.push(`— ${s.speakerName}`);
+      });
+      
+      return {
+        answer: lines.join("\n"),
+        intent: "extractive",
+        dataSource: "transcript",
+        evidence: matchingSnippets[0].content,
+      };
+    }
+  } else {
+    // No proper nouns - skip transcript search entirely
+    console.log(`[SingleMeetingOrchestrator] Skipping transcript fallback (no proper nouns to match)`);
   }
   
   return {
