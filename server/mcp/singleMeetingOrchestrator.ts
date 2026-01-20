@@ -969,15 +969,22 @@ async function handleSummaryIntent(
     messages: [
       {
         role: "system",
-        content: `You are summarizing a business meeting transcript.
-Provide a concise summary including:
-- Main purpose of the meeting
-- Key topics discussed
-- Important decisions or outcomes
-- Any open questions or concerns raised
+        content: `You are summarizing a business meeting transcript for Slack.
 
-Keep the summary factual and grounded in what was actually discussed.
-Format with Slack markdown (*bold* for headers, bullet points for lists).`,
+Provide a concise summary with these sections:
+*Purpose*
+• One sentence describing the main goal
+
+*Key Topics*
+• Bullet list of main topics discussed
+
+*Decisions & Outcomes*
+• What was decided or agreed upon
+
+*Open Questions*
+• Any unresolved issues or concerns
+
+IMPORTANT: Use Slack formatting - wrap section headers in asterisks for bold (*Purpose*, *Key Topics*, etc). Use • for bullets. Keep it concise.`,
       },
       {
         role: "user",
