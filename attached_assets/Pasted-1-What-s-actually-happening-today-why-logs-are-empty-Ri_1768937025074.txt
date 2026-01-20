@@ -1,0 +1,249 @@
+1️⃣ What’s actually happening today (why logs are empty)
+
+Right now your system has two layers of responsibility mixed together in the Slack handler:
+
+Layer A — Slack transport
+
+This layer:
+
+verifies Slack signature
+
+validates event shape
+
+ACKs fast with 200 OK
+
+decides whether the event is “real Slack”
+
+Your test runner passes this layer.
+
+That’s why:
+
+you get 200
+
+Slack-style success
+
+your test runner prints PASS
+
+Layer B — Conversation execution
+
+This layer:
+
+resolves company / meeting
+
+runs preflight (ambiguity, binary, clarification)
+
+routes to single-meeting or MCP
+
+executes Tier-1 / semantic logic
+
+writes to interaction_logs
+
+Your test runner never reaches this layer.
+
+Why?
+
+Because the Slack handler exits early when:
+
+the event doesn’t look like a real Slack event
+
+the bot/user/team context doesn’t match expectations
+
+That early exit is intentional and correct for production.
+
+But it blocks testing.
+
+2️⃣ What Option A changes (conceptually)
+
+Option A introduces one explicit idea:
+
+“Sometimes we want to process events as if they were real Slack events, without enforcing Slack-specific guards.”
+
+That’s it.
+
+We are not:
+
+changing routing logic
+
+changing behavior
+
+changing logging
+
+changing answers
+
+We are only saying:
+
+“If this request is explicitly marked as a test run, skip Slack-only validation and continue into the normal execution path.”
+
+This keeps:
+
+production safe
+
+tests realistic
+
+logs meaningful
+
+3️⃣ How to implement Option A in Replit (step by step)
+
+I’ll assume your Slack handler lives in something like events.ts or slackEvents.ts.
+
+Step 1 — Add a test-run detector (very small)
+
+At the top of your Slack events handler:
+
+function isTestRun(req: Request): boolean {
+  return req.headers['x-pitcrew-test-run'] === 'true';
+}
+
+
+Why a header?
+
+clean separation from payload
+
+impossible to collide with real Slack traffic
+
+easy to add from your test runner
+
+This is a control signal, not user data.
+
+Step 2 — Use it to bypass Slack-only guards
+
+Somewhere early in your handler you likely have logic like:
+
+if (!isValidSlackEvent(req)) {
+  return res.status(200).send();
+}
+
+
+Or:
+
+bot mention checks
+
+team/app ID checks
+
+authorization checks
+
+Modify this carefully, like this:
+
+const testRun = isTestRun(req);
+
+if (!testRun) {
+  // Production Slack guards
+  if (!isValidSlackEvent(req)) {
+    return res.status(200).send();
+  }
+}
+
+
+Important:
+
+We are not deleting guards
+
+We are conditionally bypassing them
+
+This preserves production safety.
+
+Step 3 — Force the event into the normal execution path
+
+Right after guards, make sure the same pipeline runs for both:
+
+// From here down, test runs and real Slack events behave identically
+await handleSlackConversation({
+  event,
+  headers,
+  source: testRun ? 'test' : 'slack'
+});
+
+
+This is key.
+
+From this point on:
+
+routing
+
+preflight
+
+Tier-1
+
+semantic
+
+logging
+
+…are exactly the same.
+
+That’s why Option A is so powerful.
+
+Step 4 — Log that it was a test run (inside resolved_entities)
+
+This is optional but very helpful.
+
+When writing to interaction_logs, add:
+
+resolved_entities: {
+  ...existingData,
+  test_run: true
+}
+
+
+Now you can:
+
+filter test data easily
+
+keep prod logs clean
+
+still use the same table
+
+No schema changes. Perfect fit.
+
+Step 5 — Update your test runner (1 line)
+
+In pitcrew_test_runner.js, add the header:
+
+headers: {
+  'Content-Type': 'application/json',
+  'X-Pitcrew-Test-Run': 'true'
+}
+
+
+That’s it.
+
+No payload changes.
+No Slack emulation.
+No brittle hacks.
+
+4️⃣ What will happen after this (important)
+
+After deploying this:
+
+Your test runner will still get 200
+
+But now:
+
+routing will happen
+
+Tier-1 will run
+
+semantic (if needed) will run
+
+clarification flows will trigger
+
+rows will appear in interaction_logs
+
+Replit will finally “see” the tests — because they are now real executions.
+
+5️⃣ How to validate it worked (quick checklist)
+
+Run one test and check:
+
+interaction_logs has a new row
+
+question_text matches the test question
+
+capability_name is set
+
+resolved_entities.test_run = true
+
+llm.used matches expectation
+
+Response time aligns with path (fast Tier-1 vs slower semantic)
+
+If those are true → you’re done.

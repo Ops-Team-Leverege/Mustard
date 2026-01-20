@@ -13,6 +13,14 @@ function cleanMention(text: string): string {
 }
 
 /**
+ * Detects if this is a test run from the automated test runner.
+ * Test runs bypass Slack-specific guards while still executing the full pipeline.
+ */
+function isTestRun(req: Request): boolean {
+  return req.headers['x-pitcrew-test-run'] === 'true';
+}
+
+/**
  * Determines whether to reuse thread context from a prior interaction.
  * 
  * Returns FALSE (resolve fresh) if the user explicitly overrides context:
@@ -89,10 +97,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
     console.log("Event type:", event?.type);
 
     // 5. Only handle app_mention events (bot must be @mentioned to respond)
+    // Test runs bypass this check to allow automated testing
+    const testRun = isTestRun(req);
     const eventType = event?.type;
-    if (eventType !== "app_mention") {
+    if (eventType !== "app_mention" && !testRun) {
       console.log("[Slack] Ignoring non-app_mention event:", eventType);
       return;
+    }
+    
+    if (testRun) {
+      console.log("[Slack] Test run mode - bypassing app_mention check");
     }
 
     // 6. Dedupe events
@@ -174,6 +188,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             },
             // CRITICAL: Legacy field for thread context fast-path
             awaitingClarification: "next_steps_or_summary",
+            testRun,
           }
         ),
         confidence: null,
@@ -260,6 +275,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 } : undefined,
                 // Legacy field for follow-up handling
                 awaitingClarification: meetingId ? "takeaways_or_next_steps" : undefined,
+                testRun,
               }
             ),
             confidence: null,
@@ -383,6 +399,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                   awaiting: false,
                   resolvedWith: responseType as ClarificationResolution,
                 },
+                testRun,
               }
             ),
             confidence: null,
@@ -464,6 +481,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 clarificationAsked: true,
                 type: null,
               },
+              testRun,
             }
           ),
           confidence: null,
@@ -630,6 +648,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               semanticConfidence,
               // Legacy fields for thread context
               pendingOffer,
+              testRun,
             }
           );
         } else {
@@ -645,6 +664,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               llmPurpose: "routing",
               companySource: threadContext?.companyId ? "thread" : "extracted",
               meetingSource: threadContext?.meetingId ? "thread" : "last_meeting",
+              testRun,
             }
           );
         }

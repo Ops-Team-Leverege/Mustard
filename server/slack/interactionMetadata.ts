@@ -100,6 +100,9 @@ export interface InteractionMetadata {
   // These must remain at top level for getLastInteractionByThread to work
   awaitingClarification?: ClarificationType;
   pendingOffer?: string;
+  
+  // Test run indicator for filtering test data
+  test_run?: boolean;
 }
 
 /**
@@ -140,6 +143,8 @@ export function buildInteractionMetadata(
     // Legacy fields for thread context fast-path
     awaitingClarification?: ClarificationType;
     pendingOffer?: string;
+    // Test run indicator
+    testRun?: boolean;
   }
 ): InteractionMetadata {
   return {
@@ -184,5 +189,8 @@ export function buildInteractionMetadata(
     // CRITICAL: Legacy fields for thread context fast-path
     awaitingClarification: execution.awaitingClarification,
     pendingOffer: execution.pendingOffer,
+    
+    // Test run indicator
+    test_run: execution.testRun,
   };
 }
