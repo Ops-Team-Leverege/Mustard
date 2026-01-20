@@ -126,15 +126,20 @@ export async function slackEventsHandler(req: Request, res: Response) {
     console.log(`Processing: "${text}" in channel ${channel} (isReply=${isReply})`);
 
     // 7. Send immediate acknowledgment (UX improvement - reduces perceived latency)
+    // Skip Slack API calls in test mode to avoid errors with fake channels
     const ackMessage = userId
       ? `On it, <@${userId}> — let me check that for you.`
       : `On it — let me check that for you.`;
 
-    await postSlackMessage({
-      channel,
-      text: ackMessage,
-      thread_ts: threadTs,
-    });
+    if (!testRun) {
+      await postSlackMessage({
+        channel,
+        text: ackMessage,
+        thread_ts: threadTs,
+      });
+    } else {
+      console.log("[Slack] Test mode - skipping acknowledgment message");
+    }
 
     // 7.5 EARLY AMBIGUITY DETECTION (preparation/briefing questions)
     // 
@@ -150,11 +155,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const companyContext = await extractCompanyFromMessage(text);
       console.log(`[Slack] Extracted company from preparation question: ${companyContext?.companyName || 'none'}`);
       
-      await postSlackMessage({
-        channel,
-        text: ambiguityCheck.clarificationPrompt,
-        thread_ts: threadTs,
-      });
+      if (!testRun) {
+        await postSlackMessage({
+          channel,
+          text: ambiguityCheck.clarificationPrompt,
+          thread_ts: threadTs,
+        });
+      }
       
       // Log interaction for clarification - include company so thread context works
       storage.insertInteractionLog({
@@ -240,11 +247,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
             responseText = `No, I don't see any meetings with ${companyContext.companyName} in the system.`;
           }
           
-          await postSlackMessage({
-            channel,
-            text: responseText,
-            thread_ts: threadTs,
-          });
+          if (!testRun) {
+            await postSlackMessage({
+              channel,
+              text: responseText,
+              thread_ts: threadTs,
+            });
+          }
           
           // Log interaction with structured metadata
           storage.insertInteractionLog({
@@ -365,11 +374,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
             false
           );
           
-          await postSlackMessage({
-            channel,
-            text: result.answer,
-            thread_ts: threadTs,
-          });
+          if (!testRun) {
+            await postSlackMessage({
+              channel,
+              text: result.answer,
+              thread_ts: threadTs,
+            });
+          }
           
           // Log interaction with structured metadata
           const responseType = isNextStepsResponse ? 'next_steps' : 'summary';
@@ -449,11 +460,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // Clarification needed - respond and stop processing
         console.log(`[Slack] Clarification needed: ${resolution.message}`);
         
-        await postSlackMessage({
-          channel,
-          text: resolution.message,
-          thread_ts: threadTs,
-        });
+        if (!testRun) {
+          await postSlackMessage({
+            channel,
+            text: resolution.message,
+            thread_ts: threadTs,
+          });
+        }
         
         // Log interaction for clarification with structured metadata
         storage.insertInteractionLog({
@@ -597,11 +610,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         resolvedMeetingId = mcpResult.resolvedEntities?.meetingId || null;
       }
 
-      const botReply = await postSlackMessage({
-        channel,
-        text: responseText,
-        thread_ts: threadTs,
-      });
+      // Post response to Slack (skip in test mode)
+      const botReply = testRun 
+        ? { ts: `test-${Date.now()}` } 
+        : await postSlackMessage({
+            channel,
+            text: responseText,
+            thread_ts: threadTs,
+          });
 
       // Log interaction with structured metadata (write-only, non-blocking)
       // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
@@ -717,11 +733,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.error(`${logPrefix} Stack:`, err.stack);
       }
 
-      await postSlackMessage({
-        channel,
-        text: userMessage,
-        thread_ts: threadTs,
-      });
+      if (!testRun) {
+        await postSlackMessage({
+          channel,
+          text: userMessage,
+          thread_ts: threadTs,
+        });
+      }
     }
   } catch (err) {
     console.error("Slack event handler error:", err);
