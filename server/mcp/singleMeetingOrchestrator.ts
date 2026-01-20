@@ -896,19 +896,35 @@ Format with Slack markdown (*bold* for headers, bullet points for lists).`,
 /**
  * Detect if a question is a semantic question that benefits from LLM interpretation.
  * These are questions that:
- * - Ask about abstract concepts ("any hardware device", "appliance")
+ * - Ask about abstract concepts ("any hardware device", "appliance", "piece of hardware")
  * - Ask about implications or interpretations
  * - Use vague language that requires context understanding
+ * - Reference things discussed ("they were talking about", "mentioned")
  */
 function isSemanticQuestion(question: string): boolean {
   const q = question.toLowerCase();
   const semanticPatterns = [
+    // "any X device/hardware/etc"
     /\bany\s+\w+\s+(device|product|hardware|software|system|tool|appliance)\b/,
-    /\bwhat\s+(?:is|was)\s+(?:the|a)\s+\w+\s*\??\b/,
+    // "what was the piece/type/kind of X" - specific vague referents
+    /\bwhat\s+(?:is|was)\s+(?:the|a)\s+(?:piece|type|kind|sort)\s+of\b/,
+    // "did they talk/discuss/mention about"
     /\bdid\s+(?:they|we|anyone)\s+(?:talk|discuss|mention|say)\s+(?:about|anything)\b/,
+    // "what did/was X's issue/problem"
     /\bwhat\s+(?:did|was)\s+\w+(?:'s|s)?\s+(?:issue|problem|concern|question)\b/,
+    // "what kind/type/sort of"
     /\bwhat\s+(?:kind|type|sort)\s+of\b/,
+    // "anything about/related/regarding"
     /\banything\s+(?:about|related|regarding)\b/,
+    // "they were talking about" / "they mentioned" / "they discussed"
+    /\b(?:they|we|you)\s+(?:were\s+)?(?:talking|discussed|mentioned|said)\s+(?:about)?\b/,
+    // Hardware/device/appliance terms with discussion context
+    /\b(?:hardware|device|appliance|equipment)\b.*\b(?:talking|mentioned|discussed|using)\b/,
+    /\b(?:talking|mentioned|discussed|using)\b.*\b(?:hardware|device|appliance|equipment)\b/,
+    // "what X were they talking about" / "what X did they mention"
+    /\bwhat\s+\w+\s+(?:were\s+)?(?:they|we|you)\s+(?:talking|discussing|mentioning)\b/,
+    // "the thing/stuff they mentioned/discussed"
+    /\b(?:the\s+)?(?:thing|stuff|item)\s+(?:they|we|you)\s+(?:mentioned|discussed|talked)\b/,
   ];
   return semanticPatterns.some(p => p.test(q));
 }
