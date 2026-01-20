@@ -980,17 +980,18 @@ export async function handleSingleMeetingQuestion(
       const result = await handleExtractiveIntent(ctx, question);
       
       // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
-      console.log(`[SingleMeetingOrchestrator] DEBUG: Tier-1 result dataSource=${result.dataSource}, isSemantic=${isSemantic}`);
+      console.log(`[SingleMeetingOrchestrator] STEP6-CHECK: dataSource=${result.dataSource}, isSemantic=${isSemantic}, shouldTrigger=${result.dataSource === "not_found" && isSemantic}`);
       if (result.dataSource === "not_found" && isSemantic) {
-        console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (Tier-1 failed, semantic question)`);
+        console.log(`[SingleMeetingOrchestrator] STEP6-TRIGGER: Entering semantic answer layer`);
         try {
-          console.log(`[SingleMeetingOrchestrator] DEBUG: Calling semanticAnswerSingleMeeting...`);
+          console.log(`[SingleMeetingOrchestrator] STEP6-CALL: About to call semanticAnswerSingleMeeting...`);
           const semanticResult = await semanticAnswerSingleMeeting(
             ctx.meetingId,
             ctx.companyName,
             question,
             ctx.meetingDate
           );
+          console.log(`[SingleMeetingOrchestrator] STEP6-SUCCESS: Got semantic result with confidence=${semanticResult.confidence}`);
           return {
             answer: semanticResult.answer,
             intent: "extractive",
@@ -999,9 +1000,11 @@ export async function handleSingleMeetingQuestion(
             semanticConfidence: semanticResult.confidence,
           };
         } catch (err) {
-          console.error(`[SingleMeetingOrchestrator] Semantic answer failed:`, err);
+          console.error(`[SingleMeetingOrchestrator] STEP6-ERROR: Semantic answer failed:`, err);
           // Fall through to uncertainty response
         }
+      } else {
+        console.log(`[SingleMeetingOrchestrator] STEP6-SKIP: Not triggering because dataSource=${result.dataSource} or isSemantic=${isSemantic}`);
       }
       
       // If still not found, offer summary
