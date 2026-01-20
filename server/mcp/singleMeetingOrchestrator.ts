@@ -62,6 +62,7 @@ export type SingleMeetingResult = {
   semanticAnswerUsed?: boolean;
   semanticConfidence?: "high" | "medium" | "low";
   isSemanticDebug?: boolean; // DEBUG: Track if question was classified as semantic
+  semanticError?: string; // DEBUG: Capture error message if semantic layer fails
 };
 
 /**
@@ -982,6 +983,7 @@ export async function handleSingleMeetingQuestion(
       
       // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
       console.log(`[SingleMeetingOrchestrator] STEP6-CHECK: dataSource=${result.dataSource}, isSemantic=${isSemantic}, shouldTrigger=${result.dataSource === "not_found" && isSemantic}`);
+      let semanticError: string | undefined;
       if (result.dataSource === "not_found" && isSemantic) {
         console.log(`[SingleMeetingOrchestrator] STEP6-TRIGGER: Entering semantic answer layer`);
         try {
@@ -999,9 +1001,13 @@ export async function handleSingleMeetingQuestion(
             dataSource: "semantic",
             semanticAnswerUsed: true,
             semanticConfidence: semanticResult.confidence,
+            isSemanticDebug: true,
           };
         } catch (err) {
-          console.error(`[SingleMeetingOrchestrator] STEP6-ERROR: Semantic answer failed:`, err);
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[SingleMeetingOrchestrator] STEP6-ERROR: Semantic answer failed: ${errorMsg}`);
+          console.error(`[SingleMeetingOrchestrator] STEP6-ERROR-STACK:`, err);
+          semanticError = errorMsg;
           // Fall through to uncertainty response
         }
       } else {
@@ -1010,13 +1016,14 @@ export async function handleSingleMeetingQuestion(
       
       // If still not found, offer summary
       if (result.dataSource === "not_found") {
-        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic };
+        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic, semanticError };
       }
-      return { ...result, isSemanticDebug: isSemantic };
+      return { ...result, isSemanticDebug: isSemantic, semanticError };
     }
     
     case "aggregative": {
       const result = await handleAggregativeIntent(ctx, question);
+      let aggSemanticError: string | undefined;
       
       // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
       if (result.dataSource === "not_found" && isSemantic) {
@@ -1034,18 +1041,21 @@ export async function handleSingleMeetingQuestion(
             dataSource: "semantic",
             semanticAnswerUsed: true,
             semanticConfidence: semanticResult.confidence,
+            isSemanticDebug: true,
           };
         } catch (err) {
-          console.error(`[SingleMeetingOrchestrator] Semantic answer failed:`, err);
+          const errorMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[SingleMeetingOrchestrator] Semantic answer failed (aggregative): ${errorMsg}`);
+          aggSemanticError = errorMsg;
           // Fall through to uncertainty response
         }
       }
       
       // If still not found, offer summary
       if (result.dataSource === "not_found") {
-        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic };
+        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic, semanticError: aggSemanticError };
       }
-      return { ...result, isSemanticDebug: isSemantic };
+      return { ...result, isSemanticDebug: isSemantic, semanticError: aggSemanticError };
     }
     
     case "summary":
