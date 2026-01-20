@@ -973,15 +973,18 @@ export async function handleSingleMeetingQuestion(
   const intent = classifyIntent(question);
   const isSemantic = isSemanticQuestion(question);
   console.log(`[SingleMeetingOrchestrator] Classified intent: ${intent} | isSemantic: ${isSemantic}`);
+  console.log(`[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "${question}"`);
   
   switch (intent) {
     case "extractive": {
       const result = await handleExtractiveIntent(ctx, question);
       
       // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
+      console.log(`[SingleMeetingOrchestrator] DEBUG: Tier-1 result dataSource=${result.dataSource}, isSemantic=${isSemantic}`);
       if (result.dataSource === "not_found" && isSemantic) {
         console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (Tier-1 failed, semantic question)`);
         try {
+          console.log(`[SingleMeetingOrchestrator] DEBUG: Calling semanticAnswerSingleMeeting...`);
           const semanticResult = await semanticAnswerSingleMeeting(
             ctx.meetingId,
             ctx.companyName,
