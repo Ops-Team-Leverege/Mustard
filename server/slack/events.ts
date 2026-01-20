@@ -175,6 +175,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // This enables natural follow-ups without conversation memory or hallucination risk.
     //
     let threadContext: ThreadContext | undefined;
+    let awaitingClarification: string | null = null;
+    let companyNameFromContext: string | null = null;
     
     // Only look up prior context if this is a reply in an existing thread
     if (isReply && shouldReuseThreadContext(text)) {
@@ -186,7 +188,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
             meetingId: entities.meetingId as string | null,
             companyId: entities.companyId as string | null,
           };
-          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}`);
+          // Check if we're awaiting a clarification response
+          awaitingClarification = entities.awaitingClarification as string | null;
+          companyNameFromContext = entities.companyName as string | null;
+          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}`);
         }
       } catch (err) {
         // Non-fatal - just proceed without context
@@ -194,6 +199,84 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
     } else if (isReply) {
       console.log("[Slack] User explicitly overriding context - resolving fresh");
+    }
+    
+    // 8.5 CLARIFICATION RESPONSE HANDLING (fast path)
+    //
+    // If the prior interaction was a clarification request, check if this is the response.
+    // Route directly to Tier-1 without LLM calls.
+    //
+    if (awaitingClarification === "next_steps_or_summary" && threadContext?.companyId) {
+      const lowerText = text.toLowerCase().trim();
+      const isNextStepsResponse = /\b(next\s*steps?|action\s*items?|follow[- ]?ups?|commitments?)\b/i.test(lowerText);
+      const isSummaryResponse = /\b(summary|summarize|overview|brief)\b/i.test(lowerText);
+      
+      if (isNextStepsResponse || isSummaryResponse) {
+        console.log(`[Slack] Clarification response detected: ${isNextStepsResponse ? 'next_steps' : 'summary'}`);
+        
+        // Get the last meeting for this company (fast DB query, no LLM)
+        const lastMeetingRows = await storage.rawQuery(`
+          SELECT t.id, t.meeting_date, c.name as company_name
+          FROM transcripts t
+          JOIN companies c ON t.company_id = c.id
+          WHERE t.company_id = $1
+          ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+          LIMIT 1
+        `, [threadContext.companyId]);
+        
+        if (lastMeetingRows && lastMeetingRows.length > 0) {
+          const meeting = lastMeetingRows[0];
+          const meetingId = meeting.id as string;
+          const companyName = (meeting.company_name as string) || companyNameFromContext || "Unknown";
+          const meetingDate = meeting.meeting_date ? new Date(meeting.meeting_date as string) : null;
+          
+          const singleMeetingContext: SingleMeetingContext = {
+            meetingId,
+            companyId: threadContext.companyId,
+            companyName,
+            meetingDate,
+          };
+          
+          // Route directly to single-meeting orchestrator with explicit intent
+          const result = await handleSingleMeetingQuestion(
+            singleMeetingContext,
+            isNextStepsResponse ? "What are the next steps?" : "Give me a brief summary",
+            false
+          );
+          
+          await postSlackMessage({
+            channel,
+            text: result.answer,
+            thread_ts: threadTs,
+          });
+          
+          // Log interaction
+          storage.insertInteractionLog({
+            slackThreadId: threadTs,
+            slackMessageTs: messageTs,
+            slackChannelId: channel,
+            userId: userId || null,
+            companyId: threadContext.companyId,
+            meetingId,
+            capabilityName: `clarification_response_${isNextStepsResponse ? 'next_steps' : 'summary'}`,
+            questionText: text,
+            answerText: result.answer,
+            resolvedEntities: { 
+              companyId: threadContext.companyId, 
+              meetingId,
+              isSingleMeetingMode: true,
+              intentClassification: result.intent,
+              dataSource: result.dataSource,
+              clarificationResponseType: isNextStepsResponse ? 'next_steps' : 'summary',
+            },
+            confidence: null,
+          }).catch(err => {
+            console.error("Failed to log interaction:", err);
+          });
+          
+          return; // Done - fast path completed
+        }
+      }
     }
 
     // 9. STEP 0: Meeting Resolution (runs before intent classification)
