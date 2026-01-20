@@ -31,12 +31,31 @@ export type MeetingResolverThreadContext = {
 
 /**
  * Temporal language patterns for meeting resolution.
+ * 
+ * These patterns detect when a user is asking about a specific meeting
+ * using temporal language. When matched, the system should attempt
+ * single-meeting resolution instead of routing to MCP.
+ * 
+ * IMPORTANT: Patterns must match common variations:
+ * - "last meeting" / "latest meeting" / "most recent meeting"
+ * - "last ACE meeting" / "latest Ivy Lane call" (company in between)
+ * - "last meeting with ACE" / "latest call with Discount Tire"
+ * - "meeting last week" / "call last month"
  */
 const TEMPORAL_PATTERNS = {
-  lastMeeting: /\b(last|latest|most recent)\s+(meeting|call|transcript)\b/i,
-  dateReference: /\bmeeting\s+(?:on|from)\s+(\w+\s+\d{1,2}(?:,?\s*\d{4})?|\d{1,2}(?:\/|-)\d{1,2}(?:(?:\/|-)\d{2,4})?)\b/i,
+  // Direct: "last meeting", "latest call", "most recent transcript"
+  lastMeetingDirect: /\b(last|latest|most recent)\s+(meeting|call|transcript)\b/i,
+  // With company in middle: "last ACE meeting", "latest Discount Tire call"
+  lastMeetingWithCompany: /\b(last|latest|most recent)\s+\S+(?:\s+\S+)?\s+(meeting|call|transcript)\b/i,
+  // With "with" suffix: "last meeting with ACE", "latest call with Discount Tire"
+  lastMeetingWithSuffix: /\b(last|latest|most recent)\s+(meeting|call|transcript)\s+(?:with|from)\s+/i,
+  // Date reference: "meeting on Aug 7", "call from 8/7/2025"
+  dateReference: /\b(meeting|call|transcript)\s+(?:on|from)\s+(\w+\s+\d{1,2}(?:,?\s*\d{4})?|\d{1,2}(?:\/|-)\d{1,2}(?:(?:\/|-)\d{2,4})?)\b/i,
+  // Trailing temporal: "meeting last week", "call last month"
   lastWeek: /\b(meeting|call|transcript)\s+last\s+week\b/i,
   lastMonth: /\b(meeting|call|transcript)\s+last\s+month\b/i,
+  // In-sentence temporal: "in the last meeting", "from the latest call"
+  inTheLast: /\b(?:in|from|during)\s+(?:the|our|their)?\s*(last|latest|most recent)\s+/i,
 };
 
 /**
@@ -334,8 +353,14 @@ export async function resolveMeetingFromSlackMessage(
   
   const { companyId, companyName } = companyContext;
   
-  // 3a. "Last / Latest / Most Recent meeting"
-  if (TEMPORAL_PATTERNS.lastMeeting.test(message)) {
+  // 3a. "Last / Latest / Most Recent meeting" - check all last/latest patterns
+  const hasLastMeetingPattern = 
+    TEMPORAL_PATTERNS.lastMeetingDirect.test(message) ||
+    TEMPORAL_PATTERNS.lastMeetingWithCompany.test(message) ||
+    TEMPORAL_PATTERNS.lastMeetingWithSuffix.test(message) ||
+    TEMPORAL_PATTERNS.inTheLast.test(message);
+  
+  if (hasLastMeetingPattern) {
     console.log(`[MeetingResolver] Detected "last meeting" pattern for ${companyName}`);
     
     const meetings = await getMeetingsOnMostRecentDate(companyId);

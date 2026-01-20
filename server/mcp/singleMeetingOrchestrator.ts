@@ -704,6 +704,10 @@ async function handleExtractiveIntent(
   // Score function with STRONG MATCH requirement:
   // If query contains proper nouns, candidate MUST match at least one proper noun
   // Returns -1 if strong match requirement not met (filtered out)
+  // 
+  // RELEVANCE RULE: Only return quotes that DIRECTLY answer the question.
+  // A score of 1 (single keyword match) is often insufficient for relevance.
+  // Require at least 2 keyword matches OR a proper noun match for confidence.
   const scoreMatch = (text: string): number => {
     const lowerText = text.toLowerCase();
     
@@ -719,17 +723,24 @@ async function handleExtractiveIntent(
     return allKeywords.filter(kw => lowerText.includes(kw)).length;
   };
   
+  // RELEVANCE THRESHOLD: Require minimum score to avoid noisy, irrelevant quotes.
+  // - If question has proper nouns: require proper noun match (handled above) = 1
+  // - If question has few keywords (1-2): require just 1 match (single salient term like "pricing")
+  // - If question has many keywords (3+): require 2+ matches (more context to validate)
+  const keywordThreshold = keywords.length <= 2 ? 1 : 2;
+  const minRelevanceScore = hasProperNouns ? 1 : keywordThreshold;
+  
   // Score action items FIRST (preferred for term lookups)
   const scoredActionItems = actionItems.map(ai => ({
     item: ai,
     score: scoreMatch(`${ai.action} ${ai.evidence} ${ai.owner}`),
-  })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  })).filter(x => x.score >= minRelevanceScore).sort((a, b) => b.score - a.score);
   
   // Score customer questions
   const scoredCustomerQuestions = customerQuestions.map(cq => ({
     item: cq,
     score: scoreMatch(cq.questionText + " " + (cq.answerEvidence || "")),
-  })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  })).filter(x => x.score >= minRelevanceScore).sort((a, b) => b.score - a.score);
   
   // Pick the best match - action items win ties since they contain cleaner term definitions
   const bestAI = scoredActionItems[0];

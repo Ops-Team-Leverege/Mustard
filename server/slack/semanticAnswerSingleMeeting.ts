@@ -30,29 +30,37 @@ export type AnswerShape =
  * This determines HOW the LLM should format its response.
  * 
  * RULE: Shape detection happens in code, not in the prompt.
+ * RULE: Summary is ONLY for explicit summary requests - never as default
  */
 export function detectAnswerShape(question: string): AnswerShape {
   const q = question.toLowerCase().trim();
   
   // YES/NO: Questions starting with auxiliary verbs asking for confirmation
+  // "Was X discussed?" "Did they mention Y?" "Is there a meeting?"
   const yesNoPatterns = [
     /^(?:is|are|was|were|did|do|does|has|have|had|will|would|can|could) /,
+    /\bwere .+ mentioned\b/,
+    /\bwas .+ discussed\b/,
+    /\bwas .+ covered\b/,
+    /\bwas .+ raised\b/,
   ];
   if (yesNoPatterns.some(p => p.test(q))) {
     return "yes_no";
   }
   
-  // SINGLE VALUE: Which / where / who / when questions seeking one specific answer
-  const singleValuePatterns = [
-    /^which\b/,
-    /^where\b/,
-    /^who\b/,
-    /^when\b/,
-    /^what (?:is|was|'s) (?:the|their|his|her|our)\b/,
-    /\bwhat (?:store|location|person|name|date|time|place|thing)\b/,
+  // SUMMARY: Only explicit summary requests - must check BEFORE other patterns
+  const summaryPatterns = [
+    /\bsummar(?:y|ize|ise)\b/,
+    /\bgive me (?:a |an )?overview\b/,
+    /\bmeeting overview\b/,
+    /\bbrief me\b/,
+    /\bcatch me up\b/,
+    /\brecap\b/,
+    /\bkey takeaways\b/,
+    /\brundown\b/,
   ];
-  if (singleValuePatterns.some(p => p.test(q))) {
-    return "single_value";
+  if (summaryPatterns.some(p => p.test(q))) {
+    return "summary";
   }
   
   // LIST: Questions asking for multiple items
@@ -63,24 +71,42 @@ export function detectAnswerShape(question: string): AnswerShape {
     /\baction items?\b/,
     /\bwhat (?:are|were) the\b.*\b(?:steps|items|actions|tasks|issues|concerns|questions)\b/,
     /\blist\b/,
+    /\bopen questions\b/,
+    /\bopen items\b/,
+    /\bfollow[- ]?ups?\b/,
+    /\bwhat issues\b/,
+    /\bwhat concerns\b/,
+    /\bwhat questions\b/,
+    /\bwhat problems\b/,
   ];
   if (listPatterns.some(p => p.test(q))) {
     return "list";
   }
   
-  // SUMMARY: Only explicit summary requests
-  const summaryPatterns = [
-    /\bsummar(?:y|ize|ise)\b/,
-    /\boverview\b/,
-    /\bbrief me\b/,
-    /\bcatch me up\b/,
-    /\brecap\b/,
+  // SINGLE VALUE: Specific factual questions seeking one answer
+  // "What did X say about Y?" "What pricing did they quote?" "Who said X?"
+  const singleValuePatterns = [
+    /^which\b/,
+    /^where\b/,
+    /^who\b/,
+    /^when\b/,
+    /^what (?:is|was|'s) (?:the|their|his|her|our)\b/,
+    /\bwhat (?:store|location|person|name|date|time|place|thing)\b/,
+    /\bwhat did .+ (?:say|ask|mention|request|want|quote|share)\b/,
+    /\bwhat .+ did .+ (?:say|ask|mention|request|want|quote|share)\b/,
+    /\bwhat was (?:agreed|decided|discussed|mentioned)\b/,
+    /\bwhat (?:pricing|budget|roi|timeline|deadline)\b/,
+    /\bwhat (?:technical|specific)\b/,
+    /\bwhat competitors\b/,
+    /\bwhat features\b/,
+    /\bwhat objections\b/,
   ];
-  if (summaryPatterns.some(p => p.test(q))) {
-    return "summary";
+  if (singleValuePatterns.some(p => p.test(q))) {
+    return "single_value";
   }
   
-  // Default to single_value for most semantic questions (they want a specific answer)
+  // Default to single_value - we want direct answers, not summaries
+  // Summary should NEVER be the default fallback
   return "single_value";
 }
 
