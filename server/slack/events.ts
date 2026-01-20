@@ -252,6 +252,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let semanticConfidence: string | undefined;
       let isSemanticDebug: boolean | undefined;
       let semanticError: string | undefined;
+      // Conversational behavior tracking
+      let isClarificationRequest: boolean | undefined;
+      let isBinaryQuestion: boolean | undefined;
 
       if (isSingleMeetingMode && resolvedMeeting) {
         // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
@@ -287,8 +290,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
         semanticConfidence = result.semanticConfidence;
         isSemanticDebug = result.isSemanticDebug;
         semanticError = result.semanticError;
+        // Conversational behavior flags
+        isClarificationRequest = result.isClarificationRequest;
+        isBinaryQuestion = result.isBinaryQuestion;
         
-        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}, isSemanticDebug=${isSemanticDebug}, semanticError=${semanticError || 'none'}`);
+        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}, isSemanticDebug=${isSemanticDebug}, semanticError=${semanticError || 'none'}, clarification=${isClarificationRequest || false}, binary=${isBinaryQuestion || false}`);
       } else {
         // MULTI-CONTEXT MODE: Use MCP router
         const ctx = makeMCPContext(threadContext);
@@ -347,6 +353,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
           isSemanticDebug: isSemanticDebug,
           // DEBUG: Capture error message if semantic layer fails
           semanticError: semanticError || undefined,
+          // Conversational behavior tracking
+          isClarificationRequest: isClarificationRequest || undefined,
+          isBinaryQuestion: isBinaryQuestion || undefined,
         },
         confidence: null,
       }).catch(err => {

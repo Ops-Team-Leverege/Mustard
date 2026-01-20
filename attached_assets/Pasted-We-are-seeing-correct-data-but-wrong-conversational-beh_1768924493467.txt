@@ -1,0 +1,134 @@
+We are seeing correct data but wrong conversational behavior in several Slack interactions. The system answers questions that are ambiguous or binary as if they were summaries, which makes the bot feel robotic and reduces trust.
+
+Two concrete examples from production logs:
+
+Ambiguous intent, multiple valid answers
+
+User:
+
+“I’m preparing for our weekly meeting with CJ’s. What should I make sure to cover?”
+
+This can reasonably mean:
+
+“What were the next steps from the last meeting?” (Tier 1 extractive)
+
+OR “Give me a brief summary to prepare” (Tier 2-style synthesis)
+
+Current behavior: bot jumps directly to a summary without asking.
+
+Expected behavior: bot should ask a clarifying question before answering.
+
+Binary question answered with a summary
+
+User:
+
+“Is there a meeting with Walmart?”
+
+Current behavior: bot returns a full meeting summary.
+
+Expected behavior:
+
+First answer the yes/no question with date
+
+Then optionally offer a summary
+
+This is not a tone or friendliness issue.
+It is a missing conversational decision rule.
+
+Root Cause
+
+The orchestrator assumes:
+
+every question maps to a single capability
+
+answering with “more information” is always acceptable
+
+In practice:
+
+some questions map to multiple capabilities with different output shapes
+
+some questions require a minimal answer first, not a summary
+
+There is no explicit ambiguity-handling or clarification step.
+
+Proposed Fix (Minimal, Safe, Contract-Preserving)
+1️⃣ Add an Ambiguity Check Before Answering
+
+Before executing a capability, check:
+
+Do multiple capabilities match this question?
+
+Do they produce different response types (e.g. list vs summary)?
+
+Is intent confidence below a threshold?
+
+If yes → do not answer yet.
+
+Instead, return a clarification prompt.
+
+Example clarification response:
+
+I can help in a couple of ways — which would you like?
+
+• The next steps from the last meeting
+• A brief summary to help you prepare
+
+Just tell me which one.
+
+This keeps:
+
+Tier boundaries intact
+
+No silent escalation
+
+User in control
+
+2️⃣ Enforce “Answer First, Expand Second” for Binary Questions
+
+For yes/no or existence questions (e.g. “is there a meeting with Walmart?”):
+
+Rule
+
+Always answer the literal question first
+
+Then optionally offer more detail
+
+Correct pattern:
+
+Yes — there was a meeting with Walmart on October 29, 2025.
+
+Would you like a brief summary of what was discussed?
+
+Never jump straight to a summary unless the user explicitly asks for it.
+
+3️⃣ This Does NOT Require More LLM Usage
+
+Important:
+
+This is routing logic, not “make the bot more ChatGPT-like”
+
+No additional summarization
+
+No cross-meeting behavior
+
+No Tier violations
+
+Just:
+
+an ambiguity guard
+
+a clarification response
+
+a binary-question response rule
+
+Success Criteria
+
+After this change:
+
+Ambiguous questions result in a clarifying question
+
+Yes/no questions get direct answers
+
+Summaries are never surprising
+
+The bot feels conversational without being chatty

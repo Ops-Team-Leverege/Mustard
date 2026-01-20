@@ -56,13 +56,15 @@ export type SingleMeetingContext = {
 export type SingleMeetingResult = {
   answer: string;
   intent: SingleMeetingIntent;
-  dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "semantic" | "not_found";
+  dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "semantic" | "not_found" | "clarification" | "binary_answer";
   evidence?: string;
   pendingOffer?: "summary"; // Indicates bot offered summary, awaiting user response
   semanticAnswerUsed?: boolean;
   semanticConfidence?: "high" | "medium" | "low";
   isSemanticDebug?: boolean; // DEBUG: Track if question was classified as semantic
   semanticError?: string; // DEBUG: Capture error message if semantic layer fails
+  isClarificationRequest?: boolean; // True when bot is asking user to clarify ambiguous question
+  isBinaryQuestion?: boolean; // True when bot detected a yes/no question
 };
 
 /**
@@ -101,6 +103,104 @@ If you say "yes", I'll share a brief meeting summary.`;
  * CRITICAL: Summary intent must be EXPLICIT. Questions like "What did we discuss about pricing?"
  * are EXTRACTIVE (seeking specific facts), NOT summary requests.
  */
+/**
+ * Detect if a question is ambiguous and could map to multiple valid intents.
+ * 
+ * AMBIGUITY CRITERIA:
+ * - Question contains preparation language ("preparing for", "getting ready for")
+ *   AND could be answered with either next steps OR a summary
+ * - Question asks "what should I know/cover/prepare" without specifying scope
+ * 
+ * Returns: clarification prompt if ambiguous, null if not
+ */
+export function detectAmbiguity(question: string): { isAmbiguous: boolean; clarificationPrompt?: string } {
+  const q = question.toLowerCase().trim();
+  
+  // Preparation/briefing questions are inherently ambiguous
+  // "What should I cover?" could mean:
+  //   1. "What were the action items?" (Tier-1 extractive)
+  //   2. "Give me a summary to prepare" (Tier-2 summary)
+  const preparationPatterns = [
+    /\b(?:preparing|prepare|getting ready|prepping)\s+(?:for|to)\b/,
+    /\bwhat should I\s+(?:cover|know|remember|bring up|focus on)\b/,
+    /\bwhat (?:do I need|should I need) to know\b/,
+    /\bbefore (?:the|our|this|my) (?:meeting|call)\b/,
+    /\bbrief me (?:for|before)\b/,
+  ];
+  
+  const isPreparationQuestion = preparationPatterns.some(p => p.test(q));
+  
+  if (isPreparationQuestion) {
+    return {
+      isAmbiguous: true,
+      clarificationPrompt: `I can help in a couple of ways — which would you like?
+
+• The next steps from the last meeting
+• A brief summary to help you prepare
+
+Just tell me which one.`,
+    };
+  }
+  
+  return { isAmbiguous: false };
+}
+
+/**
+ * Detect if a question is a binary (yes/no) or existence question.
+ * 
+ * BINARY QUESTION PATTERNS:
+ * - "Is there a meeting with X?"
+ * - "Was X discussed?"
+ * - "Did they mention X?"
+ * - "Do we have a meeting with X?"
+ * 
+ * These questions require a direct yes/no answer first,
+ * then optionally offer more detail.
+ */
+export function isBinaryQuestion(question: string): boolean {
+  const q = question.toLowerCase().trim();
+  
+  const binaryPatterns = [
+    /^(?:is|are|was|were|did|do|does|has|have|had) (?:there|we|they|it|he|she)\b/,
+    /^(?:is|are|was|were) .+\b(?:discussed|mentioned|covered|addressed|raised|brought up)\b/,
+    /\bdo we have (?:a|any)\b/,
+    /\bis there (?:a|any)\b/,
+    /\bwas there (?:a|any)\b/,
+    /\bdid (?:we|they|anyone) (?:discuss|mention|cover|talk about|bring up)\b/,
+    /\bhas (?:anyone|there been|this been)\b/,
+  ];
+  
+  return binaryPatterns.some(p => p.test(q));
+}
+
+/**
+ * Extract the subject of a binary question for targeted lookup.
+ * E.g., "Is there a meeting with Walmart?" → "walmart"
+ */
+function extractBinarySubject(question: string): string | null {
+  const q = question.toLowerCase();
+  
+  // "Is there a meeting with X?"
+  const meetingWithMatch = q.match(/meeting (?:with|about|for|regarding) ([\w\s]+?)(?:\?|$)/);
+  if (meetingWithMatch) {
+    return meetingWithMatch[1].trim();
+  }
+  
+  // "Was X discussed?"
+  const wasDiscussedMatch = q.match(/was ([\w\s]+?) (?:discussed|mentioned|covered|addressed)/);
+  if (wasDiscussedMatch) {
+    return wasDiscussedMatch[1].trim();
+  }
+  
+  // "Did they mention/discuss X?"
+  const didMentionMatch = q.match(/did (?:we|they|anyone) (?:discuss|mention|cover|talk about|bring up) ([\w\s]+?)(?:\?|$)/);
+  if (didMentionMatch) {
+    return didMentionMatch[1].trim();
+  }
+  
+  return null;
+}
+
 export function classifyIntent(question: string): SingleMeetingIntent {
   const q = question.toLowerCase().trim();
   
@@ -896,6 +996,96 @@ Format with Slack markdown (*bold* for headers, bullet points for lists).`,
 }
 
 /**
+ * Handle binary (yes/no) questions with "answer first, expand second" rule.
+ * 
+ * RULE: Always answer the literal yes/no question first, then offer more detail.
+ * 
+ * Example:
+ *   Q: "Is there a meeting with Walmart?"
+ *   A: "Yes — there was a meeting with Walmart on October 29, 2025.
+ *      Would you like a brief summary of what was discussed?"
+ */
+async function handleBinaryQuestion(
+  ctx: SingleMeetingContext,
+  question: string
+): Promise<SingleMeetingResult | null> {
+  const q = question.toLowerCase();
+  
+  // Check for "is there a meeting with X" pattern
+  const isMeetingExistenceQuestion = /\b(?:is there|was there|do we have) (?:a |any )?meeting\b/.test(q);
+  
+  if (isMeetingExistenceQuestion) {
+    // This is asking about meeting existence, but we're already IN a meeting thread
+    // So the answer is always "Yes" - there is a meeting with this company
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    const answer = `Yes — there was a meeting with ${ctx.companyName}${dateSuffix}.
+
+Would you like a brief summary of what was discussed?`;
+    
+    return {
+      answer,
+      intent: "extractive",
+      dataSource: "binary_answer",
+      pendingOffer: "summary",
+      isBinaryQuestion: true,
+    };
+  }
+  
+  // Check for "was X discussed" / "did they mention X" patterns
+  const subject = extractBinarySubject(question);
+  if (subject) {
+    console.log(`[SingleMeetingOrchestrator] Binary question subject: "${subject}"`);
+    
+    // Search for the subject in Tier-1 data (parallel fetch)
+    const [customerQuestions, actionItems] = await Promise.all([
+      lookupCustomerQuestions(ctx.meetingId, subject),
+      searchActionItemsForRelevantIssues(ctx.meetingId, subject),
+    ]);
+    
+    const found = customerQuestions.length > 0 || actionItems.length > 0;
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    
+    if (found) {
+      // Found the subject - answer YES with evidence
+      let answer = `Yes — "${subject}" was mentioned in this meeting${dateSuffix}.`;
+      
+      // Add brief evidence
+      if (customerQuestions.length > 0) {
+        const cq = customerQuestions[0];
+        answer += `\n\n_"${cq.questionText.substring(0, 150)}${cq.questionText.length > 150 ? '...' : ''}"_`;
+      } else if (actionItems.length > 0) {
+        const ai = actionItems[0];
+        answer += `\n\n_"${ai.evidence.substring(0, 150)}${ai.evidence.length > 150 ? '...' : ''}"_`;
+      }
+      
+      answer += `\n\nWould you like more details?`;
+      
+      return {
+        answer,
+        intent: "extractive",
+        dataSource: "binary_answer",
+        pendingOffer: "summary",
+        isBinaryQuestion: true,
+      };
+    } else {
+      // Not found - answer NO honestly
+      return {
+        answer: `I don't see "${subject}" explicitly mentioned in this meeting${dateSuffix}.
+
+Would you like me to check the full transcript, or share a meeting summary?`,
+        intent: "extractive",
+        dataSource: "binary_answer",
+        pendingOffer: "summary",
+        isBinaryQuestion: true,
+      };
+    }
+  }
+  
+  // Can't determine the subject - fall through to normal processing
+  return null;
+}
+
+/**
  * Detect if a question is a semantic question that benefits from LLM interpretation.
  * These are questions that:
  * - Ask about abstract concepts ("any hardware device", "appliance", "piece of hardware")
@@ -972,9 +1162,32 @@ export async function handleSingleMeetingQuestion(
     }
   }
   
+  // STEP 0a: AMBIGUITY CHECK - Before classifying, check if question is ambiguous
+  const ambiguity = detectAmbiguity(question);
+  if (ambiguity.isAmbiguous) {
+    console.log(`[SingleMeetingOrchestrator] AMBIGUITY DETECTED - returning clarification prompt`);
+    return {
+      answer: ambiguity.clarificationPrompt!,
+      intent: "extractive", // Default intent for tracking
+      dataSource: "clarification",
+      isClarificationRequest: true,
+    };
+  }
+  
+  // STEP 0b: BINARY QUESTION CHECK - Detect yes/no questions
+  const isBinary = isBinaryQuestion(question);
+  if (isBinary) {
+    console.log(`[SingleMeetingOrchestrator] BINARY QUESTION DETECTED - will answer yes/no first`);
+    const binaryResult = await handleBinaryQuestion(ctx, question);
+    if (binaryResult) {
+      return binaryResult;
+    }
+    // If handleBinaryQuestion returns null, fall through to normal processing
+  }
+  
   const intent = classifyIntent(question);
   const isSemantic = isSemanticQuestion(question);
-  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-20-v3 | intent: ${intent} | isSemantic: ${isSemantic}`);
+  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-20-v4 | intent: ${intent} | isSemantic: ${isSemantic} | isBinary: ${isBinary}`);
   console.log(`[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "${question}"`);
   
   switch (intent) {
