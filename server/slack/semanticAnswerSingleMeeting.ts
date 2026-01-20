@@ -12,7 +12,77 @@ export type SemanticAnswerResult = {
   answer: string;
   confidence: "high" | "medium" | "low";
   evidenceSources: string[];
+  answerShape?: AnswerShape;
 };
+
+/**
+ * Answer shape determines HOW the LLM should format its response.
+ * This is computed in code BEFORE prompting - prompts only decide how to say it.
+ */
+export type AnswerShape = 
+  | "single_value"   // which / where / who / when → one short sentence
+  | "yes_no"         // is there / did we / do we have → yes/no first, then offer detail
+  | "list"           // next steps, attendees → structured list
+  | "summary";       // only when explicitly requested
+
+/**
+ * Detect the answer shape based on question structure.
+ * This determines HOW the LLM should format its response.
+ * 
+ * RULE: Shape detection happens in code, not in the prompt.
+ */
+export function detectAnswerShape(question: string): AnswerShape {
+  const q = question.toLowerCase().trim();
+  
+  // YES/NO: Questions starting with auxiliary verbs asking for confirmation
+  const yesNoPatterns = [
+    /^(?:is|are|was|were|did|do|does|has|have|had|will|would|can|could) /,
+  ];
+  if (yesNoPatterns.some(p => p.test(q))) {
+    return "yes_no";
+  }
+  
+  // SINGLE VALUE: Which / where / who / when questions seeking one specific answer
+  const singleValuePatterns = [
+    /^which\b/,
+    /^where\b/,
+    /^who\b/,
+    /^when\b/,
+    /^what (?:is|was|'s) (?:the|their|his|her|our)\b/,
+    /\bwhat (?:store|location|person|name|date|time|place|thing)\b/,
+  ];
+  if (singleValuePatterns.some(p => p.test(q))) {
+    return "single_value";
+  }
+  
+  // LIST: Questions asking for multiple items
+  const listPatterns = [
+    /\bnext steps\b/,
+    /\battendees?\b/,
+    /\bwho (?:all |was |were )?(?:there|attended|present)\b/,
+    /\baction items?\b/,
+    /\bwhat (?:are|were) the\b.*\b(?:steps|items|actions|tasks|issues|concerns|questions)\b/,
+    /\blist\b/,
+  ];
+  if (listPatterns.some(p => p.test(q))) {
+    return "list";
+  }
+  
+  // SUMMARY: Only explicit summary requests
+  const summaryPatterns = [
+    /\bsummar(?:y|ize|ise)\b/,
+    /\boverview\b/,
+    /\bbrief me\b/,
+    /\bcatch me up\b/,
+    /\brecap\b/,
+  ];
+  if (summaryPatterns.some(p => p.test(q))) {
+    return "summary";
+  }
+  
+  // Default to single_value for most semantic questions (they want a specific answer)
+  return "single_value";
+}
 
 interface MeetingContext {
   meetingId: string;
@@ -25,26 +95,108 @@ interface MeetingContext {
   transcriptChunks: TranscriptChunk[];
 }
 
-const SYSTEM_PROMPT = `You are answering a user's question about a single meeting.
+/**
+ * Global "DO NOT" rules for all prompts.
+ * These reduce variability and make outputs stable.
+ */
+const GLOBAL_DONOT_RULES = `
+STRICT RULES (DO NOT VIOLATE):
+- Do NOT explain your reasoning
+- Do NOT quote long transcript passages unless specifically asked
+- Do NOT replace a direct answer with context
+- Do NOT apologize for missing information
+- Do NOT say "I couldn't generate an answer" or "I wasn't able to"
+- Do NOT summarize unless the user explicitly asked for a summary
+- Do NOT mention other meetings
+- You may ONLY use the provided meeting data`;
 
-RULES:
-- You may ONLY use the provided meeting data.
-- Do NOT infer facts that are not stated or strongly implied.
-- If the answer is uncertain, say so explicitly.
-- Do NOT summarize the entire meeting unless asked.
-- Do NOT mention other meetings.
-- Prefer precise, factual phrasing.
-- Always quote evidence from the meeting when possible.
-- Use Slack markdown formatting (*bold* for emphasis, _italics_ for quotes).
+/**
+ * Build shape-specific system prompt.
+ * Prompts only decide HOW to say it, not WHAT the answer is.
+ */
+function buildSystemPrompt(shape: AnswerShape): string {
+  const basePrompt = `You are answering a question about a single meeting.
+Use Slack markdown formatting (*bold* for emphasis, _italics_ for quotes).`;
 
-If relevant information exists, explain it clearly with supporting quotes.
-If not, say what was discussed instead, without speculation.
+  let shapeInstructions: string;
+  
+  switch (shape) {
+    case "single_value":
+      shapeInstructions = `
+ANSWER FORMAT: Single Value
+The user asked a specific factual question (which/where/who/when).
+The direct answer is already in the meeting data.
+
+RESPOND WITH:
+- The direct answer only
+- One short sentence
+- Do NOT summarize
+- Do NOT quote context
+- Do NOT explain unless the user asks why
+
+Example good response: "It was Store 2."
+Example bad response: "Based on the meeting discussion about store locations, it appears that..."`;
+      break;
+      
+    case "yes_no":
+      shapeInstructions = `
+ANSWER FORMAT: Yes/No
+The user asked a yes/no question.
+
+RESPOND WITH:
+- Answer yes or no FIRST
+- Add the key fact (e.g., date, name)
+- Then optionally offer more detail
+- Do NOT include a summary unless explicitly requested
+
+Example good response:
+"Yes — there was a meeting with Walmart on October 29, 2025.
+Would you like a brief summary?"
+
+Example bad response:
+"The meeting with Walmart covered several topics including..."`;
+      break;
+      
+    case "list":
+      shapeInstructions = `
+ANSWER FORMAT: List
+The user asked for a list of items (next steps, attendees, etc).
+
+RESPOND WITH:
+- A structured bullet list
+- Do not paraphrase unnecessarily
+- Do not add interpretation
+- Only include items explicitly present in the data
+
+Example good response:
+"*Next Steps:*
+• Send camera specs to Ron — Ryan
+• Schedule follow-up call — Spencer"`;
+      break;
+      
+    case "summary":
+      shapeInstructions = `
+ANSWER FORMAT: Summary
+The user explicitly requested a summary.
+
+RESPOND WITH:
+- A concise summary of the meeting
+- Do not introduce new facts
+- Clearly label it as a summary
+- Focus on key points, decisions, and outcomes`;
+      break;
+  }
+
+  return `${basePrompt}
+${shapeInstructions}
+${GLOBAL_DONOT_RULES}
 
 CONFIDENCE ASSESSMENT:
 At the end of your response, on a new line, add exactly one of:
 [CONFIDENCE: high] - Answer is directly supported by meeting data
 [CONFIDENCE: medium] - Answer is reasonably inferred from context
-[CONFIDENCE: low] - Answer is uncertain or partially supported`;
+[CONFIDENCE: low] - Answer is uncertain, partial, OR the information was not found in the meeting data`;
+}
 
 function formatMeetingDate(date: Date | null | undefined): string {
   if (!date) return "";
@@ -167,11 +319,18 @@ export async function semanticAnswerSingleMeeting(
   const contextWindow = buildContextWindow(context);
   console.log(`[SemanticAnswer] Context window: ${contextWindow.length} chars`);
   
+  // STEP 1: Detect answer shape BEFORE prompting
+  const answerShape = detectAnswerShape(userQuestion);
+  console.log(`[SemanticAnswer] Detected answer shape: ${answerShape}`);
+  
   const evidenceSources: string[] = [];
   if (customerQuestions.length > 0) evidenceSources.push("customer_questions");
   if (actionItems.length > 0) evidenceSources.push("action_items");
   if (chunks.length > 0) evidenceSources.push("transcript_chunks");
   if (leverageTeam.length > 0 || customerNames.length > 0) evidenceSources.push("attendees");
+  
+  // STEP 2: Build shape-specific prompt
+  const systemPrompt = buildSystemPrompt(answerShape);
   
   try {
     const response = await openai.chat.completions.create({
@@ -180,7 +339,7 @@ export async function semanticAnswerSingleMeeting(
       messages: [
         {
           role: "system",
-          content: SYSTEM_PROMPT,
+          content: systemPrompt,
         },
         {
           role: "user",
@@ -211,20 +370,22 @@ export async function semanticAnswerSingleMeeting(
     if (!rawAnswer) {
       console.log(`[SemanticAnswer] Empty content - full response: ${JSON.stringify(response.choices?.[0])}`);
       return {
-        answer: "I wasn't able to generate an answer from the meeting data.",
+        answer: "I don't see this explicitly mentioned in the meeting.",
         confidence: "low",
         evidenceSources,
+        answerShape,
       };
     }
     
     const { answer, confidence } = parseConfidence(rawAnswer);
     
-    console.log(`[SemanticAnswer] Complete | confidence=${confidence} | sources=${evidenceSources.join(",")}`);
+    console.log(`[SemanticAnswer] Complete | shape=${answerShape} | confidence=${confidence} | sources=${evidenceSources.join(",")}`);
     
     return {
       answer,
       confidence,
       evidenceSources,
+      answerShape,
     };
   } catch (error) {
     console.error(`[SemanticAnswer] LLM error:`, error);

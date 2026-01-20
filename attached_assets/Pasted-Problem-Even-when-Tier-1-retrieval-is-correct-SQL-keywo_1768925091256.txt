@@ -1,0 +1,169 @@
+Problem
+
+Even when Tier-1 retrieval is correct (SQL / keyword matching works), responses still feel bot-like because the LLM:
+
+explains instead of answering
+
+quotes context instead of extracting a value
+
+returns summaries when the user asked a specific question
+
+does not respect yes/no or “which / who / where” question shapes
+
+This is not a retrieval issue and not an intent-detection issue.
+It is a prompt responsibility and response-shaping issue.
+
+Goal
+
+Improve prompts so the LLM:
+
+answers directly and concisely
+
+respects the shape of the question
+
+does not explain or summarize unless explicitly asked
+
+never replaces a direct answer with context
+
+Prompts should shape the answer, not decide what the answer is.
+
+Architectural Rule (Do Not Violate)
+
+SQL / code decides:
+
+what data is relevant
+
+what the answer value(s) are
+
+what type of answer is required
+
+Prompts only decide how to say it
+
+No routing, ambiguity detection, or fact-finding should move into prompts.
+
+Required Change: Introduce Answer Shape Before Prompting
+
+Before calling the LLM, compute an explicit answerShape based on the question.
+
+Supported answer shapes (initial set)
+type AnswerShape =
+  | "single_value"   // which / where / who / when
+  | "yes_no"         // is there / did we / do we have
+  | "list"           // next steps, attendees
+  | "summary";       // only when explicitly requested
+
+
+This must be decided in code, not inferred by the prompt.
+
+Prompt Changes (Concrete)
+1️⃣ Single-value questions (which / where / who / when)
+
+Examples
+
+“Which store did we need to set up the monitor in?”
+
+“Who was responsible?”
+
+“When was the meeting?”
+
+Prompt instructions
+
+The user asked a specific factual question.
+The direct answer is already known.
+
+Respond with the direct answer only.
+One short sentence.
+Do NOT summarize.
+Do NOT quote context.
+Do NOT explain unless the user asks why.
+
+
+Expected output
+
+It was Store 2.
+
+2️⃣ Yes / No questions
+
+Examples
+
+“Is there a meeting with Walmart?”
+
+“Did we decide on the cameras?”
+
+Prompt instructions
+
+Answer the yes/no question first.
+Then optionally offer more detail.
+Do not include a summary unless the user accepts.
+
+
+Expected output
+
+Yes — there was a meeting with Walmart on October 29, 2025.
+Would you like a brief summary?
+
+3️⃣ List questions (next steps, attendees)
+
+Prompt instructions
+
+Return a structured list.
+Do not paraphrase unnecessarily.
+Do not add interpretation.
+Only include items explicitly present.
+
+
+(This is already mostly working — keep it constrained.)
+
+4️⃣ Summary (only on explicit request or opt-in)
+
+Prompt instructions
+
+Generate a concise summary.
+Do not introduce new facts.
+Clearly label it as a summary.
+
+
+Never use summaries as a fallback.
+
+Explicit “Do Not” Rules for All Prompts
+
+Add these globally:
+
+Do NOT explain your reasoning
+
+Do NOT quote long transcript passages unless asked
+
+Do NOT replace a direct answer with context
+
+Do NOT apologize for missing information
+
+Do NOT say “I couldn’t generate an answer”
+
+If the answer is missing → return not_found and let the orchestrator decide next steps.
+
+Success Criteria
+
+After this change:
+
+“Which store?” → Store 2
+
+“Is there a meeting with Walmart?” → Yes + date
+
+“What should I cover?” → clarifying question (handled before prompt)
+
+The bot feels precise, calm, and human
+
+No surprise summaries
+
+Final Note (Important)
+
+This change does not add more LLM usage.
+It reduces variability and makes outputs stable.
+
+This aligns with:
+
+clear interfaces
+
+deep modules
+
+reduced complexity
