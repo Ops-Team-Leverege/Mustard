@@ -26,6 +26,7 @@
 import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { MeetingActionItem as DbActionItem } from "@shared/schema";
+import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -55,9 +56,11 @@ export type SingleMeetingContext = {
 export type SingleMeetingResult = {
   answer: string;
   intent: SingleMeetingIntent;
-  dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "not_found";
+  dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "semantic" | "not_found";
   evidence?: string;
   pendingOffer?: "summary"; // Indicates bot offered summary, awaiting user response
+  semanticAnswerUsed?: boolean;
+  semanticConfidence?: "high" | "medium" | "low";
 };
 
 /**
@@ -891,11 +894,36 @@ Format with Slack markdown (*bold* for headers, bullet points for lists).`,
 }
 
 /**
+ * Detect if a question is a semantic question that benefits from LLM interpretation.
+ * These are questions that:
+ * - Ask about abstract concepts ("any hardware device", "appliance")
+ * - Ask about implications or interpretations
+ * - Use vague language that requires context understanding
+ */
+function isSemanticQuestion(question: string): boolean {
+  const q = question.toLowerCase();
+  const semanticPatterns = [
+    /\bany\s+\w+\s+(device|product|hardware|software|system|tool|appliance)\b/,
+    /\bwhat\s+(?:is|was)\s+(?:the|a)\s+\w+\s*\??\b/,
+    /\bdid\s+(?:they|we|anyone)\s+(?:talk|discuss|mention|say)\s+(?:about|anything)\b/,
+    /\bwhat\s+(?:did|was)\s+\w+(?:'s|s)?\s+(?:issue|problem|concern|question)\b/,
+    /\bwhat\s+(?:kind|type|sort)\s+of\b/,
+    /\banything\s+(?:about|related|regarding)\b/,
+  ];
+  return semanticPatterns.some(p => p.test(q));
+}
+
+/**
  * Main orchestrator entry point.
  * 
  * Classifies intent and routes to appropriate handler.
- * Enforces Tier-1-only access for extractive/aggregative intents.
- * Summary is only used for explicit summary requests OR when user accepts pending offer.
+ * 
+ * Processing Flow:
+ * 1. Check for offer responses (if pending)
+ * 2. Classify intent (extractive/aggregative/summary)
+ * 3. Try Tier-1 deterministic lookup
+ * 4. If Tier-1 fails AND question is semantic → use LLM semantic answer (Step 6)
+ * 5. If still no answer → return uncertainty with offer
  * 
  * @param ctx - Single meeting context (meetingId, companyName, meetingDate)
  * @param question - User's question text
@@ -927,12 +955,37 @@ export async function handleSingleMeetingQuestion(
   }
   
   const intent = classifyIntent(question);
-  console.log(`[SingleMeetingOrchestrator] Classified intent: ${intent}`);
+  const isSemantic = isSemanticQuestion(question);
+  console.log(`[SingleMeetingOrchestrator] Classified intent: ${intent} | isSemantic: ${isSemantic}`);
   
   switch (intent) {
     case "extractive": {
       const result = await handleExtractiveIntent(ctx, question);
-      // Add pendingOffer flag if we're returning uncertainty
+      
+      // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
+      if (result.dataSource === "not_found" && isSemantic) {
+        console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (Tier-1 failed, semantic question)`);
+        try {
+          const semanticResult = await semanticAnswerSingleMeeting(
+            ctx.meetingId,
+            ctx.companyName,
+            question,
+            ctx.meetingDate
+          );
+          return {
+            answer: semanticResult.answer,
+            intent: "extractive",
+            dataSource: "semantic",
+            semanticAnswerUsed: true,
+            semanticConfidence: semanticResult.confidence,
+          };
+        } catch (err) {
+          console.error(`[SingleMeetingOrchestrator] Semantic answer failed:`, err);
+          // Fall through to uncertainty response
+        }
+      }
+      
+      // If still not found, offer summary
       if (result.dataSource === "not_found") {
         return { ...result, pendingOffer: "summary" };
       }
@@ -941,7 +994,31 @@ export async function handleSingleMeetingQuestion(
     
     case "aggregative": {
       const result = await handleAggregativeIntent(ctx, question);
-      // Add pendingOffer flag if we're returning uncertainty
+      
+      // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
+      if (result.dataSource === "not_found" && isSemantic) {
+        console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (aggregative, Tier-1 failed)`);
+        try {
+          const semanticResult = await semanticAnswerSingleMeeting(
+            ctx.meetingId,
+            ctx.companyName,
+            question,
+            ctx.meetingDate
+          );
+          return {
+            answer: semanticResult.answer,
+            intent: "aggregative",
+            dataSource: "semantic",
+            semanticAnswerUsed: true,
+            semanticConfidence: semanticResult.confidence,
+          };
+        } catch (err) {
+          console.error(`[SingleMeetingOrchestrator] Semantic answer failed:`, err);
+          // Fall through to uncertainty response
+        }
+      }
+      
+      // If still not found, offer summary
       if (result.dataSource === "not_found") {
         return { ...result, pendingOffer: "summary" };
       }

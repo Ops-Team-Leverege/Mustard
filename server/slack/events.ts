@@ -248,6 +248,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Track pending offer state for single-meeting confirmations
       let pendingOffer: string | undefined;
+      let semanticAnswerUsed: boolean | undefined;
+      let semanticConfidence: string | undefined;
 
       if (isSingleMeetingMode && resolvedMeeting) {
         // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
@@ -279,8 +281,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
         intentClassification = result.intent;
         dataSource = result.dataSource;
         pendingOffer = result.pendingOffer;
+        semanticAnswerUsed = result.semanticAnswerUsed;
+        semanticConfidence = result.semanticConfidence;
         
-        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}`);
+        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
       } else {
         // MULTI-CONTEXT MODE: Use MCP router
         const ctx = makeMCPContext(threadContext);
@@ -312,7 +316,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Log interaction (write-only, non-blocking)
       // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
-      // For single-meeting mode, include intent classification, data source, and pending offer state
+      // For single-meeting mode, include intent classification, data source, pending offer, and semantic answer tracking
       storage.insertInteractionLog({
         slackThreadId: threadTs,
         slackMessageTs: botReply.ts, // Actual bot reply message timestamp
@@ -332,6 +336,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
           isSingleMeetingMode: isSingleMeetingMode || false,
           // Pending offer state (for confirmation flow)
           pendingOffer: pendingOffer || undefined,
+          // Semantic answer tracking (Step 6)
+          semanticAnswerUsed: semanticAnswerUsed || undefined,
+          semanticConfidence: semanticConfidence || undefined,
         },
         confidence: null,
       }).catch(err => {

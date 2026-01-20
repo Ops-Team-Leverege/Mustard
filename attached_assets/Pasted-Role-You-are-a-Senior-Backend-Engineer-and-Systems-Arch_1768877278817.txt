@@ -1,0 +1,244 @@
+Role
+
+You are a Senior Backend Engineer and Systems Architect.
+
+We are extending the Slack single-meeting Q&A system to add LLM-based semantic answering, but only at the correct layer, and without weakening any existing guarantees.
+
+This is NOT a RAG reset.
+This is a controlled semantic synthesis layer on top of already-resolved, single-meeting data.
+
+Context (Do Not Break)
+
+We already have:
+
+Deterministic Step 0: Meeting Resolution
+
+Single-Meeting Orchestrator
+
+Tier-1, pre-materialized data:
+
+customer_questions
+
+meeting_action_items
+
+attendees
+
+transcript chunks
+
+Strong invariants:
+
+One Slack thread → one meeting
+
+No cross-meeting answers
+
+No LLM calls for routing, resolution, or extraction
+
+Summaries are opt-in only
+
+These must remain unchanged.
+
+Problem to Solve
+
+Slack users ask semantic questions about a meeting, such as:
+
+“Did they talk about any hardware device?”
+
+“What was the Nvidia appliance?”
+
+“What was Brian’s issue about?”
+
+These questions:
+
+Do NOT map cleanly to keywords
+
+Cannot be answered reliably with deterministic lookup alone
+
+Should NOT trigger re-extraction or cross-meeting search
+
+Today, the system either:
+
+returns irrelevant snippets
+
+says “not mentioned” incorrectly
+
+loops on fallback prompts
+
+Goal
+
+Add an LLM-powered Semantic Answer Layer that:
+
+Runs only after a meeting is deterministically resolved
+
+Uses only data from that meeting
+
+Produces shaped, natural language answers
+
+Is evidence-bounded (no invention)
+
+Is used only when deterministic Tier-1 lookup fails
+
+Architectural Design (Required)
+New Step (After Tier-1 Lookup Fails)
+
+Introduce:
+
+Step 6 — Semantic Answer Synthesis (LLM, Single-Meeting Scoped)
+
+This step must:
+
+Run only if:
+
+Meeting is resolved
+
+Tier-1 lookup returns no confident match
+
+Never run for:
+
+Meeting resolution
+
+Intent classification
+
+Fast-path attendee or next-steps questions
+
+Implementation Tasks
+1️⃣ Add Semantic Answer Function
+
+Create a new helper:
+
+server/slack/semanticAnswerSingleMeeting.ts
+
+
+Responsibilities:
+
+Accept:
+
+meetingId
+
+userQuestion
+
+Load only data for that meeting:
+
+customer_questions
+
+meeting_action_items
+
+attendees
+
+relevant transcript chunks
+
+Construct a bounded context window
+
+Call the LLM once
+
+2️⃣ LLM Model & Settings (Do Not Change Others)
+
+Model: gpt-5
+
+Temperature: default
+
+Max tokens: conservative (short answers)
+
+⚠️ Do NOT modify any other OpenAI usage in the system.
+
+3️⃣ System Prompt (Critical)
+
+Use this exact intent (you may rephrase slightly, but not weaken it):
+
+You are answering a user’s question about a single meeting.
+
+RULES:
+- You may ONLY use the provided meeting data.
+- Do NOT infer facts that are not stated or strongly implied.
+- If the answer is uncertain, say so explicitly.
+- Do NOT summarize the entire meeting unless asked.
+- Do NOT mention other meetings.
+- Prefer precise, factual phrasing.
+
+If relevant information exists, explain it clearly.
+If not, say what was discussed instead, without speculation.
+
+4️⃣ Evidence-Bound Context Construction
+
+The LLM input must include:
+
+A structured section with:
+
+customer questions (verbatim)
+
+action items (with evidence quotes)
+
+attendees
+
+A limited set of transcript snippets (only from that meeting)
+
+Never pass raw full transcripts.
+
+5️⃣ Orchestrator Integration
+
+Update SingleMeetingOrchestrator logic:
+
+if (tier1ResultFound) {
+  return deterministic answer
+}
+
+if (userAcceptedFallback OR semanticIntentDetected) {
+  return semanticAnswerSingleMeeting(...)
+}
+
+
+Important:
+
+This is not a fallback summary
+
+This is semantic answering for the same question
+
+6️⃣ Logging (Required)
+
+Extend interaction_logs.resolvedEntities with:
+
+{
+  semanticAnswerUsed: true,
+  semanticConfidence: "high" | "medium" | "low"
+}
+
+
+This lets us monitor:
+
+how often semantic answers are needed
+
+which questions deterministic logic misses
+
+Explicit Non-Goals
+
+❌ Do NOT re-extract anything
+
+❌ Do NOT search across meetings
+
+❌ Do NOT auto-summarize
+
+❌ Do NOT let the LLM choose the meeting
+
+❌ Do NOT bypass Step 0 resolution
+
+Acceptance Criteria
+
+This is complete when:
+
+“Did they talk about any hardware device?” returns a correct, shaped answer
+
+“What was the Nvidia appliance?” returns “Jetson” only if supported by meeting data
+
+Attendee and next-step questions still use deterministic paths
+
+No looping fallback behavior exists
+
+All answers remain scoped to exactly one meeting
+
+Why This Matters
+
+This preserves the system’s core philosophy:
+
+Deterministic logic decides what can be answered.
+The LLM decides how to explain it — grounded in evidence.
+
+This gives users natural answers without sacrificing trust or correctness.
