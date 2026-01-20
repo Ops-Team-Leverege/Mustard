@@ -5,7 +5,7 @@ import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity } from "../mcp/singleMeetingOrchestrator";
-import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "../mcp/meetingResolver";
+import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "../mcp/meetingResolver";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -131,26 +131,33 @@ export async function slackEventsHandler(req: Request, res: Response) {
     if (ambiguityCheck.isAmbiguous && ambiguityCheck.clarificationPrompt) {
       console.log(`[Slack] Early ambiguity detected - asking for clarification`);
       
+      // IMPORTANT: Extract company from original question so thread context works for follow-up
+      const companyContext = await extractCompanyFromMessage(text);
+      console.log(`[Slack] Extracted company from preparation question: ${companyContext?.companyName || 'none'}`);
+      
       await postSlackMessage({
         channel,
         text: ambiguityCheck.clarificationPrompt,
         thread_ts: threadTs,
       });
       
-      // Log interaction for clarification
+      // Log interaction for clarification - include company so thread context works
       storage.insertInteractionLog({
         slackThreadId: threadTs,
         slackMessageTs: messageTs,
         slackChannelId: channel,
         userId: userId || null,
-        companyId: null,
+        companyId: companyContext?.companyId || null,
         meetingId: null,
         capabilityName: "ambiguity_clarification",
         questionText: text,
         answerText: ambiguityCheck.clarificationPrompt,
         resolvedEntities: { 
+          companyId: companyContext?.companyId || null,
+          companyName: companyContext?.companyName || null,
           isClarificationRequest: true,
           dataSource: "clarification",
+          awaitingClarification: "next_steps_or_summary", // Track what we're waiting for
         },
         confidence: null,
       }).catch(err => {

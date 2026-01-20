@@ -43,7 +43,7 @@ const TEMPORAL_PATTERNS = {
  * Extract company name from message if mentioned.
  * Returns null if no company explicitly mentioned.
  */
-async function extractCompanyFromMessage(message: string): Promise<{ companyId: string; companyName: string } | null> {
+export async function extractCompanyFromMessage(message: string): Promise<{ companyId: string; companyName: string } | null> {
   const companies = await storage.rawQuery(
     `SELECT id, name FROM companies ORDER BY name`,
     []
