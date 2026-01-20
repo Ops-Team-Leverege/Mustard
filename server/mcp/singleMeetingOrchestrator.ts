@@ -163,6 +163,7 @@ function isAttendeeQuestion(question: string): boolean {
   const q = question.toLowerCase();
   const patterns = [
     /\bwho attended\b/,
+    /\bhow attended\b/,  // Common typo
     /\bwho was (?:there|present|in the meeting|on the call)\b/,
     /\battendees\b/,
     /\bparticipants\b/,
@@ -171,6 +172,20 @@ function isAttendeeQuestion(question: string): boolean {
     /\bpeople (?:in|on) the (?:meeting|call)\b/,
   ];
   return patterns.some(p => p.test(q));
+}
+
+/**
+ * Detect if user is confirming a prior offer (e.g., "sure!", "yes", "ok").
+ * This triggers summary generation when following an uncertainty response.
+ */
+function isConfirmationResponse(question: string): boolean {
+  const q = question.toLowerCase().trim();
+  const confirmationPatterns = [
+    /^(sure|yes|yeah|yep|ok|okay|please|go ahead|do it|show me|tell me)\.?!?$/,
+    /^(sure thing|yes please|ok please|yeah please)\.?!?$/,
+    /^(yes,? please|yeah,? sure)\.?!?$/,
+  ];
+  return confirmationPatterns.some(p => p.test(q));
 }
 
 /**
@@ -533,9 +548,35 @@ async function handleExtractiveIntent(
   ]);
   console.log(`[SingleMeetingOrchestrator] Parallel fetch complete: ${Date.now() - startTime}ms`);
   
-  // Check customer questions first (priority 2)
-  if (customerQuestions.length > 0) {
-    const match = customerQuestions[0];
+  // Extract keywords for scoring
+  const { keywords, properNouns } = extractKeywords(question);
+  const allKeywords = Array.from(new Set([...properNouns, ...keywords]));
+  
+  // Score function: count how many keywords match in the text
+  const scoreMatch = (text: string): number => {
+    const lowerText = text.toLowerCase();
+    return allKeywords.filter(kw => lowerText.includes(kw)).length;
+  };
+  
+  // Score customer questions
+  const scoredCustomerQuestions = customerQuestions.map(cq => ({
+    item: cq,
+    score: scoreMatch(cq.questionText + " " + (cq.answerEvidence || "")),
+  })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  
+  // Score action items
+  const scoredActionItems = actionItems.map(ai => ({
+    item: ai,
+    score: scoreMatch(`${ai.action} ${ai.evidence} ${ai.owner}`),
+  })).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
+  
+  // Pick the best match across both sources (highest keyword match count wins)
+  const bestCQ = scoredCustomerQuestions[0];
+  const bestAI = scoredActionItems[0];
+  
+  // Compare scores - action items win ties since they're more specific
+  if (bestCQ && (!bestAI || bestCQ.score > bestAI.score)) {
+    const match = bestCQ.item;
     const lines: string[] = [];
     lines.push(`*From the meeting with ${ctx.companyName}:*`);
     lines.push(`\n"${match.questionText}"`);
@@ -559,40 +600,25 @@ async function handleExtractiveIntent(
     };
   }
   
-  // Check action items for relevant issues (priority 3)
-  // RULE: Action items are checked whenever the question asks about issues, problems,
-  // blockers, errors, or incidents — regardless of whether user says "next steps"
-  if (actionItems.length > 0) {
-    const q = question.toLowerCase();
-    const stopWords = new Set(["what", "when", "where", "which", "that", "this", "from", "with", "about", "were", "have", "been", "does", "friday", "monday", "tuesday", "wednesday", "thursday", "saturday", "sunday"]);
-    const keywords = q.split(/\s+/)
-      .filter(w => w.length > 3 && !stopWords.has(w));
-    
-    const matchingActionItems = actionItems.filter(item => {
-      const searchText = `${item.action} ${item.evidence} ${item.owner}`.toLowerCase();
-      return keywords.some(kw => searchText.includes(kw));
-    });
-    
-    if (matchingActionItems.length > 0) {
-      const lines: string[] = [];
-      lines.push(`The meeting notes include a follow-up related to this:`);
-      matchingActionItems.forEach((item) => {
-        let formattedItem = `• ${item.action} — ${item.owner}`;
-        if (item.deadline && item.deadline !== "Not specified") {
-          formattedItem += ` _(${item.deadline})_`;
-        }
-        lines.push(`\n${formattedItem}`);
-        lines.push(`  _"${item.evidence}"_`);
-      });
-      lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
-      
-      return {
-        answer: lines.join("\n"),
-        intent: "extractive",
-        dataSource: "action_items",
-        evidence: matchingActionItems[0].evidence,
-      };
+  if (bestAI) {
+    // Return action item match
+    const lines: string[] = [];
+    lines.push(`The meeting notes include a follow-up related to this:`);
+    const item = bestAI.item;
+    let formattedItem = `• ${item.action} — ${item.owner}`;
+    if (item.deadline && item.deadline !== "Not specified") {
+      formattedItem += ` _(${item.deadline})_`;
     }
+    lines.push(`\n${formattedItem}`);
+    lines.push(`  _"${item.evidence}"_`);
+    lines.push(`\n_Note: The specific details may not have been discussed in this meeting._`);
+    
+    return {
+      answer: lines.join("\n"),
+      intent: "extractive",
+      dataSource: "action_items",
+      evidence: item.evidence,
+    };
   }
   
   // FALLBACK: Transcript snippets (only fetch if needed - priority 4)
@@ -807,6 +833,13 @@ export async function handleSingleMeetingQuestion(
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Processing question for meeting ${ctx.meetingId}`);
   console.log(`[SingleMeetingOrchestrator] Question: "${question.substring(0, 100)}..."`);
+  
+  // Check for confirmation responses first (e.g., "sure!", "yes", "ok")
+  // These indicate user is accepting a prior offer to share what was discussed
+  if (isConfirmationResponse(question)) {
+    console.log(`[SingleMeetingOrchestrator] Detected confirmation response - triggering summary`);
+    return handleSummaryIntent(ctx);
+  }
   
   const intent = classifyIntent(question);
   console.log(`[SingleMeetingOrchestrator] Classified intent: ${intent}`);
