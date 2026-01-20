@@ -4,7 +4,7 @@ import { postSlackMessage } from "./slackApi";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
-import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity } from "../mcp/singleMeetingOrchestrator";
+import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity, isBinaryQuestion } from "../mcp/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "../mcp/meetingResolver";
 
 function cleanMention(text: string): string {
@@ -165,6 +165,81 @@ export async function slackEventsHandler(req: Request, res: Response) {
       });
       
       return; // Stop processing - clarification required
+    }
+
+    // 7.6 EARLY BINARY QUESTION HANDLING (existence checks)
+    //
+    // "Is there a meeting with Walmart?" should get "Yes, on [date]. Want details?"
+    // NOT a full summary. Handle this before routing to avoid LLM overhead.
+    //
+    if (isBinaryQuestion(text)) {
+      // Check if it's an existence question about a company meeting
+      const existenceMatch = text.match(/\b(?:is|are|was|were|do|does|did)\s+(?:there|we|they)\s+(?:a|any)\s+(?:meeting|call|transcript)s?\s+(?:with|for|about)\s+(.+?)(?:\?|$)/i);
+      
+      if (existenceMatch) {
+        const searchTerm = existenceMatch[1].trim().replace(/[?.,!]$/, '');
+        console.log(`[Slack] Binary existence question detected for: "${searchTerm}"`);
+        
+        // Try to find the company
+        const companyContext = await extractCompanyFromMessage(text);
+        
+        if (companyContext) {
+          // Fast DB query to check for meetings
+          const meetingRows = await storage.rawQuery(`
+            SELECT t.id, t.meeting_date, c.name as company_name
+            FROM transcripts t
+            JOIN companies c ON t.company_id = c.id
+            WHERE t.company_id = $1
+            ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+            LIMIT 1
+          `, [companyContext.companyId]);
+          
+          let responseText: string;
+          let meetingId: string | null = null;
+          
+          if (meetingRows && meetingRows.length > 0) {
+            const meeting = meetingRows[0];
+            meetingId = meeting.id as string;
+            const meetingDate = meeting.meeting_date 
+              ? new Date(meeting.meeting_date as string).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+              : "recently";
+            responseText = `Yes, there's a meeting with ${companyContext.companyName} from ${meetingDate}.\n\nWould you like the key takeaways or next steps?`;
+          } else {
+            responseText = `No, I don't see any meetings with ${companyContext.companyName} in the system.`;
+          }
+          
+          await postSlackMessage({
+            channel,
+            text: responseText,
+            thread_ts: threadTs,
+          });
+          
+          // Log interaction
+          storage.insertInteractionLog({
+            slackThreadId: threadTs,
+            slackMessageTs: messageTs,
+            slackChannelId: channel,
+            userId: userId || null,
+            companyId: companyContext.companyId,
+            meetingId,
+            capabilityName: "binary_existence_check",
+            questionText: text,
+            answerText: responseText,
+            resolvedEntities: { 
+              companyId: companyContext.companyId,
+              meetingId,
+              isBinaryQuestion: true,
+              dataSource: "binary_answer",
+              awaitingClarification: meetingId ? "takeaways_or_next_steps" : null,
+            },
+            confidence: null,
+          }).catch(err => {
+            console.error("Failed to log interaction:", err);
+          });
+          
+          return; // Done - fast path completed
+        }
+      }
     }
 
     // 8. Thread context resolution (deterministic follow-up support)
