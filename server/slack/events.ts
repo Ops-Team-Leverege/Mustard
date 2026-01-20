@@ -163,7 +163,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // If ambiguous → ask for clarification (no intent classification runs)
     // If resolved → proceed to single-meeting mode
     //
-    let resolvedMeeting: { meetingId: string; companyId: string; companyName: string } | null = null;
+    let resolvedMeeting: { meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null } | null = null;
     
     // Only attempt temporal resolution if:
     // - No thread context exists, OR
@@ -180,6 +180,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           meetingId: resolution.meetingId,
           companyId: resolution.companyId,
           companyName: resolution.companyName,
+          meetingDate: resolution.meetingDate,
         };
         console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
       } else if (resolution.needsClarification) {
@@ -214,14 +215,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // If not resolved and no clarification needed, proceed to MCP router
     } else if (threadContext?.meetingId && threadContext?.companyId) {
       // Thread context exists - use it
-      const companyRows = await storage.rawQuery(
-        `SELECT name FROM companies WHERE id = $1`,
-        [threadContext.companyId]
-      );
+      const [companyRows, transcriptRows] = await Promise.all([
+        storage.rawQuery(`SELECT name FROM companies WHERE id = $1`, [threadContext.companyId]),
+        storage.rawQuery(`SELECT COALESCE(meeting_date, created_at) as meeting_date FROM transcripts WHERE id = $1`, [threadContext.meetingId]),
+      ]);
       resolvedMeeting = {
         meetingId: threadContext.meetingId,
         companyId: threadContext.companyId,
         companyName: (companyRows?.[0]?.name as string) || "Unknown Company",
+        meetingDate: transcriptRows?.[0]?.meeting_date ? new Date(transcriptRows[0].meeting_date as string) : null,
       };
     }
 
@@ -252,6 +254,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           meetingId: resolvedMeeting.meetingId,
           companyId: resolvedMeeting.companyId,
           companyName: resolvedMeeting.companyName,
+          meetingDate: resolvedMeeting.meetingDate,
         };
         
         const result = await handleSingleMeetingQuestion(singleMeetingContext, text);

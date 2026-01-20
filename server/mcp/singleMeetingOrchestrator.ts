@@ -49,6 +49,7 @@ export type SingleMeetingContext = {
   meetingId: string;
   companyId: string;
   companyName: string;
+  meetingDate?: Date | null; // Optional meeting date for display
 };
 
 export type SingleMeetingResult = {
@@ -57,6 +58,28 @@ export type SingleMeetingResult = {
   dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "not_found";
   evidence?: string;
 };
+
+/**
+ * Format meeting date for display in responses.
+ */
+function formatMeetingDate(date: Date | null | undefined): string {
+  if (!date) return "";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/**
+ * Get meeting date suffix for responses (e.g., " (Jan 20, 2026)")
+ */
+function getMeetingDateSuffix(ctx: SingleMeetingContext): string {
+  if (ctx.meetingDate) {
+    return ` (${formatMeetingDate(ctx.meetingDate)})`;
+  }
+  return "";
+}
 
 const UNCERTAINTY_RESPONSE = `I don't see this explicitly mentioned in the meeting.
 If you'd like, I can share what was discussed instead.`;
@@ -474,15 +497,17 @@ async function handleExtractiveIntent(
     console.log(`[SingleMeetingOrchestrator] Action items fetch: ${Date.now() - startTime}ms`);
     
     if (actionItems.length === 0) {
+      const dateSuffix = getMeetingDateSuffix(ctx);
       return {
-        answer: "No explicit action items were identified in this meeting.",
+        answer: `No explicit action items were identified in this meeting${dateSuffix}.`,
         intent: "extractive",
         dataSource: "action_items",
       };
     }
     
     const lines: string[] = [];
-    lines.push(`*Next Steps (${ctx.companyName})*`);
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    lines.push(`*Next Steps — ${ctx.companyName}${dateSuffix}*`);
     actionItems.forEach(item => {
       let formattedItem = `• ${item.action} — ${item.owner}`;
       if (item.deadline && item.deadline !== "Not specified") {

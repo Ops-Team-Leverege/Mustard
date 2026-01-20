@@ -20,7 +20,7 @@
 import { storage } from "../storage";
 
 export type MeetingResolutionResult =
-  | { resolved: true; meetingId: string; companyId: string; companyName: string }
+  | { resolved: true; meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null }
   | { resolved: false; needsClarification: true; message: string; options?: Array<{ meetingId: string; date: Date; companyName: string }> }
   | { resolved: false; needsClarification: false; reason: string };
 
@@ -263,18 +263,26 @@ export async function resolveMeetingFromSlackMessage(
   if (threadContext?.meetingId && threadContext?.companyId) {
     console.log(`[MeetingResolver] Using thread context: meetingId=${threadContext.meetingId}`);
     
-    // Look up company name
+    // Look up company name and meeting date
     const companyRows = await storage.rawQuery(
       `SELECT name FROM companies WHERE id = $1`,
       [threadContext.companyId]
     );
     const companyName = companyRows?.[0]?.name as string || "Unknown Company";
     
+    // Get meeting date from transcript
+    const transcriptRows = await storage.rawQuery(
+      `SELECT COALESCE(meeting_date, created_at) as meeting_date FROM transcripts WHERE id = $1`,
+      [threadContext.meetingId]
+    );
+    const meetingDate = transcriptRows?.[0]?.meeting_date ? new Date(transcriptRows[0].meeting_date as string) : null;
+    
     return {
       resolved: true,
       meetingId: threadContext.meetingId,
       companyId: threadContext.companyId,
       companyName,
+      meetingDate,
     };
   }
   
@@ -346,6 +354,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingId: meetings[0].id,
         companyId,
         companyName,
+        meetingDate: meetings[0].meetingDate,
       };
     }
     
@@ -394,6 +403,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingId: meetings[0].id,
         companyId,
         companyName,
+        meetingDate: meetings[0].meetingDate,
       };
     }
     
@@ -431,6 +441,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingId: meetings[0].id,
         companyId,
         companyName,
+        meetingDate: meetings[0].meetingDate,
       };
     }
     
@@ -468,6 +479,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingId: meetings[0].id,
         companyId,
         companyName,
+        meetingDate: meetings[0].meetingDate,
       };
     }
     
