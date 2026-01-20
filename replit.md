@@ -9,16 +9,33 @@ Preferred communication style: Simple, everyday language.
 ### OpenAI Integration Changes (CRITICAL)
 **Always ask where the impact should be reflected before making OpenAI-related changes.**
 
-This application has multiple features using OpenAI with different models and settings:
+## OpenAI Prompt Inventory
 
-| Feature | File | Model | Temperature | Purpose |
-|---------|------|-------|-------------|---------|
-| Transcript Analyzer | `server/transcriptAnalyzer.ts` | gpt-5 | default (1) | Extract insights/Q&A from transcripts |
-| MCP Router | `server/mcp/llm.ts` | gpt-4o-mini | 0 | Route Slack questions to capabilities |
-| RAG Composer | `server/rag/composer.ts` | gpt-4o-mini / gpt-4o | 0 | Extract answers, commitments, quotes |
-| Customer Questions | `server/extraction/extractCustomerQuestions.ts` | gpt-4o | 0 | Extract verbatim customer questions |
+**11 OpenAI calls across 8 files:**
 
-**Model constraints:**
+| File | Line | Model | Temp | Purpose |
+|------|------|-------|------|---------|
+| `server/transcriptAnalyzer.ts` | 197 | gpt-5 | 1 (default) | Extract insights/Q&A from transcripts |
+| `server/slack/semanticAnswerSingleMeeting.ts` | 336 | gpt-5 | 1 (default) | Semantic answers for complex Slack questions |
+| `server/mcp/singleMeetingOrchestrator.ts` | 967 | gpt-5 | 1 (default) | Single-meeting intent classification |
+| `server/mcp/llm.ts` | 82 | gpt-4o-mini | 0 | Route Slack questions to MCP capabilities |
+| `server/rag/composer.ts` | 200 | gpt-4o-mini | 0 | Extract answers from context |
+| `server/rag/composer.ts` | 300 | gpt-4o-mini | 0 | Extract commitments |
+| `server/rag/composer.ts` | 366 | gpt-4o-mini | 0 | Extract quotes |
+| `server/rag/composer.ts` | 518 | gpt-4o | 0 | Extract action items (higher quality) |
+| `server/extraction/extractCustomerQuestions.ts` | 214 | gpt-4o | 0 | Extract verbatim customer questions |
+| `server/extraction/extractCustomerQuestionsFromText.ts` | 65 | gpt-4o | 0 | Extract questions from raw text |
+| `server/ingestion/resolveCustomerQuestionAnswers.ts` | 123 | gpt-4o | 0 | Verify Q&A answers from transcript |
+
+**By Model:**
+
+| Model | Count | Use Cases |
+|-------|-------|-----------|
+| gpt-5 | 3 | User-facing features (transcripts, semantic answers, intent) |
+| gpt-4o | 4 | High-quality extraction (questions, actions, verification) |
+| gpt-4o-mini | 4 | Routing & lightweight extraction (RAG composer) |
+
+**Model Constraints:**
 - gpt-5 does NOT support temperature=0 (only default value of 1)
 - gpt-4o-mini and gpt-4o support temperature=0 for deterministic output
 
