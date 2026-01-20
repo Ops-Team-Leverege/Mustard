@@ -178,6 +178,31 @@ I don't see this explicitly mentioned in the meeting.
 If you'd like, I can share what was discussed instead.
 ```
 
+**Step 6: Semantic Answer Layer (LLM-Powered)**
+
+For complex questions that require semantic understanding (e.g., "any hardware device mentioned?", "what kind of integration issues?"), the system uses an LLM to synthesize an answer from meeting data.
+
+Activation Conditions (ALL must be true):
+1. Meeting is deterministically resolved (Step 0)
+2. Tier-1 lookup fails (attendees, customer_questions, action_items return no confident match)
+3. Question is identified as semantic (`isSemanticQuestion()` returns true)
+
+Processing:
+- File: `server/slack/semanticAnswerSingleMeeting.ts`
+- Model: gpt-5 with default temperature (1)
+- Context Window: customer_questions + action_items + attendees + transcript_chunks (max 10)
+- Evidence-bounded: Answer must be grounded in provided context, no invention
+
+Response Format:
+- Confidence levels: HIGH, MEDIUM, LOW
+- Includes citation of relevant transcript/question content
+- Falls back to uncertainty if evidence is insufficient
+
+Logging:
+- `semanticAnswerUsed`: boolean flag when Step 6 triggers
+- `semanticConfidence`: "high" | "medium" | "low" confidence level
+- `dataSource`: "semantic" when this layer provides the answer
+
 **Monitoring:**
 - All Slack interactions are logged to `interaction_logs` table
 - Single-meeting mode logs include additional fields in `resolvedEntities`:
