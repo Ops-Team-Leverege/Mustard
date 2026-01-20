@@ -95,6 +95,11 @@ export interface InteractionMetadata {
   isBinaryQuestion?: boolean;
   semanticAnswerUsed?: boolean;
   semanticConfidence?: string;
+  
+  // CRITICAL: Legacy fields required for thread context fast-path
+  // These must remain at top level for getLastInteractionByThread to work
+  awaitingClarification?: ClarificationType;
+  pendingOffer?: string;
 }
 
 /**
@@ -132,6 +137,9 @@ export function buildInteractionMetadata(
     isBinaryQuestion?: boolean;
     semanticAnswerUsed?: boolean;
     semanticConfidence?: string;
+    // Legacy fields for thread context fast-path
+    awaitingClarification?: ClarificationType;
+    pendingOffer?: string;
   }
 ): InteractionMetadata {
   return {
@@ -172,5 +180,9 @@ export function buildInteractionMetadata(
     isBinaryQuestion: execution.isBinaryQuestion,
     semanticAnswerUsed: execution.semanticAnswerUsed,
     semanticConfidence: execution.semanticConfidence,
+    
+    // CRITICAL: Legacy fields for thread context fast-path
+    awaitingClarification: execution.awaitingClarification,
+    pendingOffer: execution.pendingOffer,
   };
 }
