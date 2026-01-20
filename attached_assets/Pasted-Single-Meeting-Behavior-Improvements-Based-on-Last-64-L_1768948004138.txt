@@ -1,0 +1,177 @@
+Single-Meeting Behavior Improvements (Based on Last 64 Logs)
+Context
+
+We analyzed the last 64 test interaction logs (test_run = true, ordered by created_at DESC) using a log-only review (no transcript inspection except when accuracy is questioned).
+
+The system is fundamentally sound:
+
+No hallucinations detected
+
+Tier-1 data is reliable
+
+Conservative behavior is generally correct
+
+However, logs show systemic gaps in routing and answer shape that make responses feel slow, indirect, or “bot-like”.
+
+This prompt focuses only on Single-Meeting behavior.
+Do not introduce or reference multi-meeting logic yet.
+
+Primary Issues Identified
+1. Single-Meeting questions are often routed to MCP unnecessarily
+
+Observed pattern
+
+Questions with clear company + temporal disambiguator still go through:
+
+entry_point = mcp_router
+
+This causes:
+
+slower responses
+
+summaries instead of precise answers
+
+unnecessary LLM usage
+
+Expectation
+If a question includes:
+
+a company reference
+
+AND an explicit meeting disambiguator (e.g. last, most recent, date)
+
+→ it should force the Single-Meeting orchestrator and bypass MCP.
+
+Action
+
+Move Single-Meeting detection earlier, before MCP routing
+
+Treat MCP as a fallback, not the default
+
+2. Binary questions are not enforced strongly enough
+
+Observed pattern
+
+Questions starting with Was / Did / Is:
+
+often return summaries instead of yes/no
+
+even when Tier-1 data exists
+
+Expectation
+For binary questions:
+
+Answer Yes / No first
+
+Use Tier-1 fast path when possible
+
+Summary should only be an optional follow-up, not the default
+
+Action
+
+Detect binary questions before routing
+
+Route directly to Tier-1 when possible
+
+Enforce binary answer shape strictly
+
+3. Answer shape is correct in intent, but not enforced in output
+
+Observed pattern
+
+Correct data, but wrong presentation:
+
+indirect phrasing
+
+over-verbose responses
+
+summaries for simple factual questions
+
+Expectation
+Answer shape must be enforced at output time:
+
+single_value → one short sentence
+
+yes_no → yes/no + one supporting fact
+
+list → concise bullets, no narrative
+
+No summaries unless explicitly requested
+
+Action
+
+Strengthen prompt constraints so the model cannot “explain instead of answer”
+
+Do not add new logic — this is prompt-level enforcement
+
+4. Extractive answers sometimes include irrelevant quotes
+
+Observed pattern
+
+Extractive Q&A returns quotes that:
+
+are technically from the transcript
+
+but do not answer the question topic
+
+This feels noisy and “bot-like”.
+
+Expectation
+Only return quotes that directly answer the question.
+
+If no quote clearly answers:
+
+respond with “This wasn’t explicitly discussed in this meeting.”
+
+Action
+
+Add a hard relevance rule to extractive prompts:
+
+relevance > presence
+
+no filler or generic quotes
+
+Explicit Non-Goals (Important)
+
+❌ Do not loosen conservatism
+
+❌ Do not auto-summarize to be “helpful”
+
+❌ Do not introduce multi-meeting logic
+
+❌ Do not change Tier-1 extraction
+
+We are improving routing priority and answer precision, not expanding scope.
+
+Success Criteria (How we’ll validate)
+
+After these changes, in logs we expect:
+
+Fewer mcp_router entries for valid Single-Meeting questions
+
+More Tier-1 fast paths for:
+
+binary questions
+
+factual lookups
+
+Fewer summaries where a direct answer is expected
+
+Cleaner, shorter answers that feel human and decisive
+
+We will validate this again using log-only review of the next test run.
+
+Why This Matters
+
+The system already has the right data.
+The remaining work is about when to commit and how to speak.
+
+These changes should:
+
+reduce latency
+
+reduce LLM usage
+
+increase trust
+
+eliminate “bot-like” answers
