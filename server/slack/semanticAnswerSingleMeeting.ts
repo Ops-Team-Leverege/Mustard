@@ -176,7 +176,7 @@ export async function semanticAnswerSingleMeeting(
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-5",
-      max_tokens: 500,
+      max_completion_tokens: 500,
       messages: [
         {
           role: "system",
