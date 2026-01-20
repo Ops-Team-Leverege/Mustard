@@ -1,0 +1,41 @@
+It didn't change the results, check the logs
+
+Let me check the interaction logs in the database to see what happened with that request:
+
+I see the issue. The preparation question is going through isSingleMeetingMode: false - it's NOT using the single-meeting orchestrator where the clarification detection was added. Let me check the Slack events handler to see where the routing decision is made:
+
+I see the issue now. The preparation question "I'm preparing for our weekly meeting with CJ's" is NOT triggering single-meeting mode because:
+
+It mentions CJ's but doesn't have explicit temporal language ("last meeting", "latest meeting")
+It falls through to MCP router (multi-context mode) which bypasses my clarification detection
+The clarification detection I added is in singleMeetingOrchestrator.ts, but this question never reaches that code because isSingleMeetingMode = false.
+
+I need to add the preparation/ambiguity detection BEFORE the routing decision in events.ts:
+
+Now I understand. The detectAmbiguity function exists but it's only called when in single-meeting mode. The preparation question never reaches single-meeting mode because it lacks explicit temporal language.
+
+I need to add early ambiguity detection in events.ts BEFORE meeting resolution:
+
+Now add the early ambiguity detection right after the acknowledgment message:
+
+Let me verify the detectAmbiguity function handles the preparation pattern correctly:
+
+I see a problem. The pattern /\bwhat should I\s+(?:cover|know|remember|bring up|focus on)\b/ doesn't match "What should I make sure to cover?" because of the words in between. Let me fix the regex:
+
+The fix is deployed. Here's what changed:
+
+Root Cause: The preparation question "I'm preparing for our weekly meeting with CJ's. What should I cover?" wasn't triggering single-meeting mode because it lacks explicit temporal language like "last meeting" or "latest meeting". It was falling through to the MCP router, which bypasses all the conversational behavior detection.
+
+Fix Applied:
+
+Added early ambiguity detection in the Slack event handler - runs BEFORE any routing
+Fixed regex pattern to handle "What should I make sure to cover?" (words between "should I" and "cover")
+When a preparation question is detected, the bot now asks for clarification immediately:
+I can help in a couple of ways — which would you like?
+
+• The next steps from the last meeting
+• A brief summary to help you prepare
+
+Just tell me which one.
+
+Try sending the same message again in Slack and it should now ask for clarification instead of dumping all the action items.
