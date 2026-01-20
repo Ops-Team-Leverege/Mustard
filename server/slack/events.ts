@@ -250,6 +250,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let pendingOffer: string | undefined;
       let semanticAnswerUsed: boolean | undefined;
       let semanticConfidence: string | undefined;
+      let isSemanticDebug: boolean | undefined;
 
       if (isSingleMeetingMode && resolvedMeeting) {
         // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
@@ -283,8 +284,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         pendingOffer = result.pendingOffer;
         semanticAnswerUsed = result.semanticAnswerUsed;
         semanticConfidence = result.semanticConfidence;
+        isSemanticDebug = result.isSemanticDebug;
         
-        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
+        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}, isSemanticDebug=${isSemanticDebug}`);
       } else {
         // MULTI-CONTEXT MODE: Use MCP router
         const ctx = makeMCPContext(threadContext);
@@ -339,6 +341,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
           // Semantic answer tracking (Step 6)
           semanticAnswerUsed: semanticAnswerUsed || undefined,
           semanticConfidence: semanticConfidence || undefined,
+          // DEBUG: Track if question was classified as semantic
+          isSemanticDebug: isSemanticDebug,
         },
         confidence: null,
       }).catch(err => {

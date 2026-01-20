@@ -61,6 +61,7 @@ export type SingleMeetingResult = {
   pendingOffer?: "summary"; // Indicates bot offered summary, awaiting user response
   semanticAnswerUsed?: boolean;
   semanticConfidence?: "high" | "medium" | "low";
+  isSemanticDebug?: boolean; // DEBUG: Track if question was classified as semantic
 };
 
 /**
@@ -972,7 +973,7 @@ export async function handleSingleMeetingQuestion(
   
   const intent = classifyIntent(question);
   const isSemantic = isSemanticQuestion(question);
-  console.log(`[SingleMeetingOrchestrator] Classified intent: ${intent} | isSemantic: ${isSemantic}`);
+  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-20-v3 | intent: ${intent} | isSemantic: ${isSemantic}`);
   console.log(`[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "${question}"`);
   
   switch (intent) {
@@ -1009,9 +1010,9 @@ export async function handleSingleMeetingQuestion(
       
       // If still not found, offer summary
       if (result.dataSource === "not_found") {
-        return { ...result, pendingOffer: "summary" };
+        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic };
       }
-      return result;
+      return { ...result, isSemanticDebug: isSemantic };
     }
     
     case "aggregative": {
@@ -1042,13 +1043,14 @@ export async function handleSingleMeetingQuestion(
       
       // If still not found, offer summary
       if (result.dataSource === "not_found") {
-        return { ...result, pendingOffer: "summary" };
+        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic };
       }
-      return result;
+      return { ...result, isSemanticDebug: isSemantic };
     }
     
     case "summary":
-      return handleSummaryIntent(ctx);
+      const summaryResult = await handleSummaryIntent(ctx);
+      return { ...summaryResult, isSemanticDebug: isSemantic };
     
     default:
       return {
@@ -1056,6 +1058,7 @@ export async function handleSingleMeetingQuestion(
         intent: "extractive",
         dataSource: "not_found",
         pendingOffer: "summary",
+        isSemanticDebug: isSemantic,
       };
   }
 }
