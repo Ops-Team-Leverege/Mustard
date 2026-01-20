@@ -49,6 +49,7 @@ export const transcripts = pgTable("transcripts", {
   processingStartedAt: timestamp("processing_started_at"),
   processingCompletedAt: timestamp("processing_completed_at"),
   processingError: text("processing_error"),
+  meetingDate: timestamp("meeting_date"), // Optional: Date of the meeting, defaults to createdAt in queries
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
