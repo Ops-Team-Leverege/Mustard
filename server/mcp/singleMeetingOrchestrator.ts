@@ -122,7 +122,7 @@ export function detectAmbiguity(question: string): { isAmbiguous: boolean; clari
   //   2. "Give me a summary to prepare" (Tier-2 summary)
   const preparationPatterns = [
     /\b(?:preparing|prepare|getting ready|prepping)\s+(?:for|to)\b/,
-    /\bwhat should I\s+(?:cover|know|remember|bring up|focus on)\b/,
+    /\bwhat should I\s+(?:[\w\s]+\s+)?(?:cover|know|remember|bring up|focus on)\b/,
     /\bwhat (?:do I need|should I need) to know\b/,
     /\bbefore (?:the|our|this|my) (?:meeting|call)\b/,
     /\bbrief me (?:for|before)\b/,

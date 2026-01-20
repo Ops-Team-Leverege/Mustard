@@ -4,7 +4,7 @@ import { postSlackMessage } from "./slackApi";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
-import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
+import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity } from "../mcp/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "../mcp/meetingResolver";
 
 function cleanMention(text: string): string {
@@ -120,6 +120,45 @@ export async function slackEventsHandler(req: Request, res: Response) {
       text: ackMessage,
       thread_ts: threadTs,
     });
+
+    // 7.5 EARLY AMBIGUITY DETECTION (preparation/briefing questions)
+    // 
+    // Check for ambiguous preparation questions BEFORE any routing.
+    // "I'm preparing for our meeting with X - what should I cover?"
+    // These questions are inherently ambiguous and need clarification.
+    //
+    const ambiguityCheck = detectAmbiguity(text);
+    if (ambiguityCheck.isAmbiguous && ambiguityCheck.clarificationPrompt) {
+      console.log(`[Slack] Early ambiguity detected - asking for clarification`);
+      
+      await postSlackMessage({
+        channel,
+        text: ambiguityCheck.clarificationPrompt,
+        thread_ts: threadTs,
+      });
+      
+      // Log interaction for clarification
+      storage.insertInteractionLog({
+        slackThreadId: threadTs,
+        slackMessageTs: messageTs,
+        slackChannelId: channel,
+        userId: userId || null,
+        companyId: null,
+        meetingId: null,
+        capabilityName: "ambiguity_clarification",
+        questionText: text,
+        answerText: ambiguityCheck.clarificationPrompt,
+        resolvedEntities: { 
+          isClarificationRequest: true,
+          dataSource: "clarification",
+        },
+        confidence: null,
+      }).catch(err => {
+        console.error("Failed to log interaction:", err);
+      });
+      
+      return; // Stop processing - clarification required
+    }
 
     // 8. Thread context resolution (deterministic follow-up support)
     // 
