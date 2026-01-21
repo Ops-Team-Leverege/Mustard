@@ -1,0 +1,208 @@
+This is very strong work, and the sequence Replit followed is exactly what a careful, non-over-engineered integration looks like. Let me do three things:
+
+Validate the design and fixes (what’s genuinely solid now)
+
+Call out the one remaining risk area to watch (not fix yet)
+
+Give you a minimal, pragmatic next-steps list that fits your “don’t over-engineer, RAG is next” concern
+
+1️⃣ Validation: this LLM integration is well-scoped and correct
+
+You did not fall into LLM creep. In fact, this is a textbook example of how to introduce an LLM safely.
+
+What’s particularly good (and intentional)
+✅ LLM is a fallback, not a primary signal
+
+Regex-first fast path preserved
+
+LLM only runs when regex fails
+
+Latency impact is contained and observable
+
+This keeps:
+
+common cases fast
+
+rare cases correct
+
+behavior explainable
+
+✅ Output is constrained to a boolean
+
+This is critical.
+
+The LLM:
+
+does not pick meetings
+
+does not answer questions
+
+does not route
+
+does not summarize
+
+It answers one semantic question:
+
+“Is this referring to a specific meeting instance?”
+
+That’s the right abstraction boundary.
+
+✅ You fixed the second-order bug correctly
+
+The most important moment in Replit’s update is this insight:
+
+“LLM says YES, but the resolver still falls through.”
+
+That’s exactly where many systems break:
+they add an LLM signal but don’t thread it through the control plane.
+
+Passing the LLM result into resolveMeetingFromSlackMessage and defaulting to “most recent meeting” when:
+
+company is known
+
+LLM says YES
+
+regex has no specific temporal anchor
+
+…is the correct, conservative behavior for single-meeting.
+
+This is not guessy — it mirrors how a human interprets those questions.
+
+✅ Company extraction fix was necessary (and future-proof)
+
+Fixing partial name matching ("Ivy Lane" → "Ivy Lane (Valvoline)") was not just a bug fix — it’s a RAG prerequisite.
+
+Good that this surfaced now.
+
+2️⃣ The one thing to watch, not fix yet: latency & silent dependency
+
+The only real risk here (and it’s manageable) is:
+
+⚠️ LLM fallback latency becoming invisible coupling
+
+Right now:
+
+~500–1000ms when regex misses
+
+That’s acceptable for Slack
+
+But it is a new dependency in routing
+
+You already did the right thing by logging:
+
+regex result
+
+llm result
+
+final decision
+
+Do not optimize this yet.
+Just observe.
+
+The recommended step from Replit — “monitor LLM latency” — is exactly right.
+
+No caching yet.
+No batching yet.
+No heuristics yet.
+
+3️⃣ Are we over-engineering now? No — and here’s why
+
+This change actually reduced complexity, even though it added an LLM:
+
+You deleted the need to grow keyword lists forever
+
+You centralized meeting-reference logic
+
+You removed special-case hacks (“add one more word”)
+
+You made behavior more stable under language variation
+
+This is simplification via abstraction, not over-engineering.
+
+Crucially:
+
+You did not generalize this pattern elsewhere
+
+You resisted syncing keywords across files
+
+You kept other detectors deterministic
+
+That restraint is what keeps this clean.
+
+4️⃣ Minimal next steps (trimmed, realistic, RAG-aware)
+
+Given your concern about moving on to multi-source + RAG, here is the absolute minimum I’d do before declaring Single-Meeting “ready enough”:
+
+✅ Do these (low effort, high safety)
+
+Add 5–8 unit tests for hasTemporalMeetingReference:
+
+regex-only hit
+
+regex miss + LLM YES
+
+regex miss + LLM NO
+
+parenthetical company match
+
+pronoun-only question → NO
+
+Add one log-based metric:
+
+% of requests using LLM fallback
+
+average LLM fallback latency
+
+That’s it.
+
+❌ Do NOT do these now
+
+No more routing tweaks
+
+No more prompt tuning
+
+No performance optimization
+
+No dashboards
+
+No perfect coverage
+
+Anything beyond the two bullets above is over-investment at this stage.
+
+5️⃣ Big picture check (this matters)
+
+Look at where you are now:
+
+Single-Meeting has:
+
+clear routing rules
+
+strong guarantees
+
+conservative behavior
+
+controlled LLM usage
+
+You’ve proven:
+
+control plane works
+
+language variability is handled
+
+logs explain every decision
+
+That means Single-Meeting has done its job.
+
+It is now infrastructure, not a feature.
+
+6️⃣ What this unlocks next (when you’re ready)
+
+Because you did this correctly, multi-source / RAG can now plug in as:
+
+“Another way to resolve facts, not another way to decide whether to answer.”
+
+That separation is the difference between:
+
+a system you can reason about
+
+and one that feels magical but unstable
