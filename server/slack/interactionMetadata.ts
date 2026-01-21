@@ -89,6 +89,7 @@ export interface InteractionMetadata {
   
   meeting_detection?: {
     regex_result: boolean;
+    llm_called: boolean;
     llm_result: boolean | null;
     llm_latency_ms: number | null;
   };
@@ -154,6 +155,7 @@ export function buildInteractionMetadata(
     // Meeting detection metrics
     meetingDetection?: {
       regexResult: boolean;
+      llmCalled: boolean;
       llmResult: boolean | null;
       llmLatencyMs: number | null;
     };
@@ -191,6 +193,7 @@ export function buildInteractionMetadata(
     
     meeting_detection: execution.meetingDetection ? {
       regex_result: execution.meetingDetection.regexResult,
+      llm_called: execution.meetingDetection.llmCalled,
       llm_result: execution.meetingDetection.llmResult,
       llm_latency_ms: execution.meetingDetection.llmLatencyMs,
     } : undefined,

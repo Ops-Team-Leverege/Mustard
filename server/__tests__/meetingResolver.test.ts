@@ -51,6 +51,7 @@ describe('hasTemporalMeetingReference', () => {
       
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
+      expect(result.llmCalled).toBe(false);
       expect(result.llmResult).toBeNull();
       expect(result.llmLatencyMs).toBeNull();
       expect(mockOpenAICreate).not.toHaveBeenCalled();
@@ -113,6 +114,7 @@ describe('hasTemporalMeetingReference', () => {
       
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(false);
+      expect(result.llmCalled).toBe(true);
       expect(result.llmResult).toBe(true);
       expect(result.llmLatencyMs).toBeTypeOf('number');
       expect(mockOpenAICreate).toHaveBeenCalledTimes(1);
@@ -193,7 +195,7 @@ describe('hasTemporalMeetingReference', () => {
   });
 
   describe('LLM error handling', () => {
-    it('returns false when LLM call fails', async () => {
+    it('returns false when LLM call fails but still marks llmCalled=true', async () => {
       mockOpenAICreate.mockRejectedValueOnce(new Error('API timeout'));
 
       const { hasTemporalMeetingReference } = await import('../mcp/meetingResolver');
@@ -202,7 +204,9 @@ describe('hasTemporalMeetingReference', () => {
       
       expect(result.hasMeetingRef).toBe(false);
       expect(result.regexResult).toBe(false);
+      expect(result.llmCalled).toBe(true);
       expect(result.llmResult).toBe(false);
+      expect(result.llmLatencyMs).toBeTypeOf('number');
     });
   });
 });

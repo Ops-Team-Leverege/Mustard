@@ -665,12 +665,12 @@ YES or NO`
  * - llm_result: boolean | null (null if not called)
  * - final_decision: boolean
  */
-export async function hasTemporalMeetingReference(message: string): Promise<{ hasMeetingRef: boolean; regexResult: boolean; llmResult: boolean | null; llmLatencyMs: number | null }> {
+export async function hasTemporalMeetingReference(message: string): Promise<{ hasMeetingRef: boolean; regexResult: boolean; llmCalled: boolean; llmResult: boolean | null; llmLatencyMs: number | null }> {
   const regexResult = Object.values(TEMPORAL_PATTERNS).some(p => p.test(message));
   
   if (regexResult) {
     console.log(`[MeetingResolver] Meeting reference detected via REGEX: "${message.substring(0, 40)}..."`);
-    return { hasMeetingRef: true, regexResult: true, llmResult: null, llmLatencyMs: null };
+    return { hasMeetingRef: true, regexResult: true, llmCalled: false, llmResult: null, llmLatencyMs: null };
   }
   
   const startTime = Date.now();
@@ -679,7 +679,7 @@ export async function hasTemporalMeetingReference(message: string): Promise<{ ha
   
   console.log(`[MeetingResolver] Meeting reference detection: regex=${regexResult}, llm=${llmResult}, final=${llmResult}, latency=${llmLatencyMs}ms`);
   
-  return { hasMeetingRef: llmResult, regexResult: false, llmResult, llmLatencyMs };
+  return { hasMeetingRef: llmResult, regexResult: false, llmCalled: true, llmResult, llmLatencyMs };
 }
 
 /**
