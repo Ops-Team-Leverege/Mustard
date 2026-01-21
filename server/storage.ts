@@ -240,6 +240,16 @@ export class MemStorage implements IStorage {
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
     const id = randomUUID();
+    // Handle meetingDate: convert string to Date or null
+    let meetingDate: Date | null = null;
+    if (insertTranscript.meetingDate) {
+      if (typeof insertTranscript.meetingDate === 'string') {
+        meetingDate = new Date(insertTranscript.meetingDate);
+      } else {
+        meetingDate = insertTranscript.meetingDate as Date;
+      }
+    }
+    
     const transcript: Transcript = {
       ...insertTranscript,
       name: insertTranscript.name ?? null,
@@ -259,6 +269,7 @@ export class MemStorage implements IStorage {
       processingError: null,
       id,
       createdAt: new Date(),
+      meetingDate,
     };
     this.transcripts.set(id, transcript);
     return transcript;
@@ -1235,6 +1246,14 @@ export class DbStorage implements IStorage {
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
     const { customers, ...dbValues } = insertTranscript as any;
+    
+    // Handle meetingDate: convert string to Date or null
+    if (dbValues.meetingDate && typeof dbValues.meetingDate === 'string') {
+      dbValues.meetingDate = new Date(dbValues.meetingDate);
+    } else if (!dbValues.meetingDate) {
+      dbValues.meetingDate = null;
+    }
+    
     const results = await this.db
       .insert(transcriptsTable)
       .values(dbValues)
