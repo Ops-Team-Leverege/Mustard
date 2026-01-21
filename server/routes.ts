@@ -2063,6 +2063,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
       next(err);
     }
   });
+
+  // ==========================================
+  // EXTERNAL API - API Key Authentication
+  // ==========================================
+  
+  // Middleware to validate API key
+  const validateApiKey = (req: any, res: any, next: any) => {
+    const apiKey = req.headers['x-api-key'];
+    const expectedKey = process.env.EXTERNAL_API_KEY;
+    
+    if (!expectedKey) {
+      return res.status(500).json({ error: "External API not configured" });
+    }
+    
+    if (!apiKey || apiKey !== expectedKey) {
+      return res.status(401).json({ error: "Invalid or missing API key" });
+    }
+    
+    next();
+  };
+
+  // GET /api/external/transcripts - List all transcripts
+  app.get("/api/external/transcripts", validateApiKey, async (req: any, res) => {
+    try {
+      const product = (req.query.product as Product) || "pitcrew";
+      
+      if (!PRODUCTS.includes(product)) {
+        return res.status(400).json({ error: `Invalid product. Must be one of: ${PRODUCTS.join(", ")}` });
+      }
+      
+      const transcripts = await storage.getTranscripts(product);
+      res.json({
+        success: true,
+        count: transcripts.length,
+        transcripts,
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
+
+  // GET /api/external/transcripts/:id - Get transcript with full details
+  app.get("/api/external/transcripts/:id", validateApiKey, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const product = (req.query.product as Product) || "pitcrew";
+      
+      if (!PRODUCTS.includes(product)) {
+        return res.status(400).json({ error: `Invalid product. Must be one of: ${PRODUCTS.join(", ")}` });
+      }
+      
+      const transcript = await storage.getTranscript(product, id);
+      
+      if (!transcript) {
+        return res.status(404).json({ success: false, error: "Transcript not found" });
+      }
+      
+      // Fetch all related data
+      const [insights, qaPairs, customerQuestions, actionItems, chunks, company] = await Promise.all([
+        storage.getProductInsightsByTranscript(product, id),
+        storage.getQAPairsByTranscript(product, id),
+        storage.getCustomerQuestionsByTranscript(id),
+        storage.getMeetingActionItemsByTranscript(id),
+        storage.getChunksForTranscript(id, 1000),
+        transcript.companyId ? storage.getCompany(product, transcript.companyId) : Promise.resolve(undefined),
+      ]);
+      
+      res.json({
+        success: true,
+        transcript,
+        company,
+        insights,
+        qaPairs,
+        customerQuestions,
+        actionItems,
+        chunks: chunks.map((c: { chunkIndex: number; speakerName: string | null; speakerRole: string | null; content: string }) => ({
+          chunkIndex: c.chunkIndex,
+          speakerName: c.speakerName,
+          speakerRole: c.speakerRole,
+          content: c.content,
+        })),
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  });
   
   const httpServer = createServer(app);
 
