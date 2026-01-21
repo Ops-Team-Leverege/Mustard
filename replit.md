@@ -66,6 +66,18 @@ The temporal meeting reference detection uses a regex-first strategy with LLM fa
 - **Monitoring**: `scripts/meeting-detection-metrics.sql` computes fallback % and latency distribution
 - **Scope**: Metrics cover only questions using temporal detection; preflight paths (ambiguity clarification, existence checks) are excluded
 
+### Transcript Search Relevance
+The `searchTranscriptSnippets` function returns chunks with a `matchType` field for caller filtering:
+- **Priority 1 ("both")**: Chunks matching BOTH proper nouns AND keywords - most relevant for topic+entity queries
+- **Priority 2 ("keyword")**: Chunks matching keywords only - topic-relevant even without entity
+- **Priority 3 ("proper_noun")**: Chunks matching proper nouns only - valid for existence queries like "Did they mention X?"
+
+The caller (`handleExtractiveIntent`) filters on matchType:
+- Returns results for "both" or "keyword" matches (topic-relevant)
+- Falls through to "not found" for "proper_noun"-only matches (prevents false confident answers)
+
+Binary questions use `handleBinaryQuestion` which searches both Tier-1 data AND transcript, returning proper yes/no answers with evidence.
+
 ## External Dependencies
 
 ### AI Services
