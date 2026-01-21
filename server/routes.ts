@@ -2125,7 +2125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Filter by status if provided
       if (status) {
-        transcripts = transcripts.filter(t => t.status === status);
+        transcripts = transcripts.filter(t => t.processingStatus === status);
       }
       
       // Apply pagination
