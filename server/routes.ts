@@ -2085,18 +2085,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // GET /api/external/transcripts - List all transcripts
+  // Query params:
+  //   product: "pitcrew" (default) - which product to query
+  //   companyId: filter by company UUID
+  //   companyName: filter by company name (partial match, case-insensitive)
+  //   status: filter by processing status
+  //   limit: max results (default 100)
+  //   offset: pagination offset (default 0)
   app.get("/api/external/transcripts", validateApiKey, async (req: any, res) => {
     try {
       const product = (req.query.product as Product) || "pitcrew";
+      const companyId = req.query.companyId as string | undefined;
+      const companyName = req.query.companyName as string | undefined;
+      const status = req.query.status as string | undefined;
+      const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
+      const offset = parseInt(req.query.offset as string) || 0;
       
       if (!PRODUCTS.includes(product)) {
         return res.status(400).json({ error: `Invalid product. Must be one of: ${PRODUCTS.join(", ")}` });
       }
       
-      const transcripts = await storage.getTranscripts(product);
+      let transcripts = await storage.getTranscripts(product);
+      
+      // Filter by companyId if provided
+      if (companyId) {
+        transcripts = transcripts.filter(t => t.companyId === companyId);
+      }
+      
+      // Filter by companyName if provided (need to fetch companies first)
+      if (companyName) {
+        const companies = await storage.getCompanies(product);
+        const matchingCompanyIds = new Set(
+          companies
+            .filter(c => c.name.toLowerCase().includes(companyName.toLowerCase()))
+            .map(c => c.id)
+        );
+        transcripts = transcripts.filter(t => t.companyId && matchingCompanyIds.has(t.companyId));
+      }
+      
+      // Filter by status if provided
+      if (status) {
+        transcripts = transcripts.filter(t => t.status === status);
+      }
+      
+      // Apply pagination
+      const total = transcripts.length;
+      transcripts = transcripts.slice(offset, offset + limit);
+      
       res.json({
         success: true,
+        total,
         count: transcripts.length,
+        offset,
+        limit,
         transcripts,
       });
     } catch (error) {
