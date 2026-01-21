@@ -379,10 +379,14 @@ function extractKeywords(query: string): { keywords: string[]; properNouns: stri
     .filter((w, i) => i > 0 && /^[A-Z][a-z]+$/.test(w))
     .map(w => w.toLowerCase());
   
-  // Extract general keywords
+  // Create a set of proper nouns for fast lookup
+  const properNounSet = new Set(properNouns);
+  
+  // Extract general keywords, EXCLUDING proper nouns
+  // This ensures "Canadian Tire" matches as proper_noun, not keyword
   const keywords = query.toLowerCase()
     .split(/\s+/)
-    .filter(w => w.length > 3 && !STOP_WORDS.has(w));
+    .filter(w => w.length > 3 && !STOP_WORDS.has(w) && !properNounSet.has(w));
   
   return { keywords, properNouns };
 }
