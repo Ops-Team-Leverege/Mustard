@@ -3,9 +3,19 @@
 -- 
 -- Usage: Copy/paste into database tool or run via psql
 -- 
+-- SCOPE: This query measures ONLY questions that invoke temporal meeting detection
+-- (hasTemporalMeetingReference). It answers: "Of questions that require temporal
+-- meeting detection, what % need LLM fallback and what is the latency?"
+--
+-- EXCLUDED from these metrics:
+-- - Ambiguity clarification requests (e.g., "I'm preparing for our meeting with X")
+-- - Binary existence checks (e.g., "Is there a meeting with Walmart?")
+-- - Thread-context questions (meeting already resolved from thread)
+-- These paths don't use temporal detection and aren't included in the denominator.
+--
 -- Metrics tracked:
 -- - regex_hits: Questions resolved via fast regex path (no LLM)
--- - llm_fallback_calls: Questions requiring LLM classifier
+-- - llm_fallback_calls: Questions requiring LLM classifier (includes errors)
 -- - llm_fallback_pct: Percentage of questions using LLM fallback
 -- - avg/p50/p95_latency_ms: LLM call latency distribution
 

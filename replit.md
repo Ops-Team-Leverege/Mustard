@@ -58,6 +58,14 @@ The application includes a transcript detail view, meeting date support, and das
 
 The Slack Single-Meeting Orchestrator deterministically resolves the target meeting (thread context, explicit reference, temporal language) before intent classification. It has a Capability Trust Matrix, allowing Tier 1 (attendees, customer_questions, meeting_action_items, raw transcript) for single-meeting answers, Tier 2 (summaries) with explicit opt-in, and blocking Tier 3 capabilities. Tier-1 artifacts are extracted once during transcript ingestion, making Slack Q&A read-only. An automated test mode with the `X-Pitcrew-Test-Run: true` header allows testing without real Slack interactions, bypassing API calls and logging structured metadata.
 
+### Meeting Detection Metrics
+The temporal meeting reference detection uses a regex-first strategy with LLM fallback:
+- **Regex fast path**: 10+ temporal patterns (e.g., "last meeting", "yesterday's call") checked first
+- **LLM fallback**: gpt-4o-mini classifier invoked only when regex fails
+- **Metrics captured**: `meeting_detection` field in `interaction_logs.resolved_entities` tracks `regex_result`, `llm_called`, `llm_result`, and `llm_latency_ms`
+- **Monitoring**: `scripts/meeting-detection-metrics.sql` computes fallback % and latency distribution
+- **Scope**: Metrics cover only questions using temporal detection; preflight paths (ambiguity clarification, existence checks) are excluded
+
 ## External Dependencies
 
 ### AI Services
