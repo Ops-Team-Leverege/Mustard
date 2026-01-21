@@ -417,7 +417,33 @@ async function lookupCustomerQuestions(
   
   const { keywords, properNouns } = extractKeywords(userQuestion);
   
-  // If we have proper nouns, prioritize questions mentioning them
+  // PRIORITY 1: Questions matching BOTH proper nouns AND keywords (most relevant)
+  if (properNouns.length > 0 && keywords.length > 0) {
+    const bothMatches = questions.filter(cq => {
+      const text = cq.questionText.toLowerCase();
+      const hasProperNoun = properNouns.some(noun => text.includes(noun));
+      const hasKeyword = keywords.some(kw => text.includes(kw));
+      return hasProperNoun && hasKeyword;
+    });
+    
+    if (bothMatches.length > 0) {
+      return bothMatches;
+    }
+  }
+  
+  // PRIORITY 2: Questions matching keywords only (topic-relevant)
+  if (keywords.length > 0) {
+    const keywordMatches = questions.filter(cq => {
+      const text = cq.questionText.toLowerCase();
+      return keywords.some(kw => text.includes(kw));
+    });
+    
+    if (keywordMatches.length > 0) {
+      return keywordMatches;
+    }
+  }
+  
+  // PRIORITY 3: Questions matching proper nouns only (valid for name-based queries)
   if (properNouns.length > 0) {
     const properNounMatches = questions.filter(cq => {
       const text = cq.questionText.toLowerCase();
@@ -429,15 +455,7 @@ async function lookupCustomerQuestions(
     }
   }
   
-  // Fall back to general keyword matching
-  if (keywords.length === 0) {
-    return [];
-  }
-  
-  return questions.filter(cq => {
-    const text = cq.questionText.toLowerCase();
-    return keywords.some(kw => text.includes(kw));
-  });
+  return [];
 }
 
 /**
@@ -553,12 +571,52 @@ async function searchTranscriptSnippets(
   speakerName: string;
   content: string;
   chunkIndex: number;
+  matchType?: "both" | "keyword" | "proper_noun";
 }>> {
   const chunks = await storage.getChunksForTranscript(meetingId, 1000);
   
   const { keywords, properNouns } = extractKeywords(query);
   
-  // If we have proper nouns, prioritize chunks containing them
+  // PRIORITY 1: Chunks matching BOTH proper nouns AND keywords (most relevant)
+  if (properNouns.length > 0 && keywords.length > 0) {
+    const bothMatches = chunks.filter(chunk => {
+      const content = chunk.content.toLowerCase();
+      const hasProperNoun = properNouns.some(noun => content.includes(noun));
+      const hasKeyword = keywords.some(kw => content.includes(kw));
+      return hasProperNoun && hasKeyword;
+    });
+    
+    if (bothMatches.length > 0) {
+      console.log(`[SearchTranscript] Found ${bothMatches.length} chunks matching both proper nouns AND keywords`);
+      return bothMatches.slice(0, limit).map(chunk => ({
+        speakerName: chunk.speakerName || "Unknown",
+        content: chunk.content,
+        chunkIndex: chunk.chunkIndex,
+        matchType: "both" as const,
+      }));
+    }
+  }
+  
+  // PRIORITY 2: Chunks matching keywords only (topic-relevant even without proper noun)
+  if (keywords.length > 0) {
+    const keywordMatches = chunks.filter(chunk => {
+      const content = chunk.content.toLowerCase();
+      return keywords.some(kw => content.includes(kw));
+    });
+    
+    if (keywordMatches.length > 0) {
+      console.log(`[SearchTranscript] Found ${keywordMatches.length} chunks matching keywords only`);
+      return keywordMatches.slice(0, limit).map(chunk => ({
+        speakerName: chunk.speakerName || "Unknown",
+        content: chunk.content,
+        chunkIndex: chunk.chunkIndex,
+        matchType: "keyword" as const,
+      }));
+    }
+  }
+  
+  // PRIORITY 3: Chunks matching proper nouns only (company context without topic match)
+  // Valid for queries like "Did they mention Canadian Tire?" where company IS the subject
   if (properNouns.length > 0) {
     const properNounMatches = chunks.filter(chunk => {
       const content = chunk.content.toLowerCase();
@@ -566,32 +624,17 @@ async function searchTranscriptSnippets(
     });
     
     if (properNounMatches.length > 0) {
+      console.log(`[SearchTranscript] Found ${properNounMatches.length} chunks matching proper nouns only`);
       return properNounMatches.slice(0, limit).map(chunk => ({
         speakerName: chunk.speakerName || "Unknown",
         content: chunk.content,
         chunkIndex: chunk.chunkIndex,
+        matchType: "proper_noun" as const,
       }));
     }
   }
   
-  // Fall back to general keyword matching (must match at least one keyword)
-  if (keywords.length === 0) {
-    return [];
-  }
-  
-  const matches = chunks
-    .filter(chunk => {
-      const content = chunk.content.toLowerCase();
-      return keywords.some(kw => content.includes(kw));
-    })
-    .slice(0, limit)
-    .map(chunk => ({
-      speakerName: chunk.speakerName || "Unknown",
-      content: chunk.content,
-      chunkIndex: chunk.chunkIndex,
-    }));
-  
-  return matches;
+  return [];
 }
 
 /**
@@ -795,37 +838,32 @@ async function handleExtractiveIntent(
   }
   
   // FALLBACK: Transcript snippets (only fetch if needed - priority 4)
-  // Only fall back to transcript if we have proper nouns to match
-  if (hasProperNouns) {
-    console.log(`[SingleMeetingOrchestrator] Fallback: transcript search (proper noun required)`);
-    const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
-    console.log(`[SingleMeetingOrchestrator] Transcript fetch: ${Date.now() - startTime}ms`);
-    
-    // Filter snippets to only those matching at least one proper noun
-    const matchingSnippets = snippets.filter(s => {
-      const lowerContent = s.content.toLowerCase();
-      return properNouns.some(pn => lowerContent.includes(pn));
+  console.log(`[SingleMeetingOrchestrator] Fallback: transcript search`);
+  const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
+  console.log(`[SingleMeetingOrchestrator] Transcript fetch: ${Date.now() - startTime}ms`);
+  
+  // Only return snippets that are topic-relevant (both or keyword matches)
+  // Proper-noun-only matches are NOT relevant to the question topic
+  const relevantSnippets = snippets.filter(s => s.matchType === "both" || s.matchType === "keyword");
+  
+  if (relevantSnippets.length > 0) {
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    const lines: string[] = [];
+    lines.push(`In this meeting${dateSuffix}, the transcript mentions:`);
+    relevantSnippets.slice(0, 2).forEach(s => {
+      lines.push(`\n_"${s.content.substring(0, 200)}${s.content.length > 200 ? '...' : ''}"_`);
+      lines.push(`— ${s.speakerName}`);
     });
     
-    if (matchingSnippets.length > 0) {
-      const dateSuffix = getMeetingDateSuffix(ctx);
-      const lines: string[] = [];
-      lines.push(`In this meeting${dateSuffix}, the transcript mentions:`);
-      matchingSnippets.slice(0, 2).forEach(s => {
-        lines.push(`\n_"${s.content.substring(0, 200)}${s.content.length > 200 ? '...' : ''}"_`);
-        lines.push(`— ${s.speakerName}`);
-      });
-      
-      return {
-        answer: lines.join("\n"),
-        intent: "extractive",
-        dataSource: "transcript",
-        evidence: matchingSnippets[0].content,
-      };
-    }
-  } else {
-    // No proper nouns - skip transcript search entirely
-    console.log(`[SingleMeetingOrchestrator] Skipping transcript fallback (no proper nouns to match)`);
+    return {
+      answer: lines.join("\n"),
+      intent: "extractive",
+      dataSource: "transcript",
+      evidence: relevantSnippets[0].content,
+    };
+  } else if (snippets.length > 0 && snippets[0].matchType === "proper_noun") {
+    // Found company mentions but no topic matches - this is NOT relevant
+    console.log(`[SingleMeetingOrchestrator] Only proper-noun matches found - returning not_found`);
   }
   
   return {
@@ -1054,26 +1092,33 @@ Would you like a brief summary of what was discussed?`;
   if (subject) {
     console.log(`[SingleMeetingOrchestrator] Binary question subject: "${subject}"`);
     
-    // Search for the subject in Tier-1 data (parallel fetch)
-    const [customerQuestions, actionItems] = await Promise.all([
+    // Search for the subject in Tier-1 data AND transcript (parallel fetch)
+    const [customerQuestions, actionItems, transcriptSnippets] = await Promise.all([
       lookupCustomerQuestions(ctx.meetingId, subject),
       searchActionItemsForRelevantIssues(ctx.meetingId, subject),
+      searchTranscriptSnippets(ctx.meetingId, subject, 2),
     ]);
     
-    const found = customerQuestions.length > 0 || actionItems.length > 0;
+    const foundInTier1 = customerQuestions.length > 0 || actionItems.length > 0;
+    const foundInTranscript = transcriptSnippets.length > 0;
+    const found = foundInTier1 || foundInTranscript;
     const dateSuffix = getMeetingDateSuffix(ctx);
     
     if (found) {
       // Found the subject - answer YES with evidence
       let answer = `Yes — "${subject}" was mentioned in this meeting${dateSuffix}.`;
       
-      // Add brief evidence
+      // Add brief evidence from the best source
       if (customerQuestions.length > 0) {
         const cq = customerQuestions[0];
         answer += `\n\n_"${cq.questionText.substring(0, 150)}${cq.questionText.length > 150 ? '...' : ''}"_`;
       } else if (actionItems.length > 0) {
         const ai = actionItems[0];
         answer += `\n\n_"${ai.evidence.substring(0, 150)}${ai.evidence.length > 150 ? '...' : ''}"_`;
+      } else if (transcriptSnippets.length > 0) {
+        const snippet = transcriptSnippets[0];
+        answer += `\n\n_"${snippet.content.substring(0, 150)}${snippet.content.length > 150 ? '...' : ''}"_`;
+        answer += `\n— ${snippet.speakerName}`;
       }
       
       answer += `\n\nWould you like more details?`;
@@ -1086,11 +1131,11 @@ Would you like a brief summary of what was discussed?`;
         isBinaryQuestion: true,
       };
     } else {
-      // Not found - answer NO honestly
+      // Not found in Tier-1 OR transcript - answer NO honestly
       return {
         answer: `I don't see "${subject}" explicitly mentioned in this meeting${dateSuffix}.
 
-Would you like me to check the full transcript, or share a meeting summary?`,
+Would you like a brief meeting summary instead?`,
         intent: "extractive",
         dataSource: "binary_answer",
         pendingOffer: "summary",
