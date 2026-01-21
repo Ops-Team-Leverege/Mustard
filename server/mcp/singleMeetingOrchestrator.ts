@@ -364,6 +364,9 @@ const STOP_WORDS = new Set([
   "friday", "monday", "tuesday", "wednesday", "thursday", "saturday", "sunday",
   // Common question words
   "issue", "issues", "problem", "problems", "experienced", "happening",
+  // Temporal reference words - used for meeting resolution, NOT topic matching
+  "last", "latest", "recent", "previous", "yesterday", "today", "earlier",
+  "call", "calls", "meeting", "meetings", "sync", "syncs", "demo", "demos",
 ]);
 
 /**
@@ -384,8 +387,10 @@ function extractKeywords(query: string): { keywords: string[]; properNouns: stri
   
   // Extract general keywords, EXCLUDING proper nouns
   // This ensures "Canadian Tire" matches as proper_noun, not keyword
+  // Strip punctuation before checking stop words (e.g., "call?" -> "call")
   const keywords = query.toLowerCase()
     .split(/\s+/)
+    .map(w => w.replace(/[^a-z]/g, ''))  // Strip non-letter chars
     .filter(w => w.length > 3 && !STOP_WORDS.has(w) && !properNounSet.has(w));
   
   return { keywords, properNouns };
