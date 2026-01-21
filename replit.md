@@ -11,7 +11,7 @@ Preferred communication style: Simple, everyday language.
 
 ## OpenAI Prompt Inventory
 
-**11 OpenAI calls across 8 files:**
+**12 OpenAI calls across 9 files:**
 
 | File | Line | Model | Temp | Purpose |
 |------|------|-------|------|---------|
@@ -19,6 +19,7 @@ Preferred communication style: Simple, everyday language.
 | `server/slack/semanticAnswerSingleMeeting.ts` | 336 | gpt-5 | 1 (default) | Semantic answers for complex Slack questions |
 | `server/mcp/singleMeetingOrchestrator.ts` | 967 | gpt-5 | 1 (default) | Single-meeting intent classification |
 | `server/mcp/llm.ts` | 82 | gpt-4o-mini | 0 | Route Slack questions to MCP capabilities |
+| `server/mcp/meetingResolver.ts` | 63 | gpt-4o-mini | 0 | Semantic meeting reference classifier (LLM fallback) |
 | `server/rag/composer.ts` | 200 | gpt-4o-mini | 0 | Extract answers from context |
 | `server/rag/composer.ts` | 300 | gpt-4o-mini | 0 | Extract commitments |
 | `server/rag/composer.ts` | 366 | gpt-4o-mini | 0 | Extract quotes |
@@ -33,7 +34,7 @@ Preferred communication style: Simple, everyday language.
 |-------|-------|-----------|
 | gpt-5 | 3 | User-facing features (transcripts, semantic answers, intent) |
 | gpt-4o | 4 | High-quality extraction (questions, actions, verification) |
-| gpt-4o-mini | 4 | Routing & lightweight extraction (RAG composer) |
+| gpt-4o-mini | 5 | Routing, meeting detection, & lightweight extraction (RAG composer) |
 
 **Model Constraints:**
 - gpt-5 does NOT support temperature=0 (only default value of 1)
