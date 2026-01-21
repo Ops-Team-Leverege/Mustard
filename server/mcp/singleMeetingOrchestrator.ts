@@ -862,8 +862,10 @@ async function handleExtractiveIntent(
       evidence: relevantSnippets[0].content,
     };
   } else if (snippets.length > 0 && snippets[0].matchType === "proper_noun") {
-    // Found company mentions but no topic matches - this is NOT relevant
-    console.log(`[SingleMeetingOrchestrator] Only proper-noun matches found - returning not_found`);
+    // GUARDRAIL: Entity-matched but NOT topic-matched → return "not found"
+    // This prevents false-confidence answers where we have company excerpts
+    // but nothing actually relevant to the question topic
+    console.log(`[SingleMeetingOrchestrator] GUARDRAIL: proper_noun-only matches (${snippets.length} chunks) - refusing to answer with unrelated content`);
   }
   
   return {

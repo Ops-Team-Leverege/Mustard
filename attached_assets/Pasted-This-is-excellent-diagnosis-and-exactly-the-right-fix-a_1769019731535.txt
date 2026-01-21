@@ -1,0 +1,223 @@
+This is excellent diagnosis and exactly the right fix, and I want to be very explicit about why—because this is one of the most subtle failure modes in RAG systems, and you caught it cleanly.
+
+I’ll do four things:
+
+Name the problem precisely (so it’s reusable knowledge)
+
+Validate the fix (and why it’s correct)
+
+Point out what you should not add next (important)
+
+Give you the minimal follow-up to lock this in before moving on
+
+1️⃣ What the real problem was (name it correctly)
+
+This was not a generic “RAG issue”.
+
+It was a false-confidence retrieval bug.
+
+More precisely:
+
+The system was returning entity-matched excerpts instead of topic-matched excerpts, and then presenting them as if they answered the question.
+
+That’s the worst kind of RAG failure because:
+
+the answer looks confident
+
+it is grounded in the transcript
+
+but it does not answer the question
+
+This is far more dangerous than “not found”.
+
+You diagnosed it perfectly:
+
+same excerpts for every Canadian Tire question
+
+regardless of topic
+
+even when topic-specific content existed
+
+That’s a textbook smell.
+
+2️⃣ Why your fix is the right architectural fix
+
+Let’s break down what you did, because this is very solid system design.
+
+✅ You separated match types
+
+Introducing matchType is the key move.
+
+You implicitly created a relevance lattice:
+
+company + topic → strong answer
+
+topic-only → acceptable answer
+
+company-only → existence signal, not an answer
+
+This is exactly how humans reason about relevance.
+
+Crucially:
+
+you did not delete company-only matches
+
+you demoted them
+
+and you let the caller decide what to do
+
+That’s a deep-module move.
+
+✅ You fixed the bug at the right layer
+
+You did not:
+
+hack prompts
+
+add heuristics in the orchestrator
+
+special-case “Canadian Tire”
+
+You fixed:
+
+searchTranscriptSnippets
+
+lookupCustomerQuestions
+
+and aligned them conceptually
+
+That means:
+
+the fix applies everywhere
+
+future capabilities benefit automatically
+
+This is the opposite of overfitting.
+
+✅ You avoided the classic overcorrection
+
+The architect’s feedback was correct, and so was your response.
+
+If you had removed company-only matches entirely:
+
+existence questions would break
+
+binary “was there a meeting” cases would regress
+
+Your revision (fallback + matchType) keeps:
+
+safety
+
+expressiveness
+
+debuggability
+
+Very well judged.
+
+✅ Binary question enhancement was necessary
+
+This was another subtle but correct insight:
+
+If Tier-1 doesn’t contain the signal, binary questions must still check the transcript.
+
+Otherwise:
+
+“Did they mention security?” falls through
+
+and you get generic excerpts or summaries
+
+By extending binary handling to:
+
+Tier-1 first
+
+transcript second
+
+still enforcing yes/no shape
+
+you closed a real correctness gap.
+
+3️⃣ What you should not add next (this matters)
+
+Right now, the temptation might be to add:
+
+scoring formulas
+
+confidence thresholds
+
+semantic embeddings everywhere
+
+more LLM reasoning
+
+Don’t.
+
+You already fixed the structural problem:
+
+“We answered without actually matching the topic.”
+
+Anything beyond what you did risks:
+
+reintroducing opacity
+
+masking regressions
+
+slowing the system unnecessarily
+
+This fix is necessary and sufficient for single-meeting extractive correctness.
+
+4️⃣ The one thing I’d add before moving on (minimal)
+
+Just one thing, and it’s small.
+
+🔒 Add a hard guardrail in the orchestrator
+
+Something like:
+
+If matchType === company_only
+AND question intent is content/binary
+→ return not found
+
+This sounds like what you already implemented implicitly — just make it explicit and logged.
+
+Why?
+Because this invariant is important:
+
+It is always better to say “not mentioned” than to answer with unrelated content.
+
+That’s the trust contract.
+
+5️⃣ Why this fix matters even more with RAG + multi-source
+
+This is the most important forward-looking insight:
+
+When you add:
+
+multiple transcripts
+
+documents
+
+CRM notes
+
+product docs
+
+This exact bug becomes 10× more dangerous.
+
+Without match typing:
+
+any entity mention anywhere can look like an answer
+
+confidence goes up
+
+correctness goes down
+
+What you built here:
+
+match types
+
+caller-level filtering
+
+conservative fallback
+
+…is the foundation that will keep multi-source RAG honest.
+
+So this was not wasted effort.
+It was preventative architecture.
