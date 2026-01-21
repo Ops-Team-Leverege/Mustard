@@ -52,6 +52,7 @@ describe('hasTemporalMeetingReference', () => {
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
       expect(result.llmResult).toBeNull();
+      expect(result.llmLatencyMs).toBeNull();
       expect(mockOpenAICreate).not.toHaveBeenCalled();
     });
 
@@ -113,6 +114,7 @@ describe('hasTemporalMeetingReference', () => {
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(false);
       expect(result.llmResult).toBe(true);
+      expect(result.llmLatencyMs).toBeTypeOf('number');
       expect(mockOpenAICreate).toHaveBeenCalledTimes(1);
     });
 

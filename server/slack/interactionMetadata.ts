@@ -86,6 +86,12 @@ export interface InteractionMetadata {
     company_source: ResolutionSource;
     meeting_source: ResolutionSource;
   };
+  
+  meeting_detection?: {
+    regex_result: boolean;
+    llm_result: boolean | null;
+    llm_latency_ms: number | null;
+  };
 
   // Backward-compatible fields (still included for existing queries)
   companyId?: string;
@@ -145,6 +151,12 @@ export function buildInteractionMetadata(
     pendingOffer?: string;
     // Test run indicator
     testRun?: boolean;
+    // Meeting detection metrics
+    meetingDetection?: {
+      regexResult: boolean;
+      llmResult: boolean | null;
+      llmLatencyMs: number | null;
+    };
   }
 ): InteractionMetadata {
   return {
@@ -176,6 +188,12 @@ export function buildInteractionMetadata(
       company_source: execution.companySource || "none",
       meeting_source: execution.meetingSource || "none",
     },
+    
+    meeting_detection: execution.meetingDetection ? {
+      regex_result: execution.meetingDetection.regexResult,
+      llm_result: execution.meetingDetection.llmResult,
+      llm_latency_ms: execution.meetingDetection.llmLatencyMs,
+    } : undefined,
     
     // Backward-compatible fields
     companyId: base.companyId,

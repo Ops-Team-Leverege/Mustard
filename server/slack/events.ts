@@ -441,7 +441,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // Only attempt temporal resolution if:
     // - No thread context exists, OR
     // - Message explicitly uses temporal language
-    const { hasMeetingRef, regexResult, llmResult } = await hasTemporalMeetingReference(text);
+    const { hasMeetingRef, regexResult, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
+    const meetingDetection = { regexResult, llmResult, llmLatencyMs };
     
     if (!threadContext?.meetingId || hasMeetingRef) {
       console.log(`[Slack] Step 0: Meeting resolution (hasMeetingRef=${hasMeetingRef}, regex=${regexResult}, llm=${llmResult})`);
@@ -495,6 +496,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 type: null,
               },
               testRun,
+              meetingDetection,
             }
           ),
           confidence: null,
@@ -665,6 +667,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               // Legacy fields for thread context
               pendingOffer,
               testRun,
+              meetingDetection,
             }
           );
         } else {
@@ -681,6 +684,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               companySource: threadContext?.companyId ? "thread" : "extracted",
               meetingSource: threadContext?.meetingId ? "thread" : "last_meeting",
               testRun,
+              meetingDetection,
             }
           );
         }
