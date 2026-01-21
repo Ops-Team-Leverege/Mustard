@@ -1,0 +1,178 @@
+Great — this is the right moment to codify the principle, not just the fix. Below is a clear, scoped prompt you can send to Replit that:
+
+replaces keywords only where it makes architectural sense
+
+avoids LLM creep
+
+keeps the system debuggable and deterministic
+
+is grounded in the criteria you explicitly agreed on
+
+You can paste this directly.
+
+Prompt for Replit — Replace Keywords with LLM Only Where Semantically Necessary
+Context
+
+We’ve identified that not all keyword patterns are equal. Some represent closed, intentional commands and should remain rule-based. Others attempt to solve open-vocabulary semantic problems, where keyword enumeration does not converge and missing a case causes harmful routing behavior.
+
+We want to replace keyword-based detection with an LLM-backed classifier only in cases that meet all of the following criteria:
+
+LLM Usage Criteria (Must All Be True)
+
+Use an LLM only if:
+
+The vocabulary is unbounded (cannot be fully enumerated with keywords)
+
+Missing a case causes harmful system behavior (wrong routing, wrong mode)
+
+Guessing is not worse than refusing (LLM can safely say “no”)
+
+The output can be constrained to a boolean or small class
+
+If any of these are false → do NOT use an LLM.
+
+Approved Scope for LLM Replacement (Do This)
+1️⃣ Meeting Reference Detection (Replace Keywords)
+
+Problem
+Meeting reference detection currently relies on keyword lists (meeting, call, sync, visit, etc.). This is an open-vocabulary semantic problem and has already caused incorrect routing to MCP when valid Single-Meeting questions were asked.
+
+Action
+Replace the expanding keyword list with a semantic LLM classifier, used as a fallback after regex.
+
+Design
+Create a single canonical function, for example:
+
+hasMeetingReference(question: string): boolean
+
+
+Implementation:
+
+First attempt regex-based detection (fast path)
+
+If regex fails, call a constrained LLM classifier
+
+LLM returns YES / NO only
+
+LLM Prompt (Strict)
+
+You are a classifier.
+
+Question:
+"<USER QUESTION>"
+
+Task:
+Does this question clearly refer to a specific meeting instance
+(e.g. a call, visit, demo, sync, conversation, or other concrete interaction),
+rather than a general account-level or relationship question?
+
+Answer ONLY one word:
+YES or NO
+
+
+Constraints
+
+No explanations
+
+No data access
+
+No routing decisions
+
+Boolean output only
+
+This signal is used only to inform preflight commitment.
+
+Explicitly Out of Scope for LLM (Do NOT Change)
+
+Do not introduce LLMs in the following areas — keyword rules are correct and intentional here:
+
+❌ Context override / switching (events.ts)
+
+Examples:
+
+“different meeting”
+
+“switch to Company X”
+
+Reason:
+
+These are explicit user commands
+
+Ambiguity is dangerous
+
+Deterministic behavior is required
+
+❌ Pronoun / context triggers (this, that, it)
+
+Reason:
+
+Closed vocabulary
+
+Structural, not semantic
+
+False positives are costly
+
+❌ Action-item detection (“next steps”, “commitments”)
+
+Reason:
+
+Closed-set intent
+
+Users signal this intentionally
+
+Guessing is worse than missing
+
+❌ Keyword extraction / STOP_WORDS
+
+Reason:
+
+IR plumbing
+
+Must remain deterministic and debuggable
+
+LLM would add latency and instability
+
+Architectural Requirements (Important)
+
+Centralize the semantic logic in one place
+
+Do not duplicate word lists across files
+
+Log:
+
+regex result
+
+LLM classifier result
+
+final decision
+
+Regex remains the primary mechanism; LLM is fallback only
+
+Non-Goals
+
+❌ Do not expand scope to multi-meeting
+
+❌ Do not let LLM decide routing directly
+
+❌ Do not replace all keywords “for consistency”
+
+❌ Do not add confidence scores or explanations
+
+Success Criteria
+
+After this change:
+
+Valid Single-Meeting questions using natural language (“visit”, “sync”, “touchpoint”) route correctly
+
+No increase in hallucinations
+
+Debugging remains clear: “regex failed → LLM said YES → committed”
+
+We will validate via log-based test runs.
+
+Summary
+
+We are not making the system more LLM-driven.
+We are making it less brittle by using an LLM only where the problem is inherently semantic and unbounded.
+
+This keeps control flow explicit, behavior predictable, and future maintenance manageable.

@@ -441,12 +441,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // Only attempt temporal resolution if:
     // - No thread context exists, OR
     // - Message explicitly uses temporal language
-    const hasTemporalRef = hasTemporalMeetingReference(text);
+    const { hasMeetingRef, regexResult, llmResult } = await hasTemporalMeetingReference(text);
     
-    if (!threadContext?.meetingId || hasTemporalRef) {
-      console.log(`[Slack] Step 0: Meeting resolution (hasTemporalRef=${hasTemporalRef})`);
+    if (!threadContext?.meetingId || hasMeetingRef) {
+      console.log(`[Slack] Step 0: Meeting resolution (hasMeetingRef=${hasMeetingRef}, regex=${regexResult}, llm=${llmResult})`);
       
-      const resolution = await resolveMeetingFromSlackMessage(text, threadContext);
+      const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
       
       if (resolution.resolved) {
         resolvedMeeting = {
@@ -658,7 +658,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               llmUsed: semanticAnswerUsed || intentClassification === "summary",
               llmPurpose: semanticAnswerUsed ? "semantic_answer" : (intentClassification === "summary" ? "summary" : null),
               companySource: threadContext?.companyId ? "thread" : "extracted",
-              meetingSource: threadContext?.meetingId ? "thread" : (hasTemporalRef ? "explicit" : "last_meeting"),
+              meetingSource: threadContext?.meetingId ? "thread" : (hasMeetingRef ? "explicit" : "last_meeting"),
               isBinaryQuestion,
               semanticAnswerUsed,
               semanticConfidence,

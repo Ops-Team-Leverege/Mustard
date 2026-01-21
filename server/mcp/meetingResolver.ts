@@ -18,6 +18,11 @@
  */
 
 import { storage } from "../storage";
+import { OpenAI } from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
 
 export type MeetingResolutionResult =
   | { resolved: true; meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null }
@@ -68,6 +73,10 @@ const TEMPORAL_PATTERNS = {
 /**
  * Extract company name from message if mentioned.
  * Returns null if no company explicitly mentioned.
+ * 
+ * Matching strategy:
+ * 1. First, try exact substring match (message contains full company name)
+ * 2. Then, try partial match (company name before parentheses, e.g., "Ivy Lane" from "Ivy Lane (Valvoline)")
  */
 export async function extractCompanyFromMessage(message: string): Promise<{ companyId: string; companyName: string } | null> {
   const companies = await storage.rawQuery(
@@ -81,10 +90,22 @@ export async function extractCompanyFromMessage(message: string): Promise<{ comp
   
   const messageLower = message.toLowerCase();
   
+  // First pass: exact substring match
   for (const company of companies) {
     const companyName = (company.name as string).toLowerCase();
     if (messageLower.includes(companyName)) {
       return { companyId: company.id as string, companyName: company.name as string };
+    }
+  }
+  
+  // Second pass: partial match (name before parentheses)
+  // Handles cases like "Ivy Lane (Valvoline)" matching "Ivy Lane" in message
+  for (const company of companies) {
+    const fullName = company.name as string;
+    const baseName = fullName.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
+    
+    if (baseName.length >= 3 && messageLower.includes(baseName)) {
+      return { companyId: company.id as string, companyName: fullName };
     }
   }
   
@@ -276,14 +297,16 @@ function formatDate(date: Date): string {
  * 1. Thread context (highest priority)
  * 2. Explicit meeting ID/link in message
  * 3. Temporal language (last meeting, meeting on date, etc.)
+ * 4. LLM-detected meeting reference (defaults to "last meeting" behavior)
  * 
  * Returns either a resolved meeting or a clarification request.
  */
 export async function resolveMeetingFromSlackMessage(
   message: string,
-  threadContext?: MeetingResolverThreadContext
+  threadContext?: MeetingResolverThreadContext,
+  options?: { llmMeetingRefDetected?: boolean }
 ): Promise<MeetingResolutionResult> {
-  console.log(`[MeetingResolver] Resolving meeting from message: "${message.substring(0, 50)}..."`);
+  console.log(`[MeetingResolver] Resolving meeting from message: "${message.substring(0, 50)}..." (llmDetected=${options?.llmMeetingRefDetected})`);
   
   // 1. Thread context always wins
   if (threadContext?.meetingId && threadContext?.companyId) {
@@ -528,7 +551,47 @@ export async function resolveMeetingFromSlackMessage(
     };
   }
   
-  // No temporal language but company was mentioned - can't determine which meeting
+  // 4. LLM-detected meeting reference: default to "last meeting" behavior
+  // When the LLM classifier says this is a meeting reference (e.g., "sat down with ACE",
+  // "face-to-face with Ivy Lane") but no explicit temporal pattern matched,
+  // treat it as asking about the most recent meeting.
+  if (options?.llmMeetingRefDetected) {
+    console.log(`[MeetingResolver] LLM detected meeting reference - defaulting to most recent meeting for ${companyName}`);
+    
+    const meetings = await getMeetingsOnMostRecentDate(companyId);
+    
+    if (meetings.length === 0) {
+      return {
+        resolved: false,
+        needsClarification: true,
+        message: `I don't see any meetings with ${companyName} on record.`,
+      };
+    }
+    
+    if (meetings.length === 1) {
+      return {
+        resolved: true,
+        meetingId: meetings[0].id,
+        companyId,
+        companyName,
+        meetingDate: meetings[0].meetingDate,
+      };
+    }
+    
+    // Multiple meetings on same date
+    return {
+      resolved: false,
+      needsClarification: true,
+      message: `I see multiple ${companyName} meetings on ${formatDate(meetings[0].meetingDate)}:\n${meetings.map((m, i) => `• ${m.name || `Meeting ${i + 1}`}`).join("\n")}\nWhich one should I use?`,
+      options: meetings.map(m => ({
+        meetingId: m.id,
+        date: m.meetingDate,
+        companyName,
+      })),
+    };
+  }
+  
+  // No temporal language and no LLM detection - can't determine which meeting
   return {
     resolved: false,
     needsClarification: false,
@@ -537,9 +600,90 @@ export async function resolveMeetingFromSlackMessage(
 }
 
 /**
+ * LLM-backed semantic meeting reference classifier.
+ * 
+ * This is a FALLBACK classifier - only called when regex patterns fail.
+ * Used to catch natural language variations that regex cannot enumerate.
+ * 
+ * Constraints:
+ * - Returns boolean only (YES/NO)
+ * - No explanations
+ * - No data access
+ * - No routing decisions
+ * - Used only to inform preflight commitment
+ */
+async function llmMeetingReferenceClassifier(question: string): Promise<boolean> {
+  const startTime = Date.now();
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a classifier.
+
+Task:
+Does this question clearly refer to a specific meeting instance
+(e.g. a call, visit, demo, sync, conversation, or other concrete interaction),
+rather than a general account-level or relationship question?
+
+Answer ONLY one word:
+YES or NO`
+        },
+        {
+          role: "user",
+          content: question
+        }
+      ],
+      temperature: 0,
+      max_tokens: 5,
+    });
+    
+    const answer = response.choices[0]?.message?.content?.trim().toUpperCase();
+    const result = answer === "YES";
+    
+    console.log(`[MeetingResolver] LLM classifier: "${question.substring(0, 40)}..." -> ${answer} (${Date.now() - startTime}ms)`);
+    
+    return result;
+  } catch (error) {
+    console.error(`[MeetingResolver] LLM classifier error:`, error);
+    return false;
+  }
+}
+
+/**
  * Check if message contains explicit temporal meeting reference.
  * Used to determine if we should attempt meeting resolution.
+ * 
+ * Resolution strategy:
+ * 1. Regex-first (fast path) - check all temporal patterns
+ * 2. LLM fallback (slow path) - only when regex fails
+ * 
+ * Logging:
+ * - regex_result: boolean
+ * - llm_result: boolean | null (null if not called)
+ * - final_decision: boolean
  */
-export function hasTemporalMeetingReference(message: string): boolean {
+export async function hasTemporalMeetingReference(message: string): Promise<{ hasMeetingRef: boolean; regexResult: boolean; llmResult: boolean | null }> {
+  const regexResult = Object.values(TEMPORAL_PATTERNS).some(p => p.test(message));
+  
+  if (regexResult) {
+    console.log(`[MeetingResolver] Meeting reference detected via REGEX: "${message.substring(0, 40)}..."`);
+    return { hasMeetingRef: true, regexResult: true, llmResult: null };
+  }
+  
+  const llmResult = await llmMeetingReferenceClassifier(message);
+  
+  console.log(`[MeetingResolver] Meeting reference detection: regex=${regexResult}, llm=${llmResult}, final=${llmResult}`);
+  
+  return { hasMeetingRef: llmResult, regexResult: false, llmResult };
+}
+
+/**
+ * Synchronous regex-only check for meeting reference.
+ * Used in contexts where async is not possible or LLM fallback is not desired.
+ */
+export function hasTemporalMeetingReferenceSync(message: string): boolean {
   return Object.values(TEMPORAL_PATTERNS).some(p => p.test(message));
 }
