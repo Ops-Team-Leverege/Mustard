@@ -2,20 +2,22 @@
  * Open Assistant Handler
  * 
  * Purpose:
- * Extends the existing Slack/MCP flow with intent-driven branching.
- * NOT a parallel system - integrates into the existing orchestration flow.
+ * Extends the existing Slack/MCP flow with evidence-source-driven routing.
+ * The assistant is fully open-ended in what it helps with - we only constrain
+ * which evidence sources may back the response and what claims are allowed.
  * 
- * Intent Routing:
- * - meeting_data: Delegates to existing SingleMeetingOrchestrator
- * - external_research: Uses ExternalResearch handler with citations
- * - general_assistance: Uses GPT-5 for general help (drafting, explanations)
- * - hybrid: Combines meeting data + external research
+ * Evidence Source Routing:
+ * - meeting_data: Claims backed by meeting artifacts → SingleMeetingOrchestrator
+ * - external_research: Claims backed by fetched sources → ExternalResearch (citations required)
+ * - general_assistance: General knowledge → GPT-5 (with disclaimers when needed)
+ * - hybrid: Combines sources → each claim traced to its source
  * 
  * Key Principles:
- * - Preserve single-meeting guardrails when intent is meeting_data
- * - Default to general_assistance when intent is ambiguous (low friction)
+ * - This is NOT task-type routing (write email, prep call, etc. are all allowed)
+ * - Preserve single-meeting guardrails when meeting_data is the evidence source
+ * - Default to general_assistance when source requirements are unclear
  * - Never re-derive deterministic artifacts
- * - Explicit citations for external research
+ * - When web search is available, external research requires explicit citations
  */
 
 import { OpenAI } from "openai";

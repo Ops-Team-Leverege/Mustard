@@ -131,17 +131,24 @@ Binary questions use `handleBinaryQuestion` which searches both Tier-1 data AND 
 ### Overview
 The Open Assistant expands the Slack bot capabilities beyond single-meeting queries to support broader, ChatGPT-like usage while preserving trust in meeting-derived artifacts.
 
-### Intent Classification
-Uses GPT-5 to classify user intent into:
-- **meeting_data**: Questions about what was said/agreed/asked in meetings
-- **external_research**: Questions needing public information with citations
-- **general_assistance**: Drafting, explanations, general help
-- **hybrid**: Combination of meeting data + research
+### Design Principle (CRITICAL)
+The assistant is **fully open-ended** in what it helps with. We do NOT enumerate or route by task types (e.g., write email, prepare call, draft slides).
+
+The ONLY constraints are:
+- **Which evidence sources** may be used for a response
+- **What claims** may be made based on those sources
+
+### Evidence Source Classification
+Uses GPT-5 to classify which evidence sources are appropriate:
+- **meeting_data**: Claims must be backed by meeting artifacts (Tier-1 data or transcript)
+- **external_research**: Claims must be backed by fetched sources with explicit citations
+- **general_assistance**: General knowledge (with appropriate disclaimers when needed)
+- **hybrid**: Combines meeting data + external sources (each claim traced to its source)
 
 ### Routing Rules
 1. When meeting is resolved → Single-Meeting Orchestrator (preserves all guardrails)
-2. When no meeting resolved → Intent-driven routing via Open Assistant
-3. Default to general_assistance when intent is ambiguous (low friction)
+2. When no meeting resolved → Evidence-source-driven routing via Open Assistant
+3. Default to general_assistance when source requirements are unclear (low friction)
 4. Only ask for clarification when user clearly references specific interaction but context is missing
 
 ### Key Files

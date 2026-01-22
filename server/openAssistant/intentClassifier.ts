@@ -1,20 +1,23 @@
 /**
- * Open Assistant Intent Classifier
+ * Open Assistant Evidence Source Classifier
  * 
  * Purpose:
- * Classifies user intent to determine the appropriate response path.
- * Uses GPT-5 for accuracy since this gates meeting data access.
+ * Classifies which EVIDENCE SOURCES are appropriate for answering, NOT the task type.
+ * The assistant is fully open-ended in what it helps with (write email, prep call, etc.)
+ * - we only constrain which sources may back the response and what claims are allowed.
  * 
- * Intent Types:
- * - meeting_data: User wants information from what was said/agreed/asked in meetings
- * - external_research: User wants public information about a company/topic
- * - general_assistance: User wants help with drafting, explanations, general knowledge
- * - hybrid: User needs multiple types (e.g., research + meeting context)
+ * Evidence Sources:
+ * - meeting_data: Claims must be backed by meeting artifacts (Tier-1 or transcript)
+ * - external_research: Claims must be backed by fetched sources with citations
+ * - general_assistance: General knowledge (with appropriate disclaimers)
+ * - hybrid: Combines sources (each claim traced to its source)
  * 
  * Key Principles:
- * - Default to general_assistance when intent is ambiguous (low friction)
+ * - Default to general_assistance when evidence requirements are unclear (low friction)
  * - Only trigger meeting_data when user clearly references interactions
- * - Never use keywords alone to determine intent (semantic understanding required)
+ * - This is NOT task-type routing - the assistant helps with any task
+ * 
+ * Uses GPT-5 for accuracy since this gates meeting data access.
  */
 
 import { OpenAI } from "openai";
