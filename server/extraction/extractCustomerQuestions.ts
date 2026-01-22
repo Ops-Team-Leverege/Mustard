@@ -180,11 +180,45 @@ function formatChunksForExtraction(chunks: TranscriptChunk[]): string {
   return turns.join("\n\n");
 }
 
+const BATCH_SIZE = 150;
+
+async function extractFromBatch(
+  chunks: TranscriptChunk[],
+  batchNum: number,
+  totalBatches: number
+): Promise<CustomerQuestionResult[]> {
+  const formattedTranscript = formatChunksForExtraction(chunks);
+  
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    temperature: 0,
+    max_tokens: 4096,
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `Extract customer questions from this transcript segment (batch ${batchNum}/${totalBatches}):\n\n${formattedTranscript}\n\nReturn JSON with a "questions" array. Return {"questions": []} if no customer questions are found.`,
+      },
+    ],
+  });
+  
+  const content = response.choices[0]?.message?.content;
+  if (!content) {
+    return [];
+  }
+  
+  const parsed = JSON.parse(content);
+  const validated = ExtractionOutputSchema.parse(parsed);
+  return validated.questions;
+}
+
 /**
  * Extract customer questions from speaker-attributed transcript chunks.
  * 
  * This function:
  * - Uses gpt-4o at temperature 0 for deterministic extraction
+ * - Batches large transcripts (>150 chunks) to avoid truncated responses
  * - Applies Context Anchoring post-extraction (deterministic, not LLM-driven)
  * - Returns an empty array if no valid questions are found
  * - Fails independently and is retryable
@@ -200,72 +234,58 @@ export async function extractCustomerQuestions(
     return [];
   }
   
-  const formattedTranscript = formatChunksForExtraction(chunks);
-  
   // Build a map of chunk index to array position for context lookup
   const chunkIndexMap = new Map<number, number>();
   chunks.forEach((chunk, arrayIndex) => {
     chunkIndexMap.set(chunk.chunkIndex, arrayIndex);
   });
   
-  console.log(`[CustomerQuestions] Extracting from ${chunks.length} chunks using gpt-4o temp=0`);
+  let allQuestions: CustomerQuestionResult[] = [];
   
-  try {
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        {
-          role: "user",
-          content: `Extract customer questions from this transcript:\n\n${formattedTranscript}\n\nReturn JSON with a "questions" array. Return {"questions": []} if no customer questions are found.`,
-        },
-      ],
-    });
+  if (chunks.length <= BATCH_SIZE) {
+    console.log(`[CustomerQuestions] Extracting from ${chunks.length} chunks using gpt-4o temp=0`);
+    allQuestions = await extractFromBatch(chunks, 1, 1);
+  } else {
+    const totalBatches = Math.ceil(chunks.length / BATCH_SIZE);
+    console.log(`[CustomerQuestions] Large transcript: ${chunks.length} chunks, processing in ${totalBatches} batches`);
     
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      console.log("[CustomerQuestions] No content in response, returning empty array");
-      return [];
-    }
-    
-    const parsed = JSON.parse(content);
-    const validated = ExtractionOutputSchema.parse(parsed);
-    
-    // Apply Context Anchoring post-extraction (deterministic)
-    const questionsWithContext = validated.questions.map(q => {
-      const needsContext = requiresContext(q.question_text);
+    for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+      const batchChunks = chunks.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
       
-      let contextBefore: string | null = null;
-      if (needsContext && q.question_turn_index >= 0) {
-        // Find the array position of this chunk
-        const arrayPos = chunkIndexMap.get(q.question_turn_index);
-        if (arrayPos !== undefined) {
-          contextBefore = buildContextBefore(chunks, arrayPos);
-        }
-      }
+      console.log(`[CustomerQuestions] Processing batch ${batchNum}/${totalBatches} (${batchChunks.length} chunks)`);
       
-      return {
-        ...q,
-        requires_context: needsContext,
-        context_before: contextBefore,
-      };
-    });
-    
-    const contextCount = questionsWithContext.filter(q => q.requires_context).length;
-    console.log(`[CustomerQuestions] Extracted ${validated.questions.length} questions (${contextCount} require context)`);
-    
-    return questionsWithContext;
-  } catch (error) {
-    if (error instanceof OpenAI.APIError) {
-      if (error.status === 429 || error.code === "insufficient_quota") {
-        console.error("[CustomerQuestions] [OpenAI Quota Error] Rate limited or quota exceeded");
-        throw new Error("OpenAI API quota exceeded. Please check your API key and billing status.");
+      try {
+        const batchQuestions = await extractFromBatch(batchChunks, batchNum, totalBatches);
+        allQuestions.push(...batchQuestions);
+        console.log(`[CustomerQuestions] Batch ${batchNum} extracted ${batchQuestions.length} questions`);
+      } catch (error) {
+        console.error(`[CustomerQuestions] Batch ${batchNum} failed:`, error);
       }
     }
-    
-    console.error("[CustomerQuestions] Extraction failed:", error);
-    throw error;
   }
+  
+  // Apply Context Anchoring post-extraction (deterministic)
+  const questionsWithContext = allQuestions.map(q => {
+    const needsContext = requiresContext(q.question_text);
+    
+    let contextBefore: string | null = null;
+    if (needsContext && q.question_turn_index >= 0) {
+      const arrayPos = chunkIndexMap.get(q.question_turn_index);
+      if (arrayPos !== undefined) {
+        contextBefore = buildContextBefore(chunks, arrayPos);
+      }
+    }
+    
+    return {
+      ...q,
+      requires_context: needsContext,
+      context_before: contextBefore,
+    };
+  });
+  
+  const contextCount = questionsWithContext.filter(q => q.requires_context).length;
+  console.log(`[CustomerQuestions] Extracted ${allQuestions.length} questions total (${contextCount} require context)`);
+  
+  return questionsWithContext;
 }
