@@ -1,4 +1,17 @@
-// server/mcp/index.ts
+/**
+ * MCP Runtime
+ * 
+ * Purpose:
+ * Creates an MCP instance that can run capabilities by name.
+ * This is the main entry point for executing MCP capabilities.
+ * 
+ * Usage:
+ * - createMCP(ctx).run("get_company_overview", { companyName: "Acme" })
+ * - createMCP(ctx).list() to get available capabilities
+ * 
+ * Layer: MCP (orchestration)
+ */
+
 import type { MCPContext } from "./types";
 import { capabilities } from "./capabilities";
 

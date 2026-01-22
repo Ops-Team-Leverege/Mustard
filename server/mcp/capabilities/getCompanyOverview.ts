@@ -1,3 +1,13 @@
+/**
+ * Get Company Overview Capability
+ * 
+ * Purpose:
+ * Returns a summary overview of a company including notes, stage,
+ * and counts of insights and Q&A pairs.
+ * 
+ * Layer: MCP Capability
+ */
+
 import { z } from "zod";
 import type { Capability } from "../types";
 

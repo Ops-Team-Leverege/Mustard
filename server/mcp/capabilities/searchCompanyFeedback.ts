@@ -1,4 +1,13 @@
-// src/mcp/capabilities/searchCompanyFeedback.ts
+/**
+ * Search Company Feedback Capability
+ * 
+ * Purpose:
+ * Searches customer feedback across companies by keyword.
+ * Returns matching product insights with company context.
+ * 
+ * Layer: MCP Capability (Tier-3 - blocked in Single-Meeting Orchestrator)
+ */
+
 import { z } from "zod";
 import { Capability } from "../types";
 

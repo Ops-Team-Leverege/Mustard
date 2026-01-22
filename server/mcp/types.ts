@@ -1,3 +1,18 @@
+/**
+ * MCP Type Definitions
+ * 
+ * Purpose:
+ * Shared types for the Model Context Protocol (MCP) system.
+ * Defines capability interfaces, context objects, and thread context.
+ * 
+ * Key Types:
+ * - MCPContext: Database access + optional thread context
+ * - ThreadContext: Reused entity IDs from prior Slack thread interactions
+ * - Capability: Interface for MCP capability handlers
+ * 
+ * Layer: MCP (type definitions)
+ */
+
 import type { z } from "zod";
 
 // The vocabulary the MCP uses to reason about the world

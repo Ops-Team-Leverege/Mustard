@@ -1,4 +1,13 @@
-// src/mcp/capabilities/searchQuestions.ts
+/**
+ * Search Questions Capability
+ * 
+ * Purpose:
+ * Searches Q&A pairs across all companies by keyword.
+ * Returns matching questions with answers and company context.
+ * 
+ * Layer: MCP Capability (Tier-3 - blocked in Single-Meeting Orchestrator)
+ */
+
 import { z } from "zod";
 import { Capability } from "../types";
 

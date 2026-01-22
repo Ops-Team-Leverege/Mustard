@@ -1,4 +1,13 @@
-// src/mcp/capabilities/getCompanyInsights.ts
+/**
+ * Get Company Insights Capability
+ * 
+ * Purpose:
+ * Retrieves product insights (features, context, quotes) for a specific company.
+ * Optionally filtered by product.
+ * 
+ * Layer: MCP Capability
+ */
+
 import { z } from "zod";
 import { Capability } from "../types";
 

@@ -1,3 +1,17 @@
+/**
+ * Get Last Meeting Capability
+ * 
+ * Purpose:
+ * Handles meeting-related questions by retrieving transcript chunks and
+ * composing answers. Supports summaries, quotes, and Q&A.
+ * 
+ * Note: This capability uses the RAG composer layer for LLM-based interpretation.
+ * For Tier-1 read-only data (action items, customer questions), prefer
+ * the SingleMeetingOrchestrator which reads directly from the database.
+ * 
+ * Layer: MCP Capability
+ */
+
 import { z } from "zod";
 import type { Capability, CapabilityResult } from "../types";
 import { getLastMeetingChunks } from "../../rag/retriever";

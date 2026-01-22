@@ -1,3 +1,15 @@
+/**
+ * Slack Signature Verification
+ * 
+ * Purpose:
+ * Verifies that incoming webhooks are genuinely from Slack using HMAC-SHA256
+ * signature validation. Prevents replay attacks with timestamp checking.
+ * 
+ * Security: Required for all Slack webhook endpoints.
+ * 
+ * Layer: Slack (security)
+ */
+
 import crypto from "crypto";
 import type { Request } from "express";
 

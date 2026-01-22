@@ -1,3 +1,20 @@
+/**
+ * Slack Events Handler
+ * 
+ * Purpose:
+ * Main handler for Slack Events API webhooks. Processes @mentions,
+ * routes to SingleMeetingOrchestrator or OpenAssistant, and posts responses.
+ * 
+ * Key Flows:
+ * 1. URL verification (Slack challenge)
+ * 2. Event deduplication (prevents duplicate processing)
+ * 3. Meeting resolution (thread context or explicit reference)
+ * 4. Intent routing (single-meeting vs open assistant)
+ * 5. Response posting and interaction logging
+ * 
+ * Layer: Slack (event handling)
+ */
+
 import type { Request, Response } from "express";
 import { verifySlackSignature } from "./verify";
 import { postSlackMessage } from "./slackApi";

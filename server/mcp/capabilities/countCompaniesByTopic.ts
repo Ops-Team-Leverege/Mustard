@@ -1,4 +1,13 @@
-// src/mcp/capabilities/countCompaniesByTopic.ts
+/**
+ * Count Companies By Topic Capability
+ * 
+ * Purpose:
+ * Counts how many distinct companies mentioned a given topic.
+ * Searches across product insights context and quotes.
+ * 
+ * Layer: MCP Capability
+ */
+
 import { z } from "zod";
 import { Capability } from "../types";
 

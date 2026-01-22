@@ -1,3 +1,13 @@
+/**
+ * RAG Main Entry Point
+ * 
+ * Purpose:
+ * Provides the main answerQuestion function that retrieves transcript chunks
+ * and formats responses for display. Handles speaker role formatting.
+ * 
+ * Layer: RAG (entry point)
+ */
+
 import { getLastMeetingChunks } from "./retriever";
 import { storage } from "../storage";
 

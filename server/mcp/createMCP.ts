@@ -1,3 +1,18 @@
+/**
+ * MCP Capability Router
+ * 
+ * Purpose:
+ * Routes user questions to the appropriate MCP capability using LLM-based
+ * intent classification. Handles thread context inheritance for follow-up
+ * questions in Slack threads.
+ * 
+ * Key Functions:
+ * - processQuestion: Main entry point for routing questions to capabilities
+ * - seedArgsFromThreadContext: Merges thread context into capability args
+ * 
+ * Layer: MCP (orchestration)
+ */
+
 import type { MCPContext, CapabilityResult, ResolvedEntities } from "./types";
 import { decideCapability } from "./llm";
 import { capabilities } from "./capabilities";

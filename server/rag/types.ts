@@ -1,5 +1,13 @@
-/*Shared types for RAG transcript chunks and outputs.
-Important note: Uses camelCase to match Drizzle output*/
+/**
+ * RAG Type Definitions
+ * 
+ * Purpose:
+ * Shared types for RAG transcript chunks and outputs.
+ * 
+ * Note: Uses snake_case to match raw SQL query results.
+ * 
+ * Layer: RAG (type definitions)
+ */
 
 export type TranscriptChunk = {
   id: string

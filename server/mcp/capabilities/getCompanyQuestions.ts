@@ -1,4 +1,13 @@
-// src/mcp/capabilities/getCompanyQuestions.ts
+/**
+ * Get Company Questions Capability
+ * 
+ * Purpose:
+ * Retrieves Q&A pairs (interpreted Q&A) for a specific company.
+ * Note: For verbatim customer questions, use customer_questions table instead.
+ * 
+ * Layer: MCP Capability (Tier-3 - blocked in Single-Meeting Orchestrator)
+ */
+
 import { z } from "zod";
 import { Capability } from "../types";
 

@@ -1,3 +1,13 @@
+/**
+ * MCP Context Factory
+ * 
+ * Purpose:
+ * Creates the context object passed to all MCP capabilities.
+ * Provides database access and optional thread context for follow-up queries.
+ * 
+ * Layer: MCP (context setup)
+ */
+
 import type { MCPContext, ThreadContext } from "./types";
 import { storage } from "../storage";
 

@@ -1,3 +1,21 @@
+/**
+ * Semantic Answer Engine for Single-Meeting Queries
+ * 
+ * Purpose:
+ * Generates answers for complex questions that require semantic understanding
+ * of transcript content. Used when Tier-1 data (action items, customer questions)
+ * doesn't directly answer the question.
+ * 
+ * Key Features:
+ * - Answer shape detection (yes/no, single value, list, summary)
+ * - Stop word filtering for search relevance
+ * - Proper noun + keyword matching for transcript search
+ * 
+ * Uses: GPT-5 (temperature 1) for semantic interpretation
+ * 
+ * Layer: Slack (semantic answering)
+ */
+
 import OpenAI from "openai";
 import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
