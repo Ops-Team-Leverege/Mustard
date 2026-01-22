@@ -10,6 +10,7 @@ import { extractMeetingActionStates, type MeetingActionItem as ComposerActionIte
 import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
+import { handleAirtableWebhook, verifyAirtableWebhook, getProductFeaturesFormatted, getProductValuePropositionsFormatted, searchProductKnowledge } from "./airtable";
 import {
   insertTranscriptSchema,
   insertCategorySchema,
@@ -2194,6 +2195,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       });
+    }
+  });
+  
+  // ===== AIRTABLE INTEGRATION =====
+
+  // Webhook endpoint for Airtable updates (cache invalidation)
+  app.post("/api/airtable/webhook", async (req, res) => {
+    if (!verifyAirtableWebhook(req)) {
+      res.status(401).json({ success: false, error: "Unauthorized" });
+      return;
+    }
+    await handleAirtableWebhook(req, res);
+  });
+
+  // Get all product features from Airtable
+  app.get("/api/airtable/features", isAuthenticated, async (req, res) => {
+    try {
+      const features = await getProductFeaturesFormatted();
+      res.json({ success: true, count: features.length, features });
+    } catch (error) {
+      console.error("[Airtable] Error fetching features:", error);
+      res.status(500).json({ success: false, error: "Failed to fetch features" });
+    }
+  });
+
+  // Get all value propositions from Airtable
+  app.get("/api/airtable/value-propositions", isAuthenticated, async (req, res) => {
+    try {
+      const valuePropositions = await getProductValuePropositionsFormatted();
+      res.json({ success: true, count: valuePropositions.length, valuePropositions });
+    } catch (error) {
+      console.error("[Airtable] Error fetching value propositions:", error);
+      res.status(500).json({ success: false, error: "Failed to fetch value propositions" });
+    }
+  });
+
+  // Search product knowledge (features + value propositions)
+  app.get("/api/airtable/search", isAuthenticated, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        res.status(400).json({ success: false, error: "Missing query parameter 'q'" });
+        return;
+      }
+      const results = await searchProductKnowledge(query);
+      res.json({ 
+        success: true, 
+        query,
+        featuresCount: results.features.length,
+        valuePropositionsCount: results.valuePropositions.length,
+        ...results 
+      });
+    } catch (error) {
+      console.error("[Airtable] Error searching product knowledge:", error);
+      res.status(500).json({ success: false, error: "Search failed" });
     }
   });
   

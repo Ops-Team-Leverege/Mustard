@@ -125,6 +125,7 @@ Binary questions use `handleBinaryQuestion` which searches both Tier-1 data AND 
 ### Integrations
 - Replit Auth
 - Jira Integration
+- Airtable (PitCrew Product Database)
 
 ## Open Assistant Expansion
 
@@ -168,3 +169,37 @@ Uses GPT-5 to classify which evidence sources are appropriate:
 - When web search is available, external research provides explicit citations (source, URL, date, snippet)
 - When web search is unavailable, responses include clear disclaimer about limitations
 - Single-meeting guardrails remain intact for meeting_data intent
+
+## Airtable Integration
+
+### Overview
+The PitCrew Product Database in Airtable is the source of truth for product knowledge. This integration provides read-only access to product features and value propositions.
+
+### Tables
+- **Value Propositions**: WHY PitCrew matters (Name, Description, Value Score, linked Features/Segments)
+- **Features**: WHAT PitCrew does (Name, Description, Tier availability, Product Status)
+- **Value Themes**: Groups of value propositions
+- **Feature Themes**: Groups of features by similarity/function
+- **Customer Segments**: Target customer segments
+
+### Architecture
+- **Push-based updates**: Webhook endpoint for Airtable to push changes (autoscale-compatible)
+- **In-memory cache**: 1-hour TTL, invalidated by webhook
+- **REST endpoints**: `/api/airtable/features`, `/api/airtable/value-propositions`, `/api/airtable/search`
+
+### Key Files
+- `server/airtable/types.ts` - Type definitions matching Airtable schema
+- `server/airtable/client.ts` - Low-level Airtable API client
+- `server/airtable/productData.ts` - Data access with caching
+- `server/airtable/webhook.ts` - Webhook handler for cache invalidation
+
+### Webhook Setup
+To enable push-based updates from Airtable:
+1. Create an Airtable Automation or use Make.com/Zapier
+2. Point POST requests to: `https://<your-domain>/api/airtable/webhook`
+3. Optional: Set `AIRTABLE_WEBHOOK_SECRET` and include `x-airtable-secret` header
+
+### Environment Variables
+- `AIRTABLE_API_KEY` (required): Airtable personal access token
+- `AIRTABLE_BASE_ID` (required): ID of the PitCrew Product Database base
+- `AIRTABLE_WEBHOOK_SECRET` (optional): Secret for webhook authentication
