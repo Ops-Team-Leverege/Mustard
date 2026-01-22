@@ -44,6 +44,8 @@ export {
   handleAirtableRefresh,
 } from "./webhook";
 
+export { syncAllTables, getLastSyncTime, type SyncResult, type SyncAllResult } from "./sync";
+
 export { fetchAllRecords, fetchRecord, type AirtableRecord } from "./client";
 
 export {

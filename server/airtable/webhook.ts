@@ -19,6 +19,7 @@
 import type { Request, Response } from "express";
 import { invalidateTableCache, invalidateAllDataCache } from "./dynamicData";
 import { invalidateSchemaCache } from "./schema";
+import { syncAllTables } from "./sync";
 
 type WebhookPayload = {
   base?: { id: string };
@@ -78,7 +79,7 @@ export function verifyAirtableWebhook(req: Request): boolean {
 }
 
 /**
- * Simple endpoint to force a full refresh of all Airtable data.
+ * Endpoint to force a full sync of all Airtable data to the database.
  * Can be hit daily via cron, automation, or manually.
  * 
  * GET /api/airtable/refresh
@@ -90,12 +91,16 @@ export async function handleAirtableRefresh(req: Request, res: Response): Promis
     invalidateSchemaCache();
     invalidateAllDataCache();
     
-    console.log("[Airtable Refresh] All caches invalidated - next request will fetch fresh data");
+    const syncResult = await syncAllTables();
+    
+    console.log(`[Airtable Refresh] Sync completed. Total records: ${syncResult.totalRecords}`);
 
     res.status(200).json({ 
-      success: true, 
-      message: "All Airtable caches invalidated. Fresh data will be fetched on next request.",
-      timestamp: new Date().toISOString(),
+      success: syncResult.success, 
+      message: syncResult.success 
+        ? `Synced ${syncResult.totalRecords} records from Airtable to database.`
+        : "Sync completed with errors.",
+      ...syncResult,
     });
   } catch (error) {
     console.error("[Airtable Refresh] Error:", error);

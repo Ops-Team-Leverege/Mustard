@@ -484,3 +484,100 @@ export const interactionLogs = pgTable("interaction_logs", {
 
 export type InteractionLog = typeof interactionLogs.$inferSelect;
 export type InsertInteractionLog = Omit<typeof interactionLogs.$inferInsert, 'id' | 'createdAt'>;
+
+// ============================================
+// AIRTABLE PRODUCT DATABASE TABLES
+// ============================================
+// These tables store synced data from the PitCrew Product Database in Airtable.
+// Source of truth for product knowledge (features, value propositions, etc.)
+
+export const airtableFeatures = pgTable("airtable_features", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  airtableId: varchar("airtable_id").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  productStatus: text("product_status"),
+  proTier: text("pro_tier"),
+  advancedTier: text("advanced_tier"),
+  enterpriseTier: text("enterprise_tier"),
+  listOrder: integer("list_order"),
+  hideFromPricingList: boolean("hide_from_pricing_list").default(false),
+  type: text("type"),
+  internalNotes: text("internal_notes"),
+  valuePropositionIds: text("value_proposition_ids").array(),
+  featureThemeIds: text("feature_theme_ids").array(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+}, (table) => [
+  index("airtable_features_name_idx").on(table.name),
+]);
+
+export const airtableValuePropositions = pgTable("airtable_value_propositions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  airtableId: varchar("airtable_id").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  valueToCustomer: integer("value_to_customer"),
+  internalNotes: text("internal_notes"),
+  requiresPosIntegration: boolean("requires_pos_integration").default(false),
+  featureIds: text("feature_ids").array(),
+  segmentIds: text("segment_ids").array(),
+  valueThemeIds: text("value_theme_ids").array(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+}, (table) => [
+  index("airtable_value_propositions_name_idx").on(table.name),
+]);
+
+export const airtableValueThemes = pgTable("airtable_value_themes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  airtableId: varchar("airtable_id").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  valuePropositionIds: text("value_proposition_ids").array(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+
+export const airtableFeatureThemes = pgTable("airtable_feature_themes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  airtableId: varchar("airtable_id").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  notes: text("notes"),
+  featureIds: text("feature_ids").array(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+
+export const airtableCustomerSegments = pgTable("airtable_customer_segments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  airtableId: varchar("airtable_id").notNull().unique(),
+  name: text("name").notNull(),
+  valuePropositionIds: text("value_proposition_ids").array(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+
+// Airtable sync metadata - tracks last sync time per table
+export const airtableSyncLog = pgTable("airtable_sync_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tableName: varchar("table_name").notNull(),
+  recordsCount: integer("records_count").notNull(),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+  status: text("status").default("success").notNull(),
+  errorMessage: text("error_message"),
+});
+
+// Types
+export type AirtableFeature = typeof airtableFeatures.$inferSelect;
+export type InsertAirtableFeature = typeof airtableFeatures.$inferInsert;
+
+export type AirtableValueProposition = typeof airtableValuePropositions.$inferSelect;
+export type InsertAirtableValueProposition = typeof airtableValuePropositions.$inferInsert;
+
+export type AirtableValueTheme = typeof airtableValueThemes.$inferSelect;
+export type InsertAirtableValueTheme = typeof airtableValueThemes.$inferInsert;
+
+export type AirtableFeatureTheme = typeof airtableFeatureThemes.$inferSelect;
+export type InsertAirtableFeatureTheme = typeof airtableFeatureThemes.$inferInsert;
+
+export type AirtableCustomerSegment = typeof airtableCustomerSegments.$inferSelect;
+export type InsertAirtableCustomerSegment = typeof airtableCustomerSegments.$inferInsert;
+
+export type AirtableSyncLog = typeof airtableSyncLog.$inferSelect;
