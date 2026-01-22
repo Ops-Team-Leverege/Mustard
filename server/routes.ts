@@ -10,7 +10,17 @@ import { extractMeetingActionStates, type MeetingActionItem as ComposerActionIte
 import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
-import { handleAirtableWebhook, verifyAirtableWebhook, getProductFeaturesFormatted, getProductValuePropositionsFormatted, searchProductKnowledge } from "./airtable";
+import { 
+  handleAirtableWebhook, 
+  verifyAirtableWebhook, 
+  getProductFeaturesFormatted, 
+  getProductValuePropositionsFormatted, 
+  searchProductKnowledge,
+  listTables,
+  discoverSchema,
+  getRecordsByTableName,
+  searchAllTables,
+} from "./airtable";
 import {
   insertTranscriptSchema,
   insertCategorySchema,
@@ -2249,6 +2259,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("[Airtable] Error searching product knowledge:", error);
+      res.status(500).json({ success: false, error: "Search failed" });
+    }
+  });
+
+  // ===== DYNAMIC AIRTABLE ENDPOINTS =====
+
+  // List all tables (auto-discovered from Airtable)
+  app.get("/api/airtable/tables", isAuthenticated, async (req, res) => {
+    try {
+      const tables = await listTables();
+      res.json({ success: true, count: tables.length, tables });
+    } catch (error) {
+      console.error("[Airtable] Error listing tables:", error);
+      res.status(500).json({ success: false, error: "Failed to list tables" });
+    }
+  });
+
+  // Get full schema (all tables with their fields)
+  app.get("/api/airtable/schema", isAuthenticated, async (req, res) => {
+    try {
+      const schema = await discoverSchema();
+      res.json({ success: true, ...schema });
+    } catch (error) {
+      console.error("[Airtable] Error fetching schema:", error);
+      res.status(500).json({ success: false, error: "Failed to fetch schema" });
+    }
+  });
+
+  // Get records from any table by name
+  app.get("/api/airtable/tables/:tableName/records", isAuthenticated, async (req, res) => {
+    try {
+      const { tableName } = req.params;
+      const records = await getRecordsByTableName(tableName);
+      res.json({ success: true, table: tableName, count: records.length, records });
+    } catch (error) {
+      console.error(`[Airtable] Error fetching records from ${req.params.tableName}:`, error);
+      const message = error instanceof Error ? error.message : "Failed to fetch records";
+      res.status(500).json({ success: false, error: message });
+    }
+  });
+
+  // Search across all tables
+  app.get("/api/airtable/search-all", isAuthenticated, async (req, res) => {
+    try {
+      const query = req.query.q as string;
+      if (!query) {
+        res.status(400).json({ success: false, error: "Missing query parameter 'q'" });
+        return;
+      }
+      const results = await searchAllTables(query);
+      const totalMatches = results.reduce((sum, r) => sum + r.matches.length, 0);
+      res.json({ 
+        success: true, 
+        query,
+        tablesSearched: results.length,
+        totalMatches,
+        results,
+      });
+    } catch (error) {
+      console.error("[Airtable] Error searching all tables:", error);
       res.status(500).json({ success: false, error: "Search failed" });
     }
   });

@@ -9,6 +9,7 @@
  */
 
 import type { AirtableRecord } from "./types";
+export type { AirtableRecord } from "./types";
 
 function getAirtableConfig() {
   const apiKey = process.env.AIRTABLE_API_KEY;

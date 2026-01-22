@@ -173,9 +173,9 @@ Uses GPT-5 to classify which evidence sources are appropriate:
 ## Airtable Integration
 
 ### Overview
-The PitCrew Product Database in Airtable is the source of truth for product knowledge. This integration provides read-only access to product features and value propositions.
+The PitCrew Product Database in Airtable is the source of truth for product knowledge. This integration provides read-only access to all tables with **dynamic schema discovery** - new tables added in Airtable are automatically available without code changes.
 
-### Tables
+### Current Tables (auto-discovered)
 - **Value Propositions**: WHY PitCrew matters (Name, Description, Value Score, linked Features/Segments)
 - **Features**: WHAT PitCrew does (Name, Description, Tier availability, Product Status)
 - **Value Themes**: Groups of value propositions
@@ -183,21 +183,39 @@ The PitCrew Product Database in Airtable is the source of truth for product know
 - **Customer Segments**: Target customer segments
 
 ### Architecture
+- **Dynamic schema discovery**: Uses Airtable Metadata API to auto-detect tables and fields
 - **Push-based updates**: Webhook endpoint for Airtable to push changes (autoscale-compatible)
-- **In-memory cache**: 1-hour TTL, invalidated by webhook
-- **REST endpoints**: `/api/airtable/features`, `/api/airtable/value-propositions`, `/api/airtable/search`
+- **In-memory cache**: 1-hour TTL for both schema and data, invalidated by webhook
+- **No code changes needed**: When you add new tables in Airtable, they're automatically available via the API
+
+### REST Endpoints
+**Legacy (typed, for specific tables):**
+- `GET /api/airtable/features` - Product features with typed fields
+- `GET /api/airtable/value-propositions` - Value propositions with typed fields
+- `GET /api/airtable/search?q=...` - Search features and value props
+
+**Dynamic (works with any table):**
+- `GET /api/airtable/tables` - List all tables (auto-discovered)
+- `GET /api/airtable/schema` - Full schema with all tables and fields
+- `GET /api/airtable/tables/:tableName/records` - Get records from any table by name
+- `GET /api/airtable/search-all?q=...` - Search across all tables
+
+**Webhook:**
+- `POST /api/airtable/webhook` - Cache invalidation (supports `action: "schema_change"` for new tables)
 
 ### Key Files
-- `server/airtable/types.ts` - Type definitions matching Airtable schema
+- `server/airtable/schema.ts` - Dynamic schema discovery via Metadata API
+- `server/airtable/dynamicData.ts` - Generic data access for any table
 - `server/airtable/client.ts` - Low-level Airtable API client
-- `server/airtable/productData.ts` - Data access with caching
+- `server/airtable/productData.ts` - Typed data access for known tables
 - `server/airtable/webhook.ts` - Webhook handler for cache invalidation
 
 ### Webhook Setup
 To enable push-based updates from Airtable:
 1. Create an Airtable Automation or use Make.com/Zapier
 2. Point POST requests to: `https://<your-domain>/api/airtable/webhook`
-3. Optional: Set `AIRTABLE_WEBHOOK_SECRET` and include `x-airtable-secret` header
+3. For new table notifications, include `{"action": "schema_change"}` in the payload
+4. Optional: Set `AIRTABLE_WEBHOOK_SECRET` and include `x-airtable-secret` header
 
 ### Environment Variables
 - `AIRTABLE_API_KEY` (required): Airtable personal access token

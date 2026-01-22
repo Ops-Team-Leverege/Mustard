@@ -5,6 +5,8 @@
  * Handles incoming webhooks from Airtable when records are updated.
  * Invalidates the local cache to ensure fresh data on next request.
  * 
+ * Now works dynamically with any table - no hardcoded table mappings.
+ * 
  * Airtable can send webhooks via:
  * 1. Airtable Automations (native, requires Pro plan)
  * 2. Make.com / Zapier (works with any plan)
@@ -15,23 +17,16 @@
  */
 
 import type { Request, Response } from "express";
-import { invalidateCache } from "./productData";
+import { invalidateTableCache, invalidateAllDataCache } from "./dynamicData";
+import { invalidateSchemaCache } from "./schema";
 
 type WebhookPayload = {
   base?: { id: string };
   table?: { id: string; name: string };
   record?: { id: string };
-  action?: "create" | "update" | "delete";
+  action?: "create" | "update" | "delete" | "schema_change";
   timestamp?: string;
   source?: string;
-};
-
-const TABLE_NAME_TO_CACHE_KEY: Record<string, string> = {
-  "Value Propositions": "valuePropositions",
-  "Value Themes": "valueThemes",
-  "Features": "features",
-  "Feature Themes": "featureThemes",
-  "Customer Segments": "customerSegments",
 };
 
 export async function handleAirtableWebhook(req: Request, res: Response): Promise<void> {
@@ -41,27 +36,28 @@ export async function handleAirtableWebhook(req: Request, res: Response): Promis
     const payload = req.body as WebhookPayload;
     
     console.log(`[Airtable Webhook] Action: ${payload.action || "unknown"}`);
-    console.log(`[Airtable Webhook] Table: ${payload.table?.name || "unknown"}`);
+    console.log(`[Airtable Webhook] Table: ${payload.table?.name || payload.table?.id || "unknown"}`);
     console.log(`[Airtable Webhook] Record: ${payload.record?.id || "unknown"}`);
 
-    if (payload.table?.name) {
-      const cacheKey = TABLE_NAME_TO_CACHE_KEY[payload.table.name];
-      if (cacheKey) {
-        invalidateCache(cacheKey as any);
-        console.log(`[Airtable Webhook] Invalidated cache for: ${cacheKey}`);
-      } else {
-        invalidateCache();
-        console.log(`[Airtable Webhook] Unknown table, invalidated all cache`);
-      }
+    if (payload.action === "schema_change") {
+      invalidateSchemaCache();
+      invalidateAllDataCache();
+      console.log("[Airtable Webhook] Schema change detected, invalidated schema and all data cache");
+    } else if (payload.table?.id) {
+      invalidateTableCache(payload.table.id);
+      console.log(`[Airtable Webhook] Invalidated cache for table ID: ${payload.table.id}`);
+    } else if (payload.table?.name) {
+      invalidateTableCache(payload.table.name);
+      console.log(`[Airtable Webhook] Invalidated cache for table: ${payload.table.name}`);
     } else {
-      invalidateCache();
-      console.log(`[Airtable Webhook] No table specified, invalidated all cache`);
+      invalidateAllDataCache();
+      console.log(`[Airtable Webhook] No table specified, invalidated all data cache`);
     }
 
     res.status(200).json({ 
       success: true, 
       message: "Cache invalidated",
-      table: payload.table?.name,
+      table: payload.table?.name || payload.table?.id,
       action: payload.action,
     });
   } catch (error) {
