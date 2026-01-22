@@ -2,15 +2,19 @@
  * External Research Handler
  * 
  * Purpose:
- * Fetches public information about companies/topics using real web search
- * and synthesizes results with explicit citations.
+ * Handles requests for public information about companies/topics.
  * 
- * Key Principles:
- * - Uses Perplexity API for real web search with citations
- * - Uses GPT-5 for research synthesis (reasoning-grade model required)
- * - Returns structured citations (source, URL, date, snippet)
+ * Current Implementation:
+ * - Web search capability is not yet integrated
+ * - Returns honest "not available" response when real research is needed
+ * - Can provide general knowledge via GPT-5 (with clear disclaimer)
+ * 
+ * Future:
+ * - Integrate web search API for real citations (source, URL, date, snippet)
  * - Clearly separated from meeting data paths
- * - Priority is explicit citations, not perfect coverage
+ * 
+ * Key Principle:
+ * Never fabricate citations - be honest about capabilities
  */
 
 import { OpenAI } from "openai";
@@ -19,7 +23,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-const PERPLEXITY_API_KEY = process.env.PERPLEXITY_API_KEY;
+const WEB_SEARCH_AVAILABLE = false;
 
 export type Citation = {
   source: string;
@@ -44,13 +48,22 @@ export type WebSearchResult = {
 };
 
 /**
- * Perform external research using web search and synthesize with citations.
+ * Perform external research.
+ * 
+ * Current behavior: Web search is not yet available, so we provide
+ * general knowledge with a clear disclaimer about limitations.
  */
 export async function performExternalResearch(
   query: string,
   companyName?: string | null,
   topic?: string | null
 ): Promise<ResearchResult> {
+  console.log(`[ExternalResearch] Research request: query="${query}", company="${companyName}", topic="${topic}"`);
+  
+  if (!WEB_SEARCH_AVAILABLE) {
+    return provideGeneralKnowledge(query, companyName, topic);
+  }
+  
   const searchQueries = generateSearchQueries(query, companyName, topic);
   
   const allResults: WebSearchResult[] = [];
@@ -64,13 +77,7 @@ export async function performExternalResearch(
   }
 
   if (allResults.length === 0) {
-    return {
-      answer: "I wasn't able to find relevant public information on this topic. Would you like me to try a different approach?",
-      citations: [],
-      searchQueries,
-      confidence: "low",
-      disclaimer: "No search results found.",
-    };
+    return provideGeneralKnowledge(query, companyName, topic);
   }
 
   const deduped = deduplicateResults(allResults);
@@ -79,6 +86,49 @@ export async function performExternalResearch(
   return {
     ...synthesized,
     searchQueries,
+  };
+}
+
+/**
+ * Provide general knowledge when web search is not available.
+ * Clearly disclaims that this is not cited research.
+ */
+async function provideGeneralKnowledge(
+  query: string,
+  companyName?: string | null,
+  topic?: string | null
+): Promise<ResearchResult> {
+  console.log(`[ExternalResearch] Providing general knowledge (web search not available)`);
+  
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `You are a helpful assistant providing general knowledge. The user asked a research question but web search is not currently available.
+
+IMPORTANT RULES:
+- Provide helpful general information based on your training data
+- Be clear about limitations: your knowledge has a cutoff date and may be outdated
+- NEVER fabricate specific citations, URLs, or sources
+- If you're not confident about specific facts, say so
+- Recommend the user verify important information from official sources`,
+      },
+      {
+        role: "user",
+        content: query,
+      },
+    ],
+  });
+
+  const answer = response.choices[0]?.message?.content || "I'm not able to provide information on this topic right now.";
+
+  return {
+    answer,
+    citations: [],
+    searchQueries: [],
+    confidence: "low",
+    disclaimer: "This response is based on general knowledge, not real-time web search. Please verify important information from official sources.",
   };
 }
 
@@ -108,91 +158,12 @@ function generateSearchQueries(
 }
 
 /**
- * Perplexity API response type
- */
-type PerplexityResponse = {
-  id: string;
-  model: string;
-  citations?: string[];
-  choices: {
-    index: number;
-    finish_reason: string;
-    message: {
-      role: string;
-      content: string;
-    };
-  }[];
-};
-
-/**
- * Execute a web search query using Perplexity API.
- * Returns real citations from web sources.
+ * Web search is not yet integrated.
+ * Returns empty results - caller should handle gracefully.
  */
 async function executeWebSearch(query: string): Promise<WebSearchResult[]> {
-  console.log(`[ExternalResearch] Executing web search: "${query}"`);
-  
-  if (!PERPLEXITY_API_KEY) {
-    console.warn("[ExternalResearch] PERPLEXITY_API_KEY not configured - external research disabled");
-    return [];
-  }
-  
-  try {
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${PERPLEXITY_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "llama-3.1-sonar-small-128k-online",
-        messages: [
-          {
-            role: "system",
-            content: "You are a research assistant. Provide factual, well-sourced information. Be precise and concise.",
-          },
-          {
-            role: "user",
-            content: query,
-          },
-        ],
-        temperature: 0.2,
-        return_related_questions: false,
-        search_recency_filter: "month",
-        stream: false,
-      }),
-    });
-
-    if (!response.ok) {
-      console.error(`[ExternalResearch] Perplexity API error: ${response.status} ${response.statusText}`);
-      return [];
-    }
-
-    const data: PerplexityResponse = await response.json();
-    const content = data.choices[0]?.message?.content || "";
-    const citations = data.citations || [];
-    
-    return citations.map((url, i) => ({
-      title: extractDomainFromUrl(url),
-      url,
-      snippet: i === 0 ? content.substring(0, 300) : "",
-      date: undefined,
-    }));
-  } catch (err) {
-    console.error("[ExternalResearch] Web search failed:", err);
-    return [];
-  }
-}
-
-/**
- * Extract domain name from URL for display.
- */
-function extractDomainFromUrl(url: string): string {
-  try {
-    const domain = new URL(url).hostname.replace("www.", "");
-    return domain.charAt(0).toUpperCase() + domain.slice(1);
-  } catch {
-    return "Web Source";
-  }
+  console.log(`[ExternalResearch] Web search requested: "${query}" (not available)`);
+  return [];
 }
 
 /**

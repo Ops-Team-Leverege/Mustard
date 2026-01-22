@@ -133,7 +133,10 @@ async function handleMeetingDataIntent(
 }
 
 /**
- * Handle external_research intent by fetching public information with citations.
+ * Handle external_research intent.
+ * 
+ * Note: Web search is not yet integrated. When citations are empty,
+ * the response is general knowledge with a clear disclaimer.
  */
 async function handleExternalResearchIntent(
   userMessage: string,
@@ -148,14 +151,21 @@ async function handleExternalResearchIntent(
     classification.researchRelevance.topicForResearch
   );
 
+  const hasCitations = researchResult.citations.length > 0;
   const formattedCitations = formatCitationsForDisplay(researchResult.citations);
-  const fullAnswer = researchResult.answer + formattedCitations;
+  
+  let fullAnswer = researchResult.answer;
+  if (hasCitations) {
+    fullAnswer += formattedCitations;
+  } else if (researchResult.disclaimer) {
+    fullAnswer += `\n\n_${researchResult.disclaimer}_`;
+  }
 
   return {
     answer: fullAnswer,
     intent: "external_research",
     intentClassification: classification,
-    dataSource: "external_research",
+    dataSource: hasCitations ? "external_research" : "general_knowledge",
     researchCitations: researchResult.citations,
     delegatedToSingleMeeting: false,
   };
@@ -254,7 +264,12 @@ async function synthesizeHybridResponse(
 ): Promise<string> {
   const meetingContext = meetingResult?.answer || "No meeting data available.";
   const researchContext = researchResult.answer || "No external research results.";
+  const hasCitations = researchResult.citations.length > 0;
   const citations = formatCitationsForDisplay(researchResult.citations);
+
+  const researchNote = hasCitations 
+    ? "from public sources" 
+    : "based on general knowledge (web search not currently available)";
 
   const response = await openai.chat.completions.create({
     model: "gpt-5",
@@ -266,10 +281,10 @@ async function synthesizeHybridResponse(
 1. MEETING DATA (from internal records of past meetings):
 ${meetingContext}
 
-2. EXTERNAL RESEARCH (from public sources):
+2. EXTERNAL INFORMATION (${researchNote}):
 ${researchContext}
 
-Combine these sources into a coherent, helpful answer. Be clear about which information comes from meeting records vs external research. If there are contradictions, note them.`,
+Combine these sources into a coherent, helpful answer. Be clear about which information comes from meeting records vs external sources. If there are contradictions, note them.`,
       },
       {
         role: "user",
@@ -279,7 +294,13 @@ Combine these sources into a coherent, helpful answer. Be clear about which info
   });
 
   const synthesizedAnswer = response.choices[0]?.message?.content || "Unable to synthesize response.";
-  return synthesizedAnswer + citations;
+  
+  if (hasCitations) {
+    return synthesizedAnswer + citations;
+  } else if (researchResult.disclaimer) {
+    return synthesizedAnswer + `\n\n_${researchResult.disclaimer}_`;
+  }
+  return synthesizedAnswer;
 }
 
 /**

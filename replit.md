@@ -118,7 +118,6 @@ Binary questions use `handleBinaryQuestion` which searches both Tier-1 data AND 
 ### Integrations
 - Replit Auth
 - Jira Integration
-- Perplexity API (external research with citations)
 
 ## Open Assistant Expansion
 
@@ -140,9 +139,15 @@ Uses GPT-5 to classify user intent into:
 
 ### Key Files
 - `server/openAssistant/intentClassifier.ts` - Intent classification using GPT-5
-- `server/openAssistant/externalResearch.ts` - Real web search via Perplexity API
+- `server/openAssistant/externalResearch.ts` - External research (web search integration pending)
 - `server/openAssistant/semanticArtifactSearch.ts` - Semantic matching over deterministic artifacts
 - `server/openAssistant/openAssistantHandler.ts` - Main orchestrator
+
+### External Research Status
+- Web search integration is **pending** (no external provider configured yet)
+- Currently provides general knowledge with clear disclaimer
+- When integrated, will provide explicit citations (source, URL, date, snippet)
+- Never fabricates citations - honest about capabilities
 
 ### Critical Constraints
 - Deterministic artifacts (customer_questions, meeting_action_items, meeting_summaries) are NEVER re-derived
