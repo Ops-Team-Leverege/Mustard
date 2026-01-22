@@ -1,0 +1,179 @@
+Open Assistant Expansion (Why + What)
+Context
+
+This is an incremental update to an existing Replit app.
+Single-meeting ingestion and intelligence already exist and must remain stable.
+
+We are expanding the assistant feature to support more open-ended, ChatGPT-like usage without breaking trust in meeting-derived artifacts or product facts.
+
+Why this change
+
+Users want help with broader tasks (drafting, explanations, customer research, slide decks), and today they already do this with ChatGPT.
+If implemented naively, the LLM will re-derive meeting artifacts or guess facts, silently degrading accuracy.
+
+The goal is to:
+
+keep deterministic meeting artifacts as the truth layer
+
+allow open-ended assistance around those artifacts
+
+add explicit, cited external research
+
+avoid brittle routing logic (meeting-first or keyword-based)
+
+What we need you to do
+1) Keep using deterministic meeting artifacts (do not re-derive them)
+
+The following tables are already extracted at ingestion time and remain authoritative:
+
+customer_questions
+
+meeting_action_items
+
+meeting_summaries
+
+What to do
+
+Continue using these tables as factual records of what happened.
+
+Treat them as inputs to reasoning, not outputs of the LLM.
+
+Do not
+
+Re-extract or re-infer these artifacts at runtime.
+
+Ask the LLM to regenerate them from transcripts.
+
+2) Allow semantic usage over deterministic artifacts (but don’t invent new ones)
+
+Why
+We want questions like “what questions did the customer ask about networking?” without rescanning transcripts.
+
+What to do
+
+It is OK to:
+
+semantically match over customer_questions
+
+group or summarize them
+
+answer them using general knowledge, external research, or product data (when available)
+
+Do not
+
+Generate new or “implicit” customer questions
+
+Treat inferred concerns as factual questions
+
+Rescan transcripts to rebuild question lists
+
+If a new concept (e.g. “customer concerns”) seems necessary, pause and propose it explicitly rather than overloading customer_questions.
+
+3) Make retrieval conditional (not meeting-first, not keyword-based)
+
+Why
+Users won’t reliably say “meeting” or “call.” Keyword-based routing is brittle and will cause incorrect behavior.
+
+What to do
+
+Do not route based on keywords.
+
+Use semantic intent to determine whether meeting data is required.
+
+Query meeting data only when the user intent is to reference:
+
+what was said
+
+what was agreed
+
+what the customer asked
+
+outcomes from a specific interaction
+
+Do not
+
+Default to meeting data because a keyword appeared
+
+Assume no meeting intent because the word “meeting” was not used
+
+Touch meeting data for general knowledge or external research requests
+
+If intent is ambiguous, pause and ask for clarification rather than guessing.
+
+4) Add external public research with citations (new)
+
+Why
+Users expect “research this customer” behavior similar to ChatGPT. To keep trust, research must be explicit and cited.
+
+What to do
+
+Implement an external research path that:
+
+fetches public sources (press releases, earnings calls if available, public statements)
+
+returns:
+
+source name
+
+URL
+
+date (if available)
+
+evidence snippet suitable for citation
+
+Keep external research clearly separated from internal meeting and product data paths.
+
+5) Model choice for research (explicit)
+
+What to do
+
+External public research must use a GPT-5–class model.
+
+Why
+
+Research requires stronger reasoning, disambiguation, negative findings, and citation discipline than summarization or drafting.
+
+Do not downshift the model for research tasks without discussing tradeoffs first.
+
+6) Product SSOT lives in Airtable (integration approach TBD)
+
+Why
+Product-aware assistance is in scope, but the Product SSOT does not live in Replit today.
+
+What to do
+
+Do not hardcode product knowledge in prompts.
+
+Do not assume an API vs sync approach.
+
+Propose integration options (API fetch, periodic sync, caching) and ask which to implement before building.
+
+What must not change
+
+Do not change ingestion-time extraction logic.
+
+Do not change single-meeting guardrails or behavior.
+
+Do not replace deterministic artifacts with LLM-derived output.
+
+Do not introduce fixed capability enums as the openness mechanism.
+
+Do not use RAG to decide truth (retrieval only).
+
+When to pause and ask
+
+Pause implementation and ask if there is ambiguity about:
+
+whether a request requires meeting data
+
+deterministic vs semantic interpretation
+
+Product SSOT integration from Airtable
+
+adding or redefining meeting-derived artifacts
+
+Do not make assumptions in these cases.
+
+North Star (unchanged)
+
+The assistant can answer anything, but may only assert facts when backed by deterministic internal data or cited public sources.
