@@ -17,7 +17,7 @@
  */
 
 import type { Request, Response } from "express";
-import { invalidateTableCache, invalidateAllDataCache } from "./dynamicData";
+import { invalidateAllDataCache } from "./dynamicData";
 import { invalidateSchemaCache } from "./schema";
 import { syncAllTablesDynamic } from "./dynamicSync";
 
@@ -31,35 +31,30 @@ type WebhookPayload = {
 };
 
 export async function handleAirtableWebhook(req: Request, res: Response): Promise<void> {
-  console.log("[Airtable Webhook] Received webhook");
+  console.log("[Airtable Webhook] Received webhook - triggering full sync");
 
   try {
     const payload = req.body as WebhookPayload;
     
-    console.log(`[Airtable Webhook] Action: ${payload.action || "unknown"}`);
-    console.log(`[Airtable Webhook] Table: ${payload.table?.name || payload.table?.id || "unknown"}`);
-    console.log(`[Airtable Webhook] Record: ${payload.record?.id || "unknown"}`);
+    console.log(`[Airtable Webhook] Action: ${payload.action || "sync"}`);
+    console.log(`[Airtable Webhook] Table: ${payload.table?.name || payload.table?.id || "all"}`);
 
-    if (payload.action === "schema_change") {
-      invalidateSchemaCache();
-      invalidateAllDataCache();
-      console.log("[Airtable Webhook] Schema change detected, invalidated schema and all data cache");
-    } else if (payload.table?.id) {
-      invalidateTableCache(payload.table.id);
-      console.log(`[Airtable Webhook] Invalidated cache for table ID: ${payload.table.id}`);
-    } else if (payload.table?.name) {
-      invalidateTableCache(payload.table.name);
-      console.log(`[Airtable Webhook] Invalidated cache for table: ${payload.table.name}`);
-    } else {
-      invalidateAllDataCache();
-      console.log(`[Airtable Webhook] No table specified, invalidated all data cache`);
-    }
+    // Invalidate caches
+    invalidateSchemaCache();
+    invalidateAllDataCache();
+    
+    // Trigger full sync
+    const syncResult = await syncAllTablesDynamic();
+    
+    console.log(`[Airtable Webhook] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
+
+    const message = syncResult.success 
+      ? `Synced ${syncResult.tablesDiscovered} tables, ${syncResult.totalRecords} records.`
+      : "Sync completed with errors.";
 
     res.status(200).json({ 
-      success: true, 
-      message: "Cache invalidated",
-      table: payload.table?.name || payload.table?.id,
-      action: payload.action,
+      ...syncResult,
+      message,
     });
   } catch (error) {
     console.error("[Airtable Webhook] Error:", error);
@@ -95,12 +90,13 @@ export async function handleAirtableRefresh(req: Request, res: Response): Promis
     
     console.log(`[Airtable Refresh] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
 
+    const message = syncResult.success 
+      ? `Discovered ${syncResult.tablesDiscovered} tables, synced ${syncResult.totalRecords} records.`
+      : "Sync completed with errors.";
+
     res.status(200).json({ 
-      success: syncResult.success, 
-      message: syncResult.success 
-        ? `Discovered ${syncResult.tablesDiscovered} tables, synced ${syncResult.totalRecords} records.`
-        : "Sync completed with errors.",
       ...syncResult,
+      message,
     });
   } catch (error) {
     console.error("[Airtable Refresh] Error:", error);
