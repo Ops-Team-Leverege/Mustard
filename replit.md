@@ -200,7 +200,8 @@ The PitCrew Product Database in Airtable is the source of truth for product know
 - `GET /api/airtable/tables/:tableName/records` - Get records from any table by name
 - `GET /api/airtable/search-all?q=...` - Search across all tables
 
-**Webhook:**
+**Cache Management:**
+- `GET /api/airtable/refresh` - Force full cache refresh (hit daily via cron/automation)
 - `POST /api/airtable/webhook` - Cache invalidation (supports `action: "schema_change"` for new tables)
 
 ### Key Files

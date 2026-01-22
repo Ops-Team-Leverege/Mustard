@@ -41,6 +41,7 @@ export {
 export {
   handleAirtableWebhook,
   verifyAirtableWebhook,
+  handleAirtableRefresh,
 } from "./webhook";
 
 export { fetchAllRecords, fetchRecord, type AirtableRecord } from "./client";

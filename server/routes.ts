@@ -12,6 +12,7 @@ import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
 import { 
   handleAirtableWebhook, 
+  handleAirtableRefresh,
   verifyAirtableWebhook, 
   getProductFeaturesFormatted, 
   getProductValuePropositionsFormatted, 
@@ -2217,6 +2218,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     await handleAirtableWebhook(req, res);
+  });
+
+  // Force refresh of all Airtable data (can be hit daily via cron/automation)
+  app.get("/api/airtable/refresh", async (req, res) => {
+    if (!verifyAirtableWebhook(req)) {
+      res.status(401).json({ success: false, error: "Unauthorized" });
+      return;
+    }
+    await handleAirtableRefresh(req, res);
   });
 
   // Get all product features from Airtable

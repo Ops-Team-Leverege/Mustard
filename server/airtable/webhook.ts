@@ -76,3 +76,29 @@ export function verifyAirtableWebhook(req: Request): boolean {
   const providedSecret = req.headers["x-airtable-secret"] || req.query.secret;
   return providedSecret === secret;
 }
+
+/**
+ * Simple endpoint to force a full refresh of all Airtable data.
+ * Can be hit daily via cron, automation, or manually.
+ * 
+ * GET /api/airtable/refresh
+ */
+export async function handleAirtableRefresh(req: Request, res: Response): Promise<void> {
+  console.log("[Airtable Refresh] Manual refresh triggered");
+
+  try {
+    invalidateSchemaCache();
+    invalidateAllDataCache();
+    
+    console.log("[Airtable Refresh] All caches invalidated - next request will fetch fresh data");
+
+    res.status(200).json({ 
+      success: true, 
+      message: "All Airtable caches invalidated. Fresh data will be fetched on next request.",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("[Airtable Refresh] Error:", error);
+    res.status(500).json({ success: false, error: "Refresh failed" });
+  }
+}
