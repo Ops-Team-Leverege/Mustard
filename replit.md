@@ -11,7 +11,7 @@ Preferred communication style: Simple, everyday language.
 
 ## OpenAI Prompt Inventory
 
-**12 OpenAI calls across 9 files:**
+**19 OpenAI calls across 13 files:**
 
 | File | Line | Model | Temp | Purpose |
 |------|------|-------|------|---------|
@@ -27,14 +27,21 @@ Preferred communication style: Simple, everyday language.
 | `server/extraction/extractCustomerQuestions.ts` | 214 | gpt-4o | 0 | Extract verbatim customer questions |
 | `server/extraction/extractCustomerQuestionsFromText.ts` | 65 | gpt-4o | 0 | Extract questions from raw text |
 | `server/ingestion/resolveCustomerQuestionAnswers.ts` | 123 | gpt-4o | 0 | Verify Q&A answers from transcript |
+| `server/openAssistant/intentClassifier.ts` | 90 | gpt-5 | 1 (default) | Classify user intent (Open Assistant) |
+| `server/openAssistant/externalResearch.ts` | 103 | gpt-5 | 1 (default) | General knowledge fallback |
+| `server/openAssistant/externalResearch.ts` | 192 | gpt-5 | 1 (default) | Synthesize web search results |
+| `server/openAssistant/openAssistantHandler.ts` | 184 | gpt-5 | 1 (default) | General assistance responses |
+| `server/openAssistant/openAssistantHandler.ts` | 274 | gpt-5 | 1 (default) | Hybrid response synthesis |
+| `server/openAssistant/semanticArtifactSearch.ts` | 145 | gpt-4o-mini | 0 | Semantic artifact embedding |
+| `server/openAssistant/semanticArtifactSearch.ts` | 205 | gpt-4o-mini | 0 | Artifact relevance check |
 
 **By Model:**
 
 | Model | Count | Use Cases |
 |-------|-------|-----------|
-| gpt-5 | 3 | User-facing features (transcripts, semantic answers, intent) |
+| gpt-5 | 8 | User-facing features (transcripts, semantic answers, intent, Open Assistant) |
 | gpt-4o | 4 | High-quality extraction (questions, actions, verification) |
-| gpt-4o-mini | 5 | Routing, meeting detection, & lightweight extraction (RAG composer) |
+| gpt-4o-mini | 7 | Routing, meeting detection, lightweight extraction, semantic matching |
 
 **Model Constraints:**
 - gpt-5 does NOT support temperature=0 (only default value of 1)
@@ -151,5 +158,6 @@ Uses GPT-5 to classify user intent into:
 
 ### Critical Constraints
 - Deterministic artifacts (customer_questions, meeting_action_items, meeting_summaries) are NEVER re-derived
-- External research always provides explicit citations (source, URL, date, snippet)
+- When web search is available, external research provides explicit citations (source, URL, date, snippet)
+- When web search is unavailable, responses include clear disclaimer about limitations
 - Single-meeting guardrails remain intact for meeting_data intent
