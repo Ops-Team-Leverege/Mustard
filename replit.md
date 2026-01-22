@@ -176,12 +176,12 @@ Uses GPT-5 to classify which evidence sources are appropriate:
 The PitCrew Product Database in Airtable is the source of truth for product knowledge. This integration syncs Airtable data to PostgreSQL for fast, reliable queries. New tables added in Airtable can be synced automatically.
 
 ### Database Tables (synced from Airtable)
-- **airtable_features**: WHAT PitCrew does (Name, Description, Tier availability, Product Status)
-- **airtable_value_propositions**: WHY PitCrew matters (Name, Description, Value Score)
-- **airtable_value_themes**: Groups of value propositions
-- **airtable_feature_themes**: Groups of features by similarity/function
-- **airtable_customer_segments**: Target customer segments
-- **airtable_sync_log**: Tracks sync history and status
+- **pitcrew_airtable_features**: WHAT PitCrew does (Name, Description, Tier availability, Product Status)
+- **pitcrew_airtable_value_propositions**: WHY PitCrew matters (Name, Description, Value Score)
+- **pitcrew_airtable_value_themes**: Groups of value propositions
+- **pitcrew_airtable_feature_themes**: Groups of features by similarity/function
+- **pitcrew_airtable_customer_segments**: Target customer segments
+- **pitcrew_airtable_sync_log**: Tracks sync history and status
 
 ### Architecture
 - **Database-backed storage**: Data is synced from Airtable to PostgreSQL tables

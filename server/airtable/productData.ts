@@ -16,37 +16,37 @@
 
 import { db } from "../db";
 import {
-  airtableFeatures,
-  airtableValuePropositions,
-  airtableValueThemes,
-  airtableFeatureThemes,
-  airtableCustomerSegments,
-  type AirtableFeature,
-  type AirtableValueProposition,
-  type AirtableValueTheme,
-  type AirtableFeatureTheme,
-  type AirtableCustomerSegment,
+  pitcrewAirtableFeatures,
+  pitcrewAirtableValuePropositions,
+  pitcrewAirtableValueThemes,
+  pitcrewAirtableFeatureThemes,
+  pitcrewAirtableCustomerSegments,
+  type PitcrewAirtableFeature,
+  type PitcrewAirtableValueProposition,
+  type PitcrewAirtableValueTheme,
+  type PitcrewAirtableFeatureTheme,
+  type PitcrewAirtableCustomerSegment,
 } from "@shared/schema";
 import { ilike, or } from "drizzle-orm";
 
-export async function getFeatures(): Promise<AirtableFeature[]> {
-  return db.select().from(airtableFeatures);
+export async function getFeatures(): Promise<PitcrewAirtableFeature[]> {
+  return db.select().from(pitcrewAirtableFeatures);
 }
 
-export async function getValuePropositions(): Promise<AirtableValueProposition[]> {
-  return db.select().from(airtableValuePropositions);
+export async function getValuePropositions(): Promise<PitcrewAirtableValueProposition[]> {
+  return db.select().from(pitcrewAirtableValuePropositions);
 }
 
-export async function getValueThemes(): Promise<AirtableValueTheme[]> {
-  return db.select().from(airtableValueThemes);
+export async function getValueThemes(): Promise<PitcrewAirtableValueTheme[]> {
+  return db.select().from(pitcrewAirtableValueThemes);
 }
 
-export async function getFeatureThemes(): Promise<AirtableFeatureTheme[]> {
-  return db.select().from(airtableFeatureThemes);
+export async function getFeatureThemes(): Promise<PitcrewAirtableFeatureTheme[]> {
+  return db.select().from(pitcrewAirtableFeatureThemes);
 }
 
-export async function getCustomerSegments(): Promise<AirtableCustomerSegment[]> {
-  return db.select().from(airtableCustomerSegments);
+export async function getCustomerSegments(): Promise<PitcrewAirtableCustomerSegment[]> {
+  return db.select().from(pitcrewAirtableCustomerSegments);
 }
 
 export function invalidateCache(table?: string): void {
@@ -111,17 +111,17 @@ export async function searchProductKnowledge(query: string): Promise<{
 
   const likePattern = `%${query}%`;
 
-  const features = await db.select().from(airtableFeatures).where(
+  const features = await db.select().from(pitcrewAirtableFeatures).where(
     or(
-      ilike(airtableFeatures.name, likePattern),
-      ilike(airtableFeatures.description, likePattern)
+      ilike(pitcrewAirtableFeatures.name, likePattern),
+      ilike(pitcrewAirtableFeatures.description, likePattern)
     )
   );
 
-  const valueProps = await db.select().from(airtableValuePropositions).where(
+  const valueProps = await db.select().from(pitcrewAirtableValuePropositions).where(
     or(
-      ilike(airtableValuePropositions.name, likePattern),
-      ilike(airtableValuePropositions.description, likePattern)
+      ilike(pitcrewAirtableValuePropositions.name, likePattern),
+      ilike(pitcrewAirtableValuePropositions.description, likePattern)
     )
   );
 

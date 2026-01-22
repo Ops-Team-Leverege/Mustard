@@ -14,12 +14,12 @@
 
 import { db } from "../db";
 import { 
-  airtableFeatures, 
-  airtableValuePropositions, 
-  airtableValueThemes,
-  airtableFeatureThemes,
-  airtableCustomerSegments,
-  airtableSyncLog,
+  pitcrewAirtableFeatures, 
+  pitcrewAirtableValuePropositions, 
+  pitcrewAirtableValueThemes,
+  pitcrewAirtableFeatureThemes,
+  pitcrewAirtableCustomerSegments,
+  pitcrewAirtableSyncLog,
 } from "@shared/schema";
 import { fetchAllRecords, type AirtableRecord } from "./client";
 import { AIRTABLE_TABLES, type FeatureFields, type ValuePropositionFields, type ValueThemeFields, type FeatureThemeFields, type CustomerSegmentFields } from "./types";
@@ -62,15 +62,15 @@ async function syncFeatures(): Promise<SyncResult> {
         syncedAt: new Date(),
       };
 
-      await db.insert(airtableFeatures)
+      await db.insert(pitcrewAirtableFeatures)
         .values(data)
         .onConflictDoUpdate({
-          target: airtableFeatures.airtableId,
+          target: pitcrewAirtableFeatures.airtableId,
           set: { ...data },
         });
     }
 
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: records.length,
       status: "success",
@@ -81,7 +81,7 @@ async function syncFeatures(): Promise<SyncResult> {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Airtable Sync] Error syncing ${tableName}:`, error);
     
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: 0,
       status: "error",
@@ -111,15 +111,15 @@ async function syncValuePropositions(): Promise<SyncResult> {
         syncedAt: new Date(),
       };
 
-      await db.insert(airtableValuePropositions)
+      await db.insert(pitcrewAirtableValuePropositions)
         .values(data)
         .onConflictDoUpdate({
-          target: airtableValuePropositions.airtableId,
+          target: pitcrewAirtableValuePropositions.airtableId,
           set: { ...data },
         });
     }
 
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: records.length,
       status: "success",
@@ -130,7 +130,7 @@ async function syncValuePropositions(): Promise<SyncResult> {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Airtable Sync] Error syncing ${tableName}:`, error);
     
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: 0,
       status: "error",
@@ -155,15 +155,15 @@ async function syncValueThemes(): Promise<SyncResult> {
         syncedAt: new Date(),
       };
 
-      await db.insert(airtableValueThemes)
+      await db.insert(pitcrewAirtableValueThemes)
         .values(data)
         .onConflictDoUpdate({
-          target: airtableValueThemes.airtableId,
+          target: pitcrewAirtableValueThemes.airtableId,
           set: { ...data },
         });
     }
 
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: records.length,
       status: "success",
@@ -174,7 +174,7 @@ async function syncValueThemes(): Promise<SyncResult> {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Airtable Sync] Error syncing ${tableName}:`, error);
     
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: 0,
       status: "error",
@@ -200,15 +200,15 @@ async function syncFeatureThemes(): Promise<SyncResult> {
         syncedAt: new Date(),
       };
 
-      await db.insert(airtableFeatureThemes)
+      await db.insert(pitcrewAirtableFeatureThemes)
         .values(data)
         .onConflictDoUpdate({
-          target: airtableFeatureThemes.airtableId,
+          target: pitcrewAirtableFeatureThemes.airtableId,
           set: { ...data },
         });
     }
 
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: records.length,
       status: "success",
@@ -219,7 +219,7 @@ async function syncFeatureThemes(): Promise<SyncResult> {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Airtable Sync] Error syncing ${tableName}:`, error);
     
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: 0,
       status: "error",
@@ -243,15 +243,15 @@ async function syncCustomerSegments(): Promise<SyncResult> {
         syncedAt: new Date(),
       };
 
-      await db.insert(airtableCustomerSegments)
+      await db.insert(pitcrewAirtableCustomerSegments)
         .values(data)
         .onConflictDoUpdate({
-          target: airtableCustomerSegments.airtableId,
+          target: pitcrewAirtableCustomerSegments.airtableId,
           set: { ...data },
         });
     }
 
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: records.length,
       status: "success",
@@ -262,7 +262,7 @@ async function syncCustomerSegments(): Promise<SyncResult> {
     const errorMsg = error instanceof Error ? error.message : "Unknown error";
     console.error(`[Airtable Sync] Error syncing ${tableName}:`, error);
     
-    await db.insert(airtableSyncLog).values({
+    await db.insert(pitcrewAirtableSyncLog).values({
       tableName,
       recordsCount: 0,
       status: "error",
@@ -299,9 +299,9 @@ export async function syncAllTables(): Promise<SyncAllResult> {
 
 export async function getLastSyncTime(): Promise<Date | null> {
   const [lastSync] = await db.select()
-    .from(airtableSyncLog)
-    .where(eq(airtableSyncLog.status, "success"))
-    .orderBy(airtableSyncLog.syncedAt)
+    .from(pitcrewAirtableSyncLog)
+    .where(eq(pitcrewAirtableSyncLog.status, "success"))
+    .orderBy(pitcrewAirtableSyncLog.syncedAt)
     .limit(1);
   
   return lastSync?.syncedAt || null;
