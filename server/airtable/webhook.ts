@@ -39,23 +39,24 @@ export async function handleAirtableWebhook(req: Request, res: Response): Promis
     console.log(`[Airtable Webhook] Action: ${payload.action || "sync"}`);
     console.log(`[Airtable Webhook] Table: ${payload.table?.name || payload.table?.id || "all"}`);
 
-    // Invalidate caches
+    // Respond immediately to avoid timeout
+    res.status(200).json({ 
+      success: true,
+      message: "Webhook received, sync started in background.",
+    });
+
+    // Invalidate caches and sync in background
     invalidateSchemaCache();
     invalidateAllDataCache();
     
-    // Trigger full sync
-    const syncResult = await syncAllTablesDynamic();
-    
-    console.log(`[Airtable Webhook] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
-
-    const message = syncResult.success 
-      ? `Synced ${syncResult.tablesDiscovered} tables, ${syncResult.totalRecords} records.`
-      : "Sync completed with errors.";
-
-    res.status(200).json({ 
-      ...syncResult,
-      message,
-    });
+    // Trigger full sync (runs after response is sent)
+    syncAllTablesDynamic()
+      .then(syncResult => {
+        console.log(`[Airtable Webhook] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
+      })
+      .catch(error => {
+        console.error("[Airtable Webhook] Background sync error:", error);
+      });
   } catch (error) {
     console.error("[Airtable Webhook] Error:", error);
     res.status(500).json({ success: false, error: "Webhook processing failed" });
