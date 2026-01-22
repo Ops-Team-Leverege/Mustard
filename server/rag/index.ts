@@ -35,14 +35,16 @@ export async function answerQuestion(params: {
   const mode = params.mode ?? "last_meeting";
 
   if (mode === "last_meeting") {
-    const chunks = await getLastMeetingChunks(params.companyId, 50);
+    const result = await getLastMeetingChunks(params.companyId, 50);
 
-    if (chunks.length === 0) {
+    if (!result || result.chunks.length === 0) {
       return {
         answer: "No transcript data found for the most recent meeting.",
         citations: [],
       };
     }
+
+    const { chunks } = result;
 
     // Look up company name for display (use "PitCrew" as default product)
     const company = await storage.getCompany("PitCrew", params.companyId);
