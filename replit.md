@@ -186,8 +186,9 @@ The PitCrew Product Database in Airtable is the source of truth for product know
 ### Architecture
 - **Database-backed storage**: Data is synced from Airtable to PostgreSQL tables
 - **Daily refresh**: Hit `/api/airtable/refresh` to pull latest data from Airtable
-- **Dynamic schema discovery**: Uses Airtable Metadata API to auto-detect tables and fields
-- **No code changes needed**: When you add new tables in Airtable, they're available via dynamic endpoints
+- **Dynamic schema discovery**: Uses Airtable Metadata API to auto-detect all tables and fields
+- **Auto table creation**: When new tables are added in Airtable, they're automatically created in PostgreSQL and synced
+- **No code changes needed**: The sync is fully dynamic - add new tables in Airtable and they appear in the database after refresh
 
 ### REST Endpoints
 **Legacy (typed, for specific tables):**

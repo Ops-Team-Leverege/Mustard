@@ -19,7 +19,7 @@
 import type { Request, Response } from "express";
 import { invalidateTableCache, invalidateAllDataCache } from "./dynamicData";
 import { invalidateSchemaCache } from "./schema";
-import { syncAllTables } from "./sync";
+import { syncAllTablesDynamic } from "./dynamicSync";
 
 type WebhookPayload = {
   base?: { id: string };
@@ -91,14 +91,14 @@ export async function handleAirtableRefresh(req: Request, res: Response): Promis
     invalidateSchemaCache();
     invalidateAllDataCache();
     
-    const syncResult = await syncAllTables();
+    const syncResult = await syncAllTablesDynamic();
     
-    console.log(`[Airtable Refresh] Sync completed. Total records: ${syncResult.totalRecords}`);
+    console.log(`[Airtable Refresh] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
 
     res.status(200).json({ 
       success: syncResult.success, 
       message: syncResult.success 
-        ? `Synced ${syncResult.totalRecords} records from Airtable to database.`
+        ? `Discovered ${syncResult.tablesDiscovered} tables, synced ${syncResult.totalRecords} records.`
         : "Sync completed with errors.",
       ...syncResult,
     });
