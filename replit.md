@@ -173,20 +173,21 @@ Uses GPT-5 to classify which evidence sources are appropriate:
 ## Airtable Integration
 
 ### Overview
-The PitCrew Product Database in Airtable is the source of truth for product knowledge. This integration provides read-only access to all tables with **dynamic schema discovery** - new tables added in Airtable are automatically available without code changes.
+The PitCrew Product Database in Airtable is the source of truth for product knowledge. This integration syncs Airtable data to PostgreSQL for fast, reliable queries. New tables added in Airtable can be synced automatically.
 
-### Current Tables (auto-discovered)
-- **Value Propositions**: WHY PitCrew matters (Name, Description, Value Score, linked Features/Segments)
-- **Features**: WHAT PitCrew does (Name, Description, Tier availability, Product Status)
-- **Value Themes**: Groups of value propositions
-- **Feature Themes**: Groups of features by similarity/function
-- **Customer Segments**: Target customer segments
+### Database Tables (synced from Airtable)
+- **airtable_features**: WHAT PitCrew does (Name, Description, Tier availability, Product Status)
+- **airtable_value_propositions**: WHY PitCrew matters (Name, Description, Value Score)
+- **airtable_value_themes**: Groups of value propositions
+- **airtable_feature_themes**: Groups of features by similarity/function
+- **airtable_customer_segments**: Target customer segments
+- **airtable_sync_log**: Tracks sync history and status
 
 ### Architecture
+- **Database-backed storage**: Data is synced from Airtable to PostgreSQL tables
+- **Daily refresh**: Hit `/api/airtable/refresh` to pull latest data from Airtable
 - **Dynamic schema discovery**: Uses Airtable Metadata API to auto-detect tables and fields
-- **Push-based updates**: Webhook endpoint for Airtable to push changes (autoscale-compatible)
-- **In-memory cache**: 1-hour TTL for both schema and data, invalidated by webhook
-- **No code changes needed**: When you add new tables in Airtable, they're automatically available via the API
+- **No code changes needed**: When you add new tables in Airtable, they're available via dynamic endpoints
 
 ### REST Endpoints
 **Legacy (typed, for specific tables):**
