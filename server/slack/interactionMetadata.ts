@@ -9,7 +9,7 @@
  * NOT for user-visible responses.
  */
 
-export type EntryPoint = "preflight" | "single_meeting" | "mcp_router";
+export type EntryPoint = "preflight" | "single_meeting" | "mcp_router" | "open_assistant";
 
 export type Intent = 
   | "next_steps" 
@@ -27,7 +27,7 @@ export type AnswerShape =
   | "summary" 
   | "none";
 
-export type DataSource = "tier1" | "semantic" | "not_found";
+export type DataSource = "tier1" | "semantic" | "not_found" | "external";
 
 export type Tier1Entity = 
   | "action_items" 
@@ -38,7 +38,10 @@ export type Tier1Entity =
 export type LlmPurpose = 
   | "semantic_answer" 
   | "summary" 
-  | "routing" 
+  | "routing"
+  | "intent_classification"
+  | "external_research"
+  | "general_assistance"
   | null;
 
 export type ResolutionSource = 
@@ -92,6 +95,13 @@ export interface InteractionMetadata {
     llm_called: boolean;
     llm_result: boolean | null;
     llm_latency_ms: number | null;
+  };
+
+  // Open Assistant specific metadata
+  open_assistant?: {
+    intent: string;
+    data_source: string;
+    delegated_to_single_meeting: boolean;
   };
 
   // Backward-compatible fields (still included for existing queries)
@@ -159,6 +169,12 @@ export function buildInteractionMetadata(
       llmResult: boolean | null;
       llmLatencyMs: number | null;
     };
+    // Open Assistant specific metadata
+    openAssistant?: {
+      intent: string;
+      dataSource: string;
+      delegatedToSingleMeeting: boolean;
+    };
   }
 ): InteractionMetadata {
   return {
@@ -196,6 +212,12 @@ export function buildInteractionMetadata(
       llm_called: execution.meetingDetection.llmCalled,
       llm_result: execution.meetingDetection.llmResult,
       llm_latency_ms: execution.meetingDetection.llmLatencyMs,
+    } : undefined,
+    
+    open_assistant: execution.openAssistant ? {
+      intent: execution.openAssistant.intent,
+      data_source: execution.openAssistant.dataSource,
+      delegated_to_single_meeting: execution.openAssistant.delegatedToSingleMeeting,
     } : undefined,
     
     // Backward-compatible fields

@@ -118,3 +118,33 @@ Binary questions use `handleBinaryQuestion` which searches both Tier-1 data AND 
 ### Integrations
 - Replit Auth
 - Jira Integration
+- Perplexity API (external research with citations)
+
+## Open Assistant Expansion
+
+### Overview
+The Open Assistant expands the Slack bot capabilities beyond single-meeting queries to support broader, ChatGPT-like usage while preserving trust in meeting-derived artifacts.
+
+### Intent Classification
+Uses GPT-5 to classify user intent into:
+- **meeting_data**: Questions about what was said/agreed/asked in meetings
+- **external_research**: Questions needing public information with citations
+- **general_assistance**: Drafting, explanations, general help
+- **hybrid**: Combination of meeting data + research
+
+### Routing Rules
+1. When meeting is resolved → Single-Meeting Orchestrator (preserves all guardrails)
+2. When no meeting resolved → Intent-driven routing via Open Assistant
+3. Default to general_assistance when intent is ambiguous (low friction)
+4. Only ask for clarification when user clearly references specific interaction but context is missing
+
+### Key Files
+- `server/openAssistant/intentClassifier.ts` - Intent classification using GPT-5
+- `server/openAssistant/externalResearch.ts` - Real web search via Perplexity API
+- `server/openAssistant/semanticArtifactSearch.ts` - Semantic matching over deterministic artifacts
+- `server/openAssistant/openAssistantHandler.ts` - Main orchestrator
+
+### Critical Constraints
+- Deterministic artifacts (customer_questions, meeting_action_items, meeting_summaries) are NEVER re-derived
+- External research always provides explicit citations (source, URL, date, snippet)
+- Single-meeting guardrails remain intact for meeting_data intent

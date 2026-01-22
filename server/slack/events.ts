@@ -7,6 +7,7 @@ import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity, isBinaryQuestion } from "../mcp/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "../mcp/meetingResolver";
 import { buildInteractionMetadata, type EntryPoint, type Intent, type AnswerShape, type DataSource, type Tier1Entity, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
+import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -591,26 +592,39 @@ export async function slackEventsHandler(req: Request, res: Response) {
         
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}, isSemanticDebug=${isSemanticDebug}, semanticError=${semanticError || 'none'}, clarification=${isClarificationRequest || false}, binary=${isBinaryQuestion || false}`);
       } else {
-        // MULTI-CONTEXT MODE: Use MCP router
-        const ctx = makeMCPContext(threadContext);
-        const mcp = createMCP(ctx);
-        const mcpResult: MCPResult = await mcp.runFromText(text);
-
-        // Format result - handle both string and object responses
-        const rawResult = mcpResult.result;
-        if (typeof rawResult === "string") {
-          responseText = rawResult;
-        } else if (rawResult && typeof rawResult === "object") {
-          // RAG responses have { answer, citations }
-          const objResult = rawResult as Record<string, unknown>;
-          responseText = (objResult.answer as string) || JSON.stringify(rawResult, null, 2);
-        } else {
-          responseText = String(rawResult);
+        // OPEN ASSISTANT MODE: Intent-driven routing for non-meeting requests
+        // Uses intent classification to route to:
+        // - external_research: Public information with citations
+        // - general_assistance: Drafting, explanations, general help
+        // - hybrid: Combination of meeting data + research
+        // - meeting_data: Falls through to single-meeting mode if needed
+        console.log(`[Slack] Open Assistant mode - classifying intent`);
+        
+        const openAssistantResult: OpenAssistantResult = await handleOpenAssistant(text, {
+          userId: userId || undefined,
+          threadId: threadTs,
+          conversationContext: threadContext ? `Company: ${resolvedMeeting?.companyName || 'unknown'}` : undefined,
+          resolvedMeeting: resolvedMeeting ? {
+            meetingId: resolvedMeeting.meetingId,
+            companyId: resolvedMeeting.companyId,
+            companyName: resolvedMeeting.companyName,
+            meetingDate: resolvedMeeting.meetingDate,
+          } : null,
+        });
+        
+        responseText = openAssistantResult.answer;
+        capabilityName = `open_assistant_${openAssistantResult.intent}`;
+        intentClassification = openAssistantResult.intent;
+        dataSource = openAssistantResult.dataSource;
+        
+        if (openAssistantResult.singleMeetingResult) {
+          resolvedCompanyId = resolvedMeeting?.companyId || null;
+          resolvedMeetingId = resolvedMeeting?.meetingId || null;
+          semanticAnswerUsed = openAssistantResult.singleMeetingResult.semanticAnswerUsed;
+          semanticConfidence = openAssistantResult.singleMeetingResult.semanticConfidence;
         }
         
-        capabilityName = mcpResult.capabilityName;
-        resolvedCompanyId = mcpResult.resolvedEntities?.companyId || null;
-        resolvedMeetingId = mcpResult.resolvedEntities?.meetingId || null;
+        console.log(`[Slack] Open Assistant response: intent=${openAssistantResult.intent}, dataSource=${openAssistantResult.dataSource}, delegated=${openAssistantResult.delegatedToSingleMeeting}`);
       }
 
       // Post response to Slack (skip in test mode)
@@ -672,18 +686,35 @@ export async function slackEventsHandler(req: Request, res: Response) {
             }
           );
         } else {
-          // MCP router path
+          // Open Assistant path - intent-driven routing
+          const mappedIntent: Intent = 
+            intentClassification === "external_research" ? "content" :
+            intentClassification === "general_assistance" ? "content" :
+            intentClassification === "hybrid" ? "content" :
+            intentClassification === "meeting_data" ? "content" : "unknown";
+          
+          const mappedDataSource: DataSource =
+            dataSource === "external_research" ? "external" as DataSource :
+            dataSource === "general_knowledge" ? "external" as DataSource :
+            dataSource === "hybrid" ? "external" as DataSource :
+            dataSource === "meeting_artifacts" ? "tier1" : "not_found";
+          
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
-              entryPoint: "mcp_router",
-              intent: "unknown",
-              answerShape: "summary", // MCP typically returns summaries
-              dataSource: resolvedMeetingId ? "tier1" : "not_found",
-              llmUsed: true, // MCP router always uses LLM for routing
-              llmPurpose: "routing",
+              entryPoint: "open_assistant" as EntryPoint,
+              intent: mappedIntent,
+              answerShape: "summary",
+              dataSource: mappedDataSource,
+              llmUsed: true,
+              llmPurpose: "intent_classification",
               companySource: threadContext?.companyId ? "thread" : "extracted",
-              meetingSource: threadContext?.meetingId ? "thread" : "last_meeting",
+              meetingSource: threadContext?.meetingId ? "thread" : "none",
+              openAssistant: {
+                intent: intentClassification as string,
+                dataSource: dataSource as string,
+                delegatedToSingleMeeting: Boolean(semanticAnswerUsed),
+              },
               testRun,
               meetingDetection,
             }
