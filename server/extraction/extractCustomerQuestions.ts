@@ -270,16 +270,31 @@ export async function extractCustomerQuestions(
     const needsContext = requiresContext(q.question_text);
     
     let contextBefore: string | null = null;
-    let resolvedSpeaker = q.asked_by_name;
+    let resolvedAsker = q.asked_by_name;
+    let resolvedAnswerer = q.answered_by_name;
     
     if (q.question_turn_index >= 0) {
       const arrayPos = chunkIndexMap.get(q.question_turn_index);
       if (arrayPos !== undefined) {
-        // Resolve speaker from chunk if LLM returned "Unknown"
-        if (!resolvedSpeaker || resolvedSpeaker === "Unknown") {
-          const chunk = chunks[arrayPos];
-          if (chunk?.speakerName) {
-            resolvedSpeaker = chunk.speakerName;
+        const questionChunk = chunks[arrayPos];
+        
+        // Resolve asker from chunk if LLM returned "Unknown"
+        if (!resolvedAsker || resolvedAsker === "Unknown") {
+          if (questionChunk?.speakerName) {
+            resolvedAsker = questionChunk.speakerName;
+          }
+        }
+        
+        // Resolve answerer for ANSWERED questions by looking at next turns
+        if (q.status === "ANSWERED" && (!resolvedAnswerer || resolvedAnswerer === "Unknown")) {
+          // Look at next 1-3 turns for a different speaker (the answerer)
+          for (let i = 1; i <= 3 && arrayPos + i < chunks.length; i++) {
+            const nextChunk = chunks[arrayPos + i];
+            if (nextChunk?.speakerName && nextChunk.speakerName !== resolvedAsker) {
+              // Found a different speaker - likely the answerer
+              resolvedAnswerer = nextChunk.speakerName;
+              break;
+            }
           }
         }
         
@@ -291,7 +306,8 @@ export async function extractCustomerQuestions(
     
     return {
       ...q,
-      asked_by_name: resolvedSpeaker,
+      asked_by_name: resolvedAsker,
+      answered_by_name: resolvedAnswerer,
       requires_context: needsContext,
       context_before: contextBefore,
     };
