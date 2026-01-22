@@ -70,6 +70,11 @@ export function verifyAirtableWebhook(req: Request): boolean {
   }
 
   const providedSecret = req.headers["x-airtable-secret"] || req.query.secret;
+  
+  // Debug logging
+  console.log(`[Airtable Webhook] Header value: "${providedSecret}"`);
+  console.log(`[Airtable Webhook] Expected length: ${secret.length}, Received length: ${String(providedSecret || '').length}`);
+  
   return providedSecret === secret;
 }
 
