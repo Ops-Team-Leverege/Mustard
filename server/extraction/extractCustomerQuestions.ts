@@ -265,20 +265,33 @@ export async function extractCustomerQuestions(
     }
   }
   
-  // Apply Context Anchoring post-extraction (deterministic)
+  // Apply Context Anchoring and Speaker Resolution post-extraction (deterministic)
   const questionsWithContext = allQuestions.map(q => {
     const needsContext = requiresContext(q.question_text);
     
     let contextBefore: string | null = null;
-    if (needsContext && q.question_turn_index >= 0) {
+    let resolvedSpeaker = q.asked_by_name;
+    
+    if (q.question_turn_index >= 0) {
       const arrayPos = chunkIndexMap.get(q.question_turn_index);
       if (arrayPos !== undefined) {
-        contextBefore = buildContextBefore(chunks, arrayPos);
+        // Resolve speaker from chunk if LLM returned "Unknown"
+        if (!resolvedSpeaker || resolvedSpeaker === "Unknown") {
+          const chunk = chunks[arrayPos];
+          if (chunk?.speakerName) {
+            resolvedSpeaker = chunk.speakerName;
+          }
+        }
+        
+        if (needsContext) {
+          contextBefore = buildContextBefore(chunks, arrayPos);
+        }
       }
     }
     
     return {
       ...q,
+      asked_by_name: resolvedSpeaker,
       requires_context: needsContext,
       context_before: contextBefore,
     };
