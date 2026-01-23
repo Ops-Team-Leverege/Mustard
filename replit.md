@@ -75,8 +75,7 @@ Meeting detection uses a regex-first strategy with LLM fallback (gpt-4o-mini) fo
 **Authentication**: Header `X-Airtable-Secret` with secret value (stored in `AIRTABLE_WEBHOOK_SECRET`)
 
 **Behavior**: 
-- Responds immediately with `{ success: true, message: "Webhook received, sync started in background." }`
-- Triggers full dynamic sync of all Airtable tables in background
+- Waits for sync to complete before responding (ensures Autoscale doesn't kill the process)
 - Auto-discovers new tables and creates database tables
 - Auto-adds new columns when Airtable schema changes
 
