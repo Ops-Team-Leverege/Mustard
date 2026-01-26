@@ -1,0 +1,202 @@
+Single Intent, Sequential Contracts (Chain-of-Contracts)
+Context
+
+We are refining the PitCrew assistant architecture to enforce a single-intent invariant while supporting multi-step tasks via sequential contracts.
+
+The system must never handle more than one intent per user request.
+However, a single intent may require multiple contracts executed in sequence (e.g. extract → draft).
+
+This change is required to:
+
+eliminate ambiguity
+
+preserve scope control
+
+improve testability
+
+prevent authority leakage
+
+Core Invariant (Non-negotiable)
+
+One user request → one intent → one scope → zero or more contracts executed in sequence
+
+The system does not support multiple intents per message
+
+The system does support compound tasks within a single intent
+
+If a request genuinely requires multiple intents, the system must ask the user to split the request
+
+Part 1 — Intent Handling Rules
+Intent selection
+
+Each incoming message must resolve to exactly one intent:
+
+SINGLE_MEETING
+
+MULTI_MEETING
+
+PRODUCT_KNOWLEDGE
+
+DOCUMENT_SEARCH
+
+GENERAL_HELP
+
+CLARIFY / REFUSE (terminal)
+
+Once selected:
+
+intent is final
+
+scope is locked
+
+intent must not change during execution
+
+When to ask the user to split
+
+If a message requires different scopes, do not proceed.
+
+Examples that must trigger a split:
+
+“Summarize the meeting and check pricing”
+
+“Answer the meeting questions and write a follow-up email”
+
+“Compare meetings and explain product features”
+
+Response pattern:
+
+“I can help with that, but let’s do it one step at a time. Which part should we start with?”
+
+Part 2 — Sequential Contracts (Chain of Contracts)
+Definition
+
+A contract defines:
+
+how to answer
+
+what format to use
+
+what data is allowed
+
+Within a single intent, multiple contracts may run sequentially if the task requires multiple steps.
+
+Contracts:
+
+run in order
+
+each has its own allowed context
+
+later contracts may depend on outputs of earlier ones
+
+Example: SINGLE_MEETING with two-step task
+
+User:
+
+“Help me answer the questions from the ACE meeting”
+
+Resolved intent:
+
+SINGLE_MEETING
+
+scope = ACE meeting (deterministically resolved)
+
+Execution chain:
+
+Contract 1: CUSTOMER_QUESTIONS
+- Purpose: extract customer questions
+- Context allowed: single_meeting evidence only
+- Output: list of questions (no interpretation)
+
+Contract 2: DRAFT_RESPONSE
+- Purpose: help draft answers
+- Context allowed:
+  - Product identity (always)
+  - Product SSOT (authoritative facts, if needed)
+  - General language ability
+- Output: draft answers clearly labeled as suggestions
+
+
+This is still one intent and one scope.
+
+Part 3 — Context Layer Rules (Per Contract)
+Ambient context (always on)
+
+Product identity (PitCrew)
+
+Voice and framing
+
+General language ability
+
+Ambient context:
+
+shapes language
+
+does not authorize factual claims
+
+Evidence context (explicitly gated)
+
+Evidence is attached per contract, not per request.
+
+Rules:
+
+Meeting transcripts → only for meeting contracts
+
+Product SSOT → only for contracts that draft or answer product questions
+
+Documents → only for DOCUMENT_SEARCH contracts
+
+Never inject evidence implicitly.
+
+Part 4 — Logging Requirements
+
+For each request, log:
+
+intent (single value)
+
+scope (e.g. meeting_id, company_id)
+
+contract_chain (ordered list)
+
+context_layers_used per contract
+
+evidence_sources per contract
+
+This is required to debug failures and validate correctness.
+
+Constraints (Must Be Enforced)
+
+Do not support multiple intents per message
+
+Do not mix scopes in a single response
+
+Do not treat Product SSOT as ambient
+
+Do not let later contracts expand scope
+
+Do not let Open Assistant re-decide intent
+
+Acceptance Criteria
+
+Each test case resolves to exactly one intent
+
+Sequential tasks are handled via chained contracts
+
+Evidence is only used where explicitly allowed
+
+Logs clearly show contract order and context usage
+
+Ambiguous multi-scope requests trigger a split prompt
+
+Notes for Testing
+
+New test cases should:
+
+contain only one intent per question
+
+explicitly exercise chained contracts
+
+verify that extraction and drafting are separated
+
+verify that product facts are only used in drafting steps
+
+This instruction should be treated as authoritative for implementation.

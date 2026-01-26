@@ -1,0 +1,305 @@
+Single Intent, Sequential Contracts, Ambient Context & Contract System (v2)
+Context
+
+This system is designed to answer user questions about PitCrew safely, deterministically, and auditably.
+
+It enforces:
+
+a single-intent invariant
+
+sequential contracts (chain-of-contracts) for multi-step tasks
+
+explicit authority control via Product SSOT modes
+
+a minimal ambient product context to avoid ambiguity and hallucination
+
+Core Invariant (Non-Negotiable)
+
+One user request → one intent → one scope → one or more contracts executed in sequence
+
+The system does not support multiple intents per message
+
+The system does support compound tasks via sequential contracts
+
+Intent is resolved once, before execution, and must not change mid-request
+
+If a request requires different intents or scopes, the system must ask the user to split the request.
+
+Ambient Product Context (Always On)
+Purpose
+
+Provide product identity and framing while explicitly restricting factual authority.
+
+Ambient context:
+
+resolves “what product are we talking about?”
+
+enables natural explanations and copywriting
+
+does not authorize factual claims
+
+Ambient Prompt (Authoritative Text)
+
+Always include this system-level prompt:
+
+“You are assisting with PitCrew, a product by Leverege.
+Assume all conversations refer to this product unless explicitly stated otherwise.
+When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes.
+Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT is available and the active contract permits authoritative claims.”
+
+Rules:
+
+Ambient context is not evidence
+
+Ambient context must never be cited as a source of truth
+
+Ambient context controls framing only
+
+Example — Same Question, Different Authority
+
+User:
+“Does PitCrew integrate with my POS?”
+
+❌ Ambient only (no SSOT):
+
+“PitCrew is designed to work with operational data from various sources. For specific integration details, I’d need to check our product documentation. Would you like me to look that up?”
+
+✅ With Product SSOT (FEATURE_VERIFICATION contract):
+
+“Yes. PitCrew integrates with major POS systems, pulling invoice data to correlate service times with tickets.”
+
+Intent Handling
+
+Each request must resolve to exactly one intent:
+
+SINGLE_MEETING
+
+MULTI_MEETING
+
+PRODUCT_KNOWLEDGE
+
+DOCUMENT_SEARCH
+
+GENERAL_HELP
+
+CLARIFY / REFUSE (terminal)
+
+Intent:
+
+locks scope
+
+determines which contracts are allowed
+
+must not change during execution
+
+Sequential Contracts (Chain-of-Contracts)
+Definition
+
+A contract defines:
+
+response shape
+
+authority level
+
+how Product SSOT may be used
+
+failure behavior
+
+Multiple contracts may execute sequentially within the same intent and scope.
+
+Each contract:
+
+has an explicit SSOT mode
+
+may depend on outputs of earlier contracts
+
+must not expand scope
+
+Contract Definitions
+🟢 Descriptive (Grounded, Non-Authoritative)
+PRODUCT_EXPLANATION
+
+SSOT Mode: Descriptive
+Purpose: Explain how PitCrew works at a high level
+
+Rules:
+
+SSOT may be used for grounding
+
+No enumeration of features
+
+No guarantees or integrations
+
+Language must be non-exhaustive
+
+Example:
+
+“PitCrew works by analyzing operational video data to help teams understand what’s happening in their environments.”
+
+VALUE_PROPOSITION
+
+SSOT Mode: Descriptive
+Purpose: Articulate benefits and positioning
+
+Rules:
+
+Outcome-oriented
+
+Avoid mechanics unless user already introduced them
+
+Example:
+
+“PitCrew is designed to help improve throughput and consistency by giving teams better operational visibility.”
+
+DRAFT_RESPONSE
+
+SSOT Mode: Descriptive
+Purpose: Draft answers to customer questions
+
+Rules:
+
+SSOT allowed for grounding
+
+Responses must be labeled as drafts
+
+Avoid promissory language
+
+DRAFT_EMAIL
+
+SSOT Mode: Descriptive
+Purpose: Creative drafting (emails, messaging)
+
+Rules:
+
+SSOT optional
+
+Tone and clarity prioritized
+
+No factual escalation without SSOT
+
+🔵 Authoritative (Falsifiable Claims)
+FEATURE_VERIFICATION
+
+SSOT Mode: Authoritative
+Purpose: Answer capability or integration questions
+
+Rules:
+
+SSOT required
+
+Claims must be explicit and supported
+
+If SSOT does not confirm, say so clearly
+
+Example:
+
+“Yes. PitCrew integrates with major POS systems…”
+
+FAQ_ANSWER
+
+SSOT Mode: Authoritative
+Purpose: Answer known FAQs (pricing, deployment, availability)
+
+Rules:
+
+SSOT required
+
+Short, definitive answers
+
+No hedging unless data is missing
+
+Example:
+
+“Pricing is a flat monthly fee per store.”
+
+🟣 Extractive (No SSOT)
+MEETING_SUMMARY
+
+Purpose: Summarize a meeting transcript
+
+NEXT_STEPS
+
+Purpose: Extract action items
+
+CUSTOMER_QUESTIONS
+
+Purpose: Extract questions asked by the customer
+
+Rules:
+
+Evidence only (meeting transcripts)
+
+No interpretation or synthesis
+
+No Product SSOT
+
+Example — Sequential Contracts
+
+User:
+“Help me answer the questions from the ACE meeting.”
+
+Intent:
+SINGLE_MEETING (scope = ACE meeting)
+
+Execution:
+
+Contract 1: CUSTOMER_QUESTIONS
+- Evidence: ACE meeting transcript
+
+Contract 2: DRAFT_RESPONSE
+- Evidence: Product SSOT (descriptive)
+
+
+Same intent.
+Same scope.
+Multiple contracts.
+
+When to Ask the User to Split
+
+If a request requires different intents or scopes, respond with:
+
+“I can help with that, but let’s do it one step at a time.
+Which would you like first: [option A] or [option B]?”
+
+Examples that must trigger a split:
+
+“Summarize the meeting and check pricing”
+
+“Answer the ACE questions and email Les Schwab”
+
+“Compare meetings and explain product features”
+
+Logging Requirements
+
+Log per request:
+
+intent
+
+scope
+
+contract_chain (ordered)
+
+SSOT_mode per contract (descriptive / authoritative)
+
+context layers used per contract
+
+This is mandatory.
+
+Acceptance Criteria
+
+One intent per request
+
+Sequential contracts used for multi-step tasks
+
+No authoritative product claims outside allowed contracts
+
+Product explanations are grounded, not vague or hallucinated
+
+Logs clearly explain authority decisions
+
+Final Design Rule
+
+Intent controls scope.
+Contracts control authority.
+SSOT controls truth.
+Ambient context controls framing.
