@@ -480,6 +480,8 @@ export const interactionLogs = pgTable("interaction_logs", {
   questionText: text("question_text").notNull(), // User's original question
   answerText: text("answer_text"), // System's response (nullable if error)
   
+  capabilityName: varchar("capability_name").notNull(), // Legacy field - derives from answer_contract or intent
+  
   intent: varchar("intent"), // SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, GENERAL_HELP
   intentDetectionMethod: varchar("intent_detection_method"), // keyword, llm, default
   

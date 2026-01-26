@@ -20,10 +20,15 @@ export type LogInteractionParams = {
   answerText: string;
   metadata: InteractionMetadata;
   testRun?: boolean;
+  capabilityName?: string;
 };
 
 export async function logInteraction(params: LogInteractionParams): Promise<void> {
   try {
+    // Derive capability name from metadata or use provided value
+    const capabilityName = params.capabilityName || 
+      deriveCapabilityName(params.metadata);
+    
     await storage.insertInteractionLog({
       entryPoint: params.metadata.entry_point,
       testRun: params.testRun || params.metadata.test_run || false,
@@ -39,6 +44,8 @@ export async function logInteraction(params: LogInteractionParams): Promise<void
       questionText: params.questionText,
       answerText: params.answerText,
       
+      capabilityName,
+      
       intent: String(params.metadata.intent),
       intentDetectionMethod: params.metadata.intent_detection_method,
       
@@ -53,6 +60,22 @@ export async function logInteraction(params: LogInteractionParams): Promise<void
   } catch (err) {
     console.error("[logInteraction] Failed to log interaction:", err);
   }
+}
+
+/**
+ * Derive a capability name from metadata for logging purposes.
+ */
+function deriveCapabilityName(metadata: InteractionMetadata): string {
+  // Use answer_contract if available
+  if (metadata.answer_contract) {
+    return String(metadata.answer_contract);
+  }
+  // Fall back to intent
+  if (metadata.intent) {
+    return String(metadata.intent);
+  }
+  // Default
+  return "unknown";
 }
 
 export function mapLegacyDataSource(dataSource: string): "meeting_artifacts" | "semantic" | "product_ssot" | "not_found" | "external" {
