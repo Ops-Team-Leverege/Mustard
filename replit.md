@@ -55,6 +55,14 @@ Expands Slack bot capabilities to broader ChatGPT-like usage, classifying eviden
 
 Meeting detection uses a regex-first strategy with LLM fallback (gpt-4o-mini) for temporal references. Transcript search relevance prioritizes chunks matching both proper nouns and keywords. Customer question extraction uses gpt-4o with temperature=0 for verbatim extraction and deterministic speaker resolution.
 
+**Meeting Search (when no meeting resolved)**:
+When a meeting_data query mentions a person/company but no specific meeting is resolved:
+1. Extract search terms: proper nouns (Tyler Wiggins), all-caps acronyms (ACE, HVAC, POS), multi-word names (Les Schwab)
+2. Search companies and contacts tables for matches
+3. Fallback: ILIKE search on significant words when entity extraction fails
+4. Common acronyms filtered: ROI, TV, API, IT (not company names)
+5. Single match → delegate to SingleMeetingOrchestrator; multiple matches → aggregate results
+
 ## External Dependencies
 
 ### AI Services
