@@ -1,5 +1,5 @@
 /**
- * Regression Tests: Single-Meeting Orchestrator Tier-1 Invariant
+ * Regression Tests: Single-Meeting Orchestrator Read-Only Artifact Invariant
  * 
  * These tests guard the most critical invariant in the Slack single-meeting flow:
  * - Slack Q&A must NEVER call extractMeetingActionStates (LLM extraction)
@@ -10,7 +10,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-describe('SingleMeetingOrchestrator Tier-1 Invariant', () => {
+describe('SingleMeetingOrchestrator Read-Only Artifact Invariant', () => {
   let extractMeetingActionStatesSpy: ReturnType<typeof vi.fn>;
   let storageSpy: ReturnType<typeof vi.fn>;
 
@@ -103,7 +103,7 @@ describe('SingleMeetingOrchestrator Tier-1 Invariant', () => {
   });
 });
 
-describe('Tier-1 Materialization Contract', () => {
+describe('Artifact Materialization Contract', () => {
   it('action items are extracted at ingestion time, not query time', () => {
     expect(true).toBe(true);
   });

@@ -165,10 +165,10 @@ async function extractCustomerQuestionsForTranscript(
 }
 
 /**
- * Meeting Action Items Extraction (Tier-1, Materialized at Ingestion)
+ * Meeting Action Items Extraction (Read-only Artifact, Materialized at Ingestion)
  * 
  * This function extracts action items/commitments during transcript ingestion.
- * Like customer questions, these are Tier-1 artifacts:
+ * Like customer questions, these are read-only meeting artifacts:
  * - Extracted once at ingestion time (NOT on query path)
  * - Uses extractMeetingActionStates from RAG composer
  * - Fails independently without affecting other extractors
@@ -428,7 +428,7 @@ async function processTranscriptInBackground(
         console.error(`[CustomerQuestions] Extraction failed for transcript ${transcriptId}:`, err);
       }
       
-      // Meeting Action Items Extraction (Tier-1, Materialized)
+      // Meeting Action Items Extraction (Read-only Artifact, Materialized)
       // Runs AFTER chunking, fails independently, retryable
       try {
         await extractActionItemsForTranscript(transcriptId, product);

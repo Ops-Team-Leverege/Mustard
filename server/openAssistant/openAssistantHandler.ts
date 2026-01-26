@@ -99,7 +99,7 @@ export async function handleOpenAssistant(
 
 /**
  * Handle meeting_data intent by delegating to SingleMeetingOrchestrator.
- * Preserves all existing guardrails and Tier-1 constraints.
+ * Preserves all existing guardrails and artifact read-only constraints.
  */
 async function handleMeetingDataIntent(
   userMessage: string,

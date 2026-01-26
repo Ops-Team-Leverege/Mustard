@@ -348,7 +348,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // 8.5 CLARIFICATION RESPONSE HANDLING (fast path)
     //
     // If the prior interaction was a clarification request, check if this is the response.
-    // Route directly to Tier-1 without LLM calls.
+    // Route directly to meeting artifacts without LLM calls.
     //
     if (awaitingClarification === "next_steps_or_summary" && threadContext?.companyId) {
       const lowerText = text.toLowerCase().trim();
@@ -532,7 +532,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // 
     // SINGLE-MEETING MODE:
     // When meeting is resolved (from thread or temporal language),
-    // use SingleMeetingOrchestrator for strict Tier-1-only routing.
+    // use SingleMeetingOrchestrator for read-only artifact routing.
     // 
     // MULTI-CONTEXT MODE:
     // Otherwise, use MCP router for cross-meeting and analytics capabilities.
@@ -558,7 +558,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let isBinaryQuestion: boolean | undefined;
 
       if (isSingleMeetingMode && resolvedMeeting) {
-        // SINGLE-MEETING MODE: Use orchestrator with Tier-1-only access
+        // SINGLE-MEETING MODE: Use orchestrator with read-only artifact access
         console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
         
         // Check for pending summary offer from last interaction in this thread

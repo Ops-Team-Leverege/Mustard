@@ -2,7 +2,7 @@
  * Interaction Logging Helper
  * 
  * Bridges the old metadata format with the new interaction_logs schema.
- * Handles the transition from tier-based to intent-based logging.
+ * Handles intent-based logging for the control plane.
  */
 
 import { storage } from "../storage";

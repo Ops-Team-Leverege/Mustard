@@ -23,7 +23,35 @@ The backend utilizes Express.js and TypeScript, exposing a RESTful JSON API. Dat
 ### Key Features
 The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`.
 
-The Slack Single-Meeting Orchestrator handles user questions scoped to a single meeting, resolving the target meeting deterministically and applying a Capability Trust Matrix for responses (Tier 1 artifacts are read-only). The Open Assistant expands Slack bot capabilities to broader, ChatGPT-like usage, classifying evidence sources (meeting_data, external_research, general_assistance, hybrid) with GPT-5 to ensure claims are backed by appropriate sources and citations.
+### Control Plane Architecture (Intent-Based Routing)
+The system uses an Intent → Context Layers → Answer Contract flow instead of tier-based logic:
+
+**Intent Classification** (keyword fast-paths + LLM fallback via gpt-4o-mini):
+- SINGLE_MEETING: Questions about a specific meeting
+- MULTI_MEETING: Cross-meeting analysis
+- PRODUCT_KNOWLEDGE: PitCrew product features, pricing, capabilities
+- DOCUMENT_SEARCH: Looking for specific documents
+- GENERAL_HELP: General assistance, email drafting, etc.
+
+**Context Layers** (intent-gated):
+- product_identity: Always on (PitCrew company/product context)
+- product_ssot: Product knowledge from Airtable (Pro/Advanced/Enterprise tiers)
+- single_meeting: Current meeting artifacts (action items, customer questions, attendees)
+- multi_meeting: Cross-meeting search capabilities
+- document_context: Document search and retrieval
+
+**Answer Contracts** (selected after layers determined):
+- MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, etc.
+- Contracts define response shape and constraints
+
+### Slack Single-Meeting Orchestrator
+Handles user questions scoped to a single meeting with read-only artifact access. Internal sub-intent classification:
+- extractive: Specific fact questions ("who attended?", "did they mention X?")
+- aggregative: General directed questions ("what issues came up?")
+- summary: Explicit summary requests only ("summarize the meeting")
+
+### Open Assistant
+Expands Slack bot capabilities to broader ChatGPT-like usage, classifying evidence sources (meeting_data, external_research, general_assistance, hybrid) with GPT-5 to ensure claims are backed by appropriate sources and citations.
 
 Meeting detection uses a regex-first strategy with LLM fallback (gpt-4o-mini) for temporal references. Transcript search relevance prioritizes chunks matching both proper nouns and keywords. Customer question extraction uses gpt-4o with temperature=0 for verbatim extraction and deterministic speaker resolution.
 

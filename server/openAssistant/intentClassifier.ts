@@ -7,7 +7,7 @@
  * - we only constrain which sources may back the response and what claims are allowed.
  * 
  * Evidence Sources:
- * - meeting_data: Claims must be backed by meeting artifacts (Tier-1 or transcript)
+ * - meeting_data: Claims must be backed by meeting artifacts (read-only or transcript)
  * - external_research: Claims must be backed by fetched sources with citations
  * - general_assistance: General knowledge (with appropriate disclaimers)
  * - hybrid: Combines sources (each claim traced to its source)

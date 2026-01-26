@@ -3,8 +3,8 @@
  * 
  * Purpose:
  * Generates answers for complex questions that require semantic understanding
- * of transcript content. Used when Tier-1 data (action items, customer questions)
- * doesn't directly answer the question.
+ * of transcript content. Used when meeting artifacts (action items, customer questions)
+ * don't directly answer the question.
  * 
  * Key Features:
  * - Answer shape detection (yes/no, single value, list, summary)

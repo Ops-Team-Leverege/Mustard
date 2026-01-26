@@ -3,23 +3,23 @@
  * 
  * Purpose:
  * Handles Slack user questions scoped to a single meeting with strict behavioral guarantees.
- * Enforces intent-safe routing and Tier-1-only data access.
+ * Enforces intent-safe routing with read-only artifact access.
  * 
  * Core Invariants:
  * - One thread = one meeting
  * - Summaries are opt-in only (never a fallback)
  * - No inference or hallucination
  * - Uncertainty must be communicated honestly
- * - Only Tier-1 capabilities allowed
+ * - Only read-only meeting artifacts allowed
  * 
- * Capability Trust Matrix:
- * - Tier 1 (Allowed): attendees, customer_questions, next_steps/commitments, raw transcript
- * - Tier 2 (Summary Only): meeting_summaries, GPT-5 (explicit opt-in)
- * - Tier 3 (Blocked): qa_pairs, searchQuestions, searchCompanyFeedback, etc.
+ * Data Access Layers:
+ * - Meeting Artifacts (Allowed): attendees, customer_questions, next_steps/commitments, raw transcript
+ * - Semantic Layer (Summary Only): meeting_summaries, GPT-5 (explicit opt-in)
+ * - Extended Search (Blocked): qa_pairs, searchQuestions, searchCompanyFeedback, etc.
  * 
  * Intent Classification:
- * 1. Extractive (Specific Fact) → Query Tier-1, return with evidence
- * 2. Aggregative (General but Directed) → Return curated list from Tier-1
+ * 1. Extractive (Specific Fact) → Query artifacts, return with evidence
+ * 2. Aggregative (General but Directed) → Return curated list from artifacts
  * 3. Summary (Explicit Only) → Generate summary only when explicitly requested
  */
 
@@ -33,7 +33,7 @@ const openai = new OpenAI({
 });
 
 // Orchestrator action item type (maps from DB schema)
-// Tier-1: Read-only from materialized ingestion data
+// Read-only from materialized ingestion data (meeting artifacts)
 type OrchestratorActionItem = {
   action: string;
   owner: string;
@@ -118,8 +118,8 @@ export function detectAmbiguity(question: string): { isAmbiguous: boolean; clari
   
   // Preparation/briefing questions are inherently ambiguous
   // "What should I cover?" could mean:
-  //   1. "What were the action items?" (Tier-1 extractive)
-  //   2. "Give me a summary to prepare" (Tier-2 summary)
+  //   1. "What were the action items?" (artifact extractive)
+  //   2. "Give me a summary to prepare" (semantic summary)
   const preparationPatterns = [
     /\b(?:preparing|prepare|getting ready|prepping)\s+(?:for|to)\b/,
     /\bwhat should I\s+(?:[\w\s]+\s+)?(?:cover|know|remember|bring up|focus on)\b/,
@@ -492,7 +492,7 @@ async function getMeetingAttendees(
  * Get action items/commitments for a meeting.
  * 
  * ═══════════════════════════════════════════════════════════════════════════════
- * INVARIANT: meeting_action_items are Tier-1 artifacts materialized at ingestion.
+ * INVARIANT: meeting_action_items are read-only artifacts materialized at ingestion.
  * Slack paths must NEVER trigger action item extraction (extractMeetingActionStates).
  * This function is READ-ONLY - it queries the database, no LLM calls.
  * ═══════════════════════════════════════════════════════════════════════════════
@@ -800,7 +800,7 @@ async function handleExtractiveIntent(
   
   // Action items preferred for term lookups (contain cleaner nouns)
   if (bestAI && (!bestCQ || bestAI.score >= bestCQ.score)) {
-    // Tier-1 compliant framing: "In this meeting, X references..." + quote
+    // Read-only artifact framing: "In this meeting, X references..." + quote
     const item = bestAI.item;
     const dateSuffix = getMeetingDateSuffix(ctx);
     const lines: string[] = [];
@@ -886,7 +886,7 @@ async function handleExtractiveIntent(
 
 /**
  * Handle aggregative intent (general but directed questions).
- * Returns curated lists from Tier-1 data, no narrative summary.
+ * Returns curated lists from meeting artifacts, no narrative summary.
  * 
  * PERFORMANCE: Detects question type first, fetches only what's needed.
  */
@@ -1103,16 +1103,16 @@ Would you like a brief summary of what was discussed?`;
   if (subject) {
     console.log(`[SingleMeetingOrchestrator] Binary question subject: "${subject}"`);
     
-    // Search for the subject in Tier-1 data AND transcript (parallel fetch)
+    // Search for the subject in meeting artifacts AND transcript (parallel fetch)
     const [customerQuestions, actionItems, transcriptSnippets] = await Promise.all([
       lookupCustomerQuestions(ctx.meetingId, subject),
       searchActionItemsForRelevantIssues(ctx.meetingId, subject),
       searchTranscriptSnippets(ctx.meetingId, subject, 2),
     ]);
     
-    const foundInTier1 = customerQuestions.length > 0 || actionItems.length > 0;
+    const foundInArtifacts = customerQuestions.length > 0 || actionItems.length > 0;
     const foundInTranscript = transcriptSnippets.length > 0;
-    const found = foundInTier1 || foundInTranscript;
+    const found = foundInArtifacts || foundInTranscript;
     const dateSuffix = getMeetingDateSuffix(ctx);
     
     if (found) {
@@ -1142,7 +1142,7 @@ Would you like a brief summary of what was discussed?`;
         isBinaryQuestion: true,
       };
     } else {
-      // Not found in Tier-1 OR transcript - answer NO honestly
+      // Not found in artifacts OR transcript - answer NO honestly
       return {
         answer: `I don't see "${subject}" explicitly mentioned in this meeting${dateSuffix}.
 
@@ -1203,8 +1203,8 @@ function isSemanticQuestion(question: string): boolean {
  * Processing Flow:
  * 1. Check for offer responses (if pending)
  * 2. Classify intent (extractive/aggregative/summary)
- * 3. Try Tier-1 deterministic lookup
- * 4. If Tier-1 fails AND question is semantic → use LLM semantic answer (Step 6)
+ * 3. Try artifact deterministic lookup
+ * 4. If artifacts fail AND question is semantic → use LLM semantic answer (Step 6)
  * 5. If still no answer → return uncertainty with offer
  * 
  * @param ctx - Single meeting context (meetingId, companyName, meetingDate)
@@ -1268,7 +1268,7 @@ export async function handleSingleMeetingQuestion(
     case "extractive": {
       const result = await handleExtractiveIntent(ctx, question);
       
-      // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
+      // STEP 6: If artifacts fail AND question is semantic → use LLM semantic answer
       console.log(`[SingleMeetingOrchestrator] STEP6-CHECK: dataSource=${result.dataSource}, isSemantic=${isSemantic}, shouldTrigger=${result.dataSource === "not_found" && isSemantic}`);
       let semanticError: string | undefined;
       if (result.dataSource === "not_found" && isSemantic) {
@@ -1312,9 +1312,9 @@ export async function handleSingleMeetingQuestion(
       const result = await handleAggregativeIntent(ctx, question);
       let aggSemanticError: string | undefined;
       
-      // STEP 6: If Tier-1 fails AND question is semantic → use LLM semantic answer
+      // STEP 6: If artifacts fail AND question is semantic → use LLM semantic answer
       if (result.dataSource === "not_found" && isSemantic) {
-        console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (aggregative, Tier-1 failed)`);
+        console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (aggregative, artifacts failed)`);
         try {
           const semanticResult = await semanticAnswerSingleMeeting(
             ctx.meetingId,

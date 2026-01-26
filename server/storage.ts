@@ -171,7 +171,7 @@ export interface IStorage {
     }
   ): Promise<CustomerQuestion | null>;
 
-  // Meeting Action Items (Tier-1, materialized at ingestion)
+  // Meeting Action Items (read-only artifact, materialized at ingestion)
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
   createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]>;
   deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean>;

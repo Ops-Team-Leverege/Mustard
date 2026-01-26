@@ -1,5 +1,5 @@
 /**
- * Customer Questions Resolution Pass (Verifier-Only, Tier-1)
+ * Customer Questions Resolution Pass (Verifier-Only, Meeting Artifact)
  * 
  * This module resolves whether customer questions were explicitly answered
  * during the meeting. It runs AFTER question extraction, as a separate pass.
