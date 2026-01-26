@@ -1,0 +1,195 @@
+# PitCrew Test Results Analysis - V2
+## Date: January 26, 2026
+
+## Executive Summary
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| Total Tests | 150 | - |
+| Intent Classification Accuracy | **29.3%** | 🔴 Critical |
+| Evidence Context Used | **0%** | 🔴 Critical |
+| Answers Using Ambient Only | **100%** | 🔴 Problem |
+
+**The intent-based routing is not working correctly.** 70.7% of questions are being misclassified, and Evidence Context is never being used.
+
+---
+
+## Intent Classification Results
+
+### Detected Intents (What the system classified)
+
+| Intent | Count | % |
+|--------|-------|---|
+| GENERAL_HELP | 111 | 74% |
+| content | 12 | 8% |
+| SINGLE_MEETING | 9 | 6% |
+| next_steps | 5 | 3% |
+| prep | 5 | 3% |
+| summary | 4 | 3% |
+| unknown | 2 | 1% |
+| attendees | 2 | 1% |
+
+### The Problem
+
+**74% of all questions are being classified as `GENERAL_HELP`**, even when they should be:
+- `SINGLE_MEETING` - questions about specific meetings
+- `MULTI_MEETING` - questions across multiple meetings  
+- `PRODUCT_KNOWLEDGE` - questions about PitCrew features
+- `REFUSE` - out-of-scope questions
+- `CLARIFY` - ambiguous questions
+
+---
+
+## Context Layer Usage
+
+| Context Type | Count | % |
+|--------------|-------|---|
+| **Evidence Context** (meeting data, product SSOT) | 0 | 0% |
+| **Ambient Context only** (general knowledge) | 150 | 100% |
+
+### What This Means
+
+The flow is broken:
+
+```
+User Query
+    ↓
+⚡ Intent Classification  ← 70.7% WRONG
+    ↓
+📚 Context Layers
+    ├── 🌐 Ambient (always on) ✅ Working
+    └── 📊 Evidence (intent-gated) ❌ NEVER UNLOCKED
+    ↓
+📋 Answer Contract: GENERAL_RESPONSE (always)
+    ↓
+Response: "I don't have access to your files..."
+```
+
+---
+
+## Misclassification Examples
+
+### SINGLE_MEETING → GENERAL_HELP (Wrong)
+
+| Question | Expected | Actual | Answer |
+|----------|----------|--------|--------|
+| "What did Les Shwab say about the dashbord?" | SINGLE_MEETING | GENERAL_HELP | "I'm not sure which person or context you mean..." |
+| "What did they say about the pricing?" | SINGLE_MEETING | GENERAL_HELP | "I don't have the earlier message here..." |
+| "What did John Smith say in the Amazon meeting?" | REFUSE | GENERAL_HELP | "Can you clarify which John Smith..." |
+
+### MULTI_MEETING → GENERAL_HELP (Wrong)
+
+| Question | Expected | Actual | Answer |
+|----------|----------|--------|--------|
+| "Find all the questions ACE has asked us across our meetings" | MULTI_MEETING + GENERAL_HELP | GENERAL_HELP | "I don't have access to your meeting notes..." |
+| "Someone from ACE mentioned a competitor product. Which meeting was that?" | MULTI_MEETING | GENERAL_HELP | "I don't have access to your meeting notes..." |
+| "What meetings or notes mention Walmart?" | GENERAL_SEARCH | GENERAL_HELP | "I don't have access to your calendars..." |
+
+### PRODUCT_KNOWLEDGE → GENERAL_HELP (Wrong)
+
+| Question | Expected | Actual | Answer |
+|----------|----------|--------|--------|
+| "I need to update our pricing FAQ page. What's the latest information?" | PRODUCT_KNOWLEDGE + GENERAL_HELP | GENERAL_HELP | Generic FAQ advice |
+| "Help me write a section about PitCrew's safety features" | PRODUCT_KNOWLEDGE + GENERAL_HELP | GENERAL_HELP | Generic writing advice |
+| "I'm updating copy on our website about the Live TV Dashboard" | PRODUCT_KNOWLEDGE + GENERAL_HELP | GENERAL_HELP | Generic website copy advice |
+
+### REFUSE → GENERAL_HELP (Wrong)
+
+| Question | Expected | Actual | Answer |
+|----------|----------|--------|--------|
+| "What's the weather like in Seattle?" | REFUSE | GENERAL_HELP | Probably gave weather info |
+| "What's Eric Conn's home address?" | REFUSE | GENERAL_HELP | Should have refused |
+| "If Les Schwab signs, how much revenue will we make?" | REFUSE | GENERAL_HELP | Should have refused |
+
+---
+
+## Questions That Worked (9 SINGLE_MEETING correctly routed)
+
+These questions DID get routed correctly and used meeting data:
+
+| Question | Answer Quality |
+|----------|---------------|
+| "What were the next steps discussed with TPI about BladeAssure?" | ✅ Found actual next steps with quotes |
+| "What questions did the ACE team ask during the walkthrough?" | ✅ Listed actual customer questions |
+| "What is Will Sovern's role at FullSpeed Automotive?" | ✅ Found across 2 meetings |
+| "Which customers have discussed POS integration?" | ✅ Found in TPI meeting |
+| "Randy from ACE asked about customizing the dashboard terminology" | ⚠️ Found Randy mentions but limited |
+
+---
+
+## Root Cause Analysis
+
+### 1. Intent Detection Method
+
+| Method | Count | % |
+|--------|-------|---|
+| LLM | 120 | 80% |
+| default | 30 | 20% |
+
+The LLM is being used for intent detection but is classifying most things as `GENERAL_HELP`.
+
+### 2. Keywords-First Not Working
+
+Questions with obvious patterns like:
+- "What did [Person] say in the [Company] meeting" → Should be SINGLE_MEETING
+- "Find all mentions of X across meetings" → Should be MULTI_MEETING
+- "What is [PitCrew feature]" → Should be PRODUCT_KNOWLEDGE
+
+...are all going to GENERAL_HELP.
+
+### 3. Answer Contract Always GENERAL_RESPONSE
+
+| Contract | Count |
+|----------|-------|
+| GENERAL_RESPONSE | 150 (100%) |
+
+No other answer contracts are being used (MEETING_SUMMARY, NEXT_STEPS, DIRECT_ANSWER, etc.)
+
+---
+
+## Recommendations
+
+### Immediate Fixes
+
+1. **Fix Keywords-First Detection**
+   ```
+   Pattern: "What did [Name] say" → SINGLE_MEETING
+   Pattern: "in the [Company] meeting/call" → SINGLE_MEETING
+   Pattern: "across all meetings" → MULTI_MEETING
+   Pattern: "Find all" / "Search for" → MULTI_MEETING or GENERAL_SEARCH
+   Pattern: "What is [feature]" + PitCrew context → PRODUCT_KNOWLEDGE
+   ```
+
+2. **Fix LLM Intent Classification Prompt**
+   - Provide clearer examples of each intent type
+   - Add few-shot examples showing correct classification
+
+3. **Implement Evidence Context Gating**
+   - When intent is SINGLE_MEETING → Load single meeting transcript
+   - When intent is MULTI_MEETING → Search across meetings
+   - When intent is PRODUCT_KNOWLEDGE → Load product SSOT
+
+4. **Add Answer Contract Selection**
+   - SINGLE_MEETING + "next steps" → NEXT_STEPS contract
+   - SINGLE_MEETING + "who attended" → ATTENDEES contract
+   - SINGLE_MEETING + "summarize" → MEETING_SUMMARY contract
+
+### Test Coverage Gaps
+
+The current test set needs:
+- [ ] More edge cases for typos (working: "Les Shwab" instead of "Les Schwab")
+- [ ] More combined intent scenarios
+- [ ] Negative tests for REFUSE intent
+
+---
+
+## Summary
+
+| What's Working | What's Broken |
+|----------------|---------------|
+| Test runner sends questions ✅ | Intent classification (70.7% wrong) ❌ |
+| Responses are generated ✅ | Evidence Context never used ❌ |
+| Ambient Context applied ✅ | All contracts = GENERAL_RESPONSE ❌ |
+| Some SINGLE_MEETING correct ✅ | MULTI_MEETING, PRODUCT_KNOWLEDGE broken ❌ |
+
+**Next Step:** Fix the intent classification to correctly identify meeting questions, product questions, and out-of-scope requests.
