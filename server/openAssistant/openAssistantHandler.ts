@@ -100,6 +100,11 @@ export async function handleOpenAssistant(
 /**
  * Handle meeting_data intent by delegating to SingleMeetingOrchestrator.
  * Preserves all existing guardrails and artifact read-only constraints.
+ * 
+ * When no meeting is resolved, attempts to find relevant meetings by:
+ * 1. Extracting company/person names from the query
+ * 2. Searching for meetings with matching companies/contacts
+ * 3. Delegating to single meeting if one match, or searching across if multiple
  */
 async function handleMeetingDataIntent(
   userMessage: string,
@@ -108,29 +113,72 @@ async function handleMeetingDataIntent(
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to meeting data path`);
   
-  if (!context.resolvedMeeting) {
+  // If meeting is already resolved, delegate directly
+  if (context.resolvedMeeting) {
+    const singleMeetingResult = await handleSingleMeetingQuestion(
+      context.resolvedMeeting,
+      userMessage,
+      false
+    );
+
     return {
-      answer: "I'd like to help you find meeting information, but I need to know which company or meeting you're referring to. Could you specify the company name or meeting?",
+      answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
-      dataSource: "clarification",
+      dataSource: "meeting_artifacts",
+      singleMeetingResult,
+      delegatedToSingleMeeting: true,
+    };
+  }
+
+  // No meeting resolved - try to find relevant meetings
+  console.log(`[OpenAssistant] No meeting resolved, searching for relevant meetings`);
+  
+  const meetingSearch = await findRelevantMeetings(userMessage, classification);
+  
+  if (meetingSearch.meetings.length === 0) {
+    // No meetings found - provide helpful response
+    return {
+      answer: `I searched for meetings related to your question but couldn't find any matching transcripts. ${meetingSearch.searchedFor ? `I looked for: ${meetingSearch.searchedFor}` : ''}\n\nCould you provide more details about which customer or meeting you're asking about?`,
+      intent: "meeting_data",
+      intentClassification: classification,
+      dataSource: "meeting_artifacts",
       delegatedToSingleMeeting: false,
     };
   }
 
-  const singleMeetingResult = await handleSingleMeetingQuestion(
-    context.resolvedMeeting,
-    userMessage,
-    false
-  );
+  if (meetingSearch.meetings.length === 1) {
+    // Single meeting found - delegate to SingleMeetingOrchestrator
+    const meeting = meetingSearch.meetings[0];
+    console.log(`[OpenAssistant] Found single meeting: ${meeting.companyName} (${meeting.meetingId})`);
+    
+    const singleMeetingResult = await handleSingleMeetingQuestion(
+      meeting,
+      userMessage,
+      false
+    );
 
+    return {
+      answer: singleMeetingResult.answer,
+      intent: "meeting_data",
+      intentClassification: classification,
+      dataSource: "meeting_artifacts",
+      singleMeetingResult,
+      delegatedToSingleMeeting: true,
+    };
+  }
+
+  // Multiple meetings found - search across them
+  console.log(`[OpenAssistant] Found ${meetingSearch.meetings.length} meetings, searching across`);
+  const crossMeetingResult = await searchAcrossMeetings(userMessage, meetingSearch.meetings);
+  
   return {
-    answer: singleMeetingResult.answer,
+    answer: crossMeetingResult,
     intent: "meeting_data",
     intentClassification: classification,
     dataSource: "meeting_artifacts",
-    singleMeetingResult,
-    delegatedToSingleMeeting: true,
+    artifactMatches: undefined,
+    delegatedToSingleMeeting: false,
   };
 }
 
@@ -303,6 +351,310 @@ Combine these sources into a coherent, helpful answer. Be clear about which info
     return synthesizedAnswer + `\n\n_${researchResult.disclaimer}_`;
   }
   return synthesizedAnswer;
+}
+
+/**
+ * Find relevant meetings based on company/person names in the query.
+ * Uses fuzzy matching on company names and contact names.
+ */
+type MeetingSearchResult = {
+  meetings: SingleMeetingContext[];
+  searchedFor: string;
+};
+
+async function findRelevantMeetings(
+  userMessage: string,
+  classification: IntentClassification
+): Promise<MeetingSearchResult> {
+  const { storage } = await import("../storage");
+  
+  // Extract search terms from the message
+  const searchTerms = extractSearchTerms(userMessage);
+  console.log(`[OpenAssistant] Searching for meetings with terms: ${searchTerms.join(", ")}`);
+  
+  // If no terms extracted, try a broad fallback search using key words from the message
+  if (searchTerms.length === 0) {
+    console.log(`[OpenAssistant] No search terms extracted, trying fallback word search`);
+    const fallbackMeetings = await fallbackMeetingSearch(userMessage);
+    return { 
+      meetings: fallbackMeetings, 
+      searchedFor: "(fallback search)" 
+    };
+  }
+
+  // Search for companies matching any of the terms
+  const companyMatches = await searchCompanies(searchTerms);
+  
+  if (companyMatches.length === 0) {
+    // Try searching contacts/attendees
+    const contactMatches = await searchContacts(searchTerms);
+    if (contactMatches.length > 0) {
+      return {
+        meetings: contactMatches,
+        searchedFor: searchTerms.join(", "),
+      };
+    }
+    
+    // Still no matches - try fallback search
+    console.log(`[OpenAssistant] No company/contact matches, trying fallback search`);
+    const fallbackMeetings = await fallbackMeetingSearch(userMessage);
+    return { 
+      meetings: fallbackMeetings, 
+      searchedFor: searchTerms.join(", ") + " (+ fallback)" 
+    };
+  }
+
+  // Get the most recent meeting for each matching company
+  const meetings: SingleMeetingContext[] = [];
+  for (const company of companyMatches) {
+    const transcriptRows = await storage.rawQuery(`
+      SELECT t.id, t.meeting_date, c.name as company_name, c.id as company_id
+      FROM transcripts t
+      JOIN companies c ON t.company_id = c.id
+      WHERE t.company_id = $1
+      ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+      LIMIT 1
+    `, [company.id]);
+
+    if (transcriptRows && transcriptRows.length > 0) {
+      const row = transcriptRows[0];
+      meetings.push({
+        meetingId: row.id as string,
+        companyId: row.company_id as string,
+        companyName: row.company_name as string,
+        meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+      });
+    }
+  }
+
+  return {
+    meetings,
+    searchedFor: searchTerms.join(", "),
+  };
+}
+
+/**
+ * Fallback search: extract significant words and search companies directly.
+ * Used when extractSearchTerms fails to find proper nouns/acronyms.
+ */
+async function fallbackMeetingSearch(message: string): Promise<SingleMeetingContext[]> {
+  const { storage } = await import("../storage");
+  
+  // Extract significant words (3+ chars, not common stop words)
+  const stopWords = new Set([
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", 
+    "her", "was", "one", "our", "out", "day", "get", "has", "him", "his",
+    "how", "its", "let", "may", "new", "now", "old", "see", "way", "who",
+    "did", "does", "what", "when", "where", "which", "while", "with", "about",
+    "said", "they", "this", "that", "from", "have", "been", "some", "could",
+    "would", "should", "their", "there", "these", "those", "being", "other",
+  ]);
+  
+  const words = message
+    .replace(/[^\w\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length >= 3 && !stopWords.has(w.toLowerCase()));
+  
+  console.log(`[OpenAssistant] Fallback search words: ${words.join(", ")}`);
+  
+  // Try each word as a company search
+  const meetings: SingleMeetingContext[] = [];
+  const seenCompanyIds = new Set<string>();
+  
+  for (const word of words.slice(0, 5)) { // Limit to first 5 words
+    const rows = await storage.rawQuery(`
+      SELECT DISTINCT t.id as meeting_id, t.meeting_date, c.id as company_id, c.name as company_name
+      FROM transcripts t
+      JOIN companies c ON t.company_id = c.id
+      WHERE c.name ILIKE $1
+      ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+      LIMIT 2
+    `, [`%${word}%`]);
+    
+    if (rows) {
+      for (const row of rows) {
+        if (!seenCompanyIds.has(row.company_id as string)) {
+          seenCompanyIds.add(row.company_id as string);
+          meetings.push({
+            meetingId: row.meeting_id as string,
+            companyId: row.company_id as string,
+            companyName: row.company_name as string,
+            meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+          });
+        }
+      }
+    }
+  }
+  
+  return meetings;
+}
+
+/**
+ * Extract company/person names from user message.
+ * Handles:
+ * - Proper nouns (Tyler Wiggins, Les Schwab)
+ * - All-caps acronyms (ACE, IT, ROI)
+ * - Mixed case (iPhone, PitCrew)
+ * - Quoted strings
+ */
+function extractSearchTerms(message: string): string[] {
+  const terms: string[] = [];
+  
+  // Common words to filter out (lowercase for comparison)
+  const commonWords = new Set([
+    "what", "who", "where", "when", "why", "how", "the", "this", "that", 
+    "can", "could", "would", "should", "did", "does", "do", "is", "are", 
+    "was", "were", "has", "have", "had", "will", "shall", "may", "might", 
+    "must", "find", "show", "tell", "give", "help", "get", "let", "make", 
+    "want", "need", "like", "think", "know", "say", "said", "about", "from",
+    "with", "for", "and", "or", "but", "not", "all", "any", "some", "their",
+    "they", "them", "our", "we", "you", "your", "its", "his", "her", "him",
+    "she", "he", "it", "be", "been", "being", "am", "an", "a", "to", "of",
+    "in", "on", "at", "by", "up", "out", "if", "so", "no", "yes", "my",
+    "roi", "tv", "api", "it", // common acronyms that aren't company names
+  ]);
+  
+  // 1. Match proper nouns (capitalized words like Tyler Wiggins, Les Schwab)
+  const properNounPattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g;
+  let match;
+  while ((match = properNounPattern.exec(message)) !== null) {
+    const term = match[1];
+    if (!commonWords.has(term.toLowerCase())) {
+      terms.push(term);
+    }
+  }
+
+  // 2. Match all-caps acronyms (ACE, HVAC, POS) - 2-10 uppercase letters
+  const acronymPattern = /\b([A-Z]{2,10})\b/g;
+  while ((match = acronymPattern.exec(message)) !== null) {
+    const term = match[1];
+    if (!commonWords.has(term.toLowerCase())) {
+      terms.push(term);
+    }
+  }
+
+  // 3. Match multi-word company names with mixed case (e.g., Jiffy Lube, Les Schwab)
+  const multiWordPattern = /\b([A-Z][a-z]+(?:\s+[A-Z]?[a-z]+)+)\b/g;
+  while ((match = multiWordPattern.exec(message)) !== null) {
+    const term = match[1];
+    if (!commonWords.has(term.toLowerCase()) && term.split(" ").length <= 4) {
+      terms.push(term);
+    }
+  }
+
+  // 4. Quoted strings
+  const quotedPattern = /"([^"]+)"/g;
+  while ((match = quotedPattern.exec(message)) !== null) {
+    terms.push(match[1]);
+  }
+
+  return Array.from(new Set(terms)); // Dedupe
+}
+
+/**
+ * Search companies by fuzzy name matching.
+ */
+async function searchCompanies(searchTerms: string[]): Promise<Array<{ id: string; name: string }>> {
+  const { storage } = await import("../storage");
+  const results: Array<{ id: string; name: string }> = [];
+
+  for (const term of searchTerms) {
+    // Use ILIKE for case-insensitive partial matching
+    const rows = await storage.rawQuery(`
+      SELECT id, name FROM companies 
+      WHERE name ILIKE $1 OR name ILIKE $2
+      LIMIT 5
+    `, [`%${term}%`, `${term}%`]);
+
+    if (rows) {
+      for (const row of rows) {
+        if (!results.find(r => r.id === row.id)) {
+          results.push({ id: row.id as string, name: row.name as string });
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Search contacts/attendees and return their meetings.
+ */
+async function searchContacts(searchTerms: string[]): Promise<SingleMeetingContext[]> {
+  const { storage } = await import("../storage");
+  const meetings: SingleMeetingContext[] = [];
+
+  for (const term of searchTerms) {
+    // Search in transcript attendees (contacts)
+    const rows = await storage.rawQuery(`
+      SELECT DISTINCT t.id as meeting_id, t.meeting_date, c.id as company_id, c.name as company_name
+      FROM transcripts t
+      JOIN companies c ON t.company_id = c.id
+      LEFT JOIN contacts ct ON ct.company_id = c.id
+      WHERE ct.name ILIKE $1
+      ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+      LIMIT 3
+    `, [`%${term}%`]);
+
+    if (rows) {
+      for (const row of rows) {
+        if (!meetings.find(m => m.meetingId === row.meeting_id)) {
+          meetings.push({
+            meetingId: row.meeting_id as string,
+            companyId: row.company_id as string,
+            companyName: row.company_name as string,
+            meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+          });
+        }
+      }
+    }
+  }
+
+  return meetings;
+}
+
+/**
+ * Search across multiple meetings for relevant information.
+ */
+async function searchAcrossMeetings(
+  userMessage: string,
+  meetings: SingleMeetingContext[]
+): Promise<string> {
+  console.log(`[OpenAssistant] Searching across ${meetings.length} meetings`);
+  
+  // Collect results from each meeting
+  const allResults: Array<{
+    companyName: string;
+    meetingDate: string;
+    answer: string;
+  }> = [];
+
+  for (const meeting of meetings.slice(0, 5)) { // Limit to 5 meetings
+    try {
+      const result = await handleSingleMeetingQuestion(meeting, userMessage, false);
+      if (result.dataSource !== "not_found") {
+        allResults.push({
+          companyName: meeting.companyName,
+          meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
+          answer: result.answer,
+        });
+      }
+    } catch (err) {
+      console.error(`[OpenAssistant] Error searching meeting ${meeting.meetingId}:`, err);
+    }
+  }
+
+  if (allResults.length === 0) {
+    return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information related to your question.`;
+  }
+
+  // Format combined response
+  const formattedResults = allResults.map(r => 
+    `**${r.companyName}** (${r.meetingDate}):\n${r.answer}`
+  ).join("\n\n---\n\n");
+
+  return `Here's what I found across ${allResults.length} meeting(s):\n\n${formattedResults}`;
 }
 
 /**

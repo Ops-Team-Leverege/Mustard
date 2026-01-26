@@ -691,19 +691,37 @@ export async function slackEventsHandler(req: Request, res: Response) {
           );
         } else {
           // Open Assistant path - intent-driven routing
-          const mappedIntent: LegacyIntent = 
-            intentClassification === "external_research" ? "content" :
-            intentClassification === "general_assistance" ? "content" :
-            intentClassification === "hybrid" ? "content" :
-            intentClassification === "meeting_data" ? "content" : "unknown";
+          // Map OpenAssistant intent to control plane Intent enum for logging
+          const openAssistantIntentToControlPlane: Record<string, string> = {
+            "meeting_data": "SINGLE_MEETING",  // or MULTI_MEETING depending on context
+            "external_research": "GENERAL_HELP",
+            "general_assistance": "GENERAL_HELP", 
+            "hybrid": "MULTI_MEETING",
+          };
           
+          const mappedControlPlaneIntent = openAssistantIntentToControlPlane[intentClassification || ""] || "GENERAL_HELP";
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
+          
+          // Determine context layers based on OpenAssistant intent
+          const contextLayers = {
+            product_identity: true, // Always on
+            product_ssot: false,
+            single_meeting: intentClassification === "meeting_data" && Boolean(semanticAnswerUsed),
+            multi_meeting: intentClassification === "meeting_data" && !semanticAnswerUsed,
+            document_context: false,
+          };
           
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
               entryPoint: "slack",
-              legacyIntent: mappedIntent,
+              controlPlane: {
+                intent: mappedControlPlaneIntent as any,
+                intentDetectionMethod: "llm",
+                contextLayers,
+                answerContract: "GENERAL_RESPONSE" as any,
+                contractSelectionMethod: "default",
+              },
               answerShape: "summary",
               dataSource: mappedDataSource,
               llmPurposes: ["intent_classification"],

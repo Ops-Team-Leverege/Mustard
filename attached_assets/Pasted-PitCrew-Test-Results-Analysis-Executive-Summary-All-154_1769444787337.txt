@@ -1,0 +1,28 @@
+PitCrew Test Results Analysis
+Executive Summary
+All 154 tests "PASSED" but the bot is NOT working correctly!
+The tests passed because they only checked:
+
+HTTP 200 response ✓
+Response time within threshold ✓
+
+But they did NOT validate that the bot actually:
+
+Used meeting data when it should have
+Routed to the correct intent
+Returned accurate, grounded answers
+
+The Real Problem: Routing Failures
+Statistics from Interaction Logs
+MetricCountPercentageTotal interactions173100%Routed to GENERAL_HELP intent14785%Routed to meeting intents (SINGLE_MEETING, MULTI_MEETING)2112%Actually used Evidence Context (meeting data)127%Only used Ambient Context (general knowledge)14886%Data not found137%
+
+Note: DOCUMENT_SEARCH intent is not yet implemented (pending Vertex AI integration), so those test failures are expected.
+
+What This Means
+86% of questions were classified as GENERAL_HELP and only received Ambient Context (PitCrew voice) instead of Evidence Context (actual meeting transcripts)!
+The Intent → Context Layers → Answer Contract flow is broken at the Intent Classification step.
+Examples of Routing Failures
+1. SINGLE_MEETING Questions → General Assistance (WRONG)
+QuestionExpectedActualAnswer Quality"What did Tyler Wiggins say about the new TV?"Use meeting transcriptopen_assistant_general_assistance"I don't see this explicitly mentioned""What did Randy Hentschke suggest about dashboard terminology?"Use ACE meeting dataopen_assistant_general_assistance"I'm not sure which ACE event you're referring to""What did Robert Colongo say about TV installation?"Use Jiffy Lube meetingopen_assistant_general_assistance"I'm not sure which quote you're referring to""What camera problems is TPI experiencing?"Use TPI meeting notesopen_assistant_general_assistanceGeneric camera troubleshooting guide
+2. MULTI_MEETING Questions → General Assistance (WRONG)
+QuestionExpectedActualAnswer Quality"What concerns have customers raised about competitors?"Search across meetingsopen_assistant_general_assistance"I don't have access to your meeting notes""What dashboard customizations has ACE requested over time?"Search ACE meetingsopen_assistant_general_assistance"I don't have access to your internal tickets""Compare what Les Schwab and ACE have said about TV dashboards"Search both companiesopen_assistant_general_assistanceGeneric comparison framework
