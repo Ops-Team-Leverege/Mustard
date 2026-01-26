@@ -1,17 +1,23 @@
 /**
- * Structured Interaction Metadata for Single-Meeting Logging
+ * Structured Interaction Metadata for Logging
  * 
- * This metadata is logged in resolved_entities (JSONB) for:
+ * Updated for Intent → Context Layers → Answer Contract architecture.
+ * 
+ * This metadata is logged for:
+ * - End-to-end debugging via interaction_logs
  * - Testing and regression analysis
- * - Debugging execution paths
  * - Auditing LLM usage
  * 
  * NOT for user-visible responses.
  */
 
-export type EntryPoint = "preflight" | "single_meeting" | "mcp_router" | "open_assistant";
+import type { ContextLayers } from "../controlPlane/contextLayers";
+import type { Intent } from "../controlPlane/intent";
+import type { AnswerContract } from "../controlPlane/answerContracts";
 
-export type Intent = 
+export type EntryPoint = "slack" | "api" | "test";
+
+export type LegacyIntent = 
   | "next_steps" 
   | "summary" 
   | "attendees" 
@@ -27,19 +33,20 @@ export type AnswerShape =
   | "summary" 
   | "none";
 
-export type DataSource = "tier1" | "semantic" | "not_found" | "external";
+export type DataSource = "meeting_artifacts" | "semantic" | "product_ssot" | "not_found" | "external";
 
-export type Tier1Entity = 
+export type MeetingArtifactType = 
   | "action_items" 
   | "attendees" 
   | "customer_questions" 
   | null;
 
 export type LlmPurpose = 
+  | "intent_classification"
+  | "contract_selection"
   | "semantic_answer" 
   | "summary" 
   | "routing"
-  | "intent_classification"
   | "external_research"
   | "general_assistance"
   | null;
@@ -63,7 +70,15 @@ export type ClarificationResolution =
 
 export interface InteractionMetadata {
   entry_point: EntryPoint;
-  intent: Intent;
+  
+  intent: Intent | LegacyIntent;
+  intent_detection_method: "keyword" | "llm" | "default";
+  
+  answer_contract: AnswerContract | string;
+  contract_selection_method: "keyword" | "llm" | "default";
+  
+  context_layers: ContextLayers;
+  
   answer_shape: AnswerShape;
   
   ambiguity?: {
@@ -78,17 +93,26 @@ export interface InteractionMetadata {
   };
   
   data_source: DataSource;
-  tier1_entity: Tier1Entity;
+  artifact_type: MeetingArtifactType;
   
-  llm: {
-    used: boolean;
-    purpose: LlmPurpose;
+  llm_usage: {
+    total_calls: number;
+    purposes: LlmPurpose[];
   };
   
   resolution: {
+    company_id?: string;
+    company_name?: string;
+    meeting_id?: string | null;
     company_source: ResolutionSource;
     meeting_source: ResolutionSource;
   };
+  
+  evidence_sources?: Array<{
+    type: string;
+    id?: string;
+    snippet?: string;
+  }>;
   
   meeting_detection?: {
     regex_result: boolean;
@@ -97,37 +121,34 @@ export interface InteractionMetadata {
     llm_latency_ms: number | null;
   };
 
-  // Open Assistant specific metadata
   open_assistant?: {
     intent: string;
     data_source: string;
     delegated_to_single_meeting: boolean;
   };
 
-  // Backward-compatible fields (still included for existing queries)
-  companyId?: string;
-  companyName?: string;
-  meetingId?: string | null;
   isSingleMeetingMode?: boolean;
   isBinaryQuestion?: boolean;
   semanticAnswerUsed?: boolean;
   semanticConfidence?: string;
   
-  // CRITICAL: Legacy fields required for thread context fast-path
-  // These must remain at top level for getLastInteractionByThread to work
   awaitingClarification?: ClarificationType;
   pendingOffer?: string;
   
-  // Test run indicator for filtering test data
   test_run?: boolean;
+}
+
+export interface ControlPlaneMetadata {
+  intent: Intent;
+  intentDetectionMethod: "keyword" | "llm" | "default";
+  contextLayers: ContextLayers;
+  answerContract: AnswerContract;
+  contractSelectionMethod: "keyword" | "llm" | "default";
 }
 
 /**
  * Build structured metadata for interaction logging.
- * 
- * @param base - Core identification fields
- * @param execution - Execution path metadata
- * @returns Complete metadata object for resolved_entities
+ * Updated for new control plane architecture.
  */
 export function buildInteractionMetadata(
   base: {
@@ -137,12 +158,12 @@ export function buildInteractionMetadata(
   },
   execution: {
     entryPoint: EntryPoint;
-    intent: Intent;
+    controlPlane?: ControlPlaneMetadata;
+    legacyIntent?: LegacyIntent;
     answerShape: AnswerShape;
     dataSource: DataSource;
-    tier1Entity?: Tier1Entity;
-    llmUsed: boolean;
-    llmPurpose?: LlmPurpose;
+    artifactType?: MeetingArtifactType;
+    llmPurposes?: LlmPurpose[];
     companySource?: ResolutionSource;
     meetingSource?: ResolutionSource;
     ambiguity?: {
@@ -154,22 +175,23 @@ export function buildInteractionMetadata(
       awaiting: boolean;
       resolvedWith: ClarificationResolution;
     };
+    evidenceSources?: Array<{
+      type: string;
+      id?: string;
+      snippet?: string;
+    }>;
     isBinaryQuestion?: boolean;
     semanticAnswerUsed?: boolean;
     semanticConfidence?: string;
-    // Legacy fields for thread context fast-path
     awaitingClarification?: ClarificationType;
     pendingOffer?: string;
-    // Test run indicator
     testRun?: boolean;
-    // Meeting detection metrics
     meetingDetection?: {
       regexResult: boolean;
       llmCalled: boolean;
       llmResult: boolean | null;
       llmLatencyMs: number | null;
     };
-    // Open Assistant specific metadata
     openAssistant?: {
       intent: string;
       dataSource: string;
@@ -177,10 +199,27 @@ export function buildInteractionMetadata(
     };
   }
 ): InteractionMetadata {
+  const llmPurposes = execution.llmPurposes || [];
+  
+  const defaultContextLayers: ContextLayers = {
+    product_identity: true,
+    product_ssot: false,
+    single_meeting: false,
+    multi_meeting: false,
+    document_context: false,
+  };
+  
   return {
-    // Structured execution metadata
     entry_point: execution.entryPoint,
-    intent: execution.intent,
+    
+    intent: execution.controlPlane?.intent || execution.legacyIntent || "unknown",
+    intent_detection_method: execution.controlPlane?.intentDetectionMethod || "default",
+    
+    answer_contract: execution.controlPlane?.answerContract || "GENERAL_RESPONSE",
+    contract_selection_method: execution.controlPlane?.contractSelectionMethod || "default",
+    
+    context_layers: execution.controlPlane?.contextLayers || defaultContextLayers,
+    
     answer_shape: execution.answerShape,
     
     ambiguity: execution.ambiguity ? {
@@ -195,17 +234,22 @@ export function buildInteractionMetadata(
     } : undefined,
     
     data_source: execution.dataSource,
-    tier1_entity: execution.tier1Entity || null,
+    artifact_type: execution.artifactType || null,
     
-    llm: {
-      used: execution.llmUsed,
-      purpose: execution.llmPurpose || null,
+    llm_usage: {
+      total_calls: llmPurposes.filter(p => p !== null).length,
+      purposes: llmPurposes,
     },
     
     resolution: {
+      company_id: base.companyId,
+      company_name: base.companyName,
+      meeting_id: base.meetingId,
       company_source: execution.companySource || "none",
       meeting_source: execution.meetingSource || "none",
     },
+    
+    evidence_sources: execution.evidenceSources,
     
     meeting_detection: execution.meetingDetection ? {
       regex_result: execution.meetingDetection.regexResult,
@@ -220,20 +264,20 @@ export function buildInteractionMetadata(
       delegated_to_single_meeting: execution.openAssistant.delegatedToSingleMeeting,
     } : undefined,
     
-    // Backward-compatible fields
-    companyId: base.companyId,
-    companyName: base.companyName,
-    meetingId: base.meetingId,
-    isSingleMeetingMode: execution.entryPoint === "single_meeting",
+    isSingleMeetingMode: execution.entryPoint === "slack",
     isBinaryQuestion: execution.isBinaryQuestion,
     semanticAnswerUsed: execution.semanticAnswerUsed,
     semanticConfidence: execution.semanticConfidence,
     
-    // CRITICAL: Legacy fields for thread context fast-path
     awaitingClarification: execution.awaitingClarification,
     pendingOffer: execution.pendingOffer,
     
-    // Test run indicator
     test_run: execution.testRun,
   };
 }
+
+export { 
+  type Intent,
+  type AnswerContract,
+  type ContextLayers,
+};

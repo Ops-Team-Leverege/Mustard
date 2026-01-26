@@ -464,22 +464,37 @@ export type InsertMeetingSummary = Omit<typeof meetingSummaries.$inferInsert, 'i
  */
 export const interactionLogs = pgTable("interaction_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  slackThreadId: varchar("slack_thread_id"), // Thread TS for thread grouping (nullable for non-threaded)
-  slackMessageTs: varchar("slack_message_ts").notNull(), // Unique message timestamp
-  slackChannelId: varchar("slack_channel_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  
+  entryPoint: varchar("entry_point").notNull().default("slack"), // "slack", "api", "test"
+  testRun: boolean("test_run").default(false), // For debugging/testing
+  
+  slackChannelId: varchar("slack_channel_id"),
+  slackThreadId: varchar("slack_thread_id"), // Thread TS for grouping
+  slackMessageTs: varchar("slack_message_ts"), // Unique message timestamp
+  
   userId: varchar("user_id"), // Slack user ID who asked
   companyId: varchar("company_id"), // Resolved company if applicable
   meetingId: varchar("meeting_id"), // Resolved transcript/meeting ID if applicable
-  capabilityName: varchar("capability_name").notNull(), // Which MCP capability handled this
+  
   questionText: text("question_text").notNull(), // User's original question
-  answerText: text("answer_text").notNull(), // System's response
-  resolvedEntities: jsonb("resolved_entities"), // { meetingId, people, topics, etc. }
-  confidence: text("confidence"), // Optional confidence indicator
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  answerText: text("answer_text"), // System's response (nullable if error)
+  
+  intent: varchar("intent"), // SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, GENERAL_HELP
+  intentDetectionMethod: varchar("intent_detection_method"), // keyword, llm, default
+  
+  answerContract: varchar("answer_contract"), // MEETING_SUMMARY, NEXT_STEPS, etc.
+  contractSelectionMethod: varchar("contract_selection_method"), // keyword, llm, default
+  
+  contextLayers: jsonb("context_layers"), // { product_identity: true, single_meeting: true, ... }
+  resolution: jsonb("resolution"), // { meeting_id, company_id, resolved_by, ... }
+  evidenceSources: jsonb("evidence_sources"), // [ { type, id, snippet }, ... ]
+  llmUsage: jsonb("llm_usage"), // { intent_classification: {...}, answer_generation: {...} }
 }, (table) => [
   index("interaction_logs_thread_idx").on(table.slackThreadId),
   index("interaction_logs_company_idx").on(table.companyId),
   index("interaction_logs_created_idx").on(table.createdAt),
+  index("interaction_logs_intent_idx").on(table.intent),
 ]);
 
 export type InteractionLog = typeof interactionLogs.$inferSelect;

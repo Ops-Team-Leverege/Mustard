@@ -23,7 +23,8 @@ import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity, isBinaryQuestion } from "../mcp/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "../mcp/meetingResolver";
-import { buildInteractionMetadata, type EntryPoint, type Intent, type AnswerShape, type DataSource, type Tier1Entity, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
+import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
+import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 
 function cleanMention(text: string): string {
@@ -183,24 +184,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
       
       // Log interaction for clarification - include company so thread context works
-      storage.insertInteractionLog({
+      logInteraction({
+        slackChannelId: channel,
         slackThreadId: threadTs,
         slackMessageTs: messageTs,
-        slackChannelId: channel,
         userId: userId || null,
         companyId: companyContext?.companyId || null,
         meetingId: null,
-        capabilityName: "ambiguity_clarification",
         questionText: text,
         answerText: ambiguityCheck.clarificationPrompt,
-        resolvedEntities: buildInteractionMetadata(
+        metadata: buildInteractionMetadata(
           { companyId: companyContext?.companyId, companyName: companyContext?.companyName },
           {
-            entryPoint: "preflight",
-            intent: "prep",
+            entryPoint: "slack",
+            legacyIntent: "prep",
             answerShape: "none",
             dataSource: "not_found",
-            llmUsed: false,
+            llmPurposes: [],
             companySource: companyContext ? "extracted" : "none",
             meetingSource: "none",
             ambiguity: {
@@ -212,14 +212,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
               awaiting: true,
               resolvedWith: null,
             },
-            // CRITICAL: Legacy field for thread context fast-path
             awaitingClarification: "next_steps_or_summary",
             testRun,
           }
         ),
-        confidence: null,
-      }).catch(err => {
-        console.error("Failed to log interaction:", err);
+        testRun,
       });
       
       return; // Stop processing - clarification required
@@ -275,25 +272,24 @@ export async function slackEventsHandler(req: Request, res: Response) {
           }
           
           // Log interaction with structured metadata
-          storage.insertInteractionLog({
+          logInteraction({
+            slackChannelId: channel,
             slackThreadId: threadTs,
             slackMessageTs: messageTs,
-            slackChannelId: channel,
             userId: userId || null,
             companyId: companyContext.companyId,
             meetingId,
-            capabilityName: "binary_existence_check",
             questionText: text,
             answerText: responseText,
-            resolvedEntities: buildInteractionMetadata(
+            metadata: buildInteractionMetadata(
               { companyId: companyContext.companyId, companyName: companyContext.companyName, meetingId },
               {
-                entryPoint: "preflight",
-                intent: "binary",
+                entryPoint: "slack",
+                legacyIntent: "binary",
                 answerShape: "yes_no",
-                dataSource: "tier1",
-                tier1Entity: null, // Direct DB query, not Tier-1 table
-                llmUsed: false,
+                dataSource: "meeting_artifacts",
+                artifactType: null,
+                llmPurposes: [],
                 companySource: "extracted",
                 meetingSource: meetingId ? "last_meeting" : "none",
                 isBinaryQuestion: true,
@@ -301,14 +297,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
                   awaiting: true,
                   resolvedWith: null,
                 } : undefined,
-                // Legacy field for follow-up handling
                 awaitingClarification: meetingId ? "takeaways_or_next_steps" : undefined,
                 testRun,
               }
             ),
-            confidence: null,
-          }).catch(err => {
-            console.error("Failed to log interaction:", err);
+            testRun,
           });
           
           return; // Done - fast path completed
@@ -331,15 +324,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
     if (isReply && shouldReuseThreadContext(text)) {
       try {
         const priorInteraction = await storage.getLastInteractionByThread(threadTs);
-        if (priorInteraction?.resolvedEntities) {
-          const entities = priorInteraction.resolvedEntities as Record<string, unknown>;
+        if (priorInteraction) {
+          // Use new schema fields directly, with fallback to resolution JSON
+          const resolution = priorInteraction.resolution as Record<string, unknown> | null;
           threadContext = {
-            meetingId: entities.meetingId as string | null,
-            companyId: entities.companyId as string | null,
+            meetingId: priorInteraction.meetingId || (resolution?.meeting_id as string | null) || null,
+            companyId: priorInteraction.companyId || (resolution?.company_id as string | null) || null,
           };
-          // Check if we're awaiting a clarification response
-          awaitingClarification = entities.awaitingClarification as string | null;
-          companyNameFromContext = entities.companyName as string | null;
+          // Check awaiting clarification from resolution metadata
+          const contextLayers = priorInteraction.contextLayers as Record<string, unknown> | null;
+          awaitingClarification = (contextLayers?.awaitingClarification as string) || null;
+          companyNameFromContext = (resolution?.company_name as string) || null;
           console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}`);
         }
       } catch (err) {
@@ -403,26 +398,24 @@ export async function slackEventsHandler(req: Request, res: Response) {
           
           // Log interaction with structured metadata
           const responseType = isNextStepsResponse ? 'next_steps' : 'summary';
-          storage.insertInteractionLog({
+          logInteraction({
+            slackChannelId: channel,
             slackThreadId: threadTs,
             slackMessageTs: messageTs,
-            slackChannelId: channel,
             userId: userId || null,
             companyId: threadContext.companyId,
             meetingId,
-            capabilityName: `clarification_response_${responseType}`,
             questionText: text,
             answerText: result.answer,
-            resolvedEntities: buildInteractionMetadata(
+            metadata: buildInteractionMetadata(
               { companyId: threadContext.companyId, meetingId },
               {
-                entryPoint: "preflight",
-                intent: isNextStepsResponse ? "next_steps" : "summary",
+                entryPoint: "slack",
+                legacyIntent: isNextStepsResponse ? "next_steps" : "summary",
                 answerShape: isNextStepsResponse ? "list" : "summary",
-                dataSource: result.dataSource === "action_items" ? "tier1" : (result.dataSource === "summary" ? "tier1" : "not_found"),
-                tier1Entity: isNextStepsResponse ? "action_items" : null,
-                llmUsed: !isNextStepsResponse, // Summary uses LLM, next steps doesn't
-                llmPurpose: isNextStepsResponse ? null : "summary",
+                dataSource: mapLegacyDataSource(result.dataSource),
+                artifactType: isNextStepsResponse ? "action_items" : null,
+                llmPurposes: isNextStepsResponse ? [] : ["summary"],
                 companySource: "thread",
                 meetingSource: "last_meeting",
                 clarificationState: {
@@ -432,9 +425,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 testRun,
               }
             ),
-            confidence: null,
-          }).catch(err => {
-            console.error("Failed to log interaction:", err);
+            testRun,
           });
           
           return; // Done - fast path completed
@@ -489,24 +480,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
         }
         
         // Log interaction for clarification with structured metadata
-        storage.insertInteractionLog({
+        logInteraction({
+          slackChannelId: channel,
           slackThreadId: threadTs,
           slackMessageTs: messageTs,
-          slackChannelId: channel,
           userId: userId || null,
           companyId: null,
           meetingId: null,
-          capabilityName: "meeting_resolution_clarification",
           questionText: text,
           answerText: resolution.message,
-          resolvedEntities: buildInteractionMetadata(
+          metadata: buildInteractionMetadata(
             {},
             {
-              entryPoint: "preflight",
-              intent: "unknown",
+              entryPoint: "slack",
+              legacyIntent: "unknown",
               answerShape: "none",
               dataSource: "not_found",
-              llmUsed: false,
+              llmPurposes: [],
               companySource: "none",
               meetingSource: "none",
               ambiguity: {
@@ -518,9 +508,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               meetingDetection,
             }
           ),
-          confidence: null,
-        }).catch(err => {
-          console.error("Failed to log interaction:", err);
+          testRun,
         });
         
         return; // Stop processing - clarification required
@@ -577,9 +565,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
         let hasPendingOffer = false;
         if (threadTs) {
           const lastInteraction = await storage.getLastInteractionByThread(threadTs);
-          if (lastInteraction?.resolvedEntities) {
-            const entities = lastInteraction.resolvedEntities as Record<string, unknown>;
-            hasPendingOffer = entities.pendingOffer === "summary";
+          if (lastInteraction) {
+            // Check resolution JSON for pending offer
+            const resolution = lastInteraction.resolution as Record<string, unknown> | null;
+            hasPendingOffer = resolution?.pendingOffer === "summary";
             console.log(`[Slack] Thread has pending offer: ${hasPendingOffer}`);
           }
         }
@@ -658,18 +647,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const resolvedMetadata = (() => {
         if (isSingleMeetingMode) {
           // Map dataSource to our structured format
-          const mappedDataSource: DataSource = 
-            dataSource === "semantic" ? "semantic" :
-            (dataSource === "not_found" || dataSource === "clarification") ? "not_found" : "tier1";
+          const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
           
-          // Map to tier1 entity
-          const mappedTier1: Tier1Entity = 
-            dataSource === "action_items" ? "action_items" :
-            dataSource === "attendees" ? "attendees" :
-            dataSource === "customer_questions" ? "customer_questions" : null;
+          // Map to artifact type
+          const mappedArtifact: MeetingArtifactType = mapLegacyArtifactType(dataSource);
           
           // Map intent
-          const mappedIntent: Intent =
+          const mappedIntent: LegacyIntent =
             intentClassification === "summary" ? "summary" :
             isBinaryQuestion ? "binary" :
             dataSource === "attendees" ? "attendees" :
@@ -681,22 +665,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
             isBinaryQuestion ? "yes_no" :
             (dataSource === "attendees" || dataSource === "action_items" || dataSource === "customer_questions") ? "list" : "single_value";
           
+          // Collect LLM purposes
+          const llmPurposes: LlmPurpose[] = [];
+          if (semanticAnswerUsed) llmPurposes.push("semantic_answer");
+          if (intentClassification === "summary") llmPurposes.push("summary");
+          
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
-              entryPoint: "single_meeting",
-              intent: mappedIntent,
+              entryPoint: "slack",
+              legacyIntent: mappedIntent,
               answerShape: mappedShape,
               dataSource: mappedDataSource,
-              tier1Entity: mappedTier1,
-              llmUsed: semanticAnswerUsed || intentClassification === "summary",
-              llmPurpose: semanticAnswerUsed ? "semantic_answer" : (intentClassification === "summary" ? "summary" : null),
+              artifactType: mappedArtifact,
+              llmPurposes,
               companySource: threadContext?.companyId ? "thread" : "extracted",
               meetingSource: threadContext?.meetingId ? "thread" : (hasMeetingRef ? "explicit" : "last_meeting"),
               isBinaryQuestion,
               semanticAnswerUsed,
               semanticConfidence,
-              // Legacy fields for thread context
               pendingOffer,
               testRun,
               meetingDetection,
@@ -704,27 +691,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
           );
         } else {
           // Open Assistant path - intent-driven routing
-          const mappedIntent: Intent = 
+          const mappedIntent: LegacyIntent = 
             intentClassification === "external_research" ? "content" :
             intentClassification === "general_assistance" ? "content" :
             intentClassification === "hybrid" ? "content" :
             intentClassification === "meeting_data" ? "content" : "unknown";
           
-          const mappedDataSource: DataSource =
-            dataSource === "external_research" ? "external" as DataSource :
-            dataSource === "general_knowledge" ? "external" as DataSource :
-            dataSource === "hybrid" ? "external" as DataSource :
-            dataSource === "meeting_artifacts" ? "tier1" : "not_found";
+          const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
           
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
-              entryPoint: "open_assistant" as EntryPoint,
-              intent: mappedIntent,
+              entryPoint: "slack",
+              legacyIntent: mappedIntent,
               answerShape: "summary",
               dataSource: mappedDataSource,
-              llmUsed: true,
-              llmPurpose: "intent_classification",
+              llmPurposes: ["intent_classification"],
               companySource: threadContext?.companyId ? "thread" : "extracted",
               meetingSource: threadContext?.meetingId ? "thread" : "none",
               openAssistant: {
@@ -739,20 +721,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
         }
       })();
       
-      storage.insertInteractionLog({
-        slackThreadId: threadTs,
-        slackMessageTs: botReply.ts, // Actual bot reply message timestamp
+      logInteraction({
         slackChannelId: channel,
+        slackThreadId: threadTs,
+        slackMessageTs: botReply.ts,
         userId: userId || null,
         companyId: resolvedCompanyId,
         meetingId: resolvedMeetingId,
-        capabilityName,
         questionText: text,
         answerText: responseText,
-        resolvedEntities: resolvedMetadata,
-        confidence: null,
-      }).catch(err => {
-        console.error("Failed to log interaction:", err);
+        metadata: resolvedMetadata,
+        testRun,
       });
     } catch (err) {
       // Detect specific error types for better user messaging

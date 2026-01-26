@@ -1,0 +1,261 @@
+Intent-Based Routing with First-Class Context Layers (Including Product Identity)
+Context
+
+We are refactoring the PitCrew assistant to use an explicit Intent → Context Layers → Answer Contract architecture.
+
+This is a clean reset of the control plane:
+
+Tier-based logic is removed.
+
+Intents determine data scope.
+
+Context Layers are explicitly computed and logged.
+
+Answer Contracts determine response shape and constraints.
+
+Important update:
+Product identity (i.e., “this assistant always operates in the context of PitCrew”) must be implemented as a first-class Context Layer, not as an implicit prompt-only instruction.
+
+Goals
+
+Remove all tier-based routing and terminology.
+
+Implement intent classification with keyword fast paths + small LLM fallback.
+
+Implement explicit Context Layers, including product identity as a logged layer.
+
+Select answer contracts after context layers are determined.
+
+Rebuild interaction_logs to support full end-to-end debugging.
+
+Part 1 — Remove tiers
+
+Remove all references to:
+
+tier, tier1, tier2, tier3
+
+Replace tier checks with intent-based routing.
+
+No tier terminology should remain in code, logs, or comments.
+
+Part 2 — Intent enum (required)
+
+Define a canonical Intent enum with exactly:
+
+SINGLE_MEETING
+
+MULTI_MEETING
+
+PRODUCT_KNOWLEDGE
+
+DOCUMENT_SEARCH
+
+GENERAL_HELP
+
+Intent determines what data scopes are allowed and cannot be changed later in the pipeline.
+
+Part 3 — Intent classification (unchanged from previous instruction)
+
+(Keep the full keyword fast paths, disambiguation rules, priority order, and LLM fallback exactly as previously specified.)
+
+Intent detection must log:
+
+intent
+
+intent_detection_method (keyword | llm | default)
+
+Part 4 — Context Layers (explicit, first-class, and logged)
+4.1 Context Layer model
+
+Context Layers must be computed after intent resolution and before answer contract selection.
+
+Context Layers represent what information the model is allowed to see, not how it answers.
+
+Required Context Layers
+1. product_identity (ALWAYS ON)
+
+This layer must always be included.
+
+Purpose:
+
+Establish that all reasoning is about PitCrew
+
+Anchor language such as “the system”, “the product”, etc.
+
+Provide identity, not factual claims
+
+Rules:
+
+Lightweight
+
+Non-authoritative
+
+No product capability claims
+
+Implemented as structured context, not hidden prompt text
+
+Must be logged
+
+Example content (conceptual):
+
+“This assistant operates in the context of PitCrew, a product developed by Leverege.”
+
+2. product_ssot (INTENT-GATED)
+
+Included only when intent allows product knowledge (e.g. PRODUCT_KNOWLEDGE, or meeting questions that require product claims).
+
+Purpose:
+
+Provide authoritative product facts from Airtable → Postgres
+
+Back factual product claims
+
+Rules:
+
+Never included implicitly
+
+Only relevant slices are injected
+
+Claims must still be enforced by Output Contracts
+
+3. single_meeting
+
+Included only when intent is SINGLE_MEETING.
+
+Purpose:
+
+Provide data from exactly one meeting
+
+Tier-1 meeting artifacts only
+
+4. multi_meeting
+
+Included only when intent is MULTI_MEETING.
+
+Purpose:
+
+Provide cross-meeting aggregates or indexed data
+
+5. document_context
+
+Included only when intent is DOCUMENT_SEARCH.
+
+Purpose:
+
+Non-authoritative background from documents
+
+Must never ground product claims
+
+4.2 Context Layer computation rules
+
+product_identity is always true
+
+All other layers are enabled strictly by intent
+
+No context layer may be added “just in case”
+
+All enabled layers must be logged
+
+Example logged value:
+
+{
+  "product_identity": true,
+  "product_ssot": false,
+  "single_meeting": true,
+  "multi_meeting": false,
+  "document_context": false
+}
+
+Part 5 — Answer contracts (unchanged in logic)
+
+Answer contracts are selected after Context Layers are determined
+
+Contracts determine response shape and constraints
+
+Contracts must never alter context layers or intent
+
+Deterministic first, LLM fallback only if ambiguous
+
+(SINGLE_MEETING contracts remain: MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS.)
+
+Part 6 — interaction_logs (clean rebuild, updated to include context layers)
+
+Drop and recreate interaction_logs.
+
+Required columns include:
+
+Core:
+
+id
+
+created_at
+
+entry_point
+
+test_run
+
+Slack context:
+
+slack_channel_id
+
+slack_thread_id
+
+slack_message_ts
+
+Resolution:
+
+user_id
+
+company_id
+
+meeting_id
+
+Question & answer:
+
+question_text
+
+answer_text
+
+Control plane (mandatory):
+
+intent
+
+intent_detection_method
+
+answer_contract
+
+contract_selection_method
+
+context_layers (JSON, must include product_identity)
+
+resolution (JSON)
+
+evidence_sources (JSON)
+
+llm_usage (JSON, split by purpose)
+
+Every request must produce one complete log row.
+
+Constraints (non-negotiable)
+
+Product identity must always be present as a logged Context Layer.
+
+Product factual knowledge must never be implicitly included.
+
+Intent determines scope and cannot be re-decided.
+
+LLMs are used only for classification fallback, never for scope or authority.
+
+Existing single-meeting output quality must not regress.
+
+Acceptance Criteria
+
+Product identity is implemented as a first-class Context Layer and logged.
+
+Context Layers clearly separate identity from evidence.
+
+No tier logic remains.
+
+All requests are debuggable end-to-end via interaction_logs.
+
+Behavior matches the Intent → Context Layers → Answer Contract model exactly.
