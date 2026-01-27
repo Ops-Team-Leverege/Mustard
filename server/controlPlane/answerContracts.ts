@@ -22,6 +22,49 @@
  * - Entity-specific variations (e.g., "LES_SCHWAB_SUMMARY" vs "ACE_SUMMARY")
  * ============================================================================
  * 
+ * ============================================================================
+ * CONTRACT CHAINS: Ordered Execution Plans
+ * ============================================================================
+ * A contract chain is an ordered execution plan that describes how to fulfill
+ * a request within a SINGLE intent and scope.
+ * 
+ * What it is:
+ * - Each contract performs one task with fixed output shape
+ * - Each contract has explicit authority rules
+ * - Later contracts may depend on outputs of earlier contracts
+ * - The chain is PLANNED by control plane, not discovered mid-flight
+ * 
+ * What it is NOT:
+ * - One contract per question
+ * - One contract per sentence
+ * - Dynamic improvisation by the LLM
+ * - Intent switching
+ * 
+ * RESTRICTION RULES:
+ * 1. All contracts must share the same intent and scope
+ *    - SINGLE_MEETING → CUSTOMER_QUESTIONS → DRAFT_RESPONSE ✅
+ *    - SINGLE_MEETING → FEATURE_VERIFICATION ❌ (changes scope)
+ *    - If request requires different intents → CLARIFY
+ * 
+ * 2. Contracts must be orderable (logical sequence)
+ *    - Extraction → Analysis → Drafting ✅
+ *    - Drafting → Extraction ❌
+ * 
+ * 3. Authority must not escalate accidentally
+ *    - Extractive → Descriptive ✅
+ *    - Descriptive → Authoritative (ONLY if explicitly required)
+ *    - Extractive → Authoritative ❌ (usually wrong)
+ * 
+ * 4. Contracts are task-shaped, not topic-shaped
+ *    - PATTERN_ANALYSIS ✅
+ *    - DASHBOARD_ISSUES_ANALYSIS ❌ (topic belongs in scope filters)
+ * 
+ * Chain length guidance:
+ * - 1-2 contracts: very common
+ * - 3 contracts: acceptable for compound tasks
+ * - 4+: rare and usually a smell (violating Single Intent invariant)
+ * ============================================================================
+ * 
  * Key Principles:
  * - One intent per request → one or more contracts executed in sequence
  * - Each contract has an explicit SSOT mode (Descriptive vs Authoritative)
@@ -33,12 +76,9 @@
  * - None: Extractive from meeting evidence only
  * 
  * Selection Strategy:
- * 1. Deterministic matching first (keyword patterns)
- * 2. LLM fallback only if ambiguous
- * 
- * Future Enhancement (optional):
- * - MULTI_MEETING currently selects a single contract
- * - Could evolve to contract chains: e.g., CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS
+ * - Control Plane = planner (decides the chain)
+ * - LLM = executor (executes after chain is fixed)
+ * - The LLM never decides contracts (preserves determinism, auditability, safety)
  * 
  * Layer: Control Plane (Answer Contract Selection)
  */
@@ -429,15 +469,32 @@ function shouldRefuse(question: string): boolean {
 }
 
 /**
- * Predefined contract chains for MULTI_MEETING queries.
+ * Predefined contract chains.
  * 
  * Chains execute contracts in sequence, where each contract
  * can use the output of previous contracts as context.
  * 
- * Chain naming: {PRIMARY_CONTRACT}_CHAIN
+ * IMPORTANT: All contracts in a chain must share the same intent and scope.
+ * The chain is ordered: Extraction → Analysis → Drafting
+ * 
+ * Chain naming: {INTENT}_{PRIMARY_CONTRACT}_CHAIN
  */
+
+// SINGLE_MEETING chains - scoped to one meeting
+const SINGLE_MEETING_CONTRACT_CHAINS: Record<string, ContractChain> = {
+  // Questions + Draft: Extract questions, then draft responses
+  // Example: "Help me answer the questions from the ACE meeting"
+  QUESTIONS_DRAFT_CHAIN: {
+    contracts: [AnswerContract.CUSTOMER_QUESTIONS, AnswerContract.DRAFT_RESPONSE],
+    selectionMethod: "keyword",
+    primaryContract: AnswerContract.CUSTOMER_QUESTIONS,
+  },
+};
+
+// MULTI_MEETING chains - scoped across multiple meetings
 const MULTI_MEETING_CONTRACT_CHAINS: Record<string, ContractChain> = {
   // Questions + Pattern: Gather questions first, then analyze patterns
+  // Example: "What common objections are customers raising about dashboards?"
   QUESTIONS_PATTERN_CHAIN: {
     contracts: [AnswerContract.CROSS_MEETING_QUESTIONS, AnswerContract.PATTERN_ANALYSIS],
     selectionMethod: "keyword",
@@ -445,6 +502,7 @@ const MULTI_MEETING_CONTRACT_CHAINS: Record<string, ContractChain> = {
   },
   
   // Comparison + Trend: Compare meetings, then summarize trends
+  // Example: "Compare how concerns have changed over time"
   COMPARISON_TREND_CHAIN: {
     contracts: [AnswerContract.COMPARISON, AnswerContract.TREND_SUMMARY],
     selectionMethod: "keyword",
@@ -465,6 +523,25 @@ const MULTI_MEETING_CONTRACT_CHAINS: Record<string, ContractChain> = {
     primaryContract: AnswerContract.TREND_SUMMARY,
   },
 };
+
+/**
+ * Select a contract chain for SINGLE_MEETING queries.
+ * 
+ * Chains are selected based on the minimum set of tasks required.
+ * Example: "Help me answer the questions" → CUSTOMER_QUESTIONS → DRAFT_RESPONSE
+ */
+export function selectSingleMeetingContractChain(userMessage: string): ContractChain | null {
+  const msg = userMessage.toLowerCase();
+  
+  // Questions + Draft chain: "help me answer questions", "respond to their questions"
+  if (/help\s+(me\s+)?(answer|respond|reply)/i.test(msg) && 
+      /questions?|concerns|objections/i.test(msg)) {
+    return SINGLE_MEETING_CONTRACT_CHAINS.QUESTIONS_DRAFT_CHAIN;
+  }
+  
+  // No chain needed - return null to use single contract selection
+  return null;
+}
 
 /**
  * Select a contract chain for MULTI_MEETING queries.

@@ -1,0 +1,285 @@
+1️⃣ First: what the contract chain is (and is not)
+What it is
+
+A contract chain is an ordered execution plan that describes how to fulfill a request within a single intent and scope.
+
+Think of it as:
+
+“Given what the user wants, what steps must happen, and in what order, to produce the correct output?”
+
+Each contract:
+
+performs one task
+
+has a fixed output shape
+
+has explicit authority rules
+
+may depend on outputs of earlier contracts
+
+What it is not
+
+It is not one contract per question
+
+It is not one contract per sentence
+
+It is not dynamic improvisation by the LLM
+
+It is not intent switching
+
+The contract chain is planned, not discovered mid-flight.
+
+2️⃣ Who decides the contract chain?
+
+Not the LLM. Ever.
+
+The contract chain is decided by the control plane, using:
+
+The resolved intent
+
+The resolved scope
+
+The inferred task(s) required to answer
+
+The LLM’s role starts after the chain is fixed.
+
+If the LLM were allowed to decide contracts, you’d lose determinism, auditability, and safety.
+
+So:
+
+Control Plane = planner
+
+LLM = executor
+
+3️⃣ How the system decides which contracts are needed
+
+This is the key mental model:
+
+Contracts are selected based on the minimum set of tasks required to satisfy the user’s request.
+
+Not based on:
+
+wording
+
+number of sentences
+
+number of questions embedded
+
+The system asks (implicitly):
+
+What kind of work must be done?
+
+extraction?
+
+synthesis?
+
+explanation?
+
+drafting?
+
+Does any task depend on another?
+
+you can’t answer questions before extracting them
+
+you can’t compare before collecting data
+
+What authority level is required?
+
+extractive only?
+
+descriptive?
+
+authoritative?
+
+The answers to those questions determine the chain.
+
+4️⃣ The fundamental restriction rules (these are important)
+
+There are strict restrictions. This is what keeps the system sane.
+
+🔒 Restriction 1: Contracts must share the same intent
+
+All contracts in a chain must be valid under the same intent and scope.
+
+✅ Allowed:
+
+SINGLE_MEETING → CUSTOMER_QUESTIONS → DRAFT_RESPONSE
+
+MULTI_MEETING → CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS
+
+❌ Not allowed:
+
+SINGLE_MEETING → FEATURE_VERIFICATION
+
+MULTI_MEETING → PRODUCT_EXPLANATION
+(these change scope)
+
+If a request would require contracts from different intents:
+→ CLARIFY and ask the user to split.
+
+🔒 Restriction 2: Contracts must be orderable
+
+Contracts must form a logical sequence.
+
+Examples:
+
+Extraction → analysis → drafting (valid)
+
+Drafting → extraction (invalid)
+
+Authoritative verification before data exists (invalid)
+
+This sounds obvious, but enforcing it prevents subtle bugs.
+
+🔒 Restriction 3: Authority must not escalate accidentally
+
+Authority may:
+
+stay the same
+
+become more restrictive
+
+It must never silently escalate.
+
+Examples:
+
+Extractive → Descriptive (OK)
+
+Descriptive → Authoritative (ONLY if explicitly required)
+
+Extractive → Authoritative (usually wrong)
+
+This is why SSOT mode is attached to each contract.
+
+🔒 Restriction 4: Contracts must be task-shaped, not topic-shaped
+
+You already stated this correctly:
+
+Contracts are shaped by task and output, not by question or topic.
+
+So:
+
+PATTERN_ANALYSIS ✅
+
+DASHBOARD_ISSUES_ANALYSIS ❌
+
+Topics belong in scope filters, not contracts.
+
+5️⃣ How many contracts can be in a chain?
+
+There’s no hard number, but there is a soft rule:
+
+If a chain feels long or spans different scopes, you’re probably violating the Single Intent invariant.
+
+In practice:
+
+1–2 contracts: very common
+
+3 contracts: acceptable for compound tasks
+
+4+: rare and usually a smell
+
+Example of a good 2-contract chain:
+
+CUSTOMER_QUESTIONS
+→ DRAFT_RESPONSE
+
+
+Example of a good 3-contract chain:
+
+CROSS_MEETING_QUESTIONS
+→ PATTERN_ANALYSIS
+→ DRAFT_SUMMARY
+
+6️⃣ Concrete examples (this usually makes it click)
+Example 1 — Single meeting, compound task
+
+User
+
+“Help me answer the questions from the ACE meeting.”
+
+Intent: SINGLE_MEETING
+Scope: ACE meeting
+
+Required tasks:
+
+Extract questions
+
+Draft responses
+
+Contract chain:
+
+CUSTOMER_QUESTIONS
+→ DRAFT_RESPONSE
+
+Example 2 — Multi-meeting analysis
+
+User
+
+“What common objections are customers raising about dashboards?”
+
+Intent: MULTI_MEETING
+Scope: all relevant meetings
+
+Required tasks:
+
+Collect questions across meetings
+
+Identify recurring themes
+
+Contract chain:
+
+CROSS_MEETING_QUESTIONS
+→ PATTERN_ANALYSIS
+
+Example 3 — Single contract is enough
+
+User
+
+“Summarize the last ACE meeting.”
+
+Intent: SINGLE_MEETING
+Scope: ACE meeting
+
+Required task:
+
+summarization only
+
+Contract chain:
+
+MEETING_SUMMARY
+
+Example 4 — Invalid (must CLARIFY)
+
+User
+
+“Summarize the meeting and tell me if PitCrew supports POS integration.”
+
+This requires:
+
+SINGLE_MEETING
+
+PRODUCT_KNOWLEDGE
+
+Two intents → two scopes → incompatible contracts.
+
+Correct behavior:
+→ CLARIFY and ask the user to split.
+
+7️⃣ Why this model scales cleanly
+
+This design works long-term because:
+
+New contracts add new capabilities without changing intent logic
+
+New intents add new scopes without breaking existing contracts
+
+Authority is always explicit
+
+Debugging is trivial (“which contract did the wrong thing?”)
+
+This is exactly the kind of deep module Ousterhout talks about.
+
+One-sentence summary you can reuse
+
+The control plane selects the smallest ordered set of task-based contracts needed to satisfy a single intent and scope, enforcing ordering and authority rules so execution remains safe and deterministic.

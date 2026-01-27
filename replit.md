@@ -61,13 +61,23 @@ The system uses an Intent → Context Layers → Answer Contract flow instead of
 - TERMINAL: REFUSE, CLARIFY, NOT_FOUND
 - Contracts define response shape and SSOT mode (descriptive/authoritative/none)
 
-**Contract Chaining** (MULTI_MEETING only):
-- Single contracts execute for simple queries
-- Chains execute multiple contracts in sequence for richer analysis:
-  - QUESTIONS_PATTERN_CHAIN: CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS
-  - COMPARISON_TREND_CHAIN: COMPARISON → TREND_SUMMARY
-- Each contract in chain receives previous contract's output as context
-- Chaining triggered by compound keywords (e.g., "questions and patterns", "compare over time")
+**Contract Chaining** (Ordered Execution Plans):
+- A contract chain is an ordered execution plan within a SINGLE intent and scope
+- Control plane decides the chain (not the LLM)
+- Chains selected based on minimum set of tasks required to satisfy the request
+
+Predefined chains:
+- SINGLE_MEETING: CUSTOMER_QUESTIONS → DRAFT_RESPONSE ("help me answer the questions")
+- MULTI_MEETING: CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS ("questions and patterns")
+- MULTI_MEETING: COMPARISON → TREND_SUMMARY ("compare over time")
+
+Restriction rules:
+1. All contracts must share the same intent and scope (otherwise → CLARIFY)
+2. Contracts must be orderable: Extraction → Analysis → Drafting
+3. Authority must not escalate accidentally (Extractive → Authoritative ❌)
+4. Contracts are task-shaped, not topic-shaped
+
+Chain length: 1-2 common, 3 acceptable, 4+ is a smell
 
 **Scope Types** (identical structure, different scope size):
 - SingleMeetingScope: { type, meetingId, companyId?, companyName? }
