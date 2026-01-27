@@ -557,6 +557,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Conversational behavior tracking
       let isClarificationRequest: boolean | undefined;
       let isBinaryQuestion: boolean | undefined;
+      
+      // Control Plane and Open Assistant results (for metadata logging)
+      let controlPlaneIntentResult: Awaited<ReturnType<typeof classifyControlPlaneIntent>> | null = null;
+      let openAssistantResultData: OpenAssistantResult | null = null;
 
       if (isSingleMeetingMode && resolvedMeeting) {
         // SINGLE-MEETING MODE: Use orchestrator with read-only artifact access
@@ -604,10 +608,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // Step 2: Route to appropriate handler based on intent
         console.log(`[Slack] Open Assistant mode - classifying intent via control plane`);
         
-        const controlPlaneIntent = await classifyControlPlaneIntent(text);
-        console.log(`[Slack] Control plane: intent=${controlPlaneIntent.intent}, method=${controlPlaneIntent.intentDetectionMethod}, confidence=${controlPlaneIntent.confidence.toFixed(2)}`);
+        controlPlaneIntentResult = await classifyControlPlaneIntent(text);
+        console.log(`[Slack] Control plane: intent=${controlPlaneIntentResult.intent}, method=${controlPlaneIntentResult.intentDetectionMethod}, confidence=${controlPlaneIntentResult.confidence.toFixed(2)}`);
         
-        const openAssistantResult: OpenAssistantResult = await handleOpenAssistant(text, {
+        openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
           threadId: threadTs,
           conversationContext: threadContext ? `Company: ${resolvedMeeting?.companyName || 'unknown'}` : undefined,
@@ -617,22 +621,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: resolvedMeeting.companyName,
             meetingDate: resolvedMeeting.meetingDate,
           } : null,
-          controlPlaneIntent: controlPlaneIntent,
+          controlPlaneIntent: controlPlaneIntentResult,
         });
         
-        responseText = openAssistantResult.answer;
-        capabilityName = `open_assistant_${openAssistantResult.intent}`;
-        intentClassification = openAssistantResult.intent;
-        dataSource = openAssistantResult.dataSource;
+        responseText = openAssistantResultData.answer;
+        capabilityName = `open_assistant_${openAssistantResultData.intent}`;
+        intentClassification = openAssistantResultData.intent;
+        dataSource = openAssistantResultData.dataSource;
         
-        if (openAssistantResult.singleMeetingResult) {
+        if (openAssistantResultData.singleMeetingResult) {
           resolvedCompanyId = resolvedMeeting?.companyId || null;
           resolvedMeetingId = resolvedMeeting?.meetingId || null;
-          semanticAnswerUsed = openAssistantResult.singleMeetingResult.semanticAnswerUsed;
-          semanticConfidence = openAssistantResult.singleMeetingResult.semanticConfidence;
+          semanticAnswerUsed = openAssistantResultData.singleMeetingResult.semanticAnswerUsed;
+          semanticConfidence = openAssistantResultData.singleMeetingResult.semanticConfidence;
         }
         
-        console.log(`[Slack] Open Assistant response: intent=${openAssistantResult.intent}, controlPlane=${openAssistantResult.controlPlaneIntent || 'none'}, contract=${openAssistantResult.answerContract || 'none'}, ssot=${openAssistantResult.ssotMode || 'none'}, dataSource=${openAssistantResult.dataSource}, delegated=${openAssistantResult.delegatedToSingleMeeting}`);
+        console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, controlPlane=${openAssistantResultData.controlPlaneIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, ssot=${openAssistantResultData.ssotMode || 'none'}, dataSource=${openAssistantResultData.dataSource}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
       }
 
       // Post response to Slack (skip in test mode)
@@ -692,25 +696,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
             }
           );
         } else {
-          // Open Assistant path - intent-driven routing
-          // Map OpenAssistant intent to control plane Intent enum for logging
-          const openAssistantIntentToControlPlane: Record<string, string> = {
-            "meeting_data": "SINGLE_MEETING",  // or MULTI_MEETING depending on context
-            "external_research": "GENERAL_HELP",
-            "general_assistance": "GENERAL_HELP", 
-            "hybrid": "MULTI_MEETING",
-          };
-          
-          const mappedControlPlaneIntent = openAssistantIntentToControlPlane[intentClassification || ""] || "GENERAL_HELP";
+          // Open Assistant path - use actual Control Plane results
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
           
-          // Determine context layers based on OpenAssistant intent
+          // Use actual Control Plane intent and contract from OpenAssistant result
+          const actualIntent = openAssistantResultData?.controlPlaneIntent || controlPlaneIntentResult?.intent || "GENERAL_HELP";
+          const actualContract = openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
+          const actualContractChain = openAssistantResultData?.answerContractChain;
+          const actualSsotMode = openAssistantResultData?.ssotMode || "none";
+          
+          // Determine context layers based on actual Control Plane intent
           const contextLayers = {
             product_identity: true, // Always on
-            product_ssot: false,
-            single_meeting: intentClassification === "meeting_data" && Boolean(semanticAnswerUsed),
-            multi_meeting: intentClassification === "meeting_data" && !semanticAnswerUsed,
-            document_context: false,
+            product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
+            single_meeting: actualIntent === "SINGLE_MEETING",
+            multi_meeting: actualIntent === "MULTI_MEETING",
+            document_context: actualIntent === "DOCUMENT_SEARCH",
           };
           
           return buildInteractionMetadata(
@@ -718,11 +719,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
             {
               entryPoint: "slack",
               controlPlane: {
-                intent: mappedControlPlaneIntent as any,
-                intentDetectionMethod: "llm",
+                intent: actualIntent as any,
+                intentDetectionMethod: controlPlaneIntentResult?.intentDetectionMethod || "keyword",
                 contextLayers,
-                answerContract: "GENERAL_RESPONSE" as any,
-                contractSelectionMethod: "default",
+                answerContract: actualContract as any,
+                contractChain: actualContractChain?.map((c: any) => ({ 
+                  contract: String(c), 
+                  ssot_mode: actualSsotMode as any, 
+                  selection_method: "default" as const 
+                })),
+                contractSelectionMethod: (controlPlaneIntentResult?.intentDetectionMethod as "keyword" | "llm" | "default") || "default",
+                ssotMode: actualSsotMode as any,
               },
               answerShape: "summary",
               dataSource: mappedDataSource,

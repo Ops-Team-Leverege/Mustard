@@ -1,0 +1,98 @@
+# Fix Critical Stress Test Failures - Control Plane Integration
+
+## Problem Summary
+
+**ALL 154 stress tests are failing** with the same issue: every test returns `GENERAL_RESPONSE` contract regardless of the actual intent. This indicates a complete breakdown in the Control Plane pipeline.
+
+## Root Cause Analysis
+
+### 1. **Slack Integration Bypasses Control Plane**
+- `server/slack/events.ts` calls `classifyControlPlaneIntent()` but NOT `runControlPlane()`
+- This means it only gets intent classification but skips context layers and contract selection
+- Line 724 hardcodes `answerContract: "GENERAL_RESPONSE"` instead of using proper selection
+
+### 2. **Missing Context Layers**
+- Because `runControlPlane()` is not called, context layers are never computed
+- `single_meeting: true` is never set even when `meeting_id` is resolved
+- This breaks meeting-scoped queries
+
+### 3. **Incomplete Integration**
+- Open Assistant handler expects `ControlPlaneResult` but receives partial data
+- Contract selection pipeline is completely bypassed
+
+## Solution Implementation
+
+I've started implementing the fixes but need the Replit agent to complete them:
+
+### CRITICAL FIXES NEEDED:
+
+#### 1. Fix Slack Integration (PRIORITY 1)
+**File: `server/slack/events.ts`**
+
+**ALREADY DONE:**
+- ✅ Changed import from `classifyControlPlaneIntent` to `runControlPlane`
+- ✅ Updated call to use full Control Plane pipeline
+- ✅ Fixed logging to use actual Control Plane result
+
+**STILL NEEDED:**
+- Complete the Open Assistant handler integration
+- Fix any remaining references to the old structure
+
+#### 2. Fix Open Assistant Handler (PRIORITY 2)
+**File: `server/openAssistant/openAssistantHandler.ts`**
+
+**ALREADY DONE:**
+- ✅ Started updating to use `ControlPlaneResult` instead of `IntentClassificationResult`
+
+**STILL NEEDED:**
+- Complete all references to `cpResult` instead of `cpIntent`
+- Update all the handler functions to use the new structure
+- Fix the evidence source derivation
+
+#### 3. Update Type Definitions (PRIORITY 3)
+**File: `server/openAssistant/types.ts`**
+
+**ALREADY DONE:**
+- ✅ Updated `OpenAssistantContext` to expect `ControlPlaneResult`
+
+**STILL NEEDED:**
+- Ensure all imports are correct
+- Fix any type mismatches
+
+## Expected Outcome
+
+After these fixes:
+1. **Intent Classification**: Should properly classify intents (SINGLE_MEETING, MULTI_MEETING, etc.)
+2. **Context Layers**: `single_meeting: true` should be set when meeting_id is resolved
+3. **Contract Selection**: Should return appropriate contracts (EXTRACTIVE_FACT, MEETING_SUMMARY, etc.) instead of always GENERAL_RESPONSE
+4. **Stress Tests**: All 154 tests should pass with correct intent/contract combinations
+
+## Validation Steps
+
+1. Run the stress tests to verify contract selection is working
+2. Check logs to ensure Control Plane pipeline is being called
+3. Verify context layers are being set correctly
+4. Confirm intent classification is consistent
+
+## Files to Focus On
+
+1. `server/slack/events.ts` - Main integration point
+2. `server/openAssistant/openAssistantHandler.ts` - Handler logic
+3. `server/openAssistant/types.ts` - Type definitions
+4. `server/controlPlane/index.ts` - Control Plane orchestration
+
+## Key Points for Replit Agent
+
+- This is a **CRITICAL SYSTEM FAILURE** - all tests are broken
+- The fixes are **architectural** - we're properly integrating the Control Plane
+- Focus on **completing the integration** I started
+- **Test thoroughly** - the stress test results will show if it's working
+- **Preserve existing functionality** - don't break working paths
+
+## Success Criteria
+
+✅ Stress tests show varied contracts (not all GENERAL_RESPONSE)
+✅ Context layers include `single_meeting: true` for meeting queries  
+✅ Intent classification returns proper enum values
+✅ No TypeScript compilation errors
+✅ Existing Slack functionality still works
