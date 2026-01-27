@@ -137,6 +137,13 @@ The control plane enforces safety constraints and failure semantics at multiple 
 - All multi-meeting paths route through executeContractChain for uniform constraint enforcement
 - Both handleMeetingDataIntent and handleMultiMeetingIntent use the same execution path
 
+**Single Source of Truth (Enforced)**:
+- Intent classification: ONLY in server/controlPlane/intent.ts
+- Contract selection: ONLY in server/controlPlane/answerContracts.ts
+- No duplicate LLM calls for intent/contract selection outside Control Plane
+- Open Assistant handler requires Control Plane intent (returns CLARIFY if not provided)
+- SingleMeetingOrchestrator uses deprecated internal classification for backward compatibility with direct Slack calls (migration to contract-based routing in progress)
+
 ### Slack Single-Meeting Orchestrator
 Handles user questions scoped to a single meeting with read-only artifact access. Internal sub-intent classification:
 - extractive: Specific fact questions ("who attended?", "did they mention X?")
