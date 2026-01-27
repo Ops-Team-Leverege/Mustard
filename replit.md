@@ -63,13 +63,20 @@ The system uses an Intent → Context Layers → Answer Contract flow instead of
 
 **Contract Chaining** (Ordered Execution Plans):
 - A contract chain is an ordered execution plan within a SINGLE intent and scope
-- Control plane decides the chain (not the LLM)
-- Chains selected based on minimum set of tasks required to satisfy the request
+- Control plane decides the chain using: resolved intent + resolved scope + inferred tasks
+- LLM executes the chain (never decides it)
+- Chains are built DYNAMICALLY based on minimum set of tasks required
 
-Predefined chains:
-- SINGLE_MEETING: CUSTOMER_QUESTIONS → DRAFT_RESPONSE ("help me answer the questions")
-- MULTI_MEETING: CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS ("questions and patterns")
-- MULTI_MEETING: COMPARISON → TREND_SUMMARY ("compare over time")
+Dynamic chain building:
+1. Identify required tasks from user message (extraction, analysis, drafting)
+2. Map tasks to contracts (respecting intent and scope)
+3. Order contracts by phase: Extraction → Analysis → Drafting
+4. Validate chain follows restriction rules
+
+Example chains (built dynamically, not hardcoded):
+- "help me answer the questions" → CUSTOMER_QUESTIONS → DRAFT_RESPONSE
+- "what patterns in customer questions" → CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS
+- "compare how concerns changed over time" → COMPARISON → TREND_SUMMARY
 
 Restriction rules:
 1. All contracts must share the same intent and scope (otherwise → CLARIFY)
@@ -77,7 +84,7 @@ Restriction rules:
 3. Authority must not escalate accidentally (Extractive → Authoritative ❌)
 4. Contracts are task-shaped, not topic-shaped
 
-Chain length: 1-2 common, 3 acceptable, 4+ is a smell
+Chain length: 1-2 common, 3 acceptable, 4+ is a smell (may indicate Single Intent violation)
 
 **Scope Types** (identical structure, different scope size):
 - SingleMeetingScope: { type, meetingId, companyId?, companyName? }

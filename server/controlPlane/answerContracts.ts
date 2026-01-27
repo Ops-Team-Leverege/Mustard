@@ -167,6 +167,7 @@ export type ContractChain = {
   contracts: AnswerContract[];
   selectionMethod: ContractSelectionMethod;
   primaryContract: AnswerContract; // The main contract for logging/classification
+  clarifyReason?: string; // Set when validation fails and CLARIFY is returned
 };
 
 export type ContractChainResult = {
@@ -469,139 +470,352 @@ function shouldRefuse(question: string): boolean {
 }
 
 /**
- * Predefined contract chains.
+ * Contract Task Categories - Used for dynamic chain building.
  * 
- * Chains execute contracts in sequence, where each contract
- * can use the output of previous contracts as context.
- * 
- * IMPORTANT: All contracts in a chain must share the same intent and scope.
- * The chain is ordered: Extraction → Analysis → Drafting
- * 
- * Chain naming: {INTENT}_{PRIMARY_CONTRACT}_CHAIN
+ * Tasks are ordered by execution phase:
+ * 1. EXTRACTION: Pull data from sources
+ * 2. ANALYSIS: Analyze/synthesize extracted data
+ * 3. DRAFTING: Generate output based on analysis
  */
+type TaskPhase = "extraction" | "analysis" | "drafting";
 
-// SINGLE_MEETING chains - scoped to one meeting
-const SINGLE_MEETING_CONTRACT_CHAINS: Record<string, ContractChain> = {
-  // Questions + Draft: Extract questions, then draft responses
-  // Example: "Help me answer the questions from the ACE meeting"
-  QUESTIONS_DRAFT_CHAIN: {
-    contracts: [AnswerContract.CUSTOMER_QUESTIONS, AnswerContract.DRAFT_RESPONSE],
-    selectionMethod: "keyword",
-    primaryContract: AnswerContract.CUSTOMER_QUESTIONS,
-  },
+const CONTRACT_PHASES: Record<AnswerContract, TaskPhase> = {
+  // Extraction phase
+  [AnswerContract.MEETING_SUMMARY]: "extraction",
+  [AnswerContract.NEXT_STEPS]: "extraction",
+  [AnswerContract.ATTENDEES]: "extraction",
+  [AnswerContract.CUSTOMER_QUESTIONS]: "extraction",
+  [AnswerContract.EXTRACTIVE_FACT]: "extraction",
+  [AnswerContract.AGGREGATIVE_LIST]: "extraction",
+  [AnswerContract.CROSS_MEETING_QUESTIONS]: "extraction",
+  
+  // Analysis phase
+  [AnswerContract.PATTERN_ANALYSIS]: "analysis",
+  [AnswerContract.COMPARISON]: "analysis",
+  [AnswerContract.TREND_SUMMARY]: "analysis",
+  
+  // Drafting phase
+  [AnswerContract.PRODUCT_EXPLANATION]: "drafting",
+  [AnswerContract.VALUE_PROPOSITION]: "drafting",
+  [AnswerContract.DRAFT_RESPONSE]: "drafting",
+  [AnswerContract.DRAFT_EMAIL]: "drafting",
+  [AnswerContract.FEATURE_VERIFICATION]: "drafting",
+  [AnswerContract.FAQ_ANSWER]: "drafting",
+  [AnswerContract.DOCUMENT_ANSWER]: "drafting",
+  [AnswerContract.GENERAL_RESPONSE]: "drafting",
+  [AnswerContract.NOT_FOUND]: "drafting",
+  [AnswerContract.REFUSE]: "drafting",
+  [AnswerContract.CLARIFY]: "drafting",
+  [AnswerContract.PRODUCT_INFO]: "drafting",
 };
 
-// MULTI_MEETING chains - scoped across multiple meetings
-const MULTI_MEETING_CONTRACT_CHAINS: Record<string, ContractChain> = {
-  // Questions + Pattern: Gather questions first, then analyze patterns
-  // Example: "What common objections are customers raising about dashboards?"
-  QUESTIONS_PATTERN_CHAIN: {
-    contracts: [AnswerContract.CROSS_MEETING_QUESTIONS, AnswerContract.PATTERN_ANALYSIS],
-    selectionMethod: "keyword",
-    primaryContract: AnswerContract.CROSS_MEETING_QUESTIONS,
-  },
-  
-  // Comparison + Trend: Compare meetings, then summarize trends
-  // Example: "Compare how concerns have changed over time"
-  COMPARISON_TREND_CHAIN: {
-    contracts: [AnswerContract.COMPARISON, AnswerContract.TREND_SUMMARY],
-    selectionMethod: "keyword",
-    primaryContract: AnswerContract.COMPARISON,
-  },
-  
-  // Pattern only (single contract, no chaining)
-  PATTERN_SINGLE: {
-    contracts: [AnswerContract.PATTERN_ANALYSIS],
-    selectionMethod: "keyword",
-    primaryContract: AnswerContract.PATTERN_ANALYSIS,
-  },
-  
-  // Trend only (single contract, no chaining)
-  TREND_SINGLE: {
-    contracts: [AnswerContract.TREND_SUMMARY],
-    selectionMethod: "keyword",
-    primaryContract: AnswerContract.TREND_SUMMARY,
-  },
+const PHASE_ORDER: Record<TaskPhase, number> = {
+  extraction: 1,
+  analysis: 2,
+  drafting: 3,
 };
 
 /**
- * Select a contract chain for SINGLE_MEETING queries.
- * 
- * Chains are selected based on the minimum set of tasks required.
- * Example: "Help me answer the questions" → CUSTOMER_QUESTIONS → DRAFT_RESPONSE
+ * Task keywords - maps user language to required tasks.
+ * Each task maps to one or more contracts that can fulfill it.
  */
-export function selectSingleMeetingContractChain(userMessage: string): ContractChain | null {
-  const msg = userMessage.toLowerCase();
+const TASK_KEYWORDS: Array<{
+  pattern: RegExp;
+  task: string;
+  contracts: AnswerContract[];
+  intent: Intent[];
+}> = [
+  // Extraction tasks
+  { pattern: /questions?|asked|concerns|objections/i, task: "extract_questions", 
+    contracts: [AnswerContract.CUSTOMER_QUESTIONS, AnswerContract.CROSS_MEETING_QUESTIONS],
+    intent: [Intent.SINGLE_MEETING, Intent.MULTI_MEETING] },
+  { pattern: /summarize|summary|overview/i, task: "summarize", 
+    contracts: [AnswerContract.MEETING_SUMMARY],
+    intent: [Intent.SINGLE_MEETING] },
+  { pattern: /action items?|next steps?|to-?do/i, task: "extract_actions", 
+    contracts: [AnswerContract.NEXT_STEPS],
+    intent: [Intent.SINGLE_MEETING] },
+  { pattern: /who\s+(was|attended|joined)|attendees?|participants?/i, task: "extract_attendees", 
+    contracts: [AnswerContract.ATTENDEES],
+    intent: [Intent.SINGLE_MEETING] },
   
-  // Questions + Draft chain: "help me answer questions", "respond to their questions"
-  if (/help\s+(me\s+)?(answer|respond|reply)/i.test(msg) && 
-      /questions?|concerns|objections/i.test(msg)) {
-    return SINGLE_MEETING_CONTRACT_CHAINS.QUESTIONS_DRAFT_CHAIN;
+  // Analysis tasks
+  { pattern: /pattern|recurring|theme|common\s+theme/i, task: "analyze_patterns", 
+    contracts: [AnswerContract.PATTERN_ANALYSIS],
+    intent: [Intent.MULTI_MEETING] },
+  { pattern: /compare|difference|differ|contrast|versus|vs\b/i, task: "compare", 
+    contracts: [AnswerContract.COMPARISON],
+    intent: [Intent.MULTI_MEETING] },
+  { pattern: /trend|over time|changing|evolving|progression/i, task: "analyze_trends", 
+    contracts: [AnswerContract.TREND_SUMMARY],
+    intent: [Intent.MULTI_MEETING] },
+  
+  // Drafting tasks
+  { pattern: /help\s+(me\s+)?(answer|respond|reply)|draft\s+(a\s+)?response/i, task: "draft_response", 
+    contracts: [AnswerContract.DRAFT_RESPONSE],
+    intent: [Intent.SINGLE_MEETING, Intent.MULTI_MEETING, Intent.GENERAL_HELP] },
+  { pattern: /draft\s+(an?\s+)?email|write\s+(an?\s+)?email|email\s+template/i, task: "draft_email", 
+    contracts: [AnswerContract.DRAFT_EMAIL],
+    intent: [Intent.GENERAL_HELP] },
+];
+
+/**
+ * Identify required tasks from user message.
+ */
+function identifyTasks(userMessage: string, intent: Intent): string[] {
+  const tasks: string[] = [];
+  
+  for (const taskDef of TASK_KEYWORDS) {
+    if (taskDef.pattern.test(userMessage) && taskDef.intent.includes(intent)) {
+      tasks.push(taskDef.task);
+    }
   }
   
-  // No chain needed - return null to use single contract selection
-  return null;
+  return tasks;
+}
+
+/**
+ * Get the contract for a task within an intent and scope.
+ * 
+ * Scope influences contract selection:
+ * - Single meeting scope → use single-meeting contracts
+ * - Multi-meeting scope with filters → prefer aggregative contracts
+ * - Multi-meeting scope without filters → prefer pattern/trend contracts
+ */
+function getContractForTask(task: string, intent: Intent, scope: ChainBuildScope): AnswerContract | null {
+  const taskDef = TASK_KEYWORDS.find(t => t.task === task && t.intent.includes(intent));
+  if (!taskDef) return null;
+  
+  // Scope type enforcement: don't allow cross-scope contracts
+  if (scope.type === "single_meeting" && task === "extract_questions") {
+    return AnswerContract.CUSTOMER_QUESTIONS;
+  }
+  
+  if (scope.type === "multi_meeting" && task === "extract_questions") {
+    return AnswerContract.CROSS_MEETING_QUESTIONS;
+  }
+  
+  // Scope filters influence analysis contract selection
+  if (scope.type === "multi_meeting" && scope.filters?.topic) {
+    // When topic filter exists, prefer aggregative over pattern analysis
+    if (task === "analyze_patterns") {
+      return AnswerContract.AGGREGATIVE_LIST;
+    }
+  }
+  
+  // When we have specific meeting IDs, analysis is more focused
+  if (scope.type === "multi_meeting" && scope.meetingIds && scope.meetingIds.length <= 3) {
+    // Few meetings → comparison is more appropriate than pattern analysis
+    if (task === "analyze_patterns") {
+      return AnswerContract.COMPARISON;
+    }
+  }
+  
+  return taskDef.contracts[0];
+}
+
+/**
+ * Scope information passed to chain building.
+ * Used to influence contract selection based on resolved scope.
+ */
+export type ChainBuildScope = {
+  type: "single_meeting" | "multi_meeting" | "none";
+  meetingId?: string;
+  meetingIds?: string[];
+  companyId?: string;
+  companyName?: string;
+  filters?: {
+    company?: string;
+    topic?: string;
+    timeRange?: { start?: Date; end?: Date };
+  };
+};
+
+/**
+ * Build a contract chain dynamically based on:
+ * 1. The resolved intent
+ * 2. The resolved scope
+ * 3. The inferred task(s) required to answer
+ * 
+ * The chain is built by:
+ * 1. Identifying all required tasks from user message
+ * 2. Mapping tasks to contracts (respecting intent and scope)
+ * 3. Ordering contracts by phase (extraction → analysis → drafting)
+ * 4. Validating the chain follows restriction rules
+ * 
+ * CONTROL PLANE decides the chain - LLM executes it.
+ */
+export function buildContractChain(
+  userMessage: string, 
+  intent: Intent,
+  scope: ChainBuildScope
+): ContractChain {
+  console.log(`[ContractChain] Building chain for intent=${intent}, scope.type=${scope.type}`);
+  
+  // Step 1: Identify required tasks from user message
+  const tasks = identifyTasks(userMessage, intent);
+  console.log(`[ContractChain] Identified tasks: [${tasks.join(", ")}]`);
+  
+  // Step 2: Map tasks to contracts (respecting intent and scope)
+  const contracts: AnswerContract[] = [];
+  for (const task of tasks) {
+    const contract = getContractForTask(task, intent, scope);
+    if (contract && !contracts.includes(contract)) {
+      contracts.push(contract);
+    }
+  }
+  
+  // Step 3: If no contracts identified, use defaults based on intent and scope
+  if (contracts.length === 0) {
+    const defaultContract = getDefaultContract(intent, scope);
+    contracts.push(defaultContract);
+    console.log(`[ContractChain] No tasks identified, using default: ${defaultContract}`);
+  }
+  
+  // Step 4: Order contracts by phase (extraction → analysis → drafting)
+  contracts.sort((a, b) => {
+    const phaseA = CONTRACT_PHASES[a] || "drafting";
+    const phaseB = CONTRACT_PHASES[b] || "drafting";
+    return PHASE_ORDER[phaseA] - PHASE_ORDER[phaseB];
+  });
+  
+  // Step 5: Validate chain follows restriction rules
+  const validation = validateChain(contracts, intent);
+  
+  // If validation fails, return CLARIFY contract instead
+  if (!validation.valid && validation.shouldClarify) {
+    console.log(`[ContractChain] Validation failed, returning CLARIFY: ${validation.reason}`);
+    return {
+      contracts: [AnswerContract.CLARIFY],
+      selectionMethod: "validation_failure",
+      primaryContract: AnswerContract.CLARIFY,
+      clarifyReason: validation.reason,
+    };
+  }
+  
+  console.log(`[ContractChain] Built chain: [${contracts.join(" → ")}]`);
+  
+  return {
+    contracts,
+    selectionMethod: "keyword",
+    primaryContract: contracts[0],
+  };
+}
+
+/**
+ * Get the default contract when no tasks are identified.
+ */
+function getDefaultContract(intent: Intent, scope: ChainBuildScope): AnswerContract {
+  switch (intent) {
+    case Intent.SINGLE_MEETING:
+      return AnswerContract.EXTRACTIVE_FACT;
+    case Intent.MULTI_MEETING:
+      // If scope has filters, prefer aggregation; otherwise pattern analysis
+      if (scope.filters?.topic || scope.filters?.company) {
+        return AnswerContract.AGGREGATIVE_LIST;
+      }
+      return AnswerContract.PATTERN_ANALYSIS;
+    case Intent.PRODUCT_KNOWLEDGE:
+      return AnswerContract.PRODUCT_EXPLANATION;
+    case Intent.GENERAL_HELP:
+      return AnswerContract.GENERAL_RESPONSE;
+    default:
+      return AnswerContract.GENERAL_RESPONSE;
+  }
+}
+
+/**
+ * Chain validation result.
+ */
+type ChainValidationResult = {
+  valid: boolean;
+  reason?: string;
+  shouldClarify: boolean;
+};
+
+/**
+ * Validate that the chain follows restriction rules.
+ * Returns whether the chain is valid and if CLARIFY should be used.
+ * 
+ * Restriction rules enforced:
+ * 1. Chain length 4+ → CLARIFY (likely Single Intent violation)
+ * 2. Authority escalation without explicit requirement → CLARIFY
+ * 3. Phase order violation → reorder (handled in buildContractChain)
+ */
+function validateChain(contracts: AnswerContract[], intent: Intent): ChainValidationResult {
+  // Rule 1: Chain length should be 1-3 (4+ triggers CLARIFY)
+  if (contracts.length >= 4) {
+    console.warn(`[ContractChain] Chain length ${contracts.length} indicates Single Intent violation → CLARIFY`);
+    return {
+      valid: false,
+      reason: "Your request seems to combine multiple distinct tasks. Could you break it into separate questions?",
+      shouldClarify: true,
+    };
+  }
+  
+  // Rule 2: Authority should not escalate from extractive to authoritative
+  const authorityLevels: Record<SSOTMode, number> = { none: 0, descriptive: 1, authoritative: 2 };
+  let hasExtractiveContract = false;
+  let hasAuthoritativeContract = false;
+  
+  for (const contract of contracts) {
+    const constraints = CONTRACT_CONSTRAINTS[contract];
+    if (constraints.ssotMode === "none") hasExtractiveContract = true;
+    if (constraints.ssotMode === "authoritative") hasAuthoritativeContract = true;
+  }
+  
+  // Extractive → Authoritative is usually wrong (mixing meeting data with product claims)
+  if (hasExtractiveContract && hasAuthoritativeContract) {
+    console.warn(`[ContractChain] Authority escalation: mixing extractive and authoritative contracts → CLARIFY`);
+    return {
+      valid: false,
+      reason: "Your question combines meeting-specific information with product knowledge. Please ask these as separate questions.",
+      shouldClarify: true,
+    };
+  }
+  
+  // Rule 3: Contracts must be orderable (check phase order after sorting)
+  let lastPhase = 0;
+  for (const contract of contracts) {
+    const phase = PHASE_ORDER[CONTRACT_PHASES[contract] || "drafting"];
+    if (phase < lastPhase) {
+      // This shouldn't happen after sorting, but log if it does
+      console.warn(`[ContractChain] Phase order violation: ${contract} is out of order`);
+    }
+    lastPhase = phase;
+  }
+  
+  return { valid: true, shouldClarify: false };
+}
+
+/**
+ * Select a contract chain for SINGLE_MEETING queries.
+ * Dynamically builds chain based on intent, scope, and inferred tasks.
+ */
+export function selectSingleMeetingContractChain(
+  userMessage: string, 
+  scope?: Partial<ChainBuildScope>
+): ContractChain {
+  const fullScope: ChainBuildScope = {
+    type: "single_meeting",
+    ...scope,
+  };
+  return buildContractChain(userMessage, Intent.SINGLE_MEETING, fullScope);
 }
 
 /**
  * Select a contract chain for MULTI_MEETING queries.
- * 
- * Keywords are used to infer the analytical task and determine
- * whether chaining provides value. Chaining is ONLY triggered when:
- * - Explicit conjunction language is present (e.g., "questions and patterns")
- * - Clear compound intent is expressed (e.g., "compare trends over time")
- * 
- * This is task inference within a fixed intent, not intent classification.
- * 
- * IMPORTANT: Chain triggers must be strict to avoid false positives.
- * "common questions" should NOT trigger chaining (no explicit pattern request).
+ * Dynamically builds chain based on intent, scope, and inferred tasks.
  */
-export function selectMultiMeetingContractChain(userMessage: string): ContractChain {
-  const msg = userMessage.toLowerCase();
-  
-  // CHAIN TRIGGERS - Require explicit conjunction or compound language
-  
-  // Questions + Pattern chain: ONLY with explicit "and" or clear compound request
-  // e.g., "questions and patterns", "questions with recurring themes", "what questions and what patterns"
-  if (/questions?\s+(and|with)\s+(pattern|theme|recurring)/i.test(msg) ||
-      /pattern.*questions?|recurring.*questions?/i.test(msg)) {
-    return MULTI_MEETING_CONTRACT_CHAINS.QUESTIONS_PATTERN_CHAIN;
-  }
-  
-  // Comparison + Trend chain: "compare... over time" or "how have differences changed"
-  // e.g., "compare how things have changed over time", "differences and trends"
-  if (/compare.*over time|comparison.*trend|differences?\s+and\s+trend/i.test(msg) ||
-      /how\s+(have|has|did).*differ.*over time/i.test(msg)) {
-    return MULTI_MEETING_CONTRACT_CHAINS.COMPARISON_TREND_CHAIN;
-  }
-  
-  // SINGLE CONTRACT FALLBACKS - Default behavior for simple queries
-  
-  // Trend: explicit time-based analysis
-  if (/trend|over time|changing|evolving|growing|declining|progression/i.test(msg)) {
-    return MULTI_MEETING_CONTRACT_CHAINS.TREND_SINGLE;
-  }
-  
-  // Questions: customer questions across meetings (includes "common questions")
-  if (/questions?|asked|concerns|objections/i.test(msg)) {
-    return {
-      contracts: [AnswerContract.CROSS_MEETING_QUESTIONS],
-      selectionMethod: "keyword",
-      primaryContract: AnswerContract.CROSS_MEETING_QUESTIONS,
-    };
-  }
-  
-  // Comparison: differences between meetings
-  if (/compare|difference|differ|contrast|versus|vs\b/i.test(msg)) {
-    return {
-      contracts: [AnswerContract.COMPARISON],
-      selectionMethod: "keyword",
-      primaryContract: AnswerContract.COMPARISON,
-    };
-  }
-  
-  // Default to pattern analysis for general cross-meeting queries
-  return MULTI_MEETING_CONTRACT_CHAINS.PATTERN_SINGLE;
+export function selectMultiMeetingContractChain(
+  userMessage: string,
+  scope?: Partial<ChainBuildScope>
+): ContractChain {
+  const fullScope: ChainBuildScope = {
+    type: "multi_meeting",
+    ...scope,
+  };
+  return buildContractChain(userMessage, Intent.MULTI_MEETING, fullScope);
 }
 
 export function getContractConstraints(contract: AnswerContract): AnswerContractConstraints {

@@ -389,8 +389,15 @@ async function handleMultiMeetingIntent(
     };
   }
   
-  // Select contract chain for MULTI_MEETING (may be single or multiple contracts)
-  const chain = selectMultiMeetingContractChain(userMessage);
+  // Build scope from resolved meetings
+  const scope = {
+    type: "multi_meeting" as const,
+    meetingIds: meetingSearch.meetings.map(m => m.meetingId),
+    filters: meetingSearch.searchedFor ? { topic: meetingSearch.searchedFor } : undefined,
+  };
+  
+  // Select contract chain based on intent, scope, and inferred tasks
+  const chain = selectMultiMeetingContractChain(userMessage, scope);
   const isChained = chain.contracts.length > 1;
   console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (${isChained ? "chained" : "single"})`);
   
