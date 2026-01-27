@@ -54,8 +54,16 @@ The system uses an Intent → Context Layers → Answer Contract flow instead of
 - document_context: Document search and retrieval
 
 **Answer Contracts** (selected after layers determined):
-- MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, PRODUCT_EXPLANATION, FEATURE_VERIFICATION, FAQ_ANSWER, DRAFT_RESPONSE, DRAFT_EMAIL, REFUSE, CLARIFY
+- SINGLE_MEETING: MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, EXTRACTIVE_FACT, AGGREGATIVE_LIST
+- MULTI_MEETING: PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY, CROSS_MEETING_QUESTIONS
+- PRODUCT: PRODUCT_EXPLANATION, FEATURE_VERIFICATION, FAQ_ANSWER
+- GENERAL: DRAFT_RESPONSE, DRAFT_EMAIL, VALUE_PROPOSITION
+- TERMINAL: REFUSE, CLARIFY, NOT_FOUND
 - Contracts define response shape and SSOT mode (descriptive/authoritative/none)
+
+**Scope Types** (identical structure, different scope size):
+- SingleMeetingScope: { type, meetingId, companyId?, companyName? }
+- MultiMeetingScope: { type, meetingIds, filters?: { company?, topic?, timeRange? } }
 
 ### Slack Single-Meeting Orchestrator
 Handles user questions scoped to a single meeting with read-only artifact access. Internal sub-intent classification:

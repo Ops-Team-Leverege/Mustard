@@ -43,24 +43,39 @@ const openai = new OpenAI({
  * - Ambient context must never be cited as a source of truth
  * - Ambient context controls framing only
  */
-const AMBIENT_PRODUCT_CONTEXT = `IMPORTANT: You are an AI assistant for PitCrew employees. There is only ONE PitCrew - the company you work for.
+/**
+ * Ambient Product Context - Authoritative Identity Prompt
+ * 
+ * Purpose:
+ * - Removes all "Which PitCrew?" ambiguity
+ * - Enables high-level explanations and copy
+ * - Strictly respects SSOT authority boundaries
+ * 
+ * Rules:
+ * - Ambient context is NOT evidence
+ * - Ambient context must NEVER be cited or used to justify claims
+ * - Product SSOT remains the ONLY source of authoritative product facts
+ */
+const AMBIENT_PRODUCT_CONTEXT = `IMPORTANT: You are an AI assistant for PitCrew employees.
+There is only ONE PitCrew — the product developed by Leverege.
 
-PitCrew Identity (established fact - do NOT ask "which PitCrew?"):
-- PitCrew is a B2B SaaS company that sells vision AI solutions to automotive service businesses
-- PitCrew is developed by Leverege
-- Target customers: tire shops (Les Schwab, Discount Tire), oil change chains (Jiffy Lube, Valvoline), car washes, and similar automotive service businesses
+=== PitCrew Identity (Established Fact) ===
+- PitCrew is a B2B SaaS product developed by Leverege
+- It is used by automotive service businesses (e.g., tire shops, oil change centers, car washes, dealership service departments)
+- When users mention "PitCrew," they ALWAYS mean this product
+- Never ask for clarification about which PitCrew
 
-When the user mentions "PitCrew" or asks about the product, they ALWAYS mean this PitCrew. Never ask for clarification about which PitCrew.
+=== Framing Context (Non-Authoritative) ===
+Use the following only for high-level explanation and framing:
+- PitCrew focuses on helping teams understand operations in automotive service environments
+- It applies AI and computer vision concepts to analyze activity in service bays
+- It is commonly described in terms of visibility, operational insight, and performance improvement
 
-About PitCrew (for framing only - not authoritative claims):
-- PitCrew uses computer vision and AI to analyze operations in automotive service bays
-- It helps teams understand operational performance through video-based analytics
-- The platform provides insights for improving throughput, consistency, and customer experience
-- Key value: visibility into service operations, performance tracking, queue management
+Do NOT treat the above as authoritative facts or guarantees.
 
-Authority rules:
+=== Authority Rules ===
 - When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes
-- Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided`;
+- Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided AND the active contract permits authoritative claims`;
 
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
 import { selectAnswerContract, AnswerContract, type SSOTMode } from "../controlPlane/answerContracts";
@@ -174,8 +189,12 @@ export async function handleOpenAssistant(
     
     console.log(`[OpenAssistant] Mapped to evidence source: ${mappedIntent}`);
     
-    if (cpIntent.intent === Intent.SINGLE_MEETING || cpIntent.intent === Intent.MULTI_MEETING) {
+    if (cpIntent.intent === Intent.SINGLE_MEETING) {
       return handleMeetingDataIntent(userMessage, context, fakeClassification);
+    }
+    
+    if (cpIntent.intent === Intent.MULTI_MEETING) {
+      return handleMultiMeetingIntent(userMessage, context, fakeClassification);
     }
     
     if (cpIntent.intent === Intent.PRODUCT_KNOWLEDGE) {
@@ -335,6 +354,88 @@ async function handleMeetingDataIntent(
     artifactMatches: undefined,
     delegatedToSingleMeeting: false,
   };
+}
+
+/**
+ * Handle MULTI_MEETING intent explicitly.
+ * 
+ * Uses identical structure to SINGLE_MEETING, only scope size differs.
+ * Proper contract selection for cross-meeting analysis:
+ * - PATTERN_ANALYSIS: Recurring themes
+ * - COMPARISON: Differences across meetings
+ * - TREND_SUMMARY: Changes over time
+ * - CROSS_MEETING_QUESTIONS: Questions across meetings
+ */
+async function handleMultiMeetingIntent(
+  userMessage: string,
+  context: OpenAssistantContext,
+  classification: IntentClassification
+): Promise<OpenAssistantResult> {
+  console.log(`[OpenAssistant] Routing to MULTI_MEETING path`);
+  
+  const meetingSearch = await findRelevantMeetings(userMessage, classification);
+  
+  if (meetingSearch.meetings.length === 0) {
+    return {
+      answer: `I searched for meetings related to your question but couldn't find any matching transcripts. ${meetingSearch.searchedFor ? `I looked for: ${meetingSearch.searchedFor}` : ''}\n\nCould you provide more details about which customers or meetings you're asking about?`,
+      intent: "meeting_data",
+      intentClassification: classification,
+      controlPlaneIntent: Intent.MULTI_MEETING,
+      answerContract: AnswerContract.NOT_FOUND,
+      ssotMode: "none" as SSOTMode,
+      dataSource: "meeting_artifacts",
+      delegatedToSingleMeeting: false,
+    };
+  }
+  
+  // Select appropriate MULTI_MEETING contract based on query type
+  const contract = selectMultiMeetingContract(userMessage);
+  console.log(`[OpenAssistant] Selected MULTI_MEETING contract: ${contract}`);
+  
+  // Search across all found meetings
+  const crossMeetingResult = await searchAcrossMeetings(userMessage, meetingSearch.meetings);
+  
+  return {
+    answer: crossMeetingResult,
+    intent: "meeting_data",
+    intentClassification: classification,
+    controlPlaneIntent: Intent.MULTI_MEETING,
+    answerContract: contract,
+    ssotMode: "none" as SSOTMode,
+    dataSource: "meeting_artifacts",
+    delegatedToSingleMeeting: false,
+  };
+}
+
+/**
+ * Select appropriate contract for MULTI_MEETING queries.
+ * Uses keyword-first deterministic matching.
+ */
+function selectMultiMeetingContract(userMessage: string): AnswerContract {
+  const msg = userMessage.toLowerCase();
+  
+  // Pattern analysis keywords
+  if (/pattern|recurring|common|theme|frequently|often|always/i.test(msg)) {
+    return AnswerContract.PATTERN_ANALYSIS;
+  }
+  
+  // Comparison keywords
+  if (/compare|difference|differ|contrast|versus|vs\.?|between/i.test(msg)) {
+    return AnswerContract.COMPARISON;
+  }
+  
+  // Trend/time-based keywords
+  if (/trend|over time|change|evolving|growing|declining|progression/i.test(msg)) {
+    return AnswerContract.TREND_SUMMARY;
+  }
+  
+  // Cross-meeting questions
+  if (/questions|asked|concerns|issues|objections/i.test(msg)) {
+    return AnswerContract.CROSS_MEETING_QUESTIONS;
+  }
+  
+  // Default to pattern analysis for general cross-meeting queries
+  return AnswerContract.PATTERN_ANALYSIS;
 }
 
 /**

@@ -28,6 +28,34 @@ export type ContextLayerMetadata = {
   intent: Intent;
 };
 
+// ============================================================================
+// SCOPE TYPES
+// Scope represents what data the execution plane is allowed to access.
+// MULTI_MEETING and SINGLE_MEETING use identical structure, only scope size differs.
+// ============================================================================
+
+export type SingleMeetingScope = {
+  type: "single_meeting";
+  meetingId: string;
+  companyId?: string;
+  companyName?: string;
+};
+
+export type MultiMeetingScope = {
+  type: "multi_meeting";
+  meetingIds: string[];
+  filters?: {
+    company?: string;
+    topic?: string;
+    timeRange?: {
+      start?: Date;
+      end?: Date;
+    };
+  };
+};
+
+export type MeetingScope = SingleMeetingScope | MultiMeetingScope;
+
 export const PRODUCT_IDENTITY_CONTEXT = {
   name: "PitCrew",
   company: "Leverege",

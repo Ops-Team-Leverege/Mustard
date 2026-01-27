@@ -34,7 +34,9 @@ const openai = new OpenAI({
 export type SSOTMode = "descriptive" | "authoritative" | "none";
 
 export enum AnswerContract {
-  // Extractive contracts (SSOT mode: none)
+  // ============================================================================
+  // SINGLE_MEETING Extractive Contracts (SSOT mode: none)
+  // ============================================================================
   MEETING_SUMMARY = "MEETING_SUMMARY",
   NEXT_STEPS = "NEXT_STEPS",
   ATTENDEES = "ATTENDEES",
@@ -42,22 +44,39 @@ export enum AnswerContract {
   EXTRACTIVE_FACT = "EXTRACTIVE_FACT",
   AGGREGATIVE_LIST = "AGGREGATIVE_LIST",
   
+  // ============================================================================
+  // MULTI_MEETING Contracts (SSOT mode: none)
+  // Identical structure to SINGLE_MEETING, different scope size
+  // ============================================================================
+  PATTERN_ANALYSIS = "PATTERN_ANALYSIS",       // Recurring themes across meetings
+  COMPARISON = "COMPARISON",                   // Differences across meetings
+  TREND_SUMMARY = "TREND_SUMMARY",             // Changes over time
+  CROSS_MEETING_QUESTIONS = "CROSS_MEETING_QUESTIONS", // Questions across meetings
+  
+  // ============================================================================
   // Descriptive contracts (SSOT mode: descriptive)
+  // ============================================================================
   PRODUCT_EXPLANATION = "PRODUCT_EXPLANATION",
   VALUE_PROPOSITION = "VALUE_PROPOSITION",
   DRAFT_RESPONSE = "DRAFT_RESPONSE",
   DRAFT_EMAIL = "DRAFT_EMAIL",
   
+  // ============================================================================
   // Authoritative contracts (SSOT mode: authoritative)
+  // ============================================================================
   FEATURE_VERIFICATION = "FEATURE_VERIFICATION",
   FAQ_ANSWER = "FAQ_ANSWER",
   
+  // ============================================================================
   // General contracts
+  // ============================================================================
   DOCUMENT_ANSWER = "DOCUMENT_ANSWER",
   GENERAL_RESPONSE = "GENERAL_RESPONSE",
   NOT_FOUND = "NOT_FOUND",
   
+  // ============================================================================
   // Terminal contracts
+  // ============================================================================
   REFUSE = "REFUSE",
   CLARIFY = "CLARIFY",
   
@@ -124,6 +143,36 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     requiresEvidence: true,
     allowsSummary: false,
     requiresCitation: false,
+    responseFormat: "list",
+  },
+  
+  // MULTI_MEETING contracts (identical structure to SINGLE_MEETING, different scope)
+  [AnswerContract.PATTERN_ANALYSIS]: {
+    ssotMode: "none",
+    requiresEvidence: true,
+    allowsSummary: true,
+    requiresCitation: true,
+    responseFormat: "text",
+  },
+  [AnswerContract.COMPARISON]: {
+    ssotMode: "none",
+    requiresEvidence: true,
+    allowsSummary: false,
+    requiresCitation: true,
+    responseFormat: "structured",
+  },
+  [AnswerContract.TREND_SUMMARY]: {
+    ssotMode: "none",
+    requiresEvidence: true,
+    allowsSummary: true,
+    requiresCitation: true,
+    responseFormat: "text",
+  },
+  [AnswerContract.CROSS_MEETING_QUESTIONS]: {
+    ssotMode: "none",
+    requiresEvidence: true,
+    allowsSummary: false,
+    requiresCitation: true,
     responseFormat: "list",
   },
   
@@ -272,6 +321,48 @@ const GENERAL_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "help me write": AnswerContract.DRAFT_EMAIL,
 };
 
+// MULTI_MEETING contracts - different scope size, same contract structure
+const MULTI_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
+  // Pattern analysis (recurring themes)
+  "pattern": AnswerContract.PATTERN_ANALYSIS,
+  "patterns": AnswerContract.PATTERN_ANALYSIS,
+  "recurring": AnswerContract.PATTERN_ANALYSIS,
+  "common theme": AnswerContract.PATTERN_ANALYSIS,
+  "frequently": AnswerContract.PATTERN_ANALYSIS,
+  "often": AnswerContract.PATTERN_ANALYSIS,
+  "always come up": AnswerContract.PATTERN_ANALYSIS,
+  "keeps coming up": AnswerContract.PATTERN_ANALYSIS,
+  
+  // Comparison (differences across meetings)
+  "compare": AnswerContract.COMPARISON,
+  "difference": AnswerContract.COMPARISON,
+  "differences": AnswerContract.COMPARISON,
+  "differ": AnswerContract.COMPARISON,
+  "contrast": AnswerContract.COMPARISON,
+  "versus": AnswerContract.COMPARISON,
+  "vs": AnswerContract.COMPARISON,
+  "between meetings": AnswerContract.COMPARISON,
+  
+  // Trend summary (changes over time)
+  "trend": AnswerContract.TREND_SUMMARY,
+  "trends": AnswerContract.TREND_SUMMARY,
+  "over time": AnswerContract.TREND_SUMMARY,
+  "changing": AnswerContract.TREND_SUMMARY,
+  "evolving": AnswerContract.TREND_SUMMARY,
+  "growing": AnswerContract.TREND_SUMMARY,
+  "declining": AnswerContract.TREND_SUMMARY,
+  "progression": AnswerContract.TREND_SUMMARY,
+  
+  // Cross-meeting questions
+  "questions across": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "common questions": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "what are customers asking": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "frequently asked": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "most asked": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "objections": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "concerns raised": AnswerContract.CROSS_MEETING_QUESTIONS,
+};
+
 const REFUSE_PATTERNS = [
   /\b(weather|forecast|temperature)\b/i,
   /\b(home address|personal address|private address)\b/i,
@@ -317,7 +408,8 @@ function selectContractByKeyword(
   }
 
   if (intent === Intent.MULTI_MEETING) {
-    for (const [keyword, contract] of Object.entries(SINGLE_MEETING_CONTRACT_KEYWORDS)) {
+    // Use dedicated MULTI_MEETING keywords for cross-meeting analysis
+    for (const [keyword, contract] of Object.entries(MULTI_MEETING_CONTRACT_KEYWORDS)) {
       if (lower.includes(keyword)) {
         return {
           contract,
@@ -326,10 +418,11 @@ function selectContractByKeyword(
         };
       }
     }
+    // Default to PATTERN_ANALYSIS for general cross-meeting queries
     return {
-      contract: AnswerContract.AGGREGATIVE_LIST,
+      contract: AnswerContract.PATTERN_ANALYSIS,
       contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.AGGREGATIVE_LIST],
+      constraints: CONTRACT_CONSTRAINTS[AnswerContract.PATTERN_ANALYSIS],
     };
   }
 

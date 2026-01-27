@@ -1,0 +1,212 @@
+Improve Ambient Context + Implement Multi-Meeting (v3)
+Context
+
+We are refining the PitCrew assistant to:
+
+eliminate product identity ambiguity
+
+prevent hallucinated product claims
+
+treat MULTI_MEETING as a first-class scope, identical in structure to SINGLE_MEETING
+
+reuse the existing intent → scope → contracts architecture
+
+Do not introduce new abstractions.
+Extend the existing system.
+
+Part 1 — Update Ambient Product Context (Authoritative)
+Goal
+
+Strengthen product identity and framing without introducing authoritative claims.
+
+Ambient context must:
+
+remove all “Which PitCrew?” ambiguity
+
+enable high-level explanations and copy
+
+strictly respect SSOT authority boundaries
+
+Replace the Ambient Prompt with the following text
+
+Always include this system-level prompt in all execution paths (no exceptions):
+
+IMPORTANT: You are an AI assistant for PitCrew employees.
+There is only ONE PitCrew — the product developed by Leverege.
+
+=== PitCrew Identity (Established Fact) ===
+- PitCrew is a B2B SaaS product developed by Leverege
+- It is used by automotive service businesses (e.g., tire shops, oil change centers, car washes, dealership service departments)
+- When users mention “PitCrew,” they ALWAYS mean this product
+- Never ask for clarification about which PitCrew
+
+=== Framing Context (Non-Authoritative) ===
+Use the following only for high-level explanation and framing:
+- PitCrew focuses on helping teams understand operations in automotive service environments
+- It applies AI and computer vision concepts to analyze activity in service bays
+- It is commonly described in terms of visibility, operational insight, and performance improvement
+
+Do NOT treat the above as authoritative facts or guarantees.
+
+=== Authority Rules ===
+- When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes
+- Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided AND the active contract permits authoritative claims
+
+Enforcement
+
+Ambient context is not evidence
+
+Ambient context must never be cited or used to justify claims
+
+Product SSOT remains the only source of authoritative product facts
+
+Part 2 — Implement MULTI_MEETING as First-Class Scope
+Design Principle (Must Be Preserved)
+
+MULTI_MEETING is not special.
+It differs from SINGLE_MEETING only in scope size.
+
+Everything else (contracts, authority, logging) works the same way.
+
+Intent Handling
+
+Ensure the control plane classifies and emits:
+
+MULTI_MEETING intent when the user asks:
+
+across meetings
+
+over time
+
+across customers
+
+patterns, trends, comparisons
+
+Examples:
+
+“What issues have customers raised about dashboards?”
+
+“Which customers asked about POS integration?”
+
+“What trends are we seeing across meetings?”
+
+Scope Resolution (Control Plane)
+
+For MULTI_MEETING:
+
+Resolve scope as a set of meetings, not a single meeting
+
+Scope may include:
+
+company filters
+
+time ranges
+
+topic hints (e.g., “dashboard”, “pricing”)
+
+Example scope object:
+
+{
+  "scope": {
+    "type": "multi_meeting",
+    "meeting_ids": ["m1", "m2", "m3"],
+    "filters": {
+      "company": "ACE",
+      "topic": "dashboard"
+    }
+  }
+}
+
+
+No LLM inference here — deterministic resolution only.
+
+Contracts for MULTI_MEETING
+
+Reuse the same contract system.
+
+Valid MULTI_MEETING contracts include (non-exhaustive):
+
+CUSTOMER_QUESTIONS (extractive, across meetings)
+
+MEETING_SUMMARY (aggregate summary)
+
+PATTERN_ANALYSIS (recurring themes)
+
+COMPARISON (differences across meetings)
+
+TREND_SUMMARY (over time)
+
+Contracts:
+
+define answer shape
+
+define SSOT mode
+
+do not change intent
+
+Example — MULTI_MEETING Execution
+
+User:
+“What issues have customers raised about dashboards?”
+
+Control Plane Output:
+
+intent = MULTI_MEETING
+scope = all relevant meetings mentioning dashboards
+
+
+Contract Chain:
+
+[
+  { "contract": "CUSTOMER_QUESTIONS", "ssot_mode": null },
+  { "contract": "PATTERN_ANALYSIS", "ssot_mode": null }
+]
+
+
+Execution:
+
+Extract dashboard-related questions across meetings
+
+Analyze recurring issues
+
+No product claims unless a PRODUCT_* contract is explicitly added
+
+Logging Requirements (Mandatory)
+
+Ensure logs include:
+
+{
+  "intent": "MULTI_MEETING",
+  "scope": { ... },
+  "contract_chain": [
+    { "contract": "CUSTOMER_QUESTIONS", "ssot_mode": null },
+    { "contract": "PATTERN_ANALYSIS", "ssot_mode": null }
+  ]
+}
+
+
+This must work identically to SINGLE_MEETING logging.
+
+Constraints (Do Not Violate)
+
+Do not introduce a separate “multi-meeting system”
+
+Do not bypass the control plane
+
+Do not let the LLM select intent or contracts
+
+Do not inject Product SSOT unless the contract explicitly allows it
+
+Do not treat MULTI_MEETING as RAG-only — retrieval is an implementation detail
+
+Acceptance Criteria
+
+“Which PitCrew?” never appears in responses
+
+MULTI_MEETING queries route deterministically
+
+MULTI_MEETING uses the same contract machinery as SINGLE_MEETING
+
+Authority rules behave identically across scopes
+
+Logs clearly explain intent, scope, contracts, and SSOT usage
