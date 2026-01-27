@@ -139,6 +139,7 @@ export async function handleOpenAssistant(
     if (cpResult.intent === Intent.CLARIFY) {
       // Check if the contract suggests meeting data is needed - if so, attempt meeting search
       // instead of immediately returning clarification
+      // Meeting-related contracts - attempt search instead of clarifying
       const meetingRelatedContracts = [
         AnswerContract.MEETING_SUMMARY,
         AnswerContract.EXTRACTIVE_FACT,
@@ -149,10 +150,23 @@ export async function handleOpenAssistant(
         AnswerContract.CROSS_MEETING_QUESTIONS,
       ];
       
+      // General/creative contracts that should execute without clarifying
+      const executeWithoutClarifyContracts = [
+        AnswerContract.DRAFT_EMAIL,
+        AnswerContract.DRAFT_RESPONSE,
+        AnswerContract.GENERAL_RESPONSE,
+      ];
+      
       if (meetingRelatedContracts.includes(cpResult.answerContract)) {
         console.log(`[OpenAssistant] CLARIFY intent but meeting-related contract (${cpResult.answerContract}) - attempting meeting search`);
         const classification = defaultClassification("Clarification with meeting-related contract - attempting search");
         return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
+      }
+      
+      if (executeWithoutClarifyContracts.includes(cpResult.answerContract)) {
+        console.log(`[OpenAssistant] CLARIFY intent but execute-without-clarify contract (${cpResult.answerContract}) - routing to general assistance`);
+        const classification = defaultClassification("Clarification with general contract - executing directly");
+        return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
       }
       
       return {

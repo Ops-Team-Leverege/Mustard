@@ -343,6 +343,9 @@ const KNOWN_COMPANIES = [
   "monro",
   "ntb",
   "amazon",
+  "canadian tire",
+  "atlantic coast enterprise",
+  "atlantic coast",
 ];
 
 const KNOWN_CONTACTS = [
