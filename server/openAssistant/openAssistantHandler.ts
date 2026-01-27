@@ -30,18 +30,49 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+/**
+ * AMBIENT PRODUCT CONTEXT (Always On)
+ * 
+ * Provides product identity and framing while explicitly restricting factual authority.
+ * - Resolves "what product are we talking about?"
+ * - Enables natural explanations and copywriting
+ * - Does NOT authorize factual claims
+ * 
+ * Rules:
+ * - Ambient context is not evidence
+ * - Ambient context must never be cited as a source of truth
+ * - Ambient context controls framing only
+ */
+const AMBIENT_PRODUCT_CONTEXT = `You are assisting with PitCrew, a product by Leverege.
+Assume all conversations refer to this product unless explicitly stated otherwise.
+When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes.
+Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT is available and the active contract permits authoritative claims.
+
+About PitCrew (for framing only - not authoritative claims):
+- PitCrew is a vision AI solution for automotive service businesses (tire shops, oil change chains, car washes)
+- It helps teams understand operational performance through video-based analytics
+- The platform provides insights for improving throughput, consistency, and customer experience`;
+
+import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
+import { selectAnswerContract, AnswerContract, type SSOTMode } from "../controlPlane/answerContracts";
+import { type ContextLayers } from "../controlPlane/contextLayers";
+
 export type OpenAssistantContext = {
   userId?: string;
   threadId?: string;
   conversationContext?: string;
   resolvedMeeting?: SingleMeetingContext | null;
+  controlPlaneIntent?: IntentClassificationResult;
 };
 
 export type OpenAssistantResult = {
   answer: string;
   intent: OpenAssistantIntent;
   intentClassification: IntentClassification;
-  dataSource: "meeting_artifacts" | "external_research" | "general_knowledge" | "hybrid" | "clarification";
+  controlPlaneIntent?: Intent;
+  answerContract?: AnswerContract;
+  ssotMode?: SSOTMode;
+  dataSource: "meeting_artifacts" | "external_research" | "general_knowledge" | "hybrid" | "clarification" | "product_ssot";
   researchCitations?: ResearchResult["citations"];
   artifactMatches?: ArtifactSearchResult;
   singleMeetingResult?: SingleMeetingResult;
@@ -49,16 +80,101 @@ export type OpenAssistantResult = {
 };
 
 /**
+ * Map control plane intent to evidence source intent for routing.
+ */
+function mapControlPlaneToEvidenceSource(cpIntent: Intent): OpenAssistantIntent {
+  switch (cpIntent) {
+    case Intent.SINGLE_MEETING:
+    case Intent.MULTI_MEETING:
+      return "meeting_data";
+    case Intent.PRODUCT_KNOWLEDGE:
+      return "general_assistance";
+    case Intent.DOCUMENT_SEARCH:
+      return "general_assistance";
+    case Intent.GENERAL_HELP:
+    case Intent.REFUSE:
+    case Intent.CLARIFY:
+    default:
+      return "general_assistance";
+  }
+}
+
+/**
  * Main entry point for Open Assistant.
  * 
  * Called from Slack events handler after initial processing (dedup, ack, etc.)
  * Routes to appropriate handler based on classified intent.
+ * 
+ * When a control plane intent is provided, it takes precedence over the
+ * Open Assistant's own intent classification.
  */
 export async function handleOpenAssistant(
   userMessage: string,
   context: OpenAssistantContext
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Processing: "${userMessage}"`);
+  
+  if (context.controlPlaneIntent) {
+    const cpIntent = context.controlPlaneIntent;
+    console.log(`[OpenAssistant] Using control plane intent: ${cpIntent.intent} (${cpIntent.intentDetectionMethod})`);
+    
+    if (cpIntent.intent === Intent.REFUSE) {
+      return {
+        answer: "I'm sorry, but that question is outside of what I can help with. I'm designed to assist with PitCrew-related topics, customer meetings, and product information.",
+        intent: "general_assistance",
+        intentClassification: defaultClassification("Refused by control plane"),
+        controlPlaneIntent: cpIntent.intent,
+        answerContract: AnswerContract.REFUSE,
+        dataSource: "clarification",
+        delegatedToSingleMeeting: false,
+      };
+    }
+    
+    if (cpIntent.intent === Intent.CLARIFY && cpIntent.needsSplit) {
+      const splitMessage = cpIntent.splitOptions 
+        ? `I can help with that, but let's do it one step at a time. Which would you like first: ${cpIntent.splitOptions.join(" or ")}?`
+        : "I can help with that, but let's do it one step at a time. Could you tell me which part you'd like me to focus on first?";
+      
+      return {
+        answer: splitMessage,
+        intent: "general_assistance",
+        intentClassification: defaultClassification("Split required by control plane"),
+        controlPlaneIntent: cpIntent.intent,
+        answerContract: AnswerContract.CLARIFY,
+        dataSource: "clarification",
+        delegatedToSingleMeeting: false,
+      };
+    }
+    
+    const mappedIntent = mapControlPlaneToEvidenceSource(cpIntent.intent);
+    const fakeClassification: IntentClassification = {
+      intent: mappedIntent,
+      confidence: cpIntent.confidence > 0.8 ? "high" : cpIntent.confidence > 0.5 ? "medium" : "low",
+      rationale: cpIntent.reason || "Mapped from control plane intent",
+      meetingRelevance: {
+        referencesSpecificInteraction: cpIntent.intent === Intent.SINGLE_MEETING,
+        asksWhatWasSaidOrAgreed: false,
+        asksAboutCustomerQuestions: false,
+      },
+      researchRelevance: {
+        needsPublicInfo: false,
+        companyOrEntityMentioned: null,
+        topicForResearch: null,
+      },
+    };
+    
+    console.log(`[OpenAssistant] Mapped to evidence source: ${mappedIntent}`);
+    
+    if (cpIntent.intent === Intent.SINGLE_MEETING || cpIntent.intent === Intent.MULTI_MEETING) {
+      return handleMeetingDataIntent(userMessage, context, fakeClassification);
+    }
+    
+    if (cpIntent.intent === Intent.PRODUCT_KNOWLEDGE) {
+      return handleProductKnowledgeIntent(userMessage, context, fakeClassification);
+    }
+    
+    return handleGeneralAssistanceIntent(userMessage, context, fakeClassification);
+  }
   
   const intentClassification = await classifyIntent(
     userMessage,
@@ -95,6 +211,24 @@ export async function handleOpenAssistant(
     default:
       return handleGeneralAssistanceIntent(userMessage, context, intentClassification);
   }
+}
+
+function defaultClassification(rationale: string): IntentClassification {
+  return {
+    intent: "general_assistance",
+    confidence: "low",
+    rationale,
+    meetingRelevance: {
+      referencesSpecificInteraction: false,
+      asksWhatWasSaidOrAgreed: false,
+      asksAboutCustomerQuestions: false,
+    },
+    researchRelevance: {
+      needsPublicInfo: false,
+      companyOrEntityMentioned: null,
+      topicForResearch: null,
+    },
+  };
 }
 
 /**
@@ -223,6 +357,9 @@ async function handleExternalResearchIntent(
 
 /**
  * Handle general_assistance intent using GPT-5 for general help.
+ * 
+ * Uses ambient product context for framing but does NOT make authoritative claims
+ * about product features, pricing, or integrations without Product SSOT.
  */
 async function handleGeneralAssistanceIntent(
   userMessage: string,
@@ -236,7 +373,9 @@ async function handleGeneralAssistanceIntent(
     messages: [
       {
         role: "system",
-        content: `You are a helpful business assistant. Provide clear, professional help with the user's request.
+        content: `${AMBIENT_PRODUCT_CONTEXT}
+
+You are a helpful business assistant for the PitCrew team. Provide clear, professional help with the user's request.
 
 You can help with:
 - Drafting emails, messages, and documents
@@ -244,7 +383,11 @@ You can help with:
 - Providing suggestions and recommendations
 - Helping with planning and organization
 
-Be direct and helpful. If you're unsure about something, say so.`,
+IMPORTANT CONSTRAINTS:
+- Do NOT make specific claims about PitCrew features, pricing, or integrations
+- If asked about product specifics, say you'd need to check the product documentation
+- For meeting-related questions, suggest they ask about a specific meeting
+- Be direct and helpful. If you're unsure about something, say so.`,
       },
       {
         role: "user",
@@ -259,6 +402,65 @@ Be direct and helpful. If you're unsure about something, say so.`,
     answer,
     intent: "general_assistance",
     intentClassification: classification,
+    dataSource: "general_knowledge",
+    delegatedToSingleMeeting: false,
+  };
+}
+
+/**
+ * Handle PRODUCT_KNOWLEDGE intent with proper authority control.
+ * 
+ * Uses ambient context for framing and descriptive explanations.
+ * For authoritative claims (features, pricing, integrations), requires Product SSOT.
+ * 
+ * TODO: Integrate Airtable Product SSOT for authoritative claims.
+ */
+async function handleProductKnowledgeIntent(
+  userMessage: string,
+  context: OpenAssistantContext,
+  classification: IntentClassification
+): Promise<OpenAssistantResult> {
+  console.log(`[OpenAssistant] Routing to product knowledge path`);
+  
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      {
+        role: "system",
+        content: `${AMBIENT_PRODUCT_CONTEXT}
+
+You are answering a product knowledge question about PitCrew.
+
+AUTHORITY RULES:
+- For general "how does it work" questions: Provide high-level explanations about purpose, value, and outcomes
+- For specific feature questions: Say what you know at a high level, but add "I'd recommend checking our product documentation for the latest details"
+- For pricing questions: Say "For current pricing information, please check with the sales team or product documentation"
+- For integration questions: Provide general framing but note that specific integration details should be verified
+
+NEVER fabricate specific:
+- Pricing numbers or tiers
+- Integration compatibility claims
+- Feature availability by tier
+- Technical specifications
+
+Keep responses helpful but appropriately bounded by what can be safely stated without authoritative product data.`,
+      },
+      {
+        role: "user",
+        content: userMessage,
+      },
+    ],
+  });
+
+  const answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
+
+  return {
+    answer,
+    intent: "general_assistance",
+    intentClassification: classification,
+    controlPlaneIntent: Intent.PRODUCT_KNOWLEDGE,
+    answerContract: AnswerContract.PRODUCT_EXPLANATION,
+    ssotMode: "descriptive",
     dataSource: "general_knowledge",
     delegatedToSingleMeeting: false,
   };

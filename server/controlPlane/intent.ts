@@ -1,13 +1,19 @@
 /**
- * Intent Classification System
+ * Intent Classification System (v2)
  * 
  * Purpose:
  * Canonical intent enum that determines what data scopes are allowed.
  * Intent is immutable once classified - cannot be changed later in pipeline.
  * 
+ * Core Invariant (Non-Negotiable):
+ * One user request → one intent → one scope → one or more contracts executed in sequence
+ * 
  * Classification Strategy:
- * 1. Keyword fast-paths for common patterns (no LLM cost)
- * 2. LLM fallback for ambiguous queries
+ * 1. Pattern-based fast-paths for common patterns (no LLM cost)
+ * 2. Named entity detection (company names, contact names)
+ * 3. Split detection for multi-intent requests (CLARIFY)
+ * 4. REFUSE detection for out-of-scope requests
+ * 5. LLM fallback for ambiguous queries
  * 
  * Layer: Control Plane (Intent Classification)
  */
@@ -24,16 +30,24 @@ export enum Intent {
   PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE",
   DOCUMENT_SEARCH = "DOCUMENT_SEARCH",
   GENERAL_HELP = "GENERAL_HELP",
+  REFUSE = "REFUSE",
+  CLARIFY = "CLARIFY",
 }
 
-export type IntentDetectionMethod = "keyword" | "llm" | "default";
+export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "default";
 
 export type IntentClassificationResult = {
   intent: Intent;
   intentDetectionMethod: IntentDetectionMethod;
   confidence: number;
   reason?: string;
+  needsSplit?: boolean;
+  splitOptions?: string[];
 };
+
+// ============================================================================
+// KEYWORD PATTERNS - Simple string matching (low cost, high precision)
+// ============================================================================
 
 const SINGLE_MEETING_KEYWORDS = [
   "yesterday",
@@ -66,10 +80,15 @@ const SINGLE_MEETING_KEYWORDS = [
   "on friday",
   "last week",
   "this week",
+  "summarize the meeting",
+  "summary of the meeting",
+  "meeting summary",
+  "walkthrough",
 ];
 
 const MULTI_MEETING_KEYWORDS = [
   "across meetings",
+  "across all meetings",
   "all meetings",
   "trend",
   "over time",
@@ -82,6 +101,14 @@ const MULTI_MEETING_KEYWORDS = [
   "aggregate",
   "summary of all",
   "compare meetings",
+  "find all",
+  "search for",
+  "which meetings",
+  "every meeting",
+  "any meetings",
+  "meetings that mention",
+  "who asked about",
+  "everyone who",
 ];
 
 const PRODUCT_KNOWLEDGE_KEYWORDS = [
@@ -99,6 +126,22 @@ const PRODUCT_KNOWLEDGE_KEYWORDS = [
   "value proposition",
   "how does pitcrew",
   "pitcrew integrations",
+  "pitcrew work",
+  "pitcrew help",
+  "about pitcrew",
+  "pitcrew's",
+  "live tv dashboard",
+  "bladeassure",
+  "queue analytics",
+  "tire tracking",
+  "bay tracking",
+  "vehicle tracking",
+  "camera integration",
+  "vision ai",
+  "update our pricing",
+  "pricing faq",
+  "safety features",
+  "deployment options",
 ];
 
 const DOCUMENT_SEARCH_KEYWORDS = [
@@ -109,53 +152,250 @@ const DOCUMENT_SEARCH_KEYWORDS = [
   "wiki",
   "knowledge base",
   "reference doc",
+  "find the contract",
+  "contract we signed",
+  "proposal",
+  "agreement",
 ];
 
 const GENERAL_HELP_KEYWORDS = [
-  "help",
-  "how do i",
   "what can you do",
   "commands",
   "usage",
   "hello",
-  "hi",
-  "hey",
+  "hi there",
+  "hey there",
   "thanks",
   "thank you",
+  "good morning",
+  "good afternoon",
+  "draft an email",
+  "draft email",
+  "write an email",
+  "write email",
+  "draft a message",
+  "draft message",
+  "help me write",
+  "help me draft",
 ];
+
+// ============================================================================
+// REGEX PATTERNS - More precise matching for common sentence structures
+// ============================================================================
+
+const SINGLE_MEETING_PATTERNS = [
+  /\bwhat\s+did\s+[\w\s]+\s+say\b/i,
+  /\bwhat\s+did\s+[\w\s]+\s+mention\b/i,
+  /\bwhat\s+did\s+[\w\s]+\s+ask\b/i,
+  /\bwhat\s+did\s+[\w\s]+\s+suggest\b/i,
+  /\bwhat\s+did\s+[\w\s]+\s+agree\b/i,
+  /\bwhat\s+concerns?\s+did\b/i,
+  /\bwhat\s+feedback\s+did\b/i,
+  /\bwhat\s+questions?\s+did\b/i,
+  /\bdid\s+they\s+(say|mention|ask|suggest|agree)\b/i,
+  /\bdid\s+[\w]+\s+(say|mention|ask|suggest|agree)\b/i,
+  /\bin\s+the\s+[\w\s]+\s+(meeting|call|demo)\b/i,
+  /\bfrom\s+the\s+[\w\s]+\s+(meeting|call|demo)\b/i,
+  /\bthe\s+[\w\s]+\s+(meeting|call|demo)\s+with\b/i,
+  /\bsummarize\s+(the|this|our|my)\s+(meeting|call|demo)\b/i,
+  /\bwhat\s+were\s+the\s+(next\s+steps|action\s+items|takeaways)\b/i,
+  /\bwho\s+was\s+(on|in|at)\s+(the|this)\s+(call|meeting)\b/i,
+  /\bhelp\s+me\s+answer\s+(the|their)\s+questions?\b/i,
+  /\banswer\s+(the|their)\s+questions?\s+from\b/i,
+];
+
+const MULTI_MEETING_PATTERNS = [
+  /\bacross\s+(all\s+)?meetings\b/i,
+  /\bfind\s+all\s+(the\s+)?(questions?|mentions?|times?)\b/i,
+  /\bwhich\s+meetings?\s+(mention|discuss|have|include)\b/i,
+  /\beveryone\s+who\s+(asked|mentioned|said)\b/i,
+  /\bwhat\s+meetings?\s+(mention|discuss|have|include)\b/i,
+  /\bcompare\s+what\s+[\w\s]+\s+said\b/i,
+  /\bcompare\s+[\w\s]+\s+and\s+[\w\s]+\s+meetings?\b/i,
+];
+
+const PRODUCT_KNOWLEDGE_PATTERNS = [
+  /\bhow\s+does\s+pitcrew\s+work\b/i,
+  /\bwhat\s+is\s+pitcrew('s)?\b/i,
+  /\bdoes\s+(it|pitcrew)\s+(support|integrate|work\s+with|connect)\b/i,
+  /\bcan\s+pitcrew\s+(do|handle|support|integrate)\b/i,
+  /\bpitcrew('s)?\s+(pricing|cost|features?|capabilities?)\b/i,
+  /\b(pro|advanced|enterprise)\s+tier\b/i,
+  /\bupdat(e|ing)\s+(our|the|my)\s+(pricing|faq|copy|website)\b/i,
+  /\bwrite\s+(a\s+section|copy)\s+about\s+pitcrew\b/i,
+  /\b(help\s+me\s+)?write\s+about\s+(pitcrew|our\s+product)\b/i,
+];
+
+const REFUSE_PATTERNS = [
+  /\bweather\s+(in|like|forecast)\b/i,
+  /\bstock\s+(price|market|ticker)\b/i,
+  /\bhome\s+address\b/i,
+  /\bpersonal\s+(address|phone|email)\b/i,
+  /\bhow\s+much\s+(revenue|money|profit)\s+will\b/i,
+  /\bwhat('s| is)\s+the\s+time\b/i,
+  /\b(tell\s+me\s+a\s+)?joke\b/i,
+  /\bwrite\s+(me\s+)?a?\s*(poem|story|song)\b/i,
+];
+
+const MULTI_INTENT_PATTERNS = [
+  /\b(summarize|summary)\b.*\b(and|then)\b.*\b(pricing|check|email|compare)\b/i,
+  /\b(answer|respond)\b.*\b(and|then)\b.*\b(email|summarize|pricing)\b/i,
+  /\bcompare\b.*\b(and|then)\b.*\b(email|summarize)\b/i,
+];
+
+// ============================================================================
+// KNOWN ENTITIES - Trigger SINGLE_MEETING or MULTI_MEETING based on context
+// ============================================================================
+
+const KNOWN_COMPANIES = [
+  "les schwab",
+  "les shwab",
+  "ace hardware",
+  "ace",
+  "jiffy lube",
+  "discount tire",
+  "valvoline",
+  "walmart",
+  "fullspeed",
+  "fullspeed automotive",
+  "tpi",
+  "midas",
+  "firestone",
+  "goodyear",
+  "pepboys",
+  "pep boys",
+  "take 5",
+  "take five",
+  "express oil",
+  "meineke",
+  "mavis",
+  "big o tires",
+  "belle tire",
+  "monro",
+  "ntb",
+  "amazon",
+];
+
+const KNOWN_CONTACTS = [
+  "tyler wiggins",
+  "tyler",
+  "randy hentschke",
+  "randy",
+  "robert colongo",
+  "robert",
+  "will sovern",
+  "eric conn",
+  "john smith",
+];
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
 function matchesKeywords(text: string, keywords: string[]): boolean {
   const lower = text.toLowerCase();
   return keywords.some(kw => lower.includes(kw));
 }
 
+function matchesPatterns(text: string, patterns: RegExp[]): boolean {
+  return patterns.some(pattern => pattern.test(text));
+}
+
+function containsKnownCompany(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const company of KNOWN_COMPANIES) {
+    if (lower.includes(company)) {
+      return company;
+    }
+  }
+  return null;
+}
+
+function containsKnownContact(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const contact of KNOWN_CONTACTS) {
+    if (lower.includes(contact)) {
+      return contact;
+    }
+  }
+  return null;
+}
+
+function detectMultiIntent(text: string): { needsSplit: boolean; splitOptions?: string[] } {
+  for (const pattern of MULTI_INTENT_PATTERNS) {
+    if (pattern.test(text)) {
+      return {
+        needsSplit: true,
+        splitOptions: ["meeting content", "other request"],
+      };
+    }
+  }
+  return { needsSplit: false };
+}
+
+// ============================================================================
+// CLASSIFICATION LOGIC
+// ============================================================================
+
 function classifyByKeyword(question: string): IntentClassificationResult | null {
   const lower = question.toLowerCase();
 
-  if (matchesKeywords(lower, SINGLE_MEETING_KEYWORDS)) {
+  if (matchesPatterns(question, REFUSE_PATTERNS)) {
     return {
-      intent: Intent.SINGLE_MEETING,
-      intentDetectionMethod: "keyword",
-      confidence: 0.9,
-      reason: "Matched single-meeting keyword pattern",
+      intent: Intent.REFUSE,
+      intentDetectionMethod: "pattern",
+      confidence: 0.95,
+      reason: "Question is out of scope for this assistant",
     };
   }
 
-  if (matchesKeywords(lower, MULTI_MEETING_KEYWORDS)) {
+  const multiIntentCheck = detectMultiIntent(question);
+  if (multiIntentCheck.needsSplit) {
+    return {
+      intent: Intent.CLARIFY,
+      intentDetectionMethod: "pattern",
+      confidence: 0.9,
+      reason: "Request requires multiple intents - ask user to split",
+      needsSplit: true,
+      splitOptions: multiIntentCheck.splitOptions,
+    };
+  }
+
+  if (matchesPatterns(question, MULTI_MEETING_PATTERNS) || matchesKeywords(lower, MULTI_MEETING_KEYWORDS)) {
     return {
       intent: Intent.MULTI_MEETING,
       intentDetectionMethod: "keyword",
       confidence: 0.9,
-      reason: "Matched multi-meeting keyword pattern",
+      reason: "Matched multi-meeting pattern",
     };
   }
 
-  if (matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS)) {
+  if (matchesPatterns(question, SINGLE_MEETING_PATTERNS) || matchesKeywords(lower, SINGLE_MEETING_KEYWORDS)) {
+    return {
+      intent: Intent.SINGLE_MEETING,
+      intentDetectionMethod: "pattern",
+      confidence: 0.9,
+      reason: "Matched single-meeting pattern",
+    };
+  }
+
+  if (matchesPatterns(question, PRODUCT_KNOWLEDGE_PATTERNS) || matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS)) {
     return {
       intent: Intent.PRODUCT_KNOWLEDGE,
       intentDetectionMethod: "keyword",
       confidence: 0.9,
-      reason: "Matched product knowledge keyword pattern",
+      reason: "Matched product knowledge pattern",
+    };
+  }
+
+  // IMPORTANT: Check for action-based GENERAL_HELP patterns BEFORE entity detection
+  // This ensures "Draft an email to Tyler" routes to drafting, not meeting lookup
+  if (matchesKeywords(lower, GENERAL_HELP_KEYWORDS)) {
+    return {
+      intent: Intent.GENERAL_HELP,
+      intentDetectionMethod: "keyword",
+      confidence: 0.85,
+      reason: "Matched general help keyword pattern (action takes priority)",
     };
   }
 
@@ -168,12 +408,28 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
     };
   }
 
-  if (matchesKeywords(lower, GENERAL_HELP_KEYWORDS)) {
+  // Entity detection: Only triggers if no action-based pattern matched first
+  const company = containsKnownCompany(question);
+  const contact = containsKnownContact(question);
+  
+  if (company || contact) {
+    const entityName = company || contact;
+    const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
+    
+    if (hasMultiMeetingSignal) {
+      return {
+        intent: Intent.MULTI_MEETING,
+        intentDetectionMethod: "entity",
+        confidence: 0.85,
+        reason: `Contains known entity "${entityName}" with multi-meeting signal`,
+      };
+    }
+    
     return {
-      intent: Intent.GENERAL_HELP,
-      intentDetectionMethod: "keyword",
+      intent: Intent.SINGLE_MEETING,
+      intentDetectionMethod: "entity",
       confidence: 0.85,
-      reason: "Matched general help keyword pattern",
+      reason: `Contains known entity "${entityName}" - likely asking about meeting`,
     };
   }
 
@@ -181,21 +437,39 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
 }
 
 async function classifyByLLM(question: string): Promise<IntentClassificationResult> {
-  const systemPrompt = `You are an intent classifier for a sales/product assistant.
+  const systemPrompt = `You are an intent classifier for PitCrew's internal sales assistant.
 
-Classify the user's question into exactly one of these intents:
-- SINGLE_MEETING: Questions about a specific meeting (action items, attendees, what was discussed, customer questions from a particular call)
-- MULTI_MEETING: Questions spanning multiple meetings (trends, patterns, aggregate data, comparisons)
-- PRODUCT_KNOWLEDGE: Questions about PitCrew product features, capabilities, pricing tiers
-- DOCUMENT_SEARCH: Questions about reference documentation or specs
-- GENERAL_HELP: Greetings, meta questions about the assistant, or unclear requests
+CONTEXT: PitCrew sells vision AI to automotive service businesses. Users ask about:
+- Customer meetings (Les Schwab, ACE, Jiffy Lube, etc.)
+- Contact interactions (Tyler Wiggins, Randy, Robert, etc.)
+- Product features and pricing
+- Document searches
 
-Priority order (when ambiguous):
-1. SINGLE_MEETING (if any temporal reference or meeting context)
-2. PRODUCT_KNOWLEDGE (if asking about product capabilities)
-3. MULTI_MEETING (if explicitly asking for cross-meeting data)
-4. DOCUMENT_SEARCH (if asking about docs)
-5. GENERAL_HELP (fallback)
+Classify into exactly ONE intent:
+- SINGLE_MEETING: Questions about what happened in a meeting, what someone said/asked/mentioned
+- MULTI_MEETING: Questions across multiple meetings (trends, aggregates, comparisons)
+- PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
+- DOCUMENT_SEARCH: Questions about documentation, contracts, specs
+- GENERAL_HELP: Greetings, meta questions, general assistance requests
+- REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
+- CLARIFY: Request combines multiple intents that need to be split
+
+CRITICAL RULES:
+1. If ANY person name appears (Tyler, Randy, Robert, etc.) → likely SINGLE_MEETING
+2. If ANY company name appears (Les Schwab, ACE, Walmart, etc.) → likely SINGLE_MEETING
+3. "What did X say/mention/ask" → SINGLE_MEETING
+4. "Find all" or "across meetings" → MULTI_MEETING
+5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
+6. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
+
+EXAMPLES:
+- "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
+- "What did Tyler Wiggins mention about pricing?" → SINGLE_MEETING  
+- "Find all meetings that mention Walmart" → MULTI_MEETING
+- "What is PitCrew pricing?" → PRODUCT_KNOWLEDGE
+- "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
+- "What's the weather?" → REFUSE
+- "Summarize the meeting and email it" → CLARIFY (needs split)
 
 Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation"}`;
 

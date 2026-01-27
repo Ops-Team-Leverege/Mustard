@@ -26,6 +26,7 @@ import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCom
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
+import { classifyIntent as classifyControlPlaneIntent } from "../controlPlane/intent";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -599,12 +600,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}, isSemanticDebug=${isSemanticDebug}, semanticError=${semanticError || 'none'}, clarification=${isClarificationRequest || false}, binary=${isBinaryQuestion || false}`);
       } else {
         // OPEN ASSISTANT MODE: Intent-driven routing for non-meeting requests
-        // Uses intent classification to route to:
-        // - external_research: Public information with citations
-        // - general_assistance: Drafting, explanations, general help
-        // - hybrid: Combination of meeting data + research
-        // - meeting_data: Falls through to single-meeting mode if needed
-        console.log(`[Slack] Open Assistant mode - classifying intent`);
+        // Step 1: Control plane intent classification (keyword fast-paths + LLM fallback)
+        // Step 2: Route to appropriate handler based on intent
+        console.log(`[Slack] Open Assistant mode - classifying intent via control plane`);
+        
+        const controlPlaneIntent = await classifyControlPlaneIntent(text);
+        console.log(`[Slack] Control plane: intent=${controlPlaneIntent.intent}, method=${controlPlaneIntent.intentDetectionMethod}, confidence=${controlPlaneIntent.confidence.toFixed(2)}`);
         
         const openAssistantResult: OpenAssistantResult = await handleOpenAssistant(text, {
           userId: userId || undefined,
@@ -616,6 +617,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: resolvedMeeting.companyName,
             meetingDate: resolvedMeeting.meetingDate,
           } : null,
+          controlPlaneIntent: controlPlaneIntent,
         });
         
         responseText = openAssistantResult.answer;

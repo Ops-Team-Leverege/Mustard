@@ -27,11 +27,24 @@ The application includes a transcript detail view, meeting date support, and das
 The system uses an Intent → Context Layers → Answer Contract flow instead of tier-based logic:
 
 **Intent Classification** (keyword fast-paths + LLM fallback via gpt-4o-mini):
-- SINGLE_MEETING: Questions about a specific meeting
+- SINGLE_MEETING: Questions about a specific meeting (entity detection for Les Schwab, Tyler, etc.)
 - MULTI_MEETING: Cross-meeting analysis
 - PRODUCT_KNOWLEDGE: PitCrew product features, pricing, capabilities
 - DOCUMENT_SEARCH: Looking for specific documents
 - GENERAL_HELP: General assistance, email drafting, etc.
+- REFUSE: Out-of-scope queries (weather, stocks, personal info)
+- CLARIFY: Multi-intent requests that need splitting
+
+**Classification Priority** (actions over entities):
+1. REFUSE patterns (weather, stocks, jokes)
+2. Multi-intent detection (triggers CLARIFY)
+3. MULTI_MEETING patterns
+4. SINGLE_MEETING patterns (temporal references, "what did X say")
+5. PRODUCT_KNOWLEDGE keywords (pricing, features, integrations)
+6. GENERAL_HELP keywords (drafting, writing actions) - BEFORE entity detection
+7. DOCUMENT_SEARCH keywords
+8. Entity detection (known companies/contacts → SINGLE_MEETING)
+9. LLM fallback for ambiguous queries
 
 **Context Layers** (intent-gated):
 - product_identity: Always on (PitCrew company/product context)
@@ -41,8 +54,8 @@ The system uses an Intent → Context Layers → Answer Contract flow instead of
 - document_context: Document search and retrieval
 
 **Answer Contracts** (selected after layers determined):
-- MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, etc.
-- Contracts define response shape and constraints
+- MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, PRODUCT_EXPLANATION, FEATURE_VERIFICATION, FAQ_ANSWER, DRAFT_RESPONSE, DRAFT_EMAIL, REFUSE, CLARIFY
+- Contracts define response shape and SSOT mode (descriptive/authoritative/none)
 
 ### Slack Single-Meeting Orchestrator
 Handles user questions scoped to a single meeting with read-only artifact access. Internal sub-intent classification:

@@ -1,10 +1,20 @@
 /**
- * Answer Contracts System
+ * Answer Contracts System (v2)
  * 
  * Purpose:
- * Answer contracts determine response shape and constraints.
+ * Answer contracts determine response shape, authority level, and constraints.
  * Selected AFTER context layers are determined.
  * Contracts must never alter context layers or intent.
+ * 
+ * Key Principles:
+ * - One intent per request → one or more contracts executed in sequence
+ * - Each contract has an explicit SSOT mode (Descriptive vs Authoritative)
+ * - Contracts control authority; SSOT controls truth; ambient context controls framing
+ * 
+ * SSOT Modes:
+ * - Descriptive: Grounded explanations, no factual guarantees
+ * - Authoritative: Falsifiable claims, requires Product SSOT
+ * - None: Extractive from meeting evidence only
  * 
  * Selection Strategy:
  * 1. Deterministic matching first (keyword patterns)
@@ -21,17 +31,38 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+export type SSOTMode = "descriptive" | "authoritative" | "none";
+
 export enum AnswerContract {
+  // Extractive contracts (SSOT mode: none)
   MEETING_SUMMARY = "MEETING_SUMMARY",
   NEXT_STEPS = "NEXT_STEPS",
   ATTENDEES = "ATTENDEES",
   CUSTOMER_QUESTIONS = "CUSTOMER_QUESTIONS",
   EXTRACTIVE_FACT = "EXTRACTIVE_FACT",
   AGGREGATIVE_LIST = "AGGREGATIVE_LIST",
-  PRODUCT_INFO = "PRODUCT_INFO",
+  
+  // Descriptive contracts (SSOT mode: descriptive)
+  PRODUCT_EXPLANATION = "PRODUCT_EXPLANATION",
+  VALUE_PROPOSITION = "VALUE_PROPOSITION",
+  DRAFT_RESPONSE = "DRAFT_RESPONSE",
+  DRAFT_EMAIL = "DRAFT_EMAIL",
+  
+  // Authoritative contracts (SSOT mode: authoritative)
+  FEATURE_VERIFICATION = "FEATURE_VERIFICATION",
+  FAQ_ANSWER = "FAQ_ANSWER",
+  
+  // General contracts
   DOCUMENT_ANSWER = "DOCUMENT_ANSWER",
   GENERAL_RESPONSE = "GENERAL_RESPONSE",
   NOT_FOUND = "NOT_FOUND",
+  
+  // Terminal contracts
+  REFUSE = "REFUSE",
+  CLARIFY = "CLARIFY",
+  
+  // Legacy (kept for backward compatibility)
+  PRODUCT_INFO = "PRODUCT_INFO",
 }
 
 export type ContractSelectionMethod = "keyword" | "llm" | "default";
@@ -43,6 +74,7 @@ export type AnswerContractResult = {
 };
 
 export type AnswerContractConstraints = {
+  ssotMode: SSOTMode;
   requiresEvidence: boolean;
   maxLength?: number;
   allowsSummary: boolean;
@@ -51,61 +83,136 @@ export type AnswerContractConstraints = {
 };
 
 const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = {
+  // Extractive contracts (meeting evidence only)
   [AnswerContract.MEETING_SUMMARY]: {
+    ssotMode: "none",
     requiresEvidence: false,
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
   },
   [AnswerContract.NEXT_STEPS]: {
+    ssotMode: "none",
     requiresEvidence: true,
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "list",
   },
   [AnswerContract.ATTENDEES]: {
+    ssotMode: "none",
     requiresEvidence: false,
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "list",
   },
   [AnswerContract.CUSTOMER_QUESTIONS]: {
+    ssotMode: "none",
     requiresEvidence: true,
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "list",
   },
   [AnswerContract.EXTRACTIVE_FACT]: {
+    ssotMode: "none",
     requiresEvidence: true,
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "text",
   },
   [AnswerContract.AGGREGATIVE_LIST]: {
+    ssotMode: "none",
     requiresEvidence: true,
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "list",
   },
+  
+  // Descriptive contracts (grounded, non-authoritative)
+  [AnswerContract.PRODUCT_EXPLANATION]: {
+    ssotMode: "descriptive",
+    requiresEvidence: false,
+    allowsSummary: true,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  [AnswerContract.VALUE_PROPOSITION]: {
+    ssotMode: "descriptive",
+    requiresEvidence: false,
+    allowsSummary: true,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  [AnswerContract.DRAFT_RESPONSE]: {
+    ssotMode: "descriptive",
+    requiresEvidence: false,
+    allowsSummary: true,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  [AnswerContract.DRAFT_EMAIL]: {
+    ssotMode: "descriptive",
+    requiresEvidence: false,
+    allowsSummary: true,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  
+  // Authoritative contracts (requires Product SSOT)
+  [AnswerContract.FEATURE_VERIFICATION]: {
+    ssotMode: "authoritative",
+    requiresEvidence: true,
+    allowsSummary: false,
+    requiresCitation: true,
+    responseFormat: "text",
+  },
+  [AnswerContract.FAQ_ANSWER]: {
+    ssotMode: "authoritative",
+    requiresEvidence: true,
+    allowsSummary: false,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  
+  // General/Legacy contracts
   [AnswerContract.PRODUCT_INFO]: {
+    ssotMode: "descriptive",
     requiresEvidence: false,
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
   },
   [AnswerContract.DOCUMENT_ANSWER]: {
+    ssotMode: "none",
     requiresEvidence: true,
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "text",
   },
   [AnswerContract.GENERAL_RESPONSE]: {
+    ssotMode: "none",
     requiresEvidence: false,
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
   },
   [AnswerContract.NOT_FOUND]: {
+    ssotMode: "none",
+    requiresEvidence: false,
+    allowsSummary: false,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  
+  // Terminal contracts
+  [AnswerContract.REFUSE]: {
+    ssotMode: "none",
+    requiresEvidence: false,
+    allowsSummary: false,
+    requiresCitation: false,
+    responseFormat: "text",
+  },
+  [AnswerContract.CLARIFY]: {
+    ssotMode: "none",
     requiresEvidence: false,
     allowsSummary: false,
     requiresCitation: false,
@@ -130,7 +237,52 @@ const SINGLE_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "what did they ask": AnswerContract.CUSTOMER_QUESTIONS,
   "questions asked": AnswerContract.CUSTOMER_QUESTIONS,
   "what questions": AnswerContract.CUSTOMER_QUESTIONS,
+  "help me answer": AnswerContract.DRAFT_RESPONSE,
+  "draft a response": AnswerContract.DRAFT_RESPONSE,
+  "respond to": AnswerContract.DRAFT_RESPONSE,
 };
+
+const PRODUCT_KNOWLEDGE_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
+  "how does pitcrew work": AnswerContract.PRODUCT_EXPLANATION,
+  "what is pitcrew": AnswerContract.PRODUCT_EXPLANATION,
+  "explain pitcrew": AnswerContract.PRODUCT_EXPLANATION,
+  "tell me about pitcrew": AnswerContract.PRODUCT_EXPLANATION,
+  "does it support": AnswerContract.FEATURE_VERIFICATION,
+  "does pitcrew support": AnswerContract.FEATURE_VERIFICATION,
+  "can pitcrew": AnswerContract.FEATURE_VERIFICATION,
+  "does pitcrew integrate": AnswerContract.FEATURE_VERIFICATION,
+  "integrate with": AnswerContract.FEATURE_VERIFICATION,
+  "how much": AnswerContract.FAQ_ANSWER,
+  "pricing": AnswerContract.FAQ_ANSWER,
+  "cost": AnswerContract.FAQ_ANSWER,
+  "what tier": AnswerContract.FAQ_ANSWER,
+  "pro tier": AnswerContract.FAQ_ANSWER,
+  "advanced tier": AnswerContract.FAQ_ANSWER,
+  "enterprise tier": AnswerContract.FAQ_ANSWER,
+  "value prop": AnswerContract.VALUE_PROPOSITION,
+  "why pitcrew": AnswerContract.VALUE_PROPOSITION,
+  "benefits of": AnswerContract.VALUE_PROPOSITION,
+};
+
+const GENERAL_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
+  "draft an email": AnswerContract.DRAFT_EMAIL,
+  "write an email": AnswerContract.DRAFT_EMAIL,
+  "compose an email": AnswerContract.DRAFT_EMAIL,
+  "email template": AnswerContract.DRAFT_EMAIL,
+  "help me write": AnswerContract.DRAFT_EMAIL,
+};
+
+const REFUSE_PATTERNS = [
+  /\b(weather|forecast|temperature)\b/i,
+  /\b(home address|personal address|private address)\b/i,
+  /\b(stock price|stock market|invest)\b/i,
+  /\b(revenue|profit|how much money)\s+(will|would|can|could)\b/i,
+  /\b(what's the time|current time|what time is it)\b/i,
+];
+
+function shouldRefuse(question: string): boolean {
+  return REFUSE_PATTERNS.some(pattern => pattern.test(question));
+}
 
 function selectContractByKeyword(
   question: string,
@@ -138,6 +290,14 @@ function selectContractByKeyword(
   _layers: ContextLayers
 ): AnswerContractResult | null {
   const lower = question.toLowerCase();
+
+  if (shouldRefuse(question)) {
+    return {
+      contract: AnswerContract.REFUSE,
+      contractSelectionMethod: "keyword",
+      constraints: CONTRACT_CONSTRAINTS[AnswerContract.REFUSE],
+    };
+  }
 
   if (intent === Intent.SINGLE_MEETING) {
     for (const [keyword, contract] of Object.entries(SINGLE_MEETING_CONTRACT_KEYWORDS)) {
@@ -157,6 +317,15 @@ function selectContractByKeyword(
   }
 
   if (intent === Intent.MULTI_MEETING) {
+    for (const [keyword, contract] of Object.entries(SINGLE_MEETING_CONTRACT_KEYWORDS)) {
+      if (lower.includes(keyword)) {
+        return {
+          contract,
+          contractSelectionMethod: "keyword",
+          constraints: CONTRACT_CONSTRAINTS[contract],
+        };
+      }
+    }
     return {
       contract: AnswerContract.AGGREGATIVE_LIST,
       contractSelectionMethod: "default",
@@ -165,10 +334,19 @@ function selectContractByKeyword(
   }
 
   if (intent === Intent.PRODUCT_KNOWLEDGE) {
+    for (const [keyword, contract] of Object.entries(PRODUCT_KNOWLEDGE_CONTRACT_KEYWORDS)) {
+      if (lower.includes(keyword)) {
+        return {
+          contract,
+          contractSelectionMethod: "keyword",
+          constraints: CONTRACT_CONSTRAINTS[contract],
+        };
+      }
+    }
     return {
-      contract: AnswerContract.PRODUCT_INFO,
+      contract: AnswerContract.PRODUCT_EXPLANATION,
       contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.PRODUCT_INFO],
+      constraints: CONTRACT_CONSTRAINTS[AnswerContract.PRODUCT_EXPLANATION],
     };
   }
 
@@ -181,6 +359,15 @@ function selectContractByKeyword(
   }
 
   if (intent === Intent.GENERAL_HELP) {
+    for (const [keyword, contract] of Object.entries(GENERAL_CONTRACT_KEYWORDS)) {
+      if (lower.includes(keyword)) {
+        return {
+          contract,
+          contractSelectionMethod: "keyword",
+          constraints: CONTRACT_CONSTRAINTS[contract],
+        };
+      }
+    }
     return {
       contract: AnswerContract.GENERAL_RESPONSE,
       contractSelectionMethod: "default",

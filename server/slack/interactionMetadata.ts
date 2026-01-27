@@ -1,19 +1,25 @@
 /**
- * Structured Interaction Metadata for Logging
+ * Structured Interaction Metadata for Logging (v2)
  * 
- * Updated for Intent → Context Layers → Answer Contract architecture.
+ * Updated for Intent → Context Layers → Sequential Contracts architecture.
+ * 
+ * Key logging fields:
+ * - intent: Single intent per request (immutable after classification)
+ * - contract_chain: Ordered list of contracts executed
+ * - ssot_mode: Per-contract authority level (descriptive/authoritative/none)
  * 
  * This metadata is logged for:
  * - End-to-end debugging via interaction_logs
  * - Testing and regression analysis
  * - Auditing LLM usage
+ * - Authority control auditing
  * 
  * NOT for user-visible responses.
  */
 
 import type { ContextLayers } from "../controlPlane/contextLayers";
 import type { Intent } from "../controlPlane/intent";
-import type { AnswerContract } from "../controlPlane/answerContracts";
+import type { AnswerContract, SSOTMode } from "../controlPlane/answerContracts";
 
 export type EntryPoint = "slack" | "api" | "test";
 
@@ -68,14 +74,22 @@ export type ClarificationResolution =
   | "summary" 
   | null;
 
+export type ContractChainEntry = {
+  contract: AnswerContract | string;
+  ssot_mode: SSOTMode;
+  selection_method: "keyword" | "llm" | "default";
+};
+
 export interface InteractionMetadata {
   entry_point: EntryPoint;
   
   intent: Intent | LegacyIntent;
-  intent_detection_method: "keyword" | "llm" | "default";
+  intent_detection_method: "keyword" | "pattern" | "entity" | "llm" | "default";
   
   answer_contract: AnswerContract | string;
   contract_selection_method: "keyword" | "llm" | "default";
+  
+  contract_chain?: ContractChainEntry[];
   
   context_layers: ContextLayers;
   
@@ -140,10 +154,12 @@ export interface InteractionMetadata {
 
 export interface ControlPlaneMetadata {
   intent: Intent;
-  intentDetectionMethod: "keyword" | "llm" | "default";
+  intentDetectionMethod: "keyword" | "pattern" | "entity" | "llm" | "default";
   contextLayers: ContextLayers;
   answerContract: AnswerContract;
   contractSelectionMethod: "keyword" | "llm" | "default";
+  ssotMode?: SSOTMode;
+  contractChain?: ContractChainEntry[];
 }
 
 /**
@@ -217,6 +233,8 @@ export function buildInteractionMetadata(
     
     answer_contract: execution.controlPlane?.answerContract || "GENERAL_RESPONSE",
     contract_selection_method: execution.controlPlane?.contractSelectionMethod || "default",
+    
+    contract_chain: execution.controlPlane?.contractChain,
     
     context_layers: execution.controlPlane?.contextLayers || defaultContextLayers,
     
