@@ -6,8 +6,9 @@
  */
 
 import type { SingleMeetingContext, SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
-import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
+import { Intent } from "../controlPlane/intent";
 import type { AnswerContract, SSOTMode } from "../controlPlane/answerContracts";
+import type { ControlPlaneResult } from "../controlPlane";
 import type { ResearchResult } from "./externalResearch";
 import type { ArtifactSearchResult } from "./semanticArtifactSearch";
 
@@ -52,7 +53,7 @@ export type OpenAssistantContext = {
   threadId?: string;
   conversationContext?: string;
   resolvedMeeting?: SingleMeetingContext | null;
-  controlPlaneIntent?: IntentClassificationResult;
+  controlPlaneResult?: ControlPlaneResult;
 };
 
 export type OpenAssistantResult = {

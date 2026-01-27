@@ -120,45 +120,41 @@ export async function handleOpenAssistant(
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Processing: "${userMessage}"`);
   
-  if (context.controlPlaneIntent) {
-    const cpIntent = context.controlPlaneIntent;
-    console.log(`[OpenAssistant] Using control plane intent: ${cpIntent.intent} (${cpIntent.intentDetectionMethod})`);
+  if (context.controlPlaneResult) {
+    const cpResult = context.controlPlaneResult;
+    console.log(`[OpenAssistant] Using full Control Plane result: intent=${cpResult.intent}, contract=${cpResult.answerContract}, method=${cpResult.intentDetectionMethod}`);
     
-    if (cpIntent.intent === Intent.REFUSE) {
+    if (cpResult.intent === Intent.REFUSE) {
       return {
         answer: "I'm sorry, but that question is outside of what I can help with. I'm designed to assist with PitCrew-related topics, customer meetings, and product information.",
         intent: "general_assistance",
         intentClassification: defaultClassification("Refused by control plane"),
-        controlPlaneIntent: cpIntent.intent,
-        answerContract: AnswerContract.REFUSE,
+        controlPlaneIntent: cpResult.intent,
+        answerContract: cpResult.answerContract,
         dataSource: "clarification",
         delegatedToSingleMeeting: false,
       };
     }
     
-    if (cpIntent.intent === Intent.CLARIFY && cpIntent.needsSplit) {
-      const splitMessage = cpIntent.splitOptions 
-        ? `I can help with that, but let's do it one step at a time. Which would you like first: ${cpIntent.splitOptions.join(" or ")}?`
-        : "I can help with that, but let's do it one step at a time. Could you tell me which part you'd like me to focus on first?";
-      
+    if (cpResult.intent === Intent.CLARIFY) {
       return {
-        answer: splitMessage,
+        answer: "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?",
         intent: "general_assistance",
-        intentClassification: defaultClassification("Split required by control plane"),
-        controlPlaneIntent: cpIntent.intent,
-        answerContract: AnswerContract.CLARIFY,
+        intentClassification: defaultClassification("Clarification required by control plane"),
+        controlPlaneIntent: cpResult.intent,
+        answerContract: cpResult.answerContract,
         dataSource: "clarification",
         delegatedToSingleMeeting: false,
       };
     }
     
-    const evidenceSource = deriveEvidenceSource(cpIntent.intent);
+    const evidenceSource = deriveEvidenceSource(cpResult.intent);
     const classification: IntentClassification = {
       intent: evidenceSource,
-      confidence: cpIntent.confidence > 0.8 ? "high" : cpIntent.confidence > 0.5 ? "medium" : "low",
-      rationale: cpIntent.reason || "Derived from Control Plane intent",
+      confidence: "high",
+      rationale: `Derived from Control Plane: ${cpResult.intent} -> ${cpResult.answerContract}`,
       meetingRelevance: {
-        referencesSpecificInteraction: cpIntent.intent === Intent.SINGLE_MEETING,
+        referencesSpecificInteraction: cpResult.intent === Intent.SINGLE_MEETING,
         asksWhatWasSaidOrAgreed: false,
         asksAboutCustomerQuestions: false,
       },
@@ -169,21 +165,21 @@ export async function handleOpenAssistant(
       },
     };
     
-    console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Control Plane intent: ${cpIntent.intent})`);
+    console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Control Plane: ${cpResult.intent} -> ${cpResult.answerContract})`);
     
-    if (cpIntent.intent === Intent.SINGLE_MEETING) {
-      return handleMeetingDataIntent(userMessage, context, classification);
+    if (cpResult.intent === Intent.SINGLE_MEETING) {
+      return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
     }
     
-    if (cpIntent.intent === Intent.MULTI_MEETING) {
-      return handleMultiMeetingIntent(userMessage, context, classification);
+    if (cpResult.intent === Intent.MULTI_MEETING) {
+      return handleMultiMeetingIntent(userMessage, context, classification, cpResult.answerContract);
     }
     
-    if (cpIntent.intent === Intent.PRODUCT_KNOWLEDGE) {
-      return handleProductKnowledgeIntent(userMessage, context, classification);
+    if (cpResult.intent === Intent.PRODUCT_KNOWLEDGE) {
+      return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract);
     }
     
-    return handleGeneralAssistanceIntent(userMessage, context, classification);
+    return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
   }
   
   // CONTROL PLANE REQUIRED: No fallback to separate classifier
@@ -207,9 +203,10 @@ export async function handleOpenAssistant(
 async function handleMeetingDataIntent(
   userMessage: string,
   context: OpenAssistantContext,
-  classification: IntentClassification
+  classification: IntentClassification,
+  contract?: AnswerContract
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to meeting data path`);
+  console.log(`[OpenAssistant] Routing to meeting data path${contract ? ` (CP contract: ${contract})` : ''}`);
   
   if (context.resolvedMeeting) {
     const scope = {
@@ -217,26 +214,40 @@ async function handleMeetingDataIntent(
       companyId: context.resolvedMeeting.companyId,
       companyName: context.resolvedMeeting.companyName,
     };
-    const chain = selectSingleMeetingContractChain(userMessage, scope);
-    console.log(`[OpenAssistant] Selected SINGLE_MEETING chain: [${chain.contracts.join(" → ")}]`);
+    
+    // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
+    // Only fall back to internal selection when CP contract not provided (legacy paths)
+    let primaryContract: AnswerContract;
+    let contractChain: AnswerContract[];
+    
+    if (contract) {
+      // Control Plane provided the contract - use it directly
+      primaryContract = contract;
+      contractChain = [contract];
+      console.log(`[OpenAssistant] Using CP-provided contract: ${contract}`);
+    } else {
+      // Legacy path (no CP context) - use internal selection
+      const chain = selectSingleMeetingContractChain(userMessage, scope);
+      primaryContract = chain.primaryContract;
+      contractChain = chain.contracts;
+      console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
+    }
     
     // Pass the primary contract to the orchestrator to skip deprecated classification
     const singleMeetingResult = await handleSingleMeetingQuestion(
       context.resolvedMeeting,
       userMessage,
       false,
-      chain.primaryContract
+      primaryContract
     );
-
-    const actualContract = mapOrchestratorIntentToContract(singleMeetingResult.intent, chain.primaryContract);
 
     return {
       answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.SINGLE_MEETING,
-      answerContract: actualContract,
-      answerContractChain: chain.contracts,
+      answerContract: primaryContract,
+      answerContractChain: contractChain,
       ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       singleMeetingResult,
@@ -272,26 +283,37 @@ async function handleMeetingDataIntent(
       companyId: meeting.companyId,
       companyName: meeting.companyName,
     };
-    const chain = selectSingleMeetingContractChain(userMessage, scope);
-    console.log(`[OpenAssistant] Selected SINGLE_MEETING chain: [${chain.contracts.join(" → ")}]`);
+    
+    // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
+    let primaryContract: AnswerContract;
+    let contractChain: AnswerContract[];
+    
+    if (contract) {
+      primaryContract = contract;
+      contractChain = [contract];
+      console.log(`[OpenAssistant] Using CP-provided contract: ${contract}`);
+    } else {
+      const chain = selectSingleMeetingContractChain(userMessage, scope);
+      primaryContract = chain.primaryContract;
+      contractChain = chain.contracts;
+      console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
+    }
     
     // Pass the primary contract to the orchestrator
     const singleMeetingResult = await handleSingleMeetingQuestion(
       meeting,
       userMessage,
       false,
-      chain.primaryContract
+      primaryContract
     );
-
-    const actualContract = mapOrchestratorIntentToContract(singleMeetingResult.intent, chain.primaryContract);
 
     return {
       answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.SINGLE_MEETING,
-      answerContract: actualContract,
-      answerContractChain: chain.contracts,
+      answerContract: primaryContract,
+      answerContractChain: contractChain,
       ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       singleMeetingResult,
@@ -339,9 +361,10 @@ async function handleMeetingDataIntent(
 async function handleMultiMeetingIntent(
   userMessage: string,
   context: OpenAssistantContext,
-  classification: IntentClassification
+  classification: IntentClassification,
+  contract?: AnswerContract
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to MULTI_MEETING path`);
+  console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}`);
   
   const meetingSearch = await findRelevantMeetings(userMessage, classification);
   
@@ -372,19 +395,36 @@ async function handleMultiMeetingIntent(
     },
   };
   
-  const chain = selectMultiMeetingContractChain(userMessage, scope);
-  const isChained = chain.contracts.length > 1;
-  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (${isChained ? "chained" : "single"}, coverage: ${scope.coverage.matchingMeetingsCount} meetings, ${scope.coverage.uniqueCompaniesRepresented} companies)`);
+  // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
+  let primaryContract: AnswerContract;
+  let contractChain: AnswerContract[];
   
-  const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings);
+  if (contract) {
+    // Control Plane provided the contract - use it directly
+    primaryContract = contract;
+    contractChain = [contract];
+    console.log(`[OpenAssistant] Using CP-provided contract: ${contract}`);
+  } else {
+    // Legacy path (no CP context) - use internal selection
+    const chain = selectMultiMeetingContractChain(userMessage, scope);
+    primaryContract = chain.primaryContract;
+    contractChain = chain.contracts;
+    console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
+  }
+  
+  const chainResult = await executeContractChain(
+    { contracts: contractChain, primaryContract, selectionMethod: "keyword" },
+    userMessage,
+    meetingSearch.meetings
+  );
   
   return {
     answer: chainResult.finalOutput,
     intent: "meeting_data",
     intentClassification: classification,
     controlPlaneIntent: Intent.MULTI_MEETING,
-    answerContract: chain.primaryContract,
-    answerContractChain: chain.contracts,
+    answerContract: primaryContract,
+    answerContractChain: contractChain,
     ssotMode: "none" as SSOTMode,
     dataSource: "meeting_artifacts",
     delegatedToSingleMeeting: false,
@@ -397,9 +437,13 @@ async function handleMultiMeetingIntent(
 async function handleProductKnowledgeIntent(
   userMessage: string,
   context: OpenAssistantContext,
-  classification: IntentClassification
+  classification: IntentClassification,
+  contract?: AnswerContract
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to product knowledge path`);
+  console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
+  
+  // USE CONTROL PLANE CONTRACT when provided
+  const actualContract = contract || AnswerContract.PRODUCT_EXPLANATION;
   
   const response = await openai.chat.completions.create({
     model: "gpt-5",
@@ -438,7 +482,7 @@ Keep responses helpful but appropriately bounded by what can be safely stated wi
     intent: "meeting_data",
     intentClassification: classification,
     controlPlaneIntent: Intent.PRODUCT_KNOWLEDGE,
-    answerContract: AnswerContract.PRODUCT_EXPLANATION,
+    answerContract: actualContract,
     ssotMode: "descriptive",
     dataSource: "product_ssot",
     delegatedToSingleMeeting: false,
@@ -451,9 +495,13 @@ Keep responses helpful but appropriately bounded by what can be safely stated wi
 async function handleGeneralAssistanceIntent(
   userMessage: string,
   context: OpenAssistantContext,
-  classification: IntentClassification
+  classification: IntentClassification,
+  contract?: AnswerContract
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to general assistance path`);
+  console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
+  
+  // USE CONTROL PLANE CONTRACT when provided
+  const actualContract = contract || AnswerContract.GENERAL_RESPONSE;
   
   const evidenceCheck = wouldBenefitFromEvidence(userMessage);
   if (evidenceCheck.needsEvidence) {
@@ -507,7 +555,7 @@ If you're unsure whether something requires evidence, err on the side of asking 
     intent: "general_assistance",
     intentClassification: classification,
     controlPlaneIntent: Intent.GENERAL_HELP,
-    answerContract: AnswerContract.GENERAL_RESPONSE,
+    answerContract: actualContract,
     ssotMode: "none" as SSOTMode,
     dataSource: "general_knowledge",
     delegatedToSingleMeeting: false,

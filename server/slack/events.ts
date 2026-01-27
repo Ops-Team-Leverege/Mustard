@@ -26,7 +26,7 @@ import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCom
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
-import { classifyIntent as classifyControlPlaneIntent } from "../controlPlane/intent";
+import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -559,7 +559,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let isBinaryQuestion: boolean | undefined;
       
       // Control Plane and Open Assistant results (for metadata logging)
-      let controlPlaneIntentResult: Awaited<ReturnType<typeof classifyControlPlaneIntent>> | null = null;
+      let controlPlaneResult: ControlPlaneResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
 
       if (isSingleMeetingMode && resolvedMeeting) {
@@ -606,10 +606,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // OPEN ASSISTANT MODE: Intent-driven routing for non-meeting requests
         // Step 1: Control plane intent classification (keyword fast-paths + LLM fallback)
         // Step 2: Route to appropriate handler based on intent
-        console.log(`[Slack] Open Assistant mode - classifying intent via control plane`);
+        console.log(`[Slack] Open Assistant mode - running full control plane pipeline`);
         
-        controlPlaneIntentResult = await classifyControlPlaneIntent(text);
-        console.log(`[Slack] Control plane: intent=${controlPlaneIntentResult.intent}, method=${controlPlaneIntentResult.intentDetectionMethod}, confidence=${controlPlaneIntentResult.confidence.toFixed(2)}`);
+        controlPlaneResult = await runControlPlane(text);
+        console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
         
         openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
@@ -621,7 +621,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: resolvedMeeting.companyName,
             meetingDate: resolvedMeeting.meetingDate,
           } : null,
-          controlPlaneIntent: controlPlaneIntentResult,
+          controlPlaneResult: controlPlaneResult,
         });
         
         responseText = openAssistantResultData.answer;
@@ -699,14 +699,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
           // Open Assistant path - use actual Control Plane results
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
           
-          // Use actual Control Plane intent and contract from OpenAssistant result
-          const actualIntent = openAssistantResultData?.controlPlaneIntent || controlPlaneIntentResult?.intent || "GENERAL_HELP";
-          const actualContract = openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
+          // Use Control Plane result directly (full pipeline with intent, contract, layers)
+          // OpenAssistant may override contract if it does additional processing
+          const actualIntent = controlPlaneResult?.intent || openAssistantResultData?.controlPlaneIntent || "GENERAL_HELP";
+          const actualContract = controlPlaneResult?.answerContract || openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
           const actualContractChain = openAssistantResultData?.answerContractChain;
           const actualSsotMode = openAssistantResultData?.ssotMode || "none";
           
-          // Determine context layers based on actual Control Plane intent
-          const contextLayers = {
+          // Use context layers from Control Plane result directly
+          const contextLayers = controlPlaneResult?.contextLayers || {
             product_identity: true, // Always on
             product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
             single_meeting: actualIntent === "SINGLE_MEETING",
@@ -720,7 +721,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               entryPoint: "slack",
               controlPlane: {
                 intent: actualIntent as any,
-                intentDetectionMethod: controlPlaneIntentResult?.intentDetectionMethod || "keyword",
+                intentDetectionMethod: (controlPlaneResult?.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "keyword",
                 contextLayers,
                 answerContract: actualContract as any,
                 contractChain: actualContractChain?.map((c: any) => ({ 
@@ -728,7 +729,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                   ssot_mode: actualSsotMode as any, 
                   selection_method: "default" as const 
                 })),
-                contractSelectionMethod: (controlPlaneIntentResult?.intentDetectionMethod as "keyword" | "llm" | "default") || "default",
+                contractSelectionMethod: (controlPlaneResult?.contractSelectionMethod as "keyword" | "llm" | "default") || "default",
                 ssotMode: actualSsotMode as any,
               },
               answerShape: "summary",
