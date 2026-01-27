@@ -61,6 +61,14 @@ The system uses an Intent → Context Layers → Answer Contract flow instead of
 - TERMINAL: REFUSE, CLARIFY, NOT_FOUND
 - Contracts define response shape and SSOT mode (descriptive/authoritative/none)
 
+**Contract Chaining** (MULTI_MEETING only):
+- Single contracts execute for simple queries
+- Chains execute multiple contracts in sequence for richer analysis:
+  - QUESTIONS_PATTERN_CHAIN: CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS
+  - COMPARISON_TREND_CHAIN: COMPARISON → TREND_SUMMARY
+- Each contract in chain receives previous contract's output as context
+- Chaining triggered by compound keywords (e.g., "questions and patterns", "compare over time")
+
 **Scope Types** (identical structure, different scope size):
 - SingleMeetingScope: { type, meetingId, companyId?, companyName? }
 - MultiMeetingScope: { type, meetingIds, filters?: { company?, topic?, timeRange? } }

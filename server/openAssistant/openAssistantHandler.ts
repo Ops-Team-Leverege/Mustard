@@ -78,7 +78,7 @@ Do NOT treat the above as authoritative facts or guarantees.
 - Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided AND the active contract permits authoritative claims`;
 
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
-import { selectAnswerContract, AnswerContract, type SSOTMode } from "../controlPlane/answerContracts";
+import { selectAnswerContract, AnswerContract, type SSOTMode, selectMultiMeetingContractChain, getContractConstraints, type ContractChain } from "../controlPlane/answerContracts";
 import { type ContextLayers } from "../controlPlane/contextLayers";
 
 export type OpenAssistantContext = {
@@ -95,6 +95,7 @@ export type OpenAssistantResult = {
   intentClassification: IntentClassification;
   controlPlaneIntent?: Intent;
   answerContract?: AnswerContract;
+  answerContractChain?: AnswerContract[]; // For MULTI_MEETING contract chaining
   ssotMode?: SSOTMode;
   dataSource: "meeting_artifacts" | "external_research" | "general_knowledge" | "hybrid" | "clarification" | "product_ssot";
   researchCitations?: ResearchResult["citations"];
@@ -359,12 +360,12 @@ async function handleMeetingDataIntent(
 /**
  * Handle MULTI_MEETING intent explicitly.
  * 
- * Uses identical structure to SINGLE_MEETING, only scope size differs.
- * Proper contract selection for cross-meeting analysis:
- * - PATTERN_ANALYSIS: Recurring themes
- * - COMPARISON: Differences across meetings
- * - TREND_SUMMARY: Changes over time
- * - CROSS_MEETING_QUESTIONS: Questions across meetings
+ * Uses contract chaining for richer cross-meeting analysis:
+ * - Single contracts: PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY, CROSS_MEETING_QUESTIONS
+ * - Chains: QUESTIONS_PATTERN_CHAIN, COMPARISON_TREND_CHAIN
+ * 
+ * Chaining executes contracts in sequence, where each contract
+ * can use the output of previous contracts as context.
  */
 async function handleMultiMeetingIntent(
   userMessage: string,
@@ -388,23 +389,133 @@ async function handleMultiMeetingIntent(
     };
   }
   
-  // Select appropriate MULTI_MEETING contract based on query type
-  const contract = selectMultiMeetingContract(userMessage);
-  console.log(`[OpenAssistant] Selected MULTI_MEETING contract: ${contract}`);
+  // Select contract chain for MULTI_MEETING (may be single or multiple contracts)
+  const chain = selectMultiMeetingContractChain(userMessage);
+  const isChained = chain.contracts.length > 1;
+  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (${isChained ? "chained" : "single"})`);
   
-  // Search across all found meetings
-  const crossMeetingResult = await searchAcrossMeetings(userMessage, meetingSearch.meetings);
+  // Execute contract chain
+  const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings);
   
   return {
-    answer: crossMeetingResult,
+    answer: chainResult.finalOutput,
     intent: "meeting_data",
     intentClassification: classification,
     controlPlaneIntent: Intent.MULTI_MEETING,
-    answerContract: contract,
+    answerContract: chain.primaryContract,
+    answerContractChain: chain.contracts,
     ssotMode: "none" as SSOTMode,
     dataSource: "meeting_artifacts",
     delegatedToSingleMeeting: false,
   };
+}
+
+/**
+ * Execute a contract chain for MULTI_MEETING queries.
+ * 
+ * Each contract in the chain:
+ * - Receives the output of the previous contract as context
+ * - Has its own constraints and output format
+ * - Contributes to the final response
+ */
+async function executeContractChain(
+  chain: ContractChain,
+  userMessage: string,
+  meetings: SingleMeetingContext[]
+): Promise<{ finalOutput: string; chainResults: Array<{ contract: AnswerContract; output: string }> }> {
+  const chainResults: Array<{ contract: AnswerContract; output: string }> = [];
+  let previousOutput = "";
+  
+  for (const contract of chain.contracts) {
+    const constraints = getContractConstraints(contract);
+    console.log(`[OpenAssistant] Executing contract: ${contract} (ssot: ${constraints.ssotMode}, format: ${constraints.responseFormat})`);
+    
+    // Build context with previous contract output
+    const contextForContract = previousOutput 
+      ? `Previous analysis:\n${previousOutput}\n\nNow applying ${contract} analysis:`
+      : "";
+    
+    // Execute the contract with the appropriate context
+    const output = await executeMultiMeetingContract(
+      contract,
+      userMessage,
+      meetings,
+      contextForContract,
+      constraints
+    );
+    
+    chainResults.push({ contract, output });
+    previousOutput = output;
+  }
+  
+  // For chained contracts, format the final output with clear sections
+  let finalOutput: string;
+  if (chain.contracts.length > 1) {
+    finalOutput = chainResults.map((r, i) => {
+      const header = getContractHeader(r.contract);
+      return `**${header}**\n${r.output}`;
+    }).join("\n\n");
+  } else {
+    finalOutput = chainResults[0]?.output || "No results found.";
+  }
+  
+  return { finalOutput, chainResults };
+}
+
+/**
+ * Execute a single contract for MULTI_MEETING analysis.
+ */
+async function executeMultiMeetingContract(
+  contract: AnswerContract,
+  userMessage: string,
+  meetings: SingleMeetingContext[],
+  previousContext: string,
+  constraints: { ssotMode: SSOTMode; responseFormat: string; requiresCitation: boolean }
+): Promise<string> {
+  // For now, delegate to searchAcrossMeetings with contract-specific prompting
+  // Future: Add contract-specific execution logic
+  const contractPrompt = getContractPrompt(contract, previousContext);
+  const fullQuery = contractPrompt ? `${contractPrompt}\n\nUser question: ${userMessage}` : userMessage;
+  
+  return searchAcrossMeetings(fullQuery, meetings);
+}
+
+/**
+ * Get a human-readable header for a contract in chained output.
+ */
+function getContractHeader(contract: AnswerContract): string {
+  switch (contract) {
+    case AnswerContract.CROSS_MEETING_QUESTIONS:
+      return "Customer Questions Across Meetings";
+    case AnswerContract.PATTERN_ANALYSIS:
+      return "Pattern Analysis";
+    case AnswerContract.COMPARISON:
+      return "Comparison";
+    case AnswerContract.TREND_SUMMARY:
+      return "Trend Summary";
+    default:
+      return contract;
+  }
+}
+
+/**
+ * Get contract-specific prompting instructions.
+ */
+function getContractPrompt(contract: AnswerContract, previousContext: string): string {
+  const contextPrefix = previousContext ? `${previousContext}\n\n` : "";
+  
+  switch (contract) {
+    case AnswerContract.CROSS_MEETING_QUESTIONS:
+      return `${contextPrefix}Focus on extracting and listing customer questions from these meetings. Include verbatim quotes where possible.`;
+    case AnswerContract.PATTERN_ANALYSIS:
+      return `${contextPrefix}Analyze patterns and recurring themes across these meetings. Identify what comes up frequently.`;
+    case AnswerContract.COMPARISON:
+      return `${contextPrefix}Compare and contrast the discussions across these meetings. Highlight key differences.`;
+    case AnswerContract.TREND_SUMMARY:
+      return `${contextPrefix}Summarize how topics or concerns have evolved over time across these meetings.`;
+    default:
+      return contextPrefix;
+  }
 }
 
 /**
