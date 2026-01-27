@@ -144,7 +144,7 @@ export enum AnswerContract {
   PRODUCT_INFO = "PRODUCT_INFO",
 }
 
-export type ContractSelectionMethod = "keyword" | "llm" | "default";
+export type ContractSelectionMethod = "keyword" | "llm" | "default" | "validation_failure";
 
 export type AnswerContractResult = {
   contract: AnswerContract;

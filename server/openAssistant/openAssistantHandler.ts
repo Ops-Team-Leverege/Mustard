@@ -78,7 +78,7 @@ Do NOT treat the above as authoritative facts or guarantees.
 - Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided AND the active contract permits authoritative claims`;
 
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
-import { selectAnswerContract, AnswerContract, type SSOTMode, selectMultiMeetingContractChain, getContractConstraints, type ContractChain } from "../controlPlane/answerContracts";
+import { selectAnswerContract, AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain, getContractConstraints, type ContractChain } from "../controlPlane/answerContracts";
 import { type ContextLayers } from "../controlPlane/contextLayers";
 
 export type OpenAssistantContext = {
@@ -261,6 +261,29 @@ function defaultClassification(rationale: string): IntentClassification {
 }
 
 /**
+ * Map SingleMeetingOrchestrator's internal intent to an AnswerContract.
+ * 
+ * The orchestrator has its own intent classification (extractive/aggregative/summary)
+ * which we map to the appropriate contract. The chain's primary contract is used
+ * as a fallback if the orchestrator intent doesn't map directly.
+ */
+function mapOrchestratorIntentToContract(
+  orchestratorIntent: "extractive" | "aggregative" | "summary",
+  chainPrimaryContract: AnswerContract
+): AnswerContract {
+  switch (orchestratorIntent) {
+    case "extractive":
+      return AnswerContract.EXTRACTIVE_FACT;
+    case "aggregative":
+      return AnswerContract.AGGREGATIVE_LIST;
+    case "summary":
+      return AnswerContract.MEETING_SUMMARY;
+    default:
+      return chainPrimaryContract;
+  }
+}
+
+/**
  * Handle meeting_data intent by delegating to SingleMeetingOrchestrator.
  * Preserves all existing guardrails and artifact read-only constraints.
  * 
@@ -278,18 +301,31 @@ async function handleMeetingDataIntent(
   
   // If meeting is already resolved, delegate directly
   if (context.resolvedMeeting) {
+    // Select contract chain based on user message and scope
+    const scope = {
+      meetingId: context.resolvedMeeting.meetingId,
+      companyId: context.resolvedMeeting.companyId,
+      companyName: context.resolvedMeeting.companyName,
+    };
+    const chain = selectSingleMeetingContractChain(userMessage, scope);
+    console.log(`[OpenAssistant] Selected SINGLE_MEETING chain: [${chain.contracts.join(" → ")}]`);
+    
     const singleMeetingResult = await handleSingleMeetingQuestion(
       context.resolvedMeeting,
       userMessage,
       false
     );
 
+    // Map orchestrator internal intent to contract if needed
+    const actualContract = mapOrchestratorIntentToContract(singleMeetingResult.intent, chain.primaryContract);
+
     return {
       answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.SINGLE_MEETING,
-      answerContract: AnswerContract.MEETING_SUMMARY,
+      answerContract: actualContract,
+      answerContractChain: chain.contracts,
       ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       singleMeetingResult,
@@ -303,13 +339,13 @@ async function handleMeetingDataIntent(
   const meetingSearch = await findRelevantMeetings(userMessage, classification);
   
   if (meetingSearch.meetings.length === 0) {
-    // No meetings found - provide helpful response
+    // No meetings found - provide helpful response (NOT_FOUND contract)
     return {
       answer: `I searched for meetings related to your question but couldn't find any matching transcripts. ${meetingSearch.searchedFor ? `I looked for: ${meetingSearch.searchedFor}` : ''}\n\nCould you provide more details about which customer or meeting you're asking about?`,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.SINGLE_MEETING,
-      answerContract: AnswerContract.MEETING_SUMMARY,
+      answerContract: AnswerContract.NOT_FOUND,
       ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       delegatedToSingleMeeting: false,
@@ -321,18 +357,31 @@ async function handleMeetingDataIntent(
     const meeting = meetingSearch.meetings[0];
     console.log(`[OpenAssistant] Found single meeting: ${meeting.companyName} (${meeting.meetingId})`);
     
+    // Select contract chain based on user message and scope
+    const scope = {
+      meetingId: meeting.meetingId,
+      companyId: meeting.companyId,
+      companyName: meeting.companyName,
+    };
+    const chain = selectSingleMeetingContractChain(userMessage, scope);
+    console.log(`[OpenAssistant] Selected SINGLE_MEETING chain: [${chain.contracts.join(" → ")}]`);
+    
     const singleMeetingResult = await handleSingleMeetingQuestion(
       meeting,
       userMessage,
       false
     );
 
+    // Map orchestrator internal intent to contract
+    const actualContract = mapOrchestratorIntentToContract(singleMeetingResult.intent, chain.primaryContract);
+
     return {
       answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.SINGLE_MEETING,
-      answerContract: AnswerContract.MEETING_SUMMARY,
+      answerContract: actualContract,
+      answerContractChain: chain.contracts,
       ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       singleMeetingResult,
@@ -342,6 +391,18 @@ async function handleMeetingDataIntent(
 
   // Multiple meetings found - search across them
   console.log(`[OpenAssistant] Found ${meetingSearch.meetings.length} meetings, searching across`);
+  
+  // Build scope from resolved meetings
+  const scope = {
+    type: "multi_meeting" as const,
+    meetingIds: meetingSearch.meetings.map(m => m.meetingId),
+    filters: meetingSearch.searchedFor ? { topic: meetingSearch.searchedFor } : undefined,
+  };
+  
+  // Select contract chain based on intent, scope, and inferred tasks
+  const chain = selectMultiMeetingContractChain(userMessage, scope);
+  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}]`);
+  
   const crossMeetingResult = await searchAcrossMeetings(userMessage, meetingSearch.meetings);
   
   return {
@@ -349,7 +410,8 @@ async function handleMeetingDataIntent(
     intent: "meeting_data",
     intentClassification: classification,
     controlPlaneIntent: Intent.MULTI_MEETING,
-    answerContract: AnswerContract.MEETING_SUMMARY,
+    answerContract: chain.primaryContract,
+    answerContractChain: chain.contracts,
     ssotMode: "none" as SSOTMode,
     dataSource: "meeting_artifacts",
     artifactMatches: undefined,
