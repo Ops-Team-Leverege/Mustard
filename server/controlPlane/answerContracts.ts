@@ -6,6 +6,22 @@
  * Selected AFTER context layers are determined.
  * Contracts must never alter context layers or intent.
  * 
+ * ============================================================================
+ * GUARDRAIL: What Contracts Represent
+ * ============================================================================
+ * Contracts represent task-level operations and output shapes.
+ * New contracts must change authority, evidence usage, or output structure — not topic.
+ * 
+ * Valid reasons to add a contract:
+ * - Different SSOT mode (descriptive vs authoritative vs none)
+ * - Different evidence requirements (requiresEvidence, requiresCitation)
+ * - Different output format (text vs list vs structured)
+ * 
+ * Invalid reasons to add a contract:
+ * - Topic-specific variations (e.g., "PRICING_QUESTION" vs "FEATURE_QUESTION")
+ * - Entity-specific variations (e.g., "LES_SCHWAB_SUMMARY" vs "ACE_SUMMARY")
+ * ============================================================================
+ * 
  * Key Principles:
  * - One intent per request → one or more contracts executed in sequence
  * - Each contract has an explicit SSOT mode (Descriptive vs Authoritative)
@@ -19,6 +35,10 @@
  * Selection Strategy:
  * 1. Deterministic matching first (keyword patterns)
  * 2. LLM fallback only if ambiguous
+ * 
+ * Future Enhancement (optional):
+ * - MULTI_MEETING currently selects a single contract
+ * - Could evolve to contract chains: e.g., CROSS_MEETING_QUESTIONS → PATTERN_ANALYSIS
  * 
  * Layer: Control Plane (Answer Contract Selection)
  */
@@ -321,7 +341,13 @@ const GENERAL_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "help me write": AnswerContract.DRAFT_EMAIL,
 };
 
-// MULTI_MEETING contracts - different scope size, same contract structure
+/**
+ * MULTI_MEETING contract keywords - different scope size, same contract structure.
+ * 
+ * IMPORTANT: Keywords infer the analytical task (comparison, pattern, trend),
+ * NOT new intent categories or topic-specific contracts.
+ * This is task inference within a fixed intent, not intent classification.
+ */
 const MULTI_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   // Pattern analysis (recurring themes)
   "pattern": AnswerContract.PATTERN_ANALYSIS,

@@ -410,6 +410,12 @@ async function handleMultiMeetingIntent(
 /**
  * Select appropriate contract for MULTI_MEETING queries.
  * Uses keyword-first deterministic matching.
+ * 
+ * IMPORTANT: Keywords are used only to infer the analytical task
+ * (e.g., comparison vs pattern), not to create new intent categories
+ * or topic-specific contracts.
+ * 
+ * This is task inference within a fixed intent, not intent classification.
  */
 function selectMultiMeetingContract(userMessage: string): AnswerContract {
   const msg = userMessage.toLowerCase();
