@@ -404,25 +404,42 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
     };
   }
 
-  // HARDENING: Single-Intent Invariant Enforcement
+  // HARDENING: Single-Intent Invariant Enforcement with Decision-Time Reasoning
   // Count how many distinct intent categories match to detect ambiguity
+  // Also track which patterns matched for observability
   const matchingIntents: Intent[] = [];
+  const matchedSignals: string[] = [];
+  const rejectedIntents: Array<{ intent: Intent; reason: string }> = [];
   
-  if (matchesPatterns(question, MULTI_MEETING_PATTERNS) || matchesKeywords(lower, MULTI_MEETING_KEYWORDS)) {
+  // Check MULTI_MEETING patterns
+  const multiMeetingPatternMatch = matchesPatterns(question, MULTI_MEETING_PATTERNS);
+  const multiMeetingKeywordMatch = matchesKeywords(lower, MULTI_MEETING_KEYWORDS);
+  if (multiMeetingPatternMatch || multiMeetingKeywordMatch) {
     matchingIntents.push(Intent.MULTI_MEETING);
+    matchedSignals.push(multiMeetingPatternMatch ? "multi_meeting_pattern" : "multi_meeting_keyword");
   }
-  if (matchesPatterns(question, SINGLE_MEETING_PATTERNS) || matchesKeywords(lower, SINGLE_MEETING_KEYWORDS)) {
+  
+  // Check SINGLE_MEETING patterns
+  const singleMeetingPatternMatch = matchesPatterns(question, SINGLE_MEETING_PATTERNS);
+  const singleMeetingKeywordMatch = matchesKeywords(lower, SINGLE_MEETING_KEYWORDS);
+  if (singleMeetingPatternMatch || singleMeetingKeywordMatch) {
     matchingIntents.push(Intent.SINGLE_MEETING);
+    matchedSignals.push(singleMeetingPatternMatch ? "single_meeting_pattern" : "single_meeting_keyword");
   }
-  if (matchesPatterns(question, PRODUCT_KNOWLEDGE_PATTERNS) || matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS)) {
+  
+  // Check PRODUCT_KNOWLEDGE patterns
+  const productPatternMatch = matchesPatterns(question, PRODUCT_KNOWLEDGE_PATTERNS);
+  const productKeywordMatch = matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS);
+  if (productPatternMatch || productKeywordMatch) {
     matchingIntents.push(Intent.PRODUCT_KNOWLEDGE);
+    matchedSignals.push(productPatternMatch ? "product_pattern" : "product_keyword");
   }
   
   // HARDENING: If multiple mutually exclusive intents match → CLARIFY (single-intent invariant)
   // MULTI_MEETING and SINGLE_MEETING are mutually exclusive
   // PRODUCT_KNOWLEDGE with MEETING intents is ambiguous
   if (matchingIntents.length > 1) {
-    console.log(`[IntentClassifier] HARDENING: Single-intent invariant violation detected. Matched: ${matchingIntents.join(", ")}`);
+    console.log(`[IntentClassifier] HARDENING: Single-intent invariant violation detected. Matched: ${matchingIntents.join(", ")}, Signals: ${matchedSignals.join(", ")}`);
     return {
       intent: Intent.CLARIFY,
       intentDetectionMethod: "pattern",
@@ -430,18 +447,37 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
       reason: `Multiple intents matched (${matchingIntents.join(", ")}) - clarification needed`,
       decisionMetadata: {
         singleIntentViolation: true,
-        matchedSignals: matchingIntents.map(i => i.toString()),
+        matchedSignals,
+        rejectedIntents: matchingIntents.map(i => ({ intent: i, reason: "ambiguous: multiple intents matched" })),
       },
     };
   }
   
-  // If exactly one intent matched, return it
+  // If exactly one intent matched, log rejected intents for observability
   if (matchingIntents.length === 1) {
+    const selectedIntent = matchingIntents[0];
+    
+    // Track which intents were NOT matched (rejected)
+    if (selectedIntent !== Intent.MULTI_MEETING && !multiMeetingPatternMatch && !multiMeetingKeywordMatch) {
+      rejectedIntents.push({ intent: Intent.MULTI_MEETING, reason: "no multi-meeting patterns/keywords matched" });
+    }
+    if (selectedIntent !== Intent.SINGLE_MEETING && !singleMeetingPatternMatch && !singleMeetingKeywordMatch) {
+      rejectedIntents.push({ intent: Intent.SINGLE_MEETING, reason: "no single-meeting patterns/keywords matched" });
+    }
+    if (selectedIntent !== Intent.PRODUCT_KNOWLEDGE && !productPatternMatch && !productKeywordMatch) {
+      rejectedIntents.push({ intent: Intent.PRODUCT_KNOWLEDGE, reason: "no product-knowledge patterns/keywords matched" });
+    }
+    
+    console.log(`[IntentClassifier] Decision: ${selectedIntent} (signals: ${matchedSignals.join(", ")})`);
     return {
-      intent: matchingIntents[0],
+      intent: selectedIntent,
       intentDetectionMethod: "pattern",
       confidence: 0.9,
-      reason: `Matched ${matchingIntents[0]} pattern`,
+      reason: `Matched ${selectedIntent} pattern`,
+      decisionMetadata: {
+        matchedSignals,
+        rejectedIntents,
+      },
     };
   }
 

@@ -362,7 +362,9 @@ async function handleMeetingDataIntent(
   if (meetingSearch.meetings.length === 0) {
     // HARDENING: Scope resolution failure → CLARIFY (not partial answer)
     // SINGLE_MEETING with no resolvable meeting must route to CLARIFY
-    console.log(`[OpenAssistant] Scope resolution failed: no meetings found for SINGLE_MEETING intent`);
+    // Decision-time reasoning: Log why scope resolution failed
+    console.log(`[OpenAssistant] Scope resolution failed: SINGLE_MEETING intent, searched for: "${meetingSearch.searchedFor || 'nothing specific'}", candidates found: 0`);
+    console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria)`);
     return {
       answer: `I couldn't find any meetings matching your query. ${meetingSearch.searchedFor ? `I searched for: "${meetingSearch.searchedFor}"` : ''}\n\nCould you provide more details? For example:\n- The company or customer name\n- When the meeting took place\n- Who you spoke with`,
       intent: "meeting_data",
@@ -471,7 +473,9 @@ async function handleMultiMeetingIntent(
   if (meetingSearch.meetings.length === 0) {
     // HARDENING: Scope resolution failure → CLARIFY (not partial answer)
     // MULTI_MEETING with empty result set must route to CLARIFY
-    console.log(`[OpenAssistant] Scope resolution failed: no meetings found for MULTI_MEETING intent`);
+    // Decision-time reasoning: Log why scope resolution failed
+    console.log(`[OpenAssistant] Scope resolution failed: MULTI_MEETING intent, searched for: "${meetingSearch.searchedFor || 'all meetings'}", candidates found: 0`);
+    console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria for cross-meeting analysis)`);
     return {
       answer: `I couldn't find any meetings matching your query for cross-meeting analysis. ${meetingSearch.searchedFor ? `I searched for: "${meetingSearch.searchedFor}"` : ''}\n\nCould you provide more details? For example:\n- Specific companies or customers\n- A time period to search within\n- Topics or themes to look for`,
       intent: "meeting_data",
@@ -547,6 +551,14 @@ async function executeContractChain(
   const executionDecisions: ContractExecutionDecision[] = [];
   let previousOutput = "";
   
+  // HARDENING: Compute coverage for language qualification
+  const uniqueCompanyIds = new Set(meetings.map(m => m.companyId));
+  const coverage: CoverageContext = {
+    totalMeetings: meetings.length,
+    uniqueCompanies: uniqueCompanyIds.size,
+  };
+  console.log(`[OpenAssistant] Contract chain execution with coverage: ${coverage.totalMeetings} meetings, ${coverage.uniqueCompanies} companies`);
+  
   // HARDENING: Check for CLARIFY contract (validation failure)
   if (chain.clarifyReason) {
     console.log(`[OpenAssistant] Chain validation failed, returning CLARIFY: ${chain.clarifyReason}`);
@@ -606,12 +618,14 @@ async function executeContractChain(
       : "";
     
     // Execute the contract with the appropriate context - returns structured evidence result
+    // HARDENING: Pass coverage for language qualification in prompts
     const executionResult = await executeMultiMeetingContract(
       contract,
       userMessage,
       meetings,
       contextForContract,
-      constraints
+      constraints,
+      coverage
     );
     
     // Update decision with actual evidence data
@@ -747,7 +761,8 @@ async function executeMultiMeetingContract(
   userMessage: string,
   meetings: SingleMeetingContext[],
   previousContext: string,
-  constraints: { ssotMode: SSOTMode; responseFormat: string; requiresCitation: boolean }
+  constraints: { ssotMode: SSOTMode; responseFormat: string; requiresCitation: boolean },
+  coverage?: CoverageContext
 ): Promise<ContractExecutionResult> {
   // HARDENING: Fetch actual evidence from database for contracts that support it
   const actualEvidence = await fetchActualEvidence(contract, meetings);
@@ -770,8 +785,8 @@ async function executeMultiMeetingContract(
     };
   }
   
-  // Build contract-specific prompt
-  const contractPrompt = getContractPrompt(contract, previousContext);
+  // Build contract-specific prompt with coverage qualification
+  const contractPrompt = getContractPrompt(contract, previousContext, coverage);
   const fullQuery = contractPrompt ? `${contractPrompt}\n\nUser question: ${userMessage}` : userMessage;
   
   // Execute the search (LLM-based synthesis)
@@ -895,22 +910,70 @@ function getContractHeader(contract: AnswerContract): string {
 }
 
 /**
- * Get contract-specific prompting instructions.
+ * Coverage metadata for language qualification.
  */
-function getContractPrompt(contract: AnswerContract, previousContext: string): string {
+type CoverageContext = {
+  totalMeetings: number;
+  uniqueCompanies: number;
+};
+
+/**
+ * Get coverage-aware language qualification instructions.
+ * 
+ * HARDENING: Coverage must constrain how confident the system is allowed to sound.
+ * Limited coverage requires explicit qualification of claims.
+ */
+function getCoverageQualification(coverage: CoverageContext): string {
+  const { totalMeetings, uniqueCompanies } = coverage;
+  
+  // Limited coverage: require explicit qualification
+  if (totalMeetings <= 2 || uniqueCompanies <= 1) {
+    return `
+
+IMPORTANT - LIMITED COVERAGE QUALIFICATION:
+You are analyzing only ${totalMeetings} meeting(s) from ${uniqueCompanies} company/companies.
+With limited coverage, you MUST:
+- Explicitly state the sample size: "Based on ${totalMeetings} meeting(s)..."
+- Avoid unqualified generalizations like "customers consistently..." or "typically..."
+- Use hedged language: "In these meetings...", "From what I found...", "Among the meetings reviewed..."
+- Do NOT extrapolate beyond what was directly observed`;
+  }
+  
+  // Moderate coverage: suggest qualification
+  if (totalMeetings <= 5 || uniqueCompanies <= 2) {
+    return `
+
+COVERAGE NOTE:
+You are analyzing ${totalMeetings} meeting(s) from ${uniqueCompanies} company/companies.
+- Include sample size when making analytical claims: "Across ${totalMeetings} meetings..."
+- Qualify patterns: "In several meetings reviewed..." rather than absolute statements`;
+  }
+  
+  // Good coverage: standard analysis allowed
+  return `
+
+COVERAGE: Analyzing ${totalMeetings} meeting(s) from ${uniqueCompanies} company/companies.
+When drawing conclusions, you may make analytical claims but should still ground them in the evidence.`;
+}
+
+/**
+ * Get contract-specific prompting instructions with coverage qualification.
+ */
+function getContractPrompt(contract: AnswerContract, previousContext: string, coverage?: CoverageContext): string {
   const contextPrefix = previousContext ? `${previousContext}\n\n` : "";
+  const coverageQualification = coverage ? getCoverageQualification(coverage) : "";
   
   switch (contract) {
     case AnswerContract.CROSS_MEETING_QUESTIONS:
-      return `${contextPrefix}Focus on extracting and listing customer questions from these meetings. Include verbatim quotes where possible.`;
+      return `${contextPrefix}Focus on extracting and listing customer questions from these meetings. Include verbatim quotes where possible.${coverageQualification}`;
     case AnswerContract.PATTERN_ANALYSIS:
-      return `${contextPrefix}Analyze patterns and recurring themes across these meetings. Identify what comes up frequently.`;
+      return `${contextPrefix}Analyze patterns and recurring themes across these meetings. Identify what comes up frequently.${coverageQualification}`;
     case AnswerContract.COMPARISON:
-      return `${contextPrefix}Compare and contrast the discussions across these meetings. Highlight key differences.`;
+      return `${contextPrefix}Compare and contrast the discussions across these meetings. Highlight key differences.${coverageQualification}`;
     case AnswerContract.TREND_SUMMARY:
-      return `${contextPrefix}Summarize how topics or concerns have evolved over time across these meetings.`;
+      return `${contextPrefix}Summarize how topics or concerns have evolved over time across these meetings.${coverageQualification}`;
     default:
-      return contextPrefix;
+      return contextPrefix + coverageQualification;
   }
 }
 

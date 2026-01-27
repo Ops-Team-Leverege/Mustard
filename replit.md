@@ -120,8 +120,17 @@ The control plane enforces safety constraints and failure semantics at multiple 
 - Hedged language required: "You'd want to verify with the product team..."
 - Authoritative claims only allowed when SSOT is explicitly provided AND ssotMode="authoritative"
 
+**Coverage-Aware Output Shaping**:
+- Coverage computed at chain execution: { totalMeetings, uniqueCompanies }
+- Limited coverage (≤2 meetings or ≤1 company): Requires explicit qualification, forbids unqualified generalizations
+- Moderate coverage (≤5 meetings or ≤2 companies): Suggests qualification in analytical claims
+- Good coverage (>5 meetings, >2 companies): Standard analysis with grounding requirement
+- Coverage qualifications are injected into contract prompts via getCoverageQualification()
+
 **Decision Observability**:
-- ContractExecutionDecision logged for each contract: { contract, authority, authorityValidated, evidenceCount, executionOutcome }
+- Intent Classification: matchedSignals, rejectedIntents with reasons, singleIntentViolation flag
+- Scope Resolution: searchedFor criteria, candidate count, explicit CLARIFY decision rationale
+- Contract Execution: { contract, authority, authorityValidated, evidenceCount, executionOutcome }
 - Execution outcomes: "executed" | "short_circuit_refuse" | "empty_evidence" | "evidence_threshold_not_met"
 
 **Unified Routing**:
