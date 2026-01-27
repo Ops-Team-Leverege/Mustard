@@ -1,0 +1,161 @@
+================================================================================
+              PITCREW RESPONSE QUALITY ASSESSMENT REPORT
+                         January 27, 2026
+================================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+Total Responses Analyzed: 77
+Quality Distribution:
+  ✅ Excellent (evidence-based):     9 (11.7%)
+  ✅ Good (reasonable response):    38 (49.4%)  
+  ✅ Appropriate Clarify:            9 (11.7%)
+  ✅ Appropriate Refuse:             4 (5.2%)
+  ⚠️ Needs Improvement:             17 (22.1%)
+  ❌ Broken:                         0 (0.0%)
+
+OVERALL: 78% of responses are good or appropriate
+         22% need improvement (mostly CLARIFY when should execute)
+
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+✅ WHAT'S WORKING WELL:
+
+1. PRODUCT_EXPLANATION responses are excellent
+   - "How does PitCrew work?" → Detailed, accurate product explanation
+   - Properly uses ambient knowledge without overclaiming
+
+2. NEXT_STEPS extraction is accurate
+   - "What were the action items from ACE?" → Correctly extracts action items
+   - Includes speaker attribution and dates
+
+3. REFUSE is working for out-of-scope
+   - "Write me a poem about tires" → Properly refuses
+   - "What's Eric's salary?" → Properly refuses
+
+4. Contract selection is now diverse
+   - 17 different contract types used (was 100% GENERAL_RESPONSE before)
+
+
+⚠️ MAIN ISSUE: Over-Clarifying
+
+The system is asking for clarification even when it has enough context to execute:
+
+| Question | Contract Selected | Actual Response |
+|----------|------------------|-----------------|
+| "Tell me about the dashboard conversation" | MEETING_SUMMARY | "I need more context..." |
+| "What'd they say about the cameras?" | EXTRACTIVE_FACT | "I need more context..." |
+| "Get me the feedback from our big accounts" | CUSTOMER_QUESTIONS | "I need more context..." |
+
+ROOT CAUSE: The contract is being selected correctly, but the execution
+is still falling back to clarification instead of searching the data.
+
+
+================================================================================
+RESPONSE EXAMPLES BY QUALITY
+================================================================================
+
+### EXCELLENT: Evidence-Based Answers
+
+Q: "What were the action items from ACE?"
+Contract: NEXT_STEPS
+Response: *Next Steps — Atlantic Coast Enterprise (ACE - Jiffy Lube) (Jan 23, 2026)*
+• Schedule a follow-up call next Friday to review progress...
+• Investigate and resolve the screen saver issue on the TV at location 1739...
+✅ Correctly extracts action items with attribution
+
+
+Q: "How does PitCrew work?"  
+Contract: PRODUCT_EXPLANATION
+Response: At a high level, PitCrew is a B2B SaaS product from Leverege used by 
+automotive service businesses to gain visibility into shop operations...
+✅ Clear, accurate product explanation
+
+
+### GOOD: Reasonable Responses
+
+Q: "Does PitCrew integrate with POS?"
+Contract: FEATURE_VERIFICATION
+Response: I don't have authoritative product data here to confirm specific 
+POS integrations. For definitive details, please check our product documentation...
+✅ Appropriately cautious when SSOT not available
+
+
+### APPROPRIATE CLARIFY
+
+Q: "You know what I mean"
+Contract: CLARIFY
+Response: I need a bit more context to help you effectively...
+✅ Correctly asks for clarification on vague query
+
+
+### NEEDS IMPROVEMENT
+
+Q: "Tell me about the dashboard conversation"
+Contract: MEETING_SUMMARY (correct!)
+Response: I need a bit more context to help you effectively...
+❌ Should search meetings for dashboard discussions
+
+
+================================================================================
+SPECIFIC ISSUES TO FIX
+================================================================================
+
+1. CONTRACT EXECUTION NOT FOLLOWING THROUGH
+   - Contract is selected correctly (MEETING_SUMMARY, EXTRACTIVE_FACT)
+   - But execution still returns "I need more context"
+   - Need to check contract executor is actually searching data
+
+2. ENTITY RESOLUTION FOR AMBIGUOUS QUERIES
+   - "Tell me about the dashboard conversation" → No meeting resolved
+   - System should search across meetings for "dashboard" mentions
+   - Currently only works when explicit company/meeting name given
+
+3. CLARIFY MESSAGE CUSTOMIZATION
+   - All clarify responses are identical: "I need a bit more context..."
+   - The LLM Interpretation module should provide specific clarifying questions
+   - e.g., "Which meeting - Les Schwab or ACE?"
+
+
+================================================================================
+COMPARISON: BEFORE vs AFTER FIX
+================================================================================
+
+| Metric                    | Before    | After     | Status |
+|---------------------------|-----------|-----------|--------|
+| Varied contracts          | 0%        | 100%      | ✅ Fixed |
+| Contract selection method | default   | keyword/llm/entity | ✅ Fixed |
+| single_meeting context    | 0%        | 25%       | ✅ Fixed |
+| product_ssot context      | 0%        | 16%       | ✅ Fixed |
+| CLARIFY intent detected   | 0         | 28        | ✅ Fixed |
+| Quality: Excellent/Good   | N/A       | 61%       | ✅ New |
+| Over-clarifying           | N/A       | 22%       | ⚠️ To fix |
+
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+1. FIX CONTRACT EXECUTION
+   - Verify executor actually queries meeting data when contract is MEETING_SUMMARY
+   - Add logging to see why execution returns clarify instead of data
+
+2. IMPROVE ENTITY RESOLUTION
+   - When no explicit meeting/company, search across all meetings
+   - Use topic keywords ("dashboard", "pricing") to find relevant meetings
+
+3. CUSTOMIZE CLARIFY MESSAGES  
+   - Use LLM interpretation's clarifyMessage instead of generic response
+   - Offer specific options: "Did you mean Les Schwab or ACE meeting?"
+
+4. ADD MULTI-MEETING SEARCH
+   - "What'd they say about cameras?" should search all meetings
+   - Return aggregated results with source attribution
+
+
+================================================================================
+                              END OF REPORT
+================================================================================

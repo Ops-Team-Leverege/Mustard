@@ -137,6 +137,24 @@ export async function handleOpenAssistant(
     }
     
     if (cpResult.intent === Intent.CLARIFY) {
+      // Check if the contract suggests meeting data is needed - if so, attempt meeting search
+      // instead of immediately returning clarification
+      const meetingRelatedContracts = [
+        AnswerContract.MEETING_SUMMARY,
+        AnswerContract.EXTRACTIVE_FACT,
+        AnswerContract.AGGREGATIVE_LIST,
+        AnswerContract.NEXT_STEPS,
+        AnswerContract.ATTENDEES,
+        AnswerContract.CUSTOMER_QUESTIONS,
+        AnswerContract.CROSS_MEETING_QUESTIONS,
+      ];
+      
+      if (meetingRelatedContracts.includes(cpResult.answerContract)) {
+        console.log(`[OpenAssistant] CLARIFY intent but meeting-related contract (${cpResult.answerContract}) - attempting meeting search`);
+        const classification = defaultClassification("Clarification with meeting-related contract - attempting search");
+        return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
+      }
+      
       return {
         answer: "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?",
         intent: "general_assistance",
