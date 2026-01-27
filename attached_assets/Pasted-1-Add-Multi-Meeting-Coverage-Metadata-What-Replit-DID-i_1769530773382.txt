@@ -1,0 +1,153 @@
+1️⃣ Add Multi-Meeting Coverage Metadata
+✅ What Replit DID implement
+
+From your description:
+
+MultiMeetingScope includes:
+
+totalMeetingsSearched
+
+matchingMeetingsCount
+
+uniqueCompaniesRepresented
+
+Coverage metadata is logged
+
+Coverage is available for observability/debugging
+
+That means:
+
+Coverage exists and is computed ✅
+
+❌ What is still missing
+
+Coverage metadata is not yet enforced at the answer-shaping level.
+
+Specifically missing:
+
+Contracts are not required to:
+
+reference coverage when generating analytical output
+
+qualify language based on coverage size
+
+Nothing prevents output like:
+
+“Customers consistently mention…”
+when coverage is:
+2 meetings, 1 company
+
+Right now, coverage is:
+
+observed
+
+not binding
+
+🔒 What “done” looks like
+
+Coverage metadata must affect how confident the system is allowed to sound.
+
+Concretely, at least one of these must be true:
+
+Execution instructions say:
+
+“When coverage is limited, explicitly qualify claims (e.g. ‘based on 3 meetings…’).”
+
+Or analytical contracts enforce:
+
+minimum coverage for unqualified language
+
+otherwise soften phrasing automatically
+
+So:
+
+Aspect	Status
+Coverage computed	✅ Done
+Coverage logged	✅ Done
+Coverage constrains language	❌ Missing
+2️⃣ Add Decision-Reason Observability
+✅ What Replit DID implement
+
+You now have contract-level observability:
+
+Evidence counts
+
+Authority validation status
+
+Contract execution outcomes
+
+This is excellent, but it’s not what “decision-reason observability” meant in the Control Plane discussion.
+
+What you have now is:
+
+“What happened during execution”
+
+❌ What is still missing
+
+What’s missing is decision-time observability, i.e.:
+
+Why this intent was chosen
+
+Why other intents were rejected
+
+Why this contract chain was selected
+
+Why CLARIFY or REFUSE triggered (at routing time)
+
+Right now your logs answer:
+
+“What did the contract do?”
+
+They do not answer:
+
+“Why did the Control Plane choose this path?”
+
+🔒 What “done” looks like
+
+You need structured decision metadata at Control Plane boundaries, for example:
+
+Intent classification:
+
+matched signals
+
+rejected intents + reasons
+
+Scope resolution:
+
+how many candidates found
+
+why scope failed or succeeded
+
+Contract planning:
+
+why this chain was selected
+
+why others were excluded
+
+This must exist before execution starts.
+
+So:
+
+Aspect	Status
+Contract execution logs	✅ Done
+Decision-time reasoning	❌ Missing
+Intent rejection reasons	❌ Missing
+Scope-resolution reasoning	❌ Missing
+Final, Straight Answer
+❌ They are not fully done, but also not absent
+
+Multi-Meeting Coverage Metadata
+
+Implemented ✔️
+
+Logged ✔️
+
+Not yet enforced in output shaping ❌
+
+Decision-Reason Observability
+
+Execution-level ✔️
+
+Control-Plane decision-level ❌
+
+They are both last-mile Control Plane completeness issues, not core correctness bugs.

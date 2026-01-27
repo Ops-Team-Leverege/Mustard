@@ -381,6 +381,7 @@ function detectMultiIntent(text: string): { needsSplit: boolean; splitOptions?: 
 function classifyByKeyword(question: string): IntentClassificationResult | null {
   const lower = question.toLowerCase();
 
+  // HARDENING: Check for REFUSE first (highest priority)
   if (matchesPatterns(question, REFUSE_PATTERNS)) {
     return {
       intent: Intent.REFUSE,
@@ -390,6 +391,7 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
     };
   }
 
+  // HARDENING: Check for explicit multi-intent patterns
   const multiIntentCheck = detectMultiIntent(question);
   if (multiIntentCheck.needsSplit) {
     return {
@@ -402,30 +404,44 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
     };
   }
 
+  // HARDENING: Single-Intent Invariant Enforcement
+  // Count how many distinct intent categories match to detect ambiguity
+  const matchingIntents: Intent[] = [];
+  
   if (matchesPatterns(question, MULTI_MEETING_PATTERNS) || matchesKeywords(lower, MULTI_MEETING_KEYWORDS)) {
+    matchingIntents.push(Intent.MULTI_MEETING);
+  }
+  if (matchesPatterns(question, SINGLE_MEETING_PATTERNS) || matchesKeywords(lower, SINGLE_MEETING_KEYWORDS)) {
+    matchingIntents.push(Intent.SINGLE_MEETING);
+  }
+  if (matchesPatterns(question, PRODUCT_KNOWLEDGE_PATTERNS) || matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS)) {
+    matchingIntents.push(Intent.PRODUCT_KNOWLEDGE);
+  }
+  
+  // HARDENING: If multiple mutually exclusive intents match → CLARIFY (single-intent invariant)
+  // MULTI_MEETING and SINGLE_MEETING are mutually exclusive
+  // PRODUCT_KNOWLEDGE with MEETING intents is ambiguous
+  if (matchingIntents.length > 1) {
+    console.log(`[IntentClassifier] HARDENING: Single-intent invariant violation detected. Matched: ${matchingIntents.join(", ")}`);
     return {
-      intent: Intent.MULTI_MEETING,
-      intentDetectionMethod: "keyword",
-      confidence: 0.9,
-      reason: "Matched multi-meeting pattern",
+      intent: Intent.CLARIFY,
+      intentDetectionMethod: "pattern",
+      confidence: 0,
+      reason: `Multiple intents matched (${matchingIntents.join(", ")}) - clarification needed`,
+      decisionMetadata: {
+        singleIntentViolation: true,
+        matchedSignals: matchingIntents.map(i => i.toString()),
+      },
     };
   }
-
-  if (matchesPatterns(question, SINGLE_MEETING_PATTERNS) || matchesKeywords(lower, SINGLE_MEETING_KEYWORDS)) {
+  
+  // If exactly one intent matched, return it
+  if (matchingIntents.length === 1) {
     return {
-      intent: Intent.SINGLE_MEETING,
+      intent: matchingIntents[0],
       intentDetectionMethod: "pattern",
       confidence: 0.9,
-      reason: "Matched single-meeting pattern",
-    };
-  }
-
-  if (matchesPatterns(question, PRODUCT_KNOWLEDGE_PATTERNS) || matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS)) {
-    return {
-      intent: Intent.PRODUCT_KNOWLEDGE,
-      intentDetectionMethod: "keyword",
-      confidence: 0.9,
-      reason: "Matched product knowledge pattern",
+      reason: `Matched ${matchingIntents[0]} pattern`,
     };
   }
 
@@ -527,11 +543,13 @@ Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "b
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
+      // HARDENING: Empty LLM response must not default to GENERAL_HELP
+      console.warn("[IntentClassifier] LLM returned empty response, returning CLARIFY");
       return {
-        intent: Intent.GENERAL_HELP,
+        intent: Intent.CLARIFY,
         intentDetectionMethod: "default",
-        confidence: 0.5,
-        reason: "LLM returned empty response",
+        confidence: 0,
+        reason: "Classification failed: LLM returned empty response. Please rephrase your question.",
       };
     }
 

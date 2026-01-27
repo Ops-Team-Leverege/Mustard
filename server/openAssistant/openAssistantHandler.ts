@@ -74,9 +74,29 @@ Use the following only for high-level explanation and framing:
 
 Do NOT treat the above as authoritative facts or guarantees.
 
-=== Authority Rules ===
-- When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes
-- Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided AND the active contract permits authoritative claims`;
+=== Authority Rules (HARDENING - CRITICAL) ===
+1. Ambient context is NOT evidence - never cite or reference it as a source of truth
+2. Ambient context must NEVER justify factual claims about features, pricing, or capabilities
+3. Product SSOT is the ONLY source for authoritative product information
+
+=== Forbidden Phrasing Without Product SSOT ===
+When Product SSOT data is NOT explicitly provided, you MUST NOT use phrasing like:
+- "PitCrew supports..." / "PitCrew integrates with..."
+- "PitCrew typically..." / "PitCrew can..."
+- "According to our approach..." / "Our product..."
+- Any statement implying specific feature capabilities or guarantees
+
+Instead, use hedged language like:
+- "You'd want to verify with the product team whether..."
+- "For specific integration details, please check the product documentation..."
+- "I don't have authoritative product data to confirm..."
+
+=== When SSOT IS Provided ===
+Only make authoritative claims when:
+1. Product SSOT data is explicitly included in the context
+2. The active contract permits authoritative claims (ssotMode="authoritative")
+3. The claim is directly supported by the SSOT data provided`;
+
 
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
 import { selectAnswerContract, AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain, getContractConstraints, type ContractChain } from "../controlPlane/answerContracts";
@@ -515,7 +535,7 @@ type ContractExecutionDecision = {
   authority: SSOTMode;
   authorityValidated: boolean;
   evidenceCount: number;
-  executionOutcome: "executed" | "short_circuit_clarify" | "short_circuit_refuse" | "evidence_threshold_not_met";
+  executionOutcome: "executed" | "short_circuit_clarify" | "short_circuit_refuse" | "evidence_threshold_not_met" | "empty_evidence";
 };
 
 async function executeContractChain(
@@ -685,7 +705,7 @@ async function fetchActualEvidence(
       case AnswerContract.ATTENDEES:
         // Fetch actual attendee data from transcripts
         for (const meeting of meetings) {
-          const transcript = await storage.getTranscript(meeting.meetingId);
+          const transcript = await storage.getTranscript("PitCrew", meeting.meetingId);
           if (transcript) {
             const hasAttendees = (transcript.leverageTeam && transcript.leverageTeam.length > 0) ||
                                  (transcript.customerNames && transcript.customerNames.length > 0);

@@ -91,7 +91,17 @@ Chain length: 1-2 common, 3 acceptable, 4+ is a smell (may indicate Single Inten
 - MultiMeetingScope: { type, meetingIds, filters?: { company?, topic?, timeRange? }, coverage?: { totalMeetingsSearched, matchingMeetingsCount, uniqueCompaniesRepresented } }
 
 ### Control Plane Hardening
-The control plane enforces safety constraints and failure semantics:
+The control plane enforces safety constraints and failure semantics at multiple levels:
+
+**Intent Classification Hardening**:
+- LLM failures (empty response, invalid enum, JSON parse errors, API errors) → CLARIFY (never GENERAL_HELP)
+- Single-intent invariant: If multiple intents match (e.g., SINGLE_MEETING + PRODUCT_KNOWLEDGE) → CLARIFY
+- DecisionMetadata logs singleIntentViolation and matchedSignals for observability
+
+**Scope Resolution Hardening**:
+- SINGLE_MEETING with no resolvable meeting → CLARIFY (before contracts)
+- MULTI_MEETING with empty meeting set → CLARIFY (before contracts)
+- Scope failures happen at Control Plane level, never reach contract execution
 
 **Contract Failure Semantics**:
 - EmptyResultBehavior: "clarify" | "refuse" | "return_empty" - controls response when no evidence found
@@ -103,6 +113,12 @@ The control plane enforces safety constraints and failure semantics:
 - Uses storage.getCustomerQuestionsByTranscript() and storage.getTranscript() for real evidence counts
 - emptyResultBehavior enforced based on actual data, not LLM output heuristics
 - Analytical contracts (PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY) use meetings as evidence
+
+**Ambient Context Enforcement** (Execution Prompt):
+- "Ambient context is NOT evidence" - never cite as source of truth
+- Forbidden phrasing without SSOT: "PitCrew supports...", "PitCrew typically...", "According to our approach..."
+- Hedged language required: "You'd want to verify with the product team..."
+- Authoritative claims only allowed when SSOT is explicitly provided AND ssotMode="authoritative"
 
 **Decision Observability**:
 - ContractExecutionDecision logged for each contract: { contract, authority, authorityValidated, evidenceCount, executionOutcome }
