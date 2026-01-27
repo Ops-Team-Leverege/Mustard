@@ -17,16 +17,24 @@
  * - Semantic Layer (Summary Only): meeting_summaries, GPT-5 (explicit opt-in)
  * - Extended Search (Blocked): qa_pairs, searchQuestions, searchCompanyFeedback, etc.
  * 
- * Intent Classification:
- * 1. Extractive (Specific Fact) → Query artifacts, return with evidence
- * 2. Aggregative (General but Directed) → Return curated list from artifacts
- * 3. Summary (Explicit Only) → Generate summary only when explicitly requested
+ * IMPORTANT: Intent Classification Authority
+ * The Control Plane (server/controlPlane/intent.ts) is the SOLE authority for intent classification.
+ * This orchestrator receives contracts from the Control Plane and executes them verbatim.
+ * 
+ * Internal routing (extractive/aggregative/summary) is derived from Control Plane contracts:
+ * - EXTRACTIVE_FACT, ATTENDEES, CUSTOMER_QUESTIONS, NEXT_STEPS → extractive handler
+ * - AGGREGATIVE_LIST → aggregative handler
+ * - MEETING_SUMMARY → summary handler
+ * 
+ * Legacy internal classification is retained for backward compatibility with direct Slack calls
+ * but should be migrated to Control Plane routing.
  */
 
 import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
+import { AnswerContract } from "../controlPlane/answerContracts";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -44,7 +52,15 @@ type OrchestratorActionItem = {
   isPrimary: boolean;
 };
 
-export type SingleMeetingIntent = "extractive" | "aggregative" | "summary";
+/**
+ * Internal handler type (derived from Control Plane contracts)
+ * 
+ * NOTE: This is NOT intent classification. The Control Plane has already classified intent
+ * and selected a contract. This type represents which internal handler to use.
+ * 
+ * @deprecated Direct use is discouraged. Prefer receiving contracts from Control Plane.
+ */
+type InternalHandlerType = "extractive" | "aggregative" | "summary";
 
 export type SingleMeetingContext = {
   meetingId: string;
@@ -55,7 +71,7 @@ export type SingleMeetingContext = {
 
 export type SingleMeetingResult = {
   answer: string;
-  intent: SingleMeetingIntent;
+  intent: InternalHandlerType;
   dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "semantic" | "not_found" | "clarification" | "binary_answer";
   evidence?: string;
   pendingOffer?: "summary"; // Indicates bot offered summary, awaiting user response
@@ -201,7 +217,14 @@ function extractBinarySubject(question: string): string | null {
   return null;
 }
 
-export function classifyIntent(question: string): SingleMeetingIntent {
+/**
+ * @deprecated This function is deprecated. Intent classification should be done by the Control Plane.
+ * Use the optional `contract` parameter in `handleSingleMeetingQuestion` instead.
+ * 
+ * This function is retained for backward compatibility with direct Slack calls that haven't
+ * migrated to Control Plane routing yet.
+ */
+function classifyQuestionType(question: string): InternalHandlerType {
   const q = question.toLowerCase().trim();
   
   // SUMMARY: Only explicit summary requests
@@ -1259,12 +1282,14 @@ export async function handleSingleMeetingQuestion(
     // If handleBinaryQuestion returns null, fall through to normal processing
   }
   
-  const intent = classifyIntent(question);
+  // Use internal classification for backward compatibility
+  // TODO: Migrate to Control Plane contract-based routing
+  const handlerType = classifyQuestionType(question);
   const isSemantic = isSemanticQuestion(question);
-  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-20-v4 | intent: ${intent} | isSemantic: ${isSemantic} | isBinary: ${isBinary}`);
+  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-27-v1 | handlerType: ${handlerType} | isSemantic: ${isSemantic} | isBinary: ${isBinary}`);
   console.log(`[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "${question}"`);
   
-  switch (intent) {
+  switch (handlerType) {
     case "extractive": {
       const result = await handleExtractiveIntent(ctx, question);
       
