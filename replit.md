@@ -133,6 +133,25 @@ The control plane enforces safety constraints and failure semantics at multiple 
 - Contract Execution: { contract, authority, authorityValidated, evidenceCount, executionOutcome }
 - Execution outcomes: "executed" | "short_circuit_refuse" | "empty_evidence" | "evidence_threshold_not_met"
 
+**LLM-Assisted Semantic Interpretation (Clarification Only)**:
+When deterministic classification fails or is ambiguous, the Control Plane uses LLM interpretation to propose what the user likely wants - but NEVER executes automatically.
+
+Invocation Rules:
+- Only invoked when deterministic classification yields no intent match, multi-intent ambiguity, or confidence below threshold
+- Never invoked when a single intent is confidently matched
+- Never invoked when a valid contract chain is already selected
+
+Output Handling by Confidence:
+- ≥0.9: CLARIFY with single proposed interpretation ("I think I understand...")
+- 0.7-0.9: CLARIFY with 1-2 proposed options ("I want to make sure I help you correctly...")
+- <0.7: CLARIFY asking for more detail with best guess ("Could you tell me more...")
+
+Core Invariant:
+- LLMs may help the system understand language
+- They may NEVER decide what the system does
+- All CLARIFY responses include proposedInterpretation and clarifyMessage for natural responses
+- User confirmation re-processed through normal Control Plane flow (no auto-execution)
+
 **Unified Routing**:
 - All multi-meeting paths route through executeContractChain for uniform constraint enforcement
 - Both handleMeetingDataIntent and handleMultiMeetingIntent use the same execution path

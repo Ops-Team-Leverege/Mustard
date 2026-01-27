@@ -19,6 +19,13 @@
  */
 
 import { OpenAI } from "openai";
+import { 
+  interpretAmbiguousQuery,
+  type ClarifyWithInterpretation,
+  type LLMInterpretationAlternative,
+  type IntentString,
+  type ContractString,
+} from "./llmInterpretation";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -48,6 +55,24 @@ export type IntentDecisionMetadata = {
   }>;
   classificationError?: string;        // Error if classification failed
   singleIntentViolation?: boolean;     // True if multiple intents matched
+  llmInterpretation?: {                // LLM interpretation for clarification
+    proposedIntent: IntentString;
+    proposedContract: ContractString;
+    confidence: number;
+    failureReason: string;
+    interpretationSource: "llm_fallback" | "ambiguity_resolution";
+  };
+};
+
+/**
+ * Proposed interpretation for CLARIFY responses.
+ * Enables intelligent clarification without automatic execution.
+ * Uses string types to avoid circular dependencies.
+ */
+export type ProposedInterpretation = {
+  intent: IntentString;
+  contract: ContractString;
+  summary: string;
 };
 
 export type IntentClassificationResult = {
@@ -58,6 +83,9 @@ export type IntentClassificationResult = {
   needsSplit?: boolean;
   splitOptions?: string[];
   decisionMetadata?: IntentDecisionMetadata;  // HARDENING: Structured observability
+  proposedInterpretation?: ProposedInterpretation;  // For CLARIFY: what we think they want
+  alternatives?: LLMInterpretationAlternative[];    // For CLARIFY: other possible interpretations
+  clarifyMessage?: string;                          // Natural language clarification message
 };
 
 // ============================================================================
@@ -627,10 +655,78 @@ export async function classifyIntent(question: string): Promise<IntentClassifica
   const keywordResult = classifyByKeyword(question);
   
   if (keywordResult) {
+    // Check if this is already a CLARIFY due to ambiguity
+    const isAmbiguousClarify = keywordResult.intent === Intent.CLARIFY && 
+                               keywordResult.decisionMetadata?.singleIntentViolation;
+    
+    if (isAmbiguousClarify) {
+      // Use LLM interpretation to provide helpful clarification
+      console.log(`[IntentClassifier] Ambiguous match detected, using LLM interpretation for clarification`);
+      return classifyWithInterpretation(question, "multi_intent_ambiguity", keywordResult);
+    }
+    
     console.log(`[IntentClassifier] Keyword match: ${keywordResult.intent}`);
     return keywordResult;
   }
 
-  console.log(`[IntentClassifier] No keyword match, using LLM fallback`);
-  return classifyByLLM(question);
+  // No keyword match - use LLM interpretation for intelligent clarification
+  console.log(`[IntentClassifier] No keyword match, using LLM interpretation for clarification`);
+  return classifyWithInterpretation(question, "no_intent_match", null);
+}
+
+/**
+ * Use LLM interpretation to propose what the user might want.
+ * Always returns CLARIFY - never executes automatically.
+ * 
+ * This is the ONLY path that uses LLM for interpretation.
+ * The LLM may:
+ * - Interpret what the user likely wants
+ * - Propose a candidate intent and contract
+ * - Suggest clarification options
+ * 
+ * The LLM may NOT:
+ * - Execute
+ * - Decide
+ * - Override Control Plane rules
+ */
+async function classifyWithInterpretation(
+  question: string,
+  failureReason: string,
+  originalResult: IntentClassificationResult | null
+): Promise<IntentClassificationResult> {
+  try {
+    const interpretation = await interpretAmbiguousQuery(question, failureReason);
+    
+    console.log(`[IntentClassifier] LLM interpretation: intent=${interpretation.proposedInterpretation.intent}, confidence=${interpretation.metadata.confidence}`);
+    
+    return {
+      intent: Intent.CLARIFY,
+      intentDetectionMethod: "llm",
+      confidence: interpretation.metadata.confidence,
+      reason: interpretation.message,
+      proposedInterpretation: interpretation.proposedInterpretation,
+      alternatives: interpretation.alternatives,
+      clarifyMessage: interpretation.message,
+      decisionMetadata: {
+        matchedSignals: originalResult?.decisionMetadata?.matchedSignals,
+        rejectedIntents: originalResult?.decisionMetadata?.rejectedIntents,
+        singleIntentViolation: originalResult?.decisionMetadata?.singleIntentViolation,
+        llmInterpretation: interpretation.metadata,
+      },
+    };
+  } catch (error) {
+    console.error("[IntentClassifier] LLM interpretation error:", error);
+    
+    // Fallback to basic CLARIFY without interpretation
+    return {
+      intent: Intent.CLARIFY,
+      intentDetectionMethod: "default",
+      confidence: 0,
+      reason: "I'd like to help, but I want to make sure I understand. Could you tell me a bit more about what you're looking for?",
+      clarifyMessage: "I'd like to help, but I want to make sure I understand. Could you tell me a bit more about what you're looking for?",
+      decisionMetadata: {
+        classificationError: error instanceof Error ? error.message : "Unknown error",
+      },
+    };
+  }
 }

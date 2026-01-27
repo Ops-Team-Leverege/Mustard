@@ -1,0 +1,161 @@
+LLM-Assisted Semantic Interpretation (Clarification Only)
+Context
+
+The PitCrew Control Plane is now the sole authority for intent classification and contract selection. All legacy execution paths have been removed or deprecated. Execution layers execute provided contracts and do not infer intent or authority.
+
+However, purely deterministic keyword and pattern matching is insufficient to understand all natural language phrasing. We want to improve semantic understanding without allowing LLMs to make decisions or execute actions silently.
+
+Goal
+
+Introduce LLM-assisted semantic interpretation to help the Control Plane handle ambiguous or unmatched user input by proposing interpretations and routing to CLARIFY, never by executing actions directly.
+
+Non-Goals (Explicitly Out of Scope)
+
+This change must not:
+
+Allow LLMs to select intents or contracts autonomously
+
+Allow LLMs to execute or trigger contract chains
+
+Modify existing intent classification success paths
+
+Change authority rules or SSOT enforcement
+
+Add conversational state machines or complex UX flows
+
+Replace deterministic keyword/pattern logic
+
+Change
+
+Add an interpretation-only LLM fallback that is invoked only when deterministic intent classification fails or is ambiguous.
+
+The LLM may:
+
+Interpret what the user likely wants
+
+Propose a candidate intent and contract
+
+Suggest clarification options
+
+The LLM may not:
+
+Execute
+
+Decide
+
+Override Control Plane rules
+
+Implementation Notes
+1. Introduce LLMInterpretation Type
+
+Add a new type in the Control Plane:
+
+type LLMInterpretation = {
+  proposedIntent: Intent;
+  proposedContract: AnswerContract;
+  confidence: number; // 0.0 – 1.0
+  interpretation: string; // human-readable summary
+  alternatives?: {
+    intent: Intent;
+    contract: AnswerContract;
+    description: string;
+  }[];
+};
+
+2. Invocation Rules (Very Important)
+
+Invoke LLM interpretation only if:
+
+Deterministic classification yields:
+
+no intent match, OR
+
+multi-intent ambiguity, OR
+
+confidence below deterministic threshold
+
+Do not invoke LLM interpretation if:
+
+A single intent is confidently matched
+
+A valid contract chain is already selected
+
+3. LLM Output Handling
+
+LLM interpretation results must be handled as follows:
+
+Confidence	Behavior
+≥ 0.9	Return CLARIFY with a single proposed interpretation
+0.7–0.9	Return CLARIFY with 1–2 proposed options
+< 0.7	Return CLARIFY asking for more detail, still showing best guess
+
+At no confidence level may execution proceed automatically.
+
+4. CLARIFY Response Shape
+
+When returning CLARIFY due to LLM interpretation, include:
+
+{
+  outcome: "CLARIFY",
+  proposedInterpretation: {
+    intent,
+    contract,
+    summary
+  },
+  alternatives?: [...],
+  message: string
+}
+
+
+The message must:
+
+Sound natural
+
+Demonstrate understanding
+
+Never expose internal enums or contracts
+
+Example tone (not exact wording):
+
+“I can help with that. It sounds like you may want me to summarize the last meeting, but I want to confirm before proceeding.”
+
+5. No Automatic Follow-Up Execution
+
+User confirmation (e.g. “yes”, “that’s right”) must be handled by the existing Control Plane flow
+
+The next user message is re-processed normally
+
+Do not auto-execute based on stored interpretation
+
+6. Observability
+
+Log LLM interpretation metadata:
+
+proposed intent
+
+confidence
+
+reason deterministic classification failed
+
+This is for debugging only and must not affect execution.
+
+Acceptance Criteria
+
+Deterministic intent classification remains the primary path
+
+LLM interpretation is used only for clarification
+
+No contract executes without explicit Control Plane approval
+
+No silent fallback execution exists
+
+CLARIFY responses feel helpful and intelligent
+
+Authority and SSOT rules remain unchanged
+
+Existing behavior is unchanged for all confident matches
+
+Final Principle (Must Be Preserved)
+
+LLMs may help the system understand language.
+They may never decide what the system does.
