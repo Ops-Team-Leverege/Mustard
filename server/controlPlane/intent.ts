@@ -26,6 +26,7 @@ import {
   type IntentString,
   type ContractString,
 } from "./llmInterpretation";
+import { storage } from "../storage";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -316,37 +317,42 @@ const MULTI_INTENT_PATTERNS = [
 // KNOWN ENTITIES - Trigger SINGLE_MEETING or MULTI_MEETING based on context
 // ============================================================================
 
-const KNOWN_COMPANIES = [
+// Fallback hardcoded list (used if DB query fails)
+const FALLBACK_COMPANIES = [
   "les schwab",
-  "les shwab",
   "ace hardware",
-  "ace",
   "jiffy lube",
   "discount tire",
   "valvoline",
   "walmart",
   "fullspeed",
-  "fullspeed automotive",
-  "tpi",
-  "midas",
-  "firestone",
-  "goodyear",
-  "pepboys",
-  "pep boys",
-  "take 5",
-  "take five",
-  "express oil",
-  "meineke",
-  "mavis",
-  "big o tires",
-  "belle tire",
-  "monro",
-  "ntb",
-  "amazon",
   "canadian tire",
-  "atlantic coast enterprise",
-  "atlantic coast",
 ];
+
+// Dynamic company cache - loaded from database
+let cachedCompanyNames: string[] = [];
+let companyCacheLastRefresh = 0;
+const COMPANY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getKnownCompanies(): Promise<string[]> {
+  const now = Date.now();
+  
+  // Return cache if still valid
+  if (cachedCompanyNames.length > 0 && (now - companyCacheLastRefresh) < COMPANY_CACHE_TTL_MS) {
+    return cachedCompanyNames;
+  }
+  
+  try {
+    const companies = await storage.getCompanies("PitCrew");
+    cachedCompanyNames = companies.map(c => c.name.toLowerCase());
+    companyCacheLastRefresh = now;
+    console.log(`[Intent] Loaded ${cachedCompanyNames.length} companies from database`);
+    return cachedCompanyNames;
+  } catch (error) {
+    console.warn(`[Intent] Failed to load companies from DB, using fallback:`, error);
+    return FALLBACK_COMPANIES;
+  }
+}
 
 const KNOWN_CONTACTS = [
   "tyler wiggins",
@@ -373,9 +379,10 @@ function matchesPatterns(text: string, patterns: RegExp[]): boolean {
   return patterns.some(pattern => pattern.test(text));
 }
 
-function containsKnownCompany(text: string): string | null {
+async function containsKnownCompany(text: string): Promise<string | null> {
   const lower = text.toLowerCase();
-  for (const company of KNOWN_COMPANIES) {
+  const companies = await getKnownCompanies();
+  for (const company of companies) {
     if (lower.includes(company)) {
       return company;
     }
@@ -409,7 +416,7 @@ function detectMultiIntent(text: string): { needsSplit: boolean; splitOptions?: 
 // CLASSIFICATION LOGIC
 // ============================================================================
 
-function classifyByKeyword(question: string): IntentClassificationResult | null {
+async function classifyByKeyword(question: string): Promise<IntentClassificationResult | null> {
   const lower = question.toLowerCase();
 
   // HARDENING: Check for REFUSE first (highest priority)
@@ -533,7 +540,7 @@ function classifyByKeyword(question: string): IntentClassificationResult | null 
   }
 
   // Entity detection: Only triggers if no action-based pattern matched first
-  const company = containsKnownCompany(question);
+  const company = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
   
   if (company || contact) {
@@ -655,7 +662,7 @@ Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "b
 }
 
 export async function classifyIntent(question: string): Promise<IntentClassificationResult> {
-  const keywordResult = classifyByKeyword(question);
+  const keywordResult = await classifyByKeyword(question);
   
   if (keywordResult) {
     // Check if this is already a CLARIFY due to ambiguity
