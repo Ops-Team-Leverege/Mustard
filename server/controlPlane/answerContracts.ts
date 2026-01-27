@@ -180,6 +180,12 @@ export type ContractChainResult = {
   finalOutput: string;
 };
 
+/**
+ * What to do when a contract receives no evidence.
+ * HARDENING: Execution Plane must not invent fallback behavior.
+ */
+export type EmptyResultBehavior = "return_empty" | "clarify" | "refuse";
+
 export type AnswerContractConstraints = {
   ssotMode: SSOTMode;
   requiresEvidence: boolean;
@@ -187,6 +193,8 @@ export type AnswerContractConstraints = {
   allowsSummary: boolean;
   requiresCitation: boolean;
   responseFormat: "text" | "list" | "structured";
+  emptyResultBehavior: EmptyResultBehavior;      // HARDENING: What to do on no evidence
+  minEvidenceThreshold?: number;                  // HARDENING: Minimum evidence items required
 };
 
 const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = {
@@ -197,6 +205,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",
   },
   [AnswerContract.NEXT_STEPS]: {
     ssotMode: "none",
@@ -204,6 +213,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "list",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.ATTENDEES]: {
     ssotMode: "none",
@@ -211,6 +221,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "list",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.CUSTOMER_QUESTIONS]: {
     ssotMode: "none",
@@ -218,6 +229,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "list",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.EXTRACTIVE_FACT]: {
     ssotMode: "none",
@@ -225,6 +237,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",
+    minEvidenceThreshold: 1,
   },
   [AnswerContract.AGGREGATIVE_LIST]: {
     ssotMode: "none",
@@ -232,6 +246,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "list",
+    emptyResultBehavior: "return_empty",
   },
   
   // MULTI_MEETING contracts (identical structure to SINGLE_MEETING, different scope)
@@ -241,6 +256,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: true,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",
+    minEvidenceThreshold: 2,  // Need multiple meetings for patterns
   },
   [AnswerContract.COMPARISON]: {
     ssotMode: "none",
@@ -248,6 +265,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "structured",
+    emptyResultBehavior: "clarify",
+    minEvidenceThreshold: 2,  // Need at least 2 for comparison
   },
   [AnswerContract.TREND_SUMMARY]: {
     ssotMode: "none",
@@ -255,6 +274,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: true,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",
+    minEvidenceThreshold: 3,  // Need enough data points for trends
   },
   [AnswerContract.CROSS_MEETING_QUESTIONS]: {
     ssotMode: "none",
@@ -262,6 +283,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "list",
+    emptyResultBehavior: "return_empty",
   },
   
   // Descriptive contracts (grounded, non-authoritative)
@@ -271,6 +293,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",  // Can explain without evidence
   },
   [AnswerContract.VALUE_PROPOSITION]: {
     ssotMode: "descriptive",
@@ -278,6 +301,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.DRAFT_RESPONSE]: {
     ssotMode: "descriptive",
@@ -285,6 +309,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.DRAFT_EMAIL]: {
     ssotMode: "descriptive",
@@ -292,6 +317,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",
   },
   
   // Authoritative contracts (requires Product SSOT)
@@ -301,6 +327,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "text",
+    emptyResultBehavior: "refuse",  // Cannot verify without SSOT
+    minEvidenceThreshold: 1,
   },
   [AnswerContract.FAQ_ANSWER]: {
     ssotMode: "authoritative",
@@ -308,6 +336,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",  // Can ask for clarification
   },
   
   // General/Legacy contracts
@@ -317,6 +346,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.DOCUMENT_ANSWER]: {
     ssotMode: "none",
@@ -324,6 +354,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: true,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",
+    minEvidenceThreshold: 1,
   },
   [AnswerContract.GENERAL_RESPONSE]: {
     ssotMode: "none",
@@ -331,6 +363,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: true,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",
   },
   [AnswerContract.NOT_FOUND]: {
     ssotMode: "none",
@@ -338,15 +371,17 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "return_empty",
   },
   
-  // Terminal contracts
+  // Terminal contracts (no execution, just terminal responses)
   [AnswerContract.REFUSE]: {
     ssotMode: "none",
     requiresEvidence: false,
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "refuse",  // Already a terminal
   },
   [AnswerContract.CLARIFY]: {
     ssotMode: "none",
@@ -354,6 +389,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     allowsSummary: false,
     requiresCitation: false,
     responseFormat: "text",
+    emptyResultBehavior: "clarify",  // Already a terminal
   },
 };
 
@@ -615,6 +651,21 @@ function getContractForTask(task: string, intent: Intent, scope: ChainBuildScope
 }
 
 /**
+ * Coverage metadata for multi-meeting queries.
+ * Analytical contracts can reference this to qualify claims.
+ * HARDENING: Do not imply comprehensive coverage unless explicitly true.
+ */
+export type MultiMeetingCoverage = {
+  totalMeetingsSearched: number;       // Total meetings in search space
+  matchingMeetingsCount: number;       // Meetings that matched the query
+  uniqueCompaniesRepresented: number;  // Distinct companies in results
+  dateRange?: {
+    earliest: Date;
+    latest: Date;
+  };
+};
+
+/**
  * Scope information passed to chain building.
  * Used to influence contract selection based on resolved scope.
  */
@@ -629,6 +680,7 @@ export type ChainBuildScope = {
     topic?: string;
     timeRange?: { start?: Date; end?: Date };
   };
+  coverage?: MultiMeetingCoverage;  // HARDENING: Coverage metadata for multi-meeting
 };
 
 /**

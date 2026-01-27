@@ -36,6 +36,20 @@ export enum Intent {
 
 export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "default";
 
+/**
+ * Structured decision metadata for observability.
+ * Logs should explain WHY a decision was made, not just what was chosen.
+ */
+export type IntentDecisionMetadata = {
+  matchedSignals?: string[];           // Keywords, patterns that matched
+  rejectedIntents?: Array<{            // Intents considered but rejected
+    intent: Intent;
+    reason: string;
+  }>;
+  classificationError?: string;        // Error if classification failed
+  singleIntentViolation?: boolean;     // True if multiple intents matched
+};
+
 export type IntentClassificationResult = {
   intent: Intent;
   intentDetectionMethod: IntentDetectionMethod;
@@ -43,6 +57,7 @@ export type IntentClassificationResult = {
   reason?: string;
   needsSplit?: boolean;
   splitOptions?: string[];
+  decisionMetadata?: IntentDecisionMetadata;  // HARDENING: Structured observability
 };
 
 // ============================================================================
@@ -532,19 +547,24 @@ Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "b
       };
     }
 
+    // HARDENING: Classification failures must not default to GENERAL_HELP
+    // Return CLARIFY with confidence 0 and diagnostic reason
+    console.warn("[IntentClassifier] LLM returned invalid intent, returning CLARIFY");
     return {
-      intent: Intent.GENERAL_HELP,
+      intent: Intent.CLARIFY,
       intentDetectionMethod: "default",
-      confidence: 0.5,
-      reason: "LLM returned invalid intent",
+      confidence: 0,
+      reason: "Classification failed: LLM returned invalid intent enum. Please rephrase your question.",
     };
   } catch (error) {
+    // HARDENING: API errors, timeouts, invalid JSON must not default to GENERAL_HELP
     console.error("[IntentClassifier] LLM error:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return {
-      intent: Intent.GENERAL_HELP,
+      intent: Intent.CLARIFY,
       intentDetectionMethod: "default",
-      confidence: 0.5,
-      reason: "LLM classification failed",
+      confidence: 0,
+      reason: `Classification failed: ${errorMessage}. Please try again or rephrase your question.`,
     };
   }
 }

@@ -1,0 +1,191 @@
+Control Plane Hardening & Completion
+Context
+
+We are hardening the existing PitCrew Assistant Control Plane. The Control Plane already performs intent classification, scope resolution, contract chain planning, and passes instructions to the Execution Plane. Single-meeting intelligence and existing contracts must remain stable.
+
+Change
+
+Fully enforce Control Plane invariants by making all routing, authority, failure handling, and execution boundaries explicit and deterministic.
+
+This change completes the Control Plane so it is a true decision authority and does not rely on implicit behavior or Execution Plane inference.
+
+Constraints (Must Not Change)
+
+This change must not:
+
+Alter existing successful behavior for single-meeting questions
+
+Introduce new intents or capabilities
+
+Allow Execution Plane to infer intent, scope, or authority
+
+Bypass REFUSE or CLARIFY outcomes
+
+Introduce partial answers when constraints fail
+
+Add new LLM calls beyond existing intent classification
+
+Implementation Notes
+1. Intent Classification (Hardening)
+
+Intent classification failures (API error, timeout, invalid JSON, invalid enum) must not default to GENERAL_HELP
+
+On any classification error:
+
+return intent = CLARIFY
+
+set confidence = 0
+
+include a diagnostic reason
+
+Enforce the single-intent invariant:
+
+If more than one intent matches above threshold → CLARIFY
+
+No mid-execution intent switching is allowed
+
+2. GENERAL_HELP Guardrail
+
+GENERAL_HELP is allowed only for advisory, creative, or framing tasks
+
+GENERAL_HELP may load ambient meeting and product context for framing
+
+GENERAL_HELP must not:
+
+assert factual meeting outcomes
+
+assert or guarantee product features, pricing, integrations, or availability
+
+If a request would materially benefit from factual meeting or product evidence:
+
+trigger CLARIFY
+
+do not partially answer
+
+3. Scope Resolution Failure Handling
+
+Scope resolution is a Control Plane responsibility
+
+If scope cannot be resolved:
+
+SINGLE_MEETING with no resolvable meeting → CLARIFY
+
+MULTI_MEETING with empty result set → CLARIFY
+
+Invalid or disallowed scope → REFUSE
+
+Execution must never proceed with an undefined or empty scope unless explicitly allowed by contract rules
+
+4. Multi-Meeting Coverage Metadata
+
+Extend MultiMeetingScope to include coverage metadata:
+
+total meetings searched
+
+matching meetings count
+
+unique companies represented
+
+date range (earliest, latest)
+
+Pass coverage metadata to the Execution Plane
+
+Analytical and pattern-based contracts must be able to reference coverage when shaping output
+
+Do not imply comprehensive coverage unless explicitly true
+
+5. Contract Failure Semantics
+
+Extend contract constraints to include:
+
+emptyResultBehavior: "return_empty" | "clarify" | "refuse"
+
+optional minEvidenceThreshold
+
+Enforce failure behavior deterministically when:
+
+no evidence is found
+
+evidence is below threshold
+
+Contracts may short-circuit execution with CLARIFY or REFUSE
+
+Execution Plane must not invent fallback behavior
+
+6. Authority Assignment (Explicit)
+
+Authority mode (none | descriptive | authoritative) must be assigned per contract by the Control Plane
+
+Authority must never be inferred or escalated by the Execution Plane
+
+Authoritative contracts require explicit Product SSOT evidence
+
+If authoritative evidence is unavailable → follow contract failure semantics
+
+7. Ambient vs Evidence Context Enforcement
+
+Ambient context (product identity, framing) is not evidence
+
+Execution instructions must explicitly state:
+
+Ambient context must never be cited
+
+Phrases implying authority (e.g. “according to PitCrew”) are disallowed unless Product SSOT is loaded
+
+Evidence context is the only source of authoritative claims
+
+8. REFUSE vs CLARIFY Rules
+
+CLARIFY is used when:
+
+intent is ambiguous
+
+scope cannot be resolved
+
+required evidence is missing but recoverable
+
+REFUSE is used when:
+
+request is out of scope
+
+request requires disallowed data
+
+authority requirements cannot be met
+
+Both are terminal outcomes; no partial execution is allowed
+
+9. Decision-Reason Observability
+
+Extend Control Plane outputs and logs to include structured decision metadata:
+
+matched signals (keywords, patterns)
+
+rejected intents with reasons
+
+selected contract chain rationale
+
+failure or clarification reasons
+
+Logging must explain why a decision was made, not just what was chosen
+
+Acceptance Criteria
+
+Intent classification never silently degrades to GENERAL_HELP
+
+Single-intent invariant is enforced
+
+Scope failures route to CLARIFY or REFUSE deterministically
+
+Contracts behave predictably on empty or insufficient evidence
+
+Authority is explicitly assigned and never inferred
+
+Ambient context is never cited as evidence
+
+Multi-meeting outputs can qualify claims using coverage metadata
+
+CLARIFY and REFUSE outcomes include explicit reasons
+
+All decisions are explainable from logs without inspecting prompts
+
+Existing single-meeting behavior remains unchanged

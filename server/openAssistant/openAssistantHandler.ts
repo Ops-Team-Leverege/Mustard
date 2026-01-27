@@ -25,6 +25,7 @@ import { classifyIntent, needsClarification, type IntentClassification, type Ope
 import { performExternalResearch, formatCitationsForDisplay, type ResearchResult } from "./externalResearch";
 import { searchArtifactsSemanticly, formatArtifactResults, type ArtifactSearchResult } from "./semanticArtifactSearch";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
+import { storage } from "../storage";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -339,15 +340,17 @@ async function handleMeetingDataIntent(
   const meetingSearch = await findRelevantMeetings(userMessage, classification);
   
   if (meetingSearch.meetings.length === 0) {
-    // No meetings found - provide helpful response (NOT_FOUND contract)
+    // HARDENING: Scope resolution failure → CLARIFY (not partial answer)
+    // SINGLE_MEETING with no resolvable meeting must route to CLARIFY
+    console.log(`[OpenAssistant] Scope resolution failed: no meetings found for SINGLE_MEETING intent`);
     return {
-      answer: `I searched for meetings related to your question but couldn't find any matching transcripts. ${meetingSearch.searchedFor ? `I looked for: ${meetingSearch.searchedFor}` : ''}\n\nCould you provide more details about which customer or meeting you're asking about?`,
+      answer: `I couldn't find any meetings matching your query. ${meetingSearch.searchedFor ? `I searched for: "${meetingSearch.searchedFor}"` : ''}\n\nCould you provide more details? For example:\n- The company or customer name\n- When the meeting took place\n- Who you spoke with`,
       intent: "meeting_data",
       intentClassification: classification,
-      controlPlaneIntent: Intent.SINGLE_MEETING,
-      answerContract: AnswerContract.NOT_FOUND,
+      controlPlaneIntent: Intent.CLARIFY,
+      answerContract: AnswerContract.CLARIFY,
       ssotMode: "none" as SSOTMode,
-      dataSource: "meeting_artifacts",
+      dataSource: "clarification",
       delegatedToSingleMeeting: false,
     };
   }
@@ -389,24 +392,31 @@ async function handleMeetingDataIntent(
     };
   }
 
-  // Multiple meetings found - search across them
-  console.log(`[OpenAssistant] Found ${meetingSearch.meetings.length} meetings, searching across`);
+  // Multiple meetings found - route through executeContractChain for uniform constraint enforcement
+  console.log(`[OpenAssistant] Found ${meetingSearch.meetings.length} meetings, routing to MULTI_MEETING path`);
   
-  // Build scope from resolved meetings
+  // Build scope from resolved meetings with coverage metadata
+  const uniqueCompanies2 = new Set(meetingSearch.meetings.map(m => m.companyId));
   const scope = {
     type: "multi_meeting" as const,
     meetingIds: meetingSearch.meetings.map(m => m.meetingId),
     filters: meetingSearch.searchedFor ? { topic: meetingSearch.searchedFor } : undefined,
+    coverage: {
+      totalMeetingsSearched: meetingSearch.meetings.length,
+      matchingMeetingsCount: meetingSearch.meetings.length,
+      uniqueCompaniesRepresented: uniqueCompanies2.size,
+    },
   };
   
   // Select contract chain based on intent, scope, and inferred tasks
   const chain = selectMultiMeetingContractChain(userMessage, scope);
-  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}]`);
+  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (coverage: ${scope.coverage.matchingMeetingsCount} meetings)`);
   
-  const crossMeetingResult = await searchAcrossMeetings(userMessage, meetingSearch.meetings);
+  // HARDENING: Route through executeContractChain for uniform constraint/threshold enforcement
+  const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings);
   
   return {
-    answer: crossMeetingResult,
+    answer: chainResult.finalOutput,
     intent: "meeting_data",
     intentClassification: classification,
     controlPlaneIntent: Intent.MULTI_MEETING,
@@ -439,29 +449,38 @@ async function handleMultiMeetingIntent(
   const meetingSearch = await findRelevantMeetings(userMessage, classification);
   
   if (meetingSearch.meetings.length === 0) {
+    // HARDENING: Scope resolution failure → CLARIFY (not partial answer)
+    // MULTI_MEETING with empty result set must route to CLARIFY
+    console.log(`[OpenAssistant] Scope resolution failed: no meetings found for MULTI_MEETING intent`);
     return {
-      answer: `I searched for meetings related to your question but couldn't find any matching transcripts. ${meetingSearch.searchedFor ? `I looked for: ${meetingSearch.searchedFor}` : ''}\n\nCould you provide more details about which customers or meetings you're asking about?`,
+      answer: `I couldn't find any meetings matching your query for cross-meeting analysis. ${meetingSearch.searchedFor ? `I searched for: "${meetingSearch.searchedFor}"` : ''}\n\nCould you provide more details? For example:\n- Specific companies or customers\n- A time period to search within\n- Topics or themes to look for`,
       intent: "meeting_data",
       intentClassification: classification,
-      controlPlaneIntent: Intent.MULTI_MEETING,
-      answerContract: AnswerContract.NOT_FOUND,
+      controlPlaneIntent: Intent.CLARIFY,
+      answerContract: AnswerContract.CLARIFY,
       ssotMode: "none" as SSOTMode,
-      dataSource: "meeting_artifacts",
+      dataSource: "clarification",
       delegatedToSingleMeeting: false,
     };
   }
   
-  // Build scope from resolved meetings
+  // Build scope from resolved meetings with coverage metadata
+  const uniqueCompanies = new Set(meetingSearch.meetings.map(m => m.companyId));
   const scope = {
     type: "multi_meeting" as const,
     meetingIds: meetingSearch.meetings.map(m => m.meetingId),
     filters: meetingSearch.searchedFor ? { topic: meetingSearch.searchedFor } : undefined,
+    coverage: {
+      totalMeetingsSearched: meetingSearch.meetings.length,
+      matchingMeetingsCount: meetingSearch.meetings.length,
+      uniqueCompaniesRepresented: uniqueCompanies.size,
+    },
   };
   
   // Select contract chain based on intent, scope, and inferred tasks
   const chain = selectMultiMeetingContractChain(userMessage, scope);
   const isChained = chain.contracts.length > 1;
-  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (${isChained ? "chained" : "single"})`);
+  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (${isChained ? "chained" : "single"}, coverage: ${scope.coverage.matchingMeetingsCount} meetings, ${scope.coverage.uniqueCompaniesRepresented} companies)`);
   
   // Execute contract chain
   const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings);
@@ -487,25 +506,87 @@ async function handleMultiMeetingIntent(
  * - Has its own constraints and output format
  * - Contributes to the final response
  */
+/**
+ * Structured decision log for contract chain execution.
+ * HARDENING: Logs should explain WHY decisions were made.
+ */
+type ContractExecutionDecision = {
+  contract: AnswerContract;
+  authority: SSOTMode;
+  authorityValidated: boolean;
+  evidenceCount: number;
+  executionOutcome: "executed" | "short_circuit_clarify" | "short_circuit_refuse" | "evidence_threshold_not_met";
+};
+
 async function executeContractChain(
   chain: ContractChain,
   userMessage: string,
   meetings: SingleMeetingContext[]
 ): Promise<{ finalOutput: string; chainResults: Array<{ contract: AnswerContract; output: string }> }> {
   const chainResults: Array<{ contract: AnswerContract; output: string }> = [];
+  const executionDecisions: ContractExecutionDecision[] = [];
   let previousOutput = "";
+  
+  // HARDENING: Check for CLARIFY contract (validation failure)
+  if (chain.clarifyReason) {
+    console.log(`[OpenAssistant] Chain validation failed, returning CLARIFY: ${chain.clarifyReason}`);
+    return { 
+      finalOutput: chain.clarifyReason, 
+      chainResults: [{ contract: AnswerContract.CLARIFY, output: chain.clarifyReason }] 
+    };
+  }
   
   for (const contract of chain.contracts) {
     const constraints = getContractConstraints(contract);
-    console.log(`[OpenAssistant] Executing contract: ${contract} (ssot: ${constraints.ssotMode}, format: ${constraints.responseFormat})`);
+    
+    // HARDENING: Authority validation - authoritative contracts require explicit Product SSOT
+    // Authority is assigned by Control Plane, never inferred by Execution Plane
+    const decision: ContractExecutionDecision = {
+      contract,
+      authority: constraints.ssotMode,
+      authorityValidated: true,
+      evidenceCount: meetings.length,
+      executionOutcome: "executed",
+    };
+    
+    if (constraints.ssotMode === "authoritative") {
+      // HARDENING: Authoritative contracts ALWAYS require explicit Product SSOT
+      // Authority is never inferred - if SSOT is unavailable, refuse
+      console.warn(`[OpenAssistant] Authoritative contract ${contract} requires Product SSOT - refusing without explicit evidence`);
+      decision.authorityValidated = false;
+      decision.executionOutcome = "short_circuit_refuse";
+      executionDecisions.push(decision);
+      
+      // Always refuse authoritative contracts without SSOT - no partial answers
+      return { 
+        finalOutput: "I can't provide authoritative product information without verified product documentation. For accurate details about features, pricing, or integrations, please check the product knowledge base or contact the product team.",
+        chainResults: [{ contract: AnswerContract.REFUSE, output: "Authority requirements not met: Product SSOT unavailable" }]
+      };
+    }
+    
+    // HARDENING: Check evidence threshold
+    if (constraints.minEvidenceThreshold && meetings.length < constraints.minEvidenceThreshold) {
+      console.log(`[OpenAssistant] Evidence threshold not met: need ${constraints.minEvidenceThreshold}, have ${meetings.length}`);
+      decision.executionOutcome = "evidence_threshold_not_met";
+      
+      if (constraints.emptyResultBehavior === "clarify") {
+        executionDecisions.push(decision);
+        return {
+          finalOutput: `I need more data to provide a reliable ${getContractHeader(contract).toLowerCase()}. Found ${meetings.length} meeting(s), but need at least ${constraints.minEvidenceThreshold} for this type of analysis.`,
+          chainResults: [{ contract: AnswerContract.CLARIFY, output: "Evidence threshold not met" }]
+        };
+      }
+    }
+    
+    console.log(`[OpenAssistant] Executing contract: ${contract} (authority: ${constraints.ssotMode}, format: ${constraints.responseFormat}, meetings: ${meetings.length})`);
     
     // Build context with previous contract output
     const contextForContract = previousOutput 
       ? `Previous analysis:\n${previousOutput}\n\nNow applying ${contract} analysis:`
       : "";
     
-    // Execute the contract with the appropriate context
-    const output = await executeMultiMeetingContract(
+    // Execute the contract with the appropriate context - returns structured evidence result
+    const executionResult = await executeMultiMeetingContract(
       contract,
       userMessage,
       meetings,
@@ -513,9 +594,43 @@ async function executeContractChain(
       constraints
     );
     
-    chainResults.push({ contract, output });
-    previousOutput = output;
+    // Update decision with actual evidence data
+    decision.evidenceCount = executionResult.evidenceCount;
+    
+    // HARDENING: Evidence-based emptyResultBehavior enforcement using structured evidence data
+    if (!executionResult.evidenceFound && constraints.emptyResultBehavior) {
+      console.log(`[OpenAssistant] Contract ${contract} returned no evidence (count=${executionResult.evidenceCount}, meetingsContributing=${executionResult.meetingsWithEvidence}), applying emptyResultBehavior: ${constraints.emptyResultBehavior}`);
+      decision.executionOutcome = "empty_evidence";
+      
+      if (constraints.emptyResultBehavior === "refuse") {
+        executionDecisions.push(decision);
+        return {
+          finalOutput: `I couldn't find reliable information to answer your question about ${getContractHeader(contract).toLowerCase()}. I searched ${meetings.length} meeting(s) but found no matching evidence. Please try rephrasing or narrowing your question.`,
+          chainResults: [{ contract: AnswerContract.REFUSE, output: "Empty evidence - refused" }]
+        };
+      } else if (constraints.emptyResultBehavior === "clarify") {
+        executionDecisions.push(decision);
+        return {
+          finalOutput: `I searched ${meetings.length} meeting(s) but couldn't find specific evidence for your question. Could you clarify what you're looking for or try a different search?`,
+          chainResults: [{ contract: AnswerContract.CLARIFY, output: "Empty evidence - clarification needed" }]
+        };
+      }
+      // "return_empty" falls through - return the output as-is
+    }
+    
+    chainResults.push({ contract, output: executionResult.output });
+    previousOutput = executionResult.output;
+    executionDecisions.push(decision);
   }
+  
+  // Log execution decisions for observability
+  console.log(`[OpenAssistant] Contract chain execution complete:`, 
+    JSON.stringify(executionDecisions.map(d => ({
+      contract: d.contract,
+      authority: d.authority,
+      validated: d.authorityValidated,
+      outcome: d.executionOutcome
+    }))));
   
   // For chained contracts, format the final output with clear sections
   let finalOutput: string;
@@ -532,7 +647,80 @@ async function executeContractChain(
 }
 
 /**
+ * Structured result from contract execution with evidence tracking.
+ */
+interface ContractExecutionResult {
+  output: string;
+  evidenceFound: boolean;
+  evidenceCount: number;  // Number of distinct pieces of evidence (questions, items, etc.)
+  meetingsWithEvidence: number;  // How many meetings contributed evidence
+}
+
+/**
+ * Fetch actual evidence from database for contracts that support it.
+ * Returns structured counts from real data, not LLM output heuristics.
+ */
+async function fetchActualEvidence(
+  contract: AnswerContract,
+  meetings: SingleMeetingContext[]
+): Promise<{ count: number; meetingsWithEvidence: number; items: unknown[] }> {
+  const meetingIds = meetings.map(m => m.meetingId);
+  let items: unknown[] = [];
+  let meetingsWithEvidence = 0;
+  
+  try {
+    switch (contract) {
+      case AnswerContract.CROSS_MEETING_QUESTIONS:
+      case AnswerContract.CUSTOMER_QUESTIONS:
+        // Fetch actual customer questions from database
+        for (const meetingId of meetingIds) {
+          const questions = await storage.getCustomerQuestionsByTranscript(meetingId);
+          if (questions.length > 0) {
+            items.push(...questions);
+            meetingsWithEvidence++;
+          }
+        }
+        break;
+        
+      case AnswerContract.ATTENDEES:
+        // Fetch actual attendee data from transcripts
+        for (const meeting of meetings) {
+          const transcript = await storage.getTranscript(meeting.meetingId);
+          if (transcript) {
+            const hasAttendees = (transcript.leverageTeam && transcript.leverageTeam.length > 0) ||
+                                 (transcript.customerNames && transcript.customerNames.length > 0);
+            if (hasAttendees) {
+              items.push({ meetingId: meeting.meetingId, attendees: transcript.leverageTeam, customers: transcript.customerNames });
+              meetingsWithEvidence++;
+            }
+          }
+        }
+        break;
+        
+      default:
+        // For other contracts (PATTERN_ANALYSIS, TREND_SUMMARY, COMPARISON),
+        // we use the meetings themselves as evidence since they're analytical
+        items = meetings;
+        meetingsWithEvidence = meetings.length;
+    }
+  } catch (error) {
+    console.warn(`[fetchActualEvidence] Error fetching evidence for ${contract}:`, error);
+    // Fall through to return empty if database query fails
+  }
+  
+  return {
+    count: items.length,
+    meetingsWithEvidence,
+    items,
+  };
+}
+
+/**
  * Execute a single contract for MULTI_MEETING analysis.
+ * Returns structured result with evidence tracking for emptyResultBehavior enforcement.
+ * 
+ * HARDENING: For contracts that extract specific data (CUSTOMER_QUESTIONS, ATTENDEES),
+ * we fetch actual evidence from the database first to determine if evidence exists.
  */
 async function executeMultiMeetingContract(
   contract: AnswerContract,
@@ -540,13 +728,132 @@ async function executeMultiMeetingContract(
   meetings: SingleMeetingContext[],
   previousContext: string,
   constraints: { ssotMode: SSOTMode; responseFormat: string; requiresCitation: boolean }
-): Promise<string> {
-  // For now, delegate to searchAcrossMeetings with contract-specific prompting
-  // Future: Add contract-specific execution logic
+): Promise<ContractExecutionResult> {
+  // HARDENING: Fetch actual evidence from database for contracts that support it
+  const actualEvidence = await fetchActualEvidence(contract, meetings);
+  console.log(`[executeMultiMeetingContract] ${contract}: actual evidence count=${actualEvidence.count}, meetingsWithEvidence=${actualEvidence.meetingsWithEvidence}`);
+  
+  // For extraction contracts (CUSTOMER_QUESTIONS, ATTENDEES), use actual evidence as ground truth
+  const isExtractionContract = [
+    AnswerContract.CROSS_MEETING_QUESTIONS,
+    AnswerContract.CUSTOMER_QUESTIONS,
+    AnswerContract.ATTENDEES,
+  ].includes(contract);
+  
+  // If extraction contract has no actual evidence, return early with empty result
+  if (isExtractionContract && actualEvidence.count === 0) {
+    return {
+      output: `No ${contract === AnswerContract.ATTENDEES ? 'attendee information' : 'customer questions'} found in the searched meetings.`,
+      evidenceFound: false,
+      evidenceCount: 0,
+      meetingsWithEvidence: 0,
+    };
+  }
+  
+  // Build contract-specific prompt
   const contractPrompt = getContractPrompt(contract, previousContext);
   const fullQuery = contractPrompt ? `${contractPrompt}\n\nUser question: ${userMessage}` : userMessage;
   
-  return searchAcrossMeetings(fullQuery, meetings);
+  // Execute the search (LLM-based synthesis)
+  const rawOutput = await searchAcrossMeetings(fullQuery, meetings);
+  
+  // Use actual evidence counts for extraction contracts, fallback to heuristics for analytical contracts
+  if (isExtractionContract) {
+    return {
+      output: rawOutput,
+      evidenceFound: actualEvidence.count > 0,
+      evidenceCount: actualEvidence.count,
+      meetingsWithEvidence: actualEvidence.meetingsWithEvidence,
+    };
+  }
+  
+  // For analytical contracts (PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY),
+  // use output heuristics since they synthesize rather than extract
+  const evidenceResult = analyzeOutputForEvidence(contract, rawOutput, meetings.length);
+  
+  return {
+    output: rawOutput,
+    evidenceFound: evidenceResult.found,
+    evidenceCount: evidenceResult.count,
+    meetingsWithEvidence: evidenceResult.meetingsContributing,
+  };
+}
+
+/**
+ * Analyze contract output to determine evidence presence.
+ * Uses contract-specific heuristics to count distinct evidence items.
+ */
+function analyzeOutputForEvidence(
+  contract: AnswerContract,
+  output: string,
+  totalMeetings: number
+): { found: boolean; count: number; meetingsContributing: number } {
+  // Early exit for clearly empty outputs
+  if (!output || output.length < 15) {
+    return { found: false, count: 0, meetingsContributing: 0 };
+  }
+  
+  // Explicit "no evidence" phrases
+  const noEvidencePatterns = [
+    /no (data|evidence|results|questions|items|attendees|information) (found|available|detected)/i,
+    /could not find|couldn't find|unable to (find|locate)/i,
+    /no specific (questions|concerns|topics)/i,
+    /didn't (find|mention|discuss)/i,
+  ];
+  
+  for (const pattern of noEvidencePatterns) {
+    if (pattern.test(output)) {
+      return { found: false, count: 0, meetingsContributing: 0 };
+    }
+  }
+  
+  // Contract-specific evidence counting
+  let evidenceCount = 0;
+  let meetingsContributing = 0;
+  
+  switch (contract) {
+    case AnswerContract.CROSS_MEETING_QUESTIONS:
+    case AnswerContract.CUSTOMER_QUESTIONS:
+      // Count question marks as proxy for extracted questions
+      evidenceCount = (output.match(/\?/g) || []).length;
+      // Count meeting references (e.g., "In the Les Schwab meeting...")
+      meetingsContributing = Math.min(totalMeetings, (output.match(/\b(meeting|call|conversation)\b/gi) || []).length);
+      break;
+      
+    case AnswerContract.ATTENDEES:
+      // Count names (capitalized words in sequence)
+      evidenceCount = (output.match(/[A-Z][a-z]+ [A-Z][a-z]+/g) || []).length;
+      meetingsContributing = Math.min(totalMeetings, 1);
+      break;
+      
+    case AnswerContract.PATTERN_ANALYSIS:
+    case AnswerContract.TREND_SUMMARY:
+      // Count bullet points or numbered items as patterns/trends
+      evidenceCount = (output.match(/^[\-\*\d\.]+\s/gm) || []).length;
+      if (evidenceCount === 0) {
+        // Fallback: count sentences as evidence
+        evidenceCount = Math.max(1, (output.match(/\./g) || []).length);
+      }
+      meetingsContributing = totalMeetings;  // Patterns inherently span meetings
+      break;
+      
+    case AnswerContract.COMPARISON:
+      // Count comparison indicators
+      evidenceCount = (output.match(/\b(differ|similar|unlike|whereas|however|in contrast)\b/gi) || []).length;
+      meetingsContributing = Math.min(totalMeetings, 2);  // Comparison needs at least 2
+      break;
+      
+    default:
+      // Generic: count sentences as evidence items
+      evidenceCount = Math.max(1, (output.match(/[.!?]/g) || []).length);
+      meetingsContributing = 1;
+  }
+  
+  return {
+    found: evidenceCount > 0,
+    count: evidenceCount,
+    meetingsContributing: Math.max(0, meetingsContributing),
+  };
 }
 
 /**
@@ -669,12 +976,60 @@ async function handleExternalResearchIntent(
  * Uses ambient product context for framing but does NOT make authoritative claims
  * about product features, pricing, or integrations without Product SSOT.
  */
+/**
+ * HARDENING: Patterns that indicate the user would benefit from factual evidence.
+ * If matched, route to CLARIFY instead of proceeding with GENERAL_HELP.
+ */
+const NEEDS_FACTUAL_EVIDENCE_PATTERNS = [
+  /what (?:did|was) (?:discussed|said|agreed|mentioned)/i,
+  /(?:from|in|during) (?:the|my|our) (?:meeting|call|demo)/i,
+  /(?:customer|client) (?:said|asked|mentioned|wanted)/i,
+  /(?:action items?|next steps?|commitments?) from/i,
+  /(?:does|can|will) pitcrew (?:integrate|support|have|include|work with)/i,
+  /(?:what|how much) (?:does|is) (?:the )?(?:pricing|cost|price)/i,
+  /(?:available|included) (?:in|on|for) (?:the )?(?:pro|advanced|enterprise)/i,
+];
+
+/**
+ * Check if a request would materially benefit from factual evidence.
+ */
+function wouldBenefitFromEvidence(message: string): { needsEvidence: boolean; reason?: string } {
+  const lower = message.toLowerCase();
+  
+  for (const pattern of NEEDS_FACTUAL_EVIDENCE_PATTERNS) {
+    if (pattern.test(lower)) {
+      return { 
+        needsEvidence: true, 
+        reason: "This question appears to ask about specific meeting outcomes or product capabilities." 
+      };
+    }
+  }
+  
+  return { needsEvidence: false };
+}
+
 async function handleGeneralAssistanceIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path`);
+  
+  // HARDENING: GENERAL_HELP guardrail
+  // If request would materially benefit from factual meeting or product evidence, trigger CLARIFY
+  const evidenceCheck = wouldBenefitFromEvidence(userMessage);
+  if (evidenceCheck.needsEvidence) {
+    console.log(`[OpenAssistant] GENERAL_HELP guardrail triggered: ${evidenceCheck.reason}`);
+    return {
+      answer: `${evidenceCheck.reason}\n\nTo give you accurate information, could you:\n- For meeting questions: specify which customer or meeting you're asking about\n- For product questions: let me know what specific capability you want to verify\n\nThis helps me provide verified information rather than general guidance.`,
+      intent: "general_assistance",
+      intentClassification: classification,
+      controlPlaneIntent: Intent.CLARIFY,
+      answerContract: AnswerContract.CLARIFY,
+      dataSource: "clarification",
+      delegatedToSingleMeeting: false,
+    };
+  }
   
   const response = await openai.chat.completions.create({
     model: "gpt-5",
@@ -685,17 +1040,20 @@ async function handleGeneralAssistanceIntent(
 
 You are a helpful business assistant for the PitCrew team. Provide clear, professional help with the user's request.
 
-You can help with:
+=== ALLOWED (Advisory, Creative, Framing) ===
 - Drafting emails, messages, and documents
 - Explaining concepts and answering general questions
 - Providing suggestions and recommendations
 - Helping with planning and organization
+- High-level descriptions of what PitCrew does and its value
 
-IMPORTANT CONSTRAINTS:
-- Do NOT make specific claims about PitCrew features, pricing, or integrations
-- If asked about product specifics, say you'd need to check the product documentation
-- For meeting-related questions, suggest they ask about a specific meeting
-- Be direct and helpful. If you're unsure about something, say so.`,
+=== STRICTLY FORBIDDEN ===
+- Asserting factual meeting outcomes (what was said, decided, agreed)
+- Guaranteeing product features, pricing, integrations, or availability
+- Making claims that require Product SSOT or meeting evidence
+- Implying you have access to specific meeting data
+
+If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.`,
       },
       {
         role: "user",
@@ -710,6 +1068,9 @@ IMPORTANT CONSTRAINTS:
     answer,
     intent: "general_assistance",
     intentClassification: classification,
+    controlPlaneIntent: Intent.GENERAL_HELP,
+    answerContract: AnswerContract.GENERAL_RESPONSE,
+    ssotMode: "none" as SSOTMode,
     dataSource: "general_knowledge",
     delegatedToSingleMeeting: false,
   };

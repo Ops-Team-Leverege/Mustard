@@ -88,7 +88,29 @@ Chain length: 1-2 common, 3 acceptable, 4+ is a smell (may indicate Single Inten
 
 **Scope Types** (identical structure, different scope size):
 - SingleMeetingScope: { type, meetingId, companyId?, companyName? }
-- MultiMeetingScope: { type, meetingIds, filters?: { company?, topic?, timeRange? } }
+- MultiMeetingScope: { type, meetingIds, filters?: { company?, topic?, timeRange? }, coverage?: { totalMeetingsSearched, matchingMeetingsCount, uniqueCompaniesRepresented } }
+
+### Control Plane Hardening
+The control plane enforces safety constraints and failure semantics:
+
+**Contract Failure Semantics**:
+- EmptyResultBehavior: "clarify" | "refuse" | "return_empty" - controls response when no evidence found
+- minEvidenceThreshold: Minimum evidence items required (e.g., PATTERN_ANALYSIS needs 2+ meetings)
+- Authority validation: Authoritative contracts (ssotMode="authoritative") always refuse without Product SSOT
+
+**Evidence-Based Enforcement**:
+- Extraction contracts (CUSTOMER_QUESTIONS, ATTENDEES, CROSS_MEETING_QUESTIONS) fetch actual evidence from database
+- Uses storage.getCustomerQuestionsByTranscript() and storage.getTranscript() for real evidence counts
+- emptyResultBehavior enforced based on actual data, not LLM output heuristics
+- Analytical contracts (PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY) use meetings as evidence
+
+**Decision Observability**:
+- ContractExecutionDecision logged for each contract: { contract, authority, authorityValidated, evidenceCount, executionOutcome }
+- Execution outcomes: "executed" | "short_circuit_refuse" | "empty_evidence" | "evidence_threshold_not_met"
+
+**Unified Routing**:
+- All multi-meeting paths route through executeContractChain for uniform constraint enforcement
+- Both handleMeetingDataIntent and handleMultiMeetingIntent use the same execution path
 
 ### Slack Single-Meeting Orchestrator
 Handles user questions scoped to a single meeting with read-only artifact access. Internal sub-intent classification:
