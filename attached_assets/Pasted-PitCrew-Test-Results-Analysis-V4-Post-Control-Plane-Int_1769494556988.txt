@@ -1,0 +1,67 @@
+PitCrew Test Results Analysis - V4 (Post Control Plane Integration)
+Date: January 27, 2026
+Executive Summary
+MetricBefore (V2)After (V4)TargetStatusTotal Tests150122--GENERAL_HELP fallback74%76%<20%🔴 No improvementMeeting-related intents~6%22%70%+🟡 Some improvementPRODUCT_KNOWLEDGE0%0%80%+🔴 Not workingEvidence Context used0%0%60%+🔴 Still broken"Which PitCrew?" confusionN/A23 responses0🔴 Critical issue
+The Ambient Product Context is NOT being applied. The model doesn't know it's PitCrew.
+
+Key Problems Identified
+1. 🔴 Ambient Product Context NOT Working
+23 out of 122 responses asked "which PitCrew do you mean?"
+Examples:
+
+"I'm not sure which 'PitCrew' you're referring to..."
+"Could you clarify which 'PitCrew' you mean?"
+"There are several products with that name..."
+
+This should NEVER happen. The Ambient Prompt should establish:
+
+"You are assisting with PitCrew, a product by Leverege."
+
+Root Cause: The Ambient Product Context prompt is either:
+
+Not being injected into the system prompt
+Being overridden by Open Assistant's default behavior
+Not reaching the LLM at all
+
+
+2. 🔴 PRODUCT_KNOWLEDGE Intent Never Used
+Expected IntentActual IntentCountPRODUCT_KNOWLEDGEGENERAL_HELP31/31
+Every single product question went to GENERAL_HELP instead of PRODUCT_KNOWLEDGE.
+Examples:
+
+"How is PitCrew priced?" → GENERAL_HELP (should be PRODUCT_KNOWLEDGE)
+"Does PitCrew integrate with POS systems?" → GENERAL_HELP (should be PRODUCT_KNOWLEDGE)
+"What safety features does PitCrew provide?" → GENERAL_HELP (should be PRODUCT_KNOWLEDGE)
+
+
+3. 🟡 Meeting Intents Partially Working
+Some meeting questions are now routing correctly:
+IntentCountNotesSINGLE_MEETING8✅ Direct hitscontent8✅ Sub-intent workingsummary3✅ Sub-intent workingnext_steps3✅ Sub-intent workingattendees2✅ Sub-intent workingprep3✅ Sub-intent workingTotal meeting-related2722% of total
+But 65%+ of meeting questions still go to GENERAL_HELP.
+
+4. 🔴 Evidence Context NEVER Used
+Evidence Context used: 0/122 (0.0%)
+Ambient Only: 122/122 (100.0%)
+Even when intent is correctly classified as SINGLE_MEETING, the meeting transcript is not being loaded.
+
+5. 🔴 Answer Contract Always GENERAL_RESPONSE
+GENERAL_RESPONSE: 122/122 (100%)
+No contract variation. The system is not selecting contracts based on intent.
+
+Intent Distribution
+IntentCount%GENERAL_HELP9376.2%SINGLE_MEETING86.6%content86.6%prep32.5%summary32.5%next_steps32.5%unknown21.6%attendees21.6%
+
+What's Working vs What's Broken
+✅ Working (Partial)
+
+Some meeting questions route to meeting-related intents
+Pattern matching for known companies (Les Schwab, ACE) sometimes works
+Test runner executes and logs correctly
+
+❌ Broken
+
+Ambient Product Context - Model doesn't know it's PitCrew
+PRODUCT_KNOWLEDGE intent - Never triggered (0%)
+Evidence Context - Never loaded (0%)
+Contract Selection - Always GENERAL_RESPONSE
+Product SSOT - Never used

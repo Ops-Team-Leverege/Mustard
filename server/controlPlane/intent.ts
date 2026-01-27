@@ -112,17 +112,33 @@ const MULTI_MEETING_KEYWORDS = [
 ];
 
 const PRODUCT_KNOWLEDGE_KEYWORDS = [
+  // Direct product questions
   "what is pitcrew",
   "what does pitcrew do",
+  "what's pitcrew",
   "pitcrew features",
   "product features",
   "capabilities",
   "what can pitcrew",
   "does pitcrew support",
+  "does pitcrew integrate",
+  "does pitcrew connect",
+  "does pitcrew work with",
+  "can pitcrew",
+  // Pricing variations
   "pitcrew pricing",
+  "pitcrew priced",
+  "pitcrew cost",
+  "how is pitcrew priced",
+  "how much is pitcrew",
+  "how much does pitcrew",
+  "price of pitcrew",
+  "pricing for pitcrew",
+  // Tier keywords
   "pro tier",
   "advanced tier",
   "enterprise tier",
+  // Value/features
   "value proposition",
   "how does pitcrew",
   "pitcrew integrations",
@@ -130,6 +146,9 @@ const PRODUCT_KNOWLEDGE_KEYWORDS = [
   "pitcrew help",
   "about pitcrew",
   "pitcrew's",
+  "tell me about pitcrew",
+  "explain pitcrew",
+  // Product feature names
   "live tv dashboard",
   "bladeassure",
   "queue analytics",
@@ -138,10 +157,17 @@ const PRODUCT_KNOWLEDGE_KEYWORDS = [
   "vehicle tracking",
   "camera integration",
   "vision ai",
+  // Content creation
   "update our pricing",
   "pricing faq",
   "safety features",
   "deployment options",
+  // Integration questions
+  "pos system",
+  "pos integration",
+  "integrate with pos",
+  "dms integration",
+  "dealer management",
 ];
 
 const DOCUMENT_SEARCH_KEYWORDS = [

@@ -43,15 +43,24 @@ const openai = new OpenAI({
  * - Ambient context must never be cited as a source of truth
  * - Ambient context controls framing only
  */
-const AMBIENT_PRODUCT_CONTEXT = `You are assisting with PitCrew, a product by Leverege.
-Assume all conversations refer to this product unless explicitly stated otherwise.
-When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes.
-Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT is available and the active contract permits authoritative claims.
+const AMBIENT_PRODUCT_CONTEXT = `IMPORTANT: You are an AI assistant for PitCrew employees. There is only ONE PitCrew - the company you work for.
+
+PitCrew Identity (established fact - do NOT ask "which PitCrew?"):
+- PitCrew is a B2B SaaS company that sells vision AI solutions to automotive service businesses
+- PitCrew is developed by Leverege
+- Target customers: tire shops (Les Schwab, Discount Tire), oil change chains (Jiffy Lube, Valvoline), car washes, and similar automotive service businesses
+
+When the user mentions "PitCrew" or asks about the product, they ALWAYS mean this PitCrew. Never ask for clarification about which PitCrew.
 
 About PitCrew (for framing only - not authoritative claims):
-- PitCrew is a vision AI solution for automotive service businesses (tire shops, oil change chains, car washes)
+- PitCrew uses computer vision and AI to analyze operations in automotive service bays
 - It helps teams understand operational performance through video-based analytics
-- The platform provides insights for improving throughput, consistency, and customer experience`;
+- The platform provides insights for improving throughput, consistency, and customer experience
+- Key value: visibility into service operations, performance tracking, queue management
+
+Authority rules:
+- When authoritative product data is not provided, speak only at a high level about purpose, value, and outcomes
+- Do not state or imply specific features, integrations, guarantees, pricing, or technical details unless Product SSOT data is explicitly provided`;
 
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
 import { selectAnswerContract, AnswerContract, type SSOTMode } from "../controlPlane/answerContracts";
@@ -259,6 +268,9 @@ async function handleMeetingDataIntent(
       answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
+      controlPlaneIntent: Intent.SINGLE_MEETING,
+      answerContract: AnswerContract.MEETING_SUMMARY,
+      ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       singleMeetingResult,
       delegatedToSingleMeeting: true,
@@ -276,6 +288,9 @@ async function handleMeetingDataIntent(
       answer: `I searched for meetings related to your question but couldn't find any matching transcripts. ${meetingSearch.searchedFor ? `I looked for: ${meetingSearch.searchedFor}` : ''}\n\nCould you provide more details about which customer or meeting you're asking about?`,
       intent: "meeting_data",
       intentClassification: classification,
+      controlPlaneIntent: Intent.SINGLE_MEETING,
+      answerContract: AnswerContract.MEETING_SUMMARY,
+      ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       delegatedToSingleMeeting: false,
     };
@@ -296,6 +311,9 @@ async function handleMeetingDataIntent(
       answer: singleMeetingResult.answer,
       intent: "meeting_data",
       intentClassification: classification,
+      controlPlaneIntent: Intent.SINGLE_MEETING,
+      answerContract: AnswerContract.MEETING_SUMMARY,
+      ssotMode: "none" as SSOTMode,
       dataSource: "meeting_artifacts",
       singleMeetingResult,
       delegatedToSingleMeeting: true,
@@ -310,6 +328,9 @@ async function handleMeetingDataIntent(
     answer: crossMeetingResult,
     intent: "meeting_data",
     intentClassification: classification,
+    controlPlaneIntent: Intent.MULTI_MEETING,
+    answerContract: AnswerContract.MEETING_SUMMARY,
+    ssotMode: "none" as SSOTMode,
     dataSource: "meeting_artifacts",
     artifactMatches: undefined,
     delegatedToSingleMeeting: false,
@@ -456,12 +477,12 @@ Keep responses helpful but appropriately bounded by what can be safely stated wi
 
   return {
     answer,
-    intent: "general_assistance",
+    intent: "meeting_data", // Maps to "product_knowledge" for logging
     intentClassification: classification,
     controlPlaneIntent: Intent.PRODUCT_KNOWLEDGE,
     answerContract: AnswerContract.PRODUCT_EXPLANATION,
     ssotMode: "descriptive",
-    dataSource: "general_knowledge",
+    dataSource: "product_ssot", // Indicates product context was used
     delegatedToSingleMeeting: false,
   };
 }

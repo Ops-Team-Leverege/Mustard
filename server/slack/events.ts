@@ -632,7 +632,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           semanticConfidence = openAssistantResult.singleMeetingResult.semanticConfidence;
         }
         
-        console.log(`[Slack] Open Assistant response: intent=${openAssistantResult.intent}, dataSource=${openAssistantResult.dataSource}, delegated=${openAssistantResult.delegatedToSingleMeeting}`);
+        console.log(`[Slack] Open Assistant response: intent=${openAssistantResult.intent}, controlPlane=${openAssistantResult.controlPlaneIntent || 'none'}, contract=${openAssistantResult.answerContract || 'none'}, ssot=${openAssistantResult.ssotMode || 'none'}, dataSource=${openAssistantResult.dataSource}, delegated=${openAssistantResult.delegatedToSingleMeeting}`);
       }
 
       // Post response to Slack (skip in test mode)
