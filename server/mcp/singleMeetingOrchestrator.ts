@@ -1219,13 +1219,35 @@ function isSemanticQuestion(question: string): boolean {
 }
 
 /**
+ * Derive internal handler type from Control Plane contract.
+ * 
+ * When a contract is provided by the Control Plane, we skip the deprecated
+ * internal classification and directly route to the appropriate handler.
+ */
+function deriveHandlerFromContract(contract: AnswerContract): InternalHandlerType {
+  switch (contract) {
+    case AnswerContract.EXTRACTIVE_FACT:
+    case AnswerContract.ATTENDEES:
+    case AnswerContract.CUSTOMER_QUESTIONS:
+    case AnswerContract.NEXT_STEPS:
+      return "extractive";
+    case AnswerContract.AGGREGATIVE_LIST:
+      return "aggregative";
+    case AnswerContract.MEETING_SUMMARY:
+      return "summary";
+    default:
+      return "extractive";
+  }
+}
+
+/**
  * Main orchestrator entry point.
  * 
- * Classifies intent and routes to appropriate handler.
+ * Routes to appropriate handler based on Control Plane contract or internal classification.
  * 
  * Processing Flow:
  * 1. Check for offer responses (if pending)
- * 2. Classify intent (extractive/aggregative/summary)
+ * 2. Derive handler type from contract OR use deprecated classification
  * 3. Try artifact deterministic lookup
  * 4. If artifacts fail AND question is semantic → use LLM semantic answer (Step 6)
  * 5. If still no answer → return uncertainty with offer
@@ -1233,11 +1255,13 @@ function isSemanticQuestion(question: string): boolean {
  * @param ctx - Single meeting context (meetingId, companyName, meetingDate)
  * @param question - User's question text
  * @param hasPendingOffer - Whether the previous interaction offered a summary (from interaction_logs)
+ * @param contract - Optional Control Plane contract. When provided, skips deprecated internal classification.
  */
 export async function handleSingleMeetingQuestion(
   ctx: SingleMeetingContext,
   question: string,
-  hasPendingOffer: boolean = false
+  hasPendingOffer: boolean = false,
+  contract?: AnswerContract
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Processing question for meeting ${ctx.meetingId}`);
   console.log(`[SingleMeetingOrchestrator] Question: "${question.substring(0, 100)}..." | pendingOffer: ${hasPendingOffer}`);
@@ -1282,11 +1306,20 @@ export async function handleSingleMeetingQuestion(
     // If handleBinaryQuestion returns null, fall through to normal processing
   }
   
-  // Use internal classification for backward compatibility
-  // TODO: Migrate to Control Plane contract-based routing
-  const handlerType = classifyQuestionType(question);
+  // Derive handler type from Control Plane contract if provided, otherwise use deprecated internal classification
+  let handlerType: InternalHandlerType;
+  if (contract) {
+    handlerType = deriveHandlerFromContract(contract);
+    console.log(`[SingleMeetingOrchestrator] Using Control Plane contract: ${contract} → handler: ${handlerType}`);
+  } else {
+    // @deprecated Legacy internal classification for backward compatibility with direct Slack calls
+    // This path should only execute when invoked without Control Plane context
+    handlerType = classifyQuestionType(question);
+    console.log(`[SingleMeetingOrchestrator] Using deprecated internal classification (no contract provided)`);
+  }
+  
   const isSemantic = isSemanticQuestion(question);
-  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-27-v1 | handlerType: ${handlerType} | isSemantic: ${isSemantic} | isBinary: ${isBinary}`);
+  console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-27-v2 | handlerType: ${handlerType} | isSemantic: ${isSemantic} | isBinary: ${isBinary} | hasContract: ${!!contract}`);
   console.log(`[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "${question}"`);
   
   switch (handlerType) {

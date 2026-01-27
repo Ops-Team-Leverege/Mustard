@@ -142,7 +142,15 @@ The control plane enforces safety constraints and failure semantics at multiple 
 - Contract selection: ONLY in server/controlPlane/answerContracts.ts
 - No duplicate LLM calls for intent/contract selection outside Control Plane
 - Open Assistant handler requires Control Plane intent (returns CLARIFY if not provided)
-- SingleMeetingOrchestrator uses deprecated internal classification for backward compatibility with direct Slack calls (migration to contract-based routing in progress)
+- SingleMeetingOrchestrator accepts optional `contract` parameter:
+  - When contract is provided: Uses contract-based routing (skips deprecated internal classification)
+  - When contract is NOT provided: Falls back to deprecated internal classification (backward compatibility for direct Slack calls)
+
+**Open Assistant Module Architecture**:
+- openAssistantHandler.ts: Thin orchestration layer (wires modules together)
+- meetingResolver.ts: Meeting lookup and scope resolution
+- contractExecutor.ts: Contract chain execution and evidence enforcement
+- types.ts: Shared type definitions
 
 ### Slack Single-Meeting Orchestrator
 Handles user questions scoped to a single meeting with read-only artifact access. Internal sub-intent classification:
