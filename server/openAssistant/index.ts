@@ -1,11 +1,12 @@
 /**
  * Open Assistant Module
  * 
- * Exports for the Open Assistant capability that extends
- * the existing Slack/MCP flow with intent-driven branching.
+ * Exports for the Open Assistant capability.
+ * 
+ * NOTE: Intent classification is handled EXCLUSIVELY by the Control Plane (server/controlPlane/intent.ts).
+ * This module no longer exports any intent classification logic - the Control Plane is the single source of truth.
  */
 
-export { classifyIntent, needsClarification, type IntentClassification, type OpenAssistantIntent } from "./intentClassifier";
 export { performExternalResearch, formatCitationsForDisplay, type ResearchResult, type Citation } from "./externalResearch";
 export { searchArtifactsSemanticly, searchArtifactsAcrossMeetings, formatArtifactResults, type ArtifactSearchResult } from "./semanticArtifactSearch";
 export { handleOpenAssistant, shouldUseOpenAssistant, type OpenAssistantContext, type OpenAssistantResult } from "./openAssistantHandler";

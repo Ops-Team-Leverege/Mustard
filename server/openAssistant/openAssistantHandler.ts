@@ -21,11 +21,46 @@
  */
 
 import { OpenAI } from "openai";
-import { classifyIntent, needsClarification, type IntentClassification, type OpenAssistantIntent } from "./intentClassifier";
 import { performExternalResearch, formatCitationsForDisplay, type ResearchResult } from "./externalResearch";
 import { searchArtifactsSemanticly, formatArtifactResults, type ArtifactSearchResult } from "./semanticArtifactSearch";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
 import { storage } from "../storage";
+
+/**
+ * Evidence Source Type (derived from Control Plane intent)
+ * 
+ * NOTE: This is NOT a duplicate classifier. The Control Plane (server/controlPlane/intent.ts) 
+ * is the SOLE authority for intent classification. This type represents the evidence source
+ * that the handler uses for routing, derived directly from the Control Plane intent.
+ */
+export type EvidenceSource = 
+  | "meeting_data"
+  | "external_research" 
+  | "general_assistance"
+  | "hybrid";
+
+/**
+ * Intent Classification Result (Control Plane derived)
+ * 
+ * This type is populated from Control Plane results - never from a separate classifier.
+ * Kept for API compatibility with existing handler functions.
+ */
+export type IntentClassification = {
+  intent: EvidenceSource;
+  confidence: "high" | "medium" | "low";
+  rationale: string;
+  meetingRelevance: {
+    referencesSpecificInteraction: boolean;
+    asksWhatWasSaidOrAgreed: boolean;
+    asksAboutCustomerQuestions: boolean;
+  };
+  researchRelevance: {
+    needsPublicInfo: boolean;
+    companyOrEntityMentioned: string | null;
+    topicForResearch: string | null;
+  };
+  suggestedClarification?: string;
+};
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -112,7 +147,7 @@ export type OpenAssistantContext = {
 
 export type OpenAssistantResult = {
   answer: string;
-  intent: OpenAssistantIntent;
+  intent: EvidenceSource;
   intentClassification: IntentClassification;
   controlPlaneIntent?: Intent;
   answerContract?: AnswerContract;
@@ -126,9 +161,12 @@ export type OpenAssistantResult = {
 };
 
 /**
- * Map control plane intent to evidence source intent for routing.
+ * Derive evidence source from Control Plane intent.
+ * 
+ * NOTE: This is NOT intent classification. The Control Plane has already classified the intent.
+ * This function simply maps the Control Plane intent to the evidence source for routing.
  */
-function mapControlPlaneToEvidenceSource(cpIntent: Intent): OpenAssistantIntent {
+function deriveEvidenceSource(cpIntent: Intent): EvidenceSource {
   switch (cpIntent) {
     case Intent.SINGLE_MEETING:
     case Intent.MULTI_MEETING:
@@ -192,11 +230,11 @@ export async function handleOpenAssistant(
       };
     }
     
-    const mappedIntent = mapControlPlaneToEvidenceSource(cpIntent.intent);
-    const fakeClassification: IntentClassification = {
-      intent: mappedIntent,
+    const evidenceSource = deriveEvidenceSource(cpIntent.intent);
+    const classification: IntentClassification = {
+      intent: evidenceSource,
       confidence: cpIntent.confidence > 0.8 ? "high" : cpIntent.confidence > 0.5 ? "medium" : "low",
-      rationale: cpIntent.reason || "Mapped from control plane intent",
+      rationale: cpIntent.reason || "Derived from Control Plane intent",
       meetingRelevance: {
         referencesSpecificInteraction: cpIntent.intent === Intent.SINGLE_MEETING,
         asksWhatWasSaidOrAgreed: false,
@@ -209,58 +247,37 @@ export async function handleOpenAssistant(
       },
     };
     
-    console.log(`[OpenAssistant] Mapped to evidence source: ${mappedIntent}`);
+    console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Control Plane intent: ${cpIntent.intent})`);
     
     if (cpIntent.intent === Intent.SINGLE_MEETING) {
-      return handleMeetingDataIntent(userMessage, context, fakeClassification);
+      return handleMeetingDataIntent(userMessage, context, classification);
     }
     
     if (cpIntent.intent === Intent.MULTI_MEETING) {
-      return handleMultiMeetingIntent(userMessage, context, fakeClassification);
+      return handleMultiMeetingIntent(userMessage, context, classification);
     }
     
     if (cpIntent.intent === Intent.PRODUCT_KNOWLEDGE) {
-      return handleProductKnowledgeIntent(userMessage, context, fakeClassification);
+      return handleProductKnowledgeIntent(userMessage, context, classification);
     }
     
-    return handleGeneralAssistanceIntent(userMessage, context, fakeClassification);
+    return handleGeneralAssistanceIntent(userMessage, context, classification);
   }
   
-  const intentClassification = await classifyIntent(
-    userMessage,
-    context.conversationContext
-  );
+  // CONTROL PLANE REQUIRED: No fallback to separate classifier
+  // If no Control Plane intent is provided, route to general assistance with CLARIFY
+  console.log(`[OpenAssistant] WARNING: No Control Plane intent provided, defaulting to CLARIFY`);
+  const fallbackClassification = defaultClassification("No Control Plane intent provided - clarification needed");
   
-  console.log(`[OpenAssistant] Intent: ${intentClassification.intent} (${intentClassification.confidence})`);
-  console.log(`[OpenAssistant] Rationale: ${intentClassification.rationale}`);
-
-  const clarificationPrompt = needsClarification(intentClassification);
-  if (clarificationPrompt) {
-    return {
-      answer: clarificationPrompt,
-      intent: intentClassification.intent,
-      intentClassification,
-      dataSource: "clarification",
-      delegatedToSingleMeeting: false,
-    };
-  }
-
-  switch (intentClassification.intent) {
-    case "meeting_data":
-      return handleMeetingDataIntent(userMessage, context, intentClassification);
-    
-    case "external_research":
-      return handleExternalResearchIntent(userMessage, context, intentClassification);
-    
-    case "general_assistance":
-      return handleGeneralAssistanceIntent(userMessage, context, intentClassification);
-    
-    case "hybrid":
-      return handleHybridIntent(userMessage, context, intentClassification);
-    
-    default:
-      return handleGeneralAssistanceIntent(userMessage, context, intentClassification);
-  }
+  return {
+    answer: "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?",
+    intent: "general_assistance",
+    intentClassification: fallbackClassification,
+    controlPlaneIntent: Intent.CLARIFY,
+    answerContract: AnswerContract.CLARIFY,
+    dataSource: "clarification",
+    delegatedToSingleMeeting: false,
+  };
 }
 
 function defaultClassification(rationale: string): IntentClassification {
@@ -1614,26 +1631,22 @@ async function searchAcrossMeetings(
 /**
  * Determine if the Open Assistant path should be used.
  * 
- * The Open Assistant path is used when:
- * - No meeting is resolved AND user intent appears to be general assistance/research
- * - OR user explicitly asks for research or general help
+ * IMPORTANT: This function no longer performs intent classification.
+ * Intent classification is handled EXCLUSIVELY by the Control Plane.
  * 
- * The existing single-meeting path is used when:
- * - Meeting is resolved AND user intent is meeting_data
+ * The decision is now simple:
+ * - If a meeting is already resolved → use single-meeting path
+ * - Otherwise → use Open Assistant (which will invoke Control Plane for routing)
+ * 
+ * The Control Plane (server/controlPlane/intent.ts) is the SOLE authority for intent decisions.
  */
-export async function shouldUseOpenAssistant(
-  userMessage: string,
+export function shouldUseOpenAssistant(
   resolvedMeeting: SingleMeetingContext | null
-): Promise<{ useOpenAssistant: boolean; classification?: IntentClassification }> {
+): { useOpenAssistant: boolean } {
   if (resolvedMeeting) {
     return { useOpenAssistant: false };
   }
 
-  const classification = await classifyIntent(userMessage);
-  
-  if (classification.intent === "meeting_data" && classification.meetingRelevance.referencesSpecificInteraction) {
-    return { useOpenAssistant: false, classification };
-  }
-
-  return { useOpenAssistant: true, classification };
+  // No meeting resolved - route to Open Assistant which will use Control Plane
+  return { useOpenAssistant: true };
 }

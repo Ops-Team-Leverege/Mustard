@@ -1,0 +1,75 @@
+Eliminate Duplicate Intent & Contract Authority
+Context
+
+We are hardening the existing PitCrew Control Plane. Intent classification, scope resolution, and contract chain selection are already implemented and stable in server/controlPlane. Single-meeting and multi-meeting behavior must remain unchanged.
+
+Change
+
+Remove all duplicate intent classification and contract selection logic outside the Control Plane. Enforce the Control Plane as the sole authority for intent and contract decisions.
+
+Constraints (Must Not Change)
+
+This change must not:
+
+Alter Control Plane intent classification behavior
+
+Alter contract constraints or failure semantics
+
+Introduce new intents or contracts
+
+Add new LLM calls
+
+Change execution results for valid requests
+
+Implementation Notes
+1. Remove Open Assistant Intent Classification
+
+Delete or bypass server/openAssistant/intentClassifier.ts
+
+Remove any calls to Open Assistant–level intent classification
+
+Do not perform intent classification in openAssistantHandler.ts
+
+2. Use Control Plane Intent Exclusively
+
+openAssistantHandler.ts must consume intent only from the Control Plane result
+
+Remove mapControlPlaneToEvidenceSource()–style bridging logic
+
+No “fake” or reconstructed intent objects
+
+3. Remove Orchestrator-Level Intent Logic
+
+Delete intent classification logic in singleMeetingOrchestrator.ts
+
+Remove SingleMeetingIntent types (extractive | aggregative | summary)
+
+Remove mapOrchestratorIntentToContract()
+
+Orchestrator must:
+
+receive a ContractChain from the Control Plane
+
+execute it verbatim
+
+never select or override contracts
+
+4. Enforce Single Source of Truth
+
+Intent is classified once, in server/controlPlane/intent.ts
+
+Contract chains are selected once, in answerContracts.ts
+
+Execution layers must not reinterpret intent or contracts
+
+Acceptance Criteria
+
+Only one intent classifier exists in the system (Control Plane)
+
+No LLM calls perform intent or contract selection outside the Control Plane
+
+Orchestrators execute contracts without reclassification
+
+No behavior regression in existing single- or multi-meeting flows
+
+Logs clearly show Control Plane intent and contract chain used
