@@ -1,0 +1,202 @@
+# Smart Clarification with Default Assumption
+
+## Problem
+
+Current CLARIFY responses feel robotic and unhelpful:
+
+```
+User: "how does the cameras installation work?"
+Bot:  "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?"
+```
+
+This is a dead-end that forces the user to do all the work.
+
+## Solution
+
+Make clarifications **conversational** with a **best guess + alternatives**:
+
+```
+User: "how does the cameras installation work?"
+Bot:  "Are you asking how camera installation works with PitCrew? 
+
+      If so—cameras are typically mounted in service bays pointing at the work area. Our team or your IT handles physical install; PitCrew then connects to the feeds over your network. I can go deeper on any part.
+
+      Or did you mean:
+      • A specific customer's installation (Les Schwab, ACE, etc.)
+      • Technical requirements for your own deployment
+
+      Just say 'yes' or tell me which!"
+```
+
+## Implementation
+
+### 1. Enhance LLM Interpretation Output
+
+When confidence is medium-low, the LLM should return:
+
+```typescript
+interface SmartClarification {
+  bestGuess: {
+    interpretation: string;      // "camera installation process for PitCrew"
+    intent: Intent;              // PRODUCT_KNOWLEDGE
+    contract: AnswerContract;    // PRODUCT_EXPLANATION
+    confidence: number;          // 0.65
+  };
+  alternatives: Array<{
+    interpretation: string;      // "specific customer's installation"
+    intent: Intent;              // SINGLE_MEETING
+    hint: string;                // "Les Schwab, ACE, etc."
+  }>;
+  canPartialAnswer: boolean;     // true = give short answer + ask to confirm
+}
+```
+
+### 2. Response Generation Logic
+
+```typescript
+function generateClarifyResponse(clarification: SmartClarification): string {
+  const { bestGuess, alternatives, canPartialAnswer } = clarification;
+  
+  let response = "";
+  
+  // Lead with the best guess as a question
+  response += `Are you asking about ${bestGuess.interpretation}?\n\n`;
+  
+  // If we can give a partial answer, do it
+  if (canPartialAnswer && bestGuess.confidence > 0.5) {
+    response += `If so—${getShortAnswer(bestGuess.contract)}\n\n`;
+  }
+  
+  // Offer alternatives
+  if (alternatives.length > 0) {
+    response += "Or did you mean:\n";
+    alternatives.forEach(alt => {
+      response += `• ${alt.interpretation}`;
+      if (alt.hint) response += ` (${alt.hint})`;
+      response += "\n";
+    });
+  }
+  
+  // Friendly close
+  response += "\nJust say 'yes' or let me know which!";
+  
+  return response;
+}
+```
+
+### 3. Context-Aware Best Guesses
+
+| Query Pattern | Best Guess | Alternatives |
+|--------------|------------|--------------|
+| "how does X work" | Product explanation | Customer-specific, your deployment |
+| "what about [topic]" | Search meetings for topic | Product info about topic |
+| "the [entity] thing" | Most recent [entity] meeting | Other [entity] mentions |
+| "[company] + [topic]" | That company's mentions of topic | General product info |
+| "pricing/cost/price" | Product pricing | Customer's pricing questions |
+
+### 4. Examples
+
+**Example 1: Installation Question**
+```
+User: "how does the cameras installation work?"
+
+Best guess: Product installation process (confidence: 0.7)
+Alternatives: Customer-specific install, your deployment requirements
+
+Response:
+"Are you asking how camera installation works with PitCrew?
+
+If so—cameras mount in service bays pointing at work areas. Physical install is handled by your IT or our team, then PitCrew connects to feeds over your network. Happy to go deeper.
+
+Or did you mean:
+• A specific customer's installation (Les Schwab, ACE)
+• Technical requirements for your own deployment
+
+Just say 'yes' or let me know which!"
+```
+
+**Example 2: Vague Company Reference**
+```
+User: "what's the deal with Canadian Tire?"
+
+Best guess: Canadian Tire meeting summary (confidence: 0.6)
+Alternatives: Their pilot status, specific topic from their meetings
+
+Response:
+"Are you looking for a summary of our Canadian Tire meetings?
+
+I have 2 meetings with them on record. I can summarize the key points.
+
+Or did you mean:
+• Their pilot status and next steps
+• Something specific they discussed (pricing, integration, etc.)
+
+Which would help most?"
+```
+
+**Example 3: Ambiguous Topic**
+```
+User: "can you help me with the pricing stuff?"
+
+Best guess: Product pricing info (confidence: 0.5)
+Alternatives: Customer's pricing questions, quote preparation
+
+Response:
+"Happy to help with pricing! Are you looking for:
+
+• **PitCrew pricing** — I can outline the general model, though you'll want to confirm specifics with the sales team
+• **Customer pricing questions** — I can pull what customers have asked about pricing in meetings
+• **Quote prep** — I can help structure a quote or proposal
+
+Which one?"
+```
+
+### 5. Tone Guidelines
+
+**DO:**
+- Lead with a best guess
+- Offer a short helpful answer when possible
+- Give specific alternatives (not generic)
+- End with a clear, friendly prompt
+- Use contractions (it's, I'll, you're)
+- Keep it conversational
+
+**DON'T:**
+- Say "I need more context"
+- Give generic alternatives like "something else"
+- Sound like an error message
+- Make the user start over
+- Use formal/stiff language
+- Write walls of text
+
+### 6. Fallback for True Ambiguity
+
+When confidence is very low (<40%) and no good guess:
+
+```
+"I want to help but I'm not sure what you're looking for. Are you asking about:
+
+• A customer meeting (which company?)
+• PitCrew product info (which feature?)
+• Help with a task (what kind?)
+
+Give me a hint and I'll get you sorted!"
+```
+
+Still friendly, still offers paths forward—never a dead end.
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| Generic "I need more context" | 14/64 (22%) | <5% |
+| User abandons after clarify | Unknown | Track & minimize |
+| Clarify → successful follow-up | Unknown | >80% |
+
+## Files to Modify
+
+1. `server/controlPlane/llmInterpretation.ts` — Return SmartClarification structure
+2. `server/openAssistant/openAssistantHandler.ts` — Generate conversational clarify responses
+3. `server/controlPlane/prompts/` — Update LLM prompts to generate best guesses

@@ -50,12 +50,35 @@ export type LLMInterpretation = {
   confidence: number; // 0.0 – 1.0
   interpretation: string; // human-readable summary
   alternatives?: LLMInterpretationAlternative[];
+  // Smart clarification enhancements
+  canPartialAnswer: boolean; // true = we can give a short helpful answer
+  partialAnswer?: string; // short answer to provide while clarifying
+  questionForm: string; // natural question to ask user (e.g., "Are you asking about...")
+};
+
+export type SmartClarification = {
+  bestGuess: {
+    interpretation: string;
+    intent: IntentString;
+    contract: ContractString;
+    confidence: number;
+    questionForm: string;
+    partialAnswer?: string;
+  };
+  alternatives: Array<{
+    interpretation: string;
+    intent: IntentString;
+    contract: ContractString;
+    hint?: string;
+  }>;
+  canPartialAnswer: boolean;
 };
 
 export type LLMInterpretationAlternative = {
   intent: IntentString;
   contract: ContractString;
   description: string;
+  hint?: string; // Specific examples like "Les Schwab, ACE, etc."
 };
 
 export type InterpretationMetadata = {
@@ -111,40 +134,71 @@ function getDefaultContractForIntent(intent: IntentString): ContractString {
   return contracts?.[0] ?? "GENERAL_RESPONSE";
 }
 
-function generateClarifyMessage(
+function generateSmartClarifyMessage(
   interpretation: LLMInterpretation,
-  hasAlternatives: boolean
+  alternatives: LLMInterpretationAlternative[]
 ): string {
-  const { confidence, interpretation: summary } = interpretation;
+  const { confidence, questionForm, partialAnswer, canPartialAnswer } = interpretation;
+  const hasAlternatives = alternatives.length > 0;
   
-  if (confidence >= 0.9) {
-    return `I think I understand what you're looking for. ${summary} Is that what you had in mind?`;
+  let response = "";
+  
+  // Lead with the best guess as a natural question
+  response += questionForm + "\n\n";
+  
+  // If we can give a partial answer and confidence is decent, include it
+  if (canPartialAnswer && partialAnswer && confidence > 0.5) {
+    response += `If so—${partialAnswer}\n\n`;
   }
   
-  if (confidence >= 0.7) {
-    if (hasAlternatives) {
-      return `I want to make sure I help you correctly. ${summary} Or were you looking for something else?`;
-    }
-    return `It sounds like ${summary.toLowerCase()} – is that right?`;
+  // Offer specific alternatives if available
+  if (hasAlternatives) {
+    response += "Or did you mean:\n";
+    alternatives.forEach(alt => {
+      response += `• ${alt.description}`;
+      if (alt.hint) response += ` (${alt.hint})`;
+      response += "\n";
+    });
+    response += "\n";
   }
   
-  return `I'd like to help, but I want to make sure I understand. Could you tell me a bit more about what you're looking for? My best guess is that ${summary.toLowerCase()}`;
+  // Friendly close
+  if (hasAlternatives || confidence < 0.8) {
+    response += "Just say 'yes' or let me know which!";
+  } else {
+    response += "Let me know!";
+  }
+  
+  return response.trim();
+}
+
+function generateFallbackClarifyMessage(): string {
+  return `I want to help but I'm not sure what you're looking for. Are you asking about:
+
+• A customer meeting (which company?)
+• PitCrew product info (which feature?)
+• Help with a task (what kind?)
+
+Give me a hint and I'll get you sorted!`;
 }
 
 export async function interpretAmbiguousQuery(
   question: string,
   failureReason: string
 ): Promise<ClarifyWithInterpretation> {
-  const systemPrompt = `You are a semantic interpreter for PitCrew's sales assistant.
+  const systemPrompt = `You are a helpful assistant for PitCrew's sales team. Your job is to make smart clarifications that are conversational and helpful—never robotic dead ends.
 
-CONTEXT: PitCrew sells vision AI to automotive service businesses. The system handles:
-- Customer meeting data (Les Schwab, ACE, Jiffy Lube, etc.)
+CONTEXT: PitCrew sells vision AI to automotive service businesses. You have access to:
+- Customer meeting data (Les Schwab, ACE, Jiffy Lube, Canadian Tire, etc.)
 - Contact information (Tyler Wiggins, Randy, Robert, etc.)
 - Product knowledge (features, pricing, integrations)
 - General assistance (drafting, summarizing, etc.)
 
-YOUR ROLE: Interpret what the user LIKELY wants and express it in plain language.
-You are NOT deciding what happens - you are helping understand the request.
+YOUR GOAL: When a request is ambiguous, provide a HELPFUL clarification that:
+1. Leads with your best guess as a natural question
+2. Offers a short partial answer if possible (so the user gets SOMETHING helpful)
+3. Lists specific alternatives (not generic options)
+4. Uses friendly, conversational language
 
 VALID INTENTS:
 - SINGLE_MEETING: Questions about a specific meeting or conversation
@@ -165,50 +219,113 @@ RESPONSE FORMAT (JSON):
   "proposedIntent": "INTENT_NAME",
   "proposedContract": "CONTRACT_NAME",
   "confidence": 0.0-1.0,
-  "interpretation": "A natural language summary of what the user likely wants",
+  "interpretation": "Brief summary of what user likely wants",
+  "questionForm": "A natural question to ask the user, e.g., 'Are you asking how camera installation works with PitCrew?'",
+  "canPartialAnswer": true/false,
+  "partialAnswer": "A short helpful answer IF canPartialAnswer is true. Keep it 1-2 sentences.",
   "alternatives": [
     {
       "intent": "ALTERNATE_INTENT",
       "contract": "ALTERNATE_CONTRACT",
-      "description": "Alternative interpretation in plain language"
+      "description": "Specific alternative in plain language",
+      "hint": "Examples like 'Les Schwab, ACE' or 'pricing, features' if relevant"
     }
   ]
 }
 
 RULES:
-1. The "interpretation" field must be a natural, conversational summary
-2. Do NOT use technical terms like "contract" or "intent" in the interpretation
-3. Provide 1-2 alternatives if confidence is below 0.9
-4. Only provide alternatives if they are meaningfully different
-5. Confidence should reflect how sure you are about the interpretation
+1. "questionForm" should be a natural question leading with the best guess (e.g., "Are you asking about...")
+2. "partialAnswer" should give REAL value—not "I can help with that" but actual info
+3. For PRODUCT_KNOWLEDGE, you CAN provide partial answers about PitCrew (cameras, pricing model, integrations)
+4. Alternatives should be SPECIFIC—not "something else" but concrete options with hints
+5. Use contractions (it's, I'll, you're) and conversational tone
+6. Never say "I need more context"—always offer a path forward
+
+COMMON PATTERNS:
+- "how does X work" → PRODUCT_KNOWLEDGE with partial answer about X
+- "what about [company]" → SINGLE_MEETING or MULTI_MEETING depending on context
+- "pricing/cost/price" → PRODUCT_KNOWLEDGE with partial pricing model info
+- "[company] + [topic]" → SINGLE_MEETING with company-specific search
 
 EXAMPLES:
-User: "tyler schwab"
+
+User: "how does the cameras installation work?"
 Response: {
-  "proposedIntent": "SINGLE_MEETING",
-  "proposedContract": "MEETING_SUMMARY",
-  "confidence": 0.6,
-  "interpretation": "you're asking about a meeting with someone named Tyler or a company like Les Schwab",
+  "proposedIntent": "PRODUCT_KNOWLEDGE",
+  "proposedContract": "PRODUCT_EXPLANATION",
+  "confidence": 0.7,
+  "interpretation": "how PitCrew camera installation works",
+  "questionForm": "Are you asking how camera installation works with PitCrew?",
+  "canPartialAnswer": true,
+  "partialAnswer": "Cameras are typically mounted in service bays pointing at the work area. Your IT team or ours handles physical install; PitCrew then connects to the feeds over your network. I can go deeper on any part.",
   "alternatives": [
     {
-      "intent": "MULTI_MEETING",
-      "contract": "CROSS_MEETING_QUESTIONS",
-      "description": "you want to find all meetings mentioning Tyler or Schwab"
+      "intent": "SINGLE_MEETING",
+      "contract": "EXTRACTIVE_FACT",
+      "description": "A specific customer's installation experience",
+      "hint": "Les Schwab, ACE, etc."
+    },
+    {
+      "intent": "PRODUCT_KNOWLEDGE",
+      "contract": "FAQ_ANSWER",
+      "description": "Technical requirements for your own deployment",
+      "hint": "network specs, camera specs"
     }
   ]
 }
 
-User: "help with pricing response"
+User: "what's the deal with Canadian Tire?"
 Response: {
-  "proposedIntent": "GENERAL_HELP",
-  "proposedContract": "DRAFT_RESPONSE",
-  "confidence": 0.8,
-  "interpretation": "you want help drafting a response about pricing",
+  "proposedIntent": "SINGLE_MEETING",
+  "proposedContract": "MEETING_SUMMARY",
+  "confidence": 0.6,
+  "interpretation": "summary of Canadian Tire meetings",
+  "questionForm": "Are you looking for a summary of our Canadian Tire meetings?",
+  "canPartialAnswer": false,
+  "partialAnswer": "",
+  "alternatives": [
+    {
+      "intent": "SINGLE_MEETING",
+      "contract": "NEXT_STEPS",
+      "description": "Their pilot status and next steps",
+      "hint": ""
+    },
+    {
+      "intent": "SINGLE_MEETING",
+      "contract": "EXTRACTIVE_FACT",
+      "description": "Something specific they discussed",
+      "hint": "pricing, integration, concerns"
+    }
+  ]
+}
+
+User: "can you help me with the pricing stuff?"
+Response: {
+  "proposedIntent": "PRODUCT_KNOWLEDGE",
+  "proposedContract": "FAQ_ANSWER",
+  "confidence": 0.5,
+  "interpretation": "PitCrew pricing information",
+  "questionForm": "Happy to help with pricing! Are you looking for:",
+  "canPartialAnswer": false,
+  "partialAnswer": "",
   "alternatives": [
     {
       "intent": "PRODUCT_KNOWLEDGE",
-      "contract": "FAQ_ANSWER",
-      "description": "you have a question about PitCrew's pricing"
+      "contract": "PRODUCT_EXPLANATION",
+      "description": "PitCrew's pricing model",
+      "hint": "I can outline the general structure"
+    },
+    {
+      "intent": "MULTI_MEETING",
+      "contract": "CROSS_MEETING_QUESTIONS",
+      "description": "What customers have asked about pricing",
+      "hint": ""
+    },
+    {
+      "intent": "GENERAL_HELP",
+      "contract": "DRAFT_RESPONSE",
+      "description": "Help structuring a quote or proposal",
+      "hint": ""
     }
   ]
 }`;
@@ -235,10 +352,14 @@ Response: {
       proposedContract: string;
       confidence: number;
       interpretation: string;
+      questionForm?: string;
+      canPartialAnswer?: boolean;
+      partialAnswer?: string;
       alternatives?: Array<{
         intent: string;
         contract: string;
         description: string;
+        hint?: string;
       }>;
     };
 
@@ -250,15 +371,19 @@ Response: {
       : getDefaultContractForIntent(proposedIntent);
     const confidence = Math.max(0, Math.min(1, parsed.confidence ?? 0.5));
     const interpretation = parsed.interpretation || "you have a question I'd like to help with";
+    const questionForm = parsed.questionForm || `Are you asking about ${interpretation}?`;
+    const canPartialAnswer = parsed.canPartialAnswer ?? false;
+    const partialAnswer = parsed.partialAnswer || undefined;
 
     const alternatives: LLMInterpretationAlternative[] = (parsed.alternatives || [])
-      .slice(0, 2)
+      .slice(0, 3) // Allow up to 3 alternatives for better UX
       .map(alt => ({
         intent: (isValidIntent(alt.intent) ? alt.intent : "GENERAL_HELP") as IntentString,
         contract: (isValidContract(alt.contract) ? alt.contract : "GENERAL_RESPONSE") as ContractString,
         description: alt.description,
+        hint: alt.hint || undefined,
       }))
-      .filter(alt => alt.intent !== proposedIntent);
+      .filter(alt => alt.intent !== proposedIntent || alt.contract !== proposedContract);
 
     const llmInterpretation: LLMInterpretation = {
       proposedIntent,
@@ -266,10 +391,12 @@ Response: {
       confidence,
       interpretation,
       alternatives: alternatives.length > 0 ? alternatives : undefined,
+      canPartialAnswer,
+      partialAnswer,
+      questionForm,
     };
 
-    const hasAlternatives = alternatives.length > 0 && confidence < 0.9;
-    const message = generateClarifyMessage(llmInterpretation, hasAlternatives);
+    const message = generateSmartClarifyMessage(llmInterpretation, alternatives);
 
     console.log(`[LLMInterpretation] Interpretation: intent=${proposedIntent}, contract=${proposedContract}, confidence=${confidence}, reason=${failureReason}`);
 
@@ -280,7 +407,7 @@ Response: {
         contract: proposedContract,
         summary: interpretation,
       },
-      alternatives: hasAlternatives ? alternatives : undefined,
+      alternatives: alternatives.length > 0 ? alternatives : undefined,
       message,
       metadata: {
         proposedIntent,
@@ -304,7 +431,7 @@ function createFallbackClarify(_question: string, failureReason: string): Clarif
       contract: "GENERAL_RESPONSE",
       summary: "you have a question I'd like to help with",
     },
-    message: "I'd like to help, but I want to make sure I understand. Could you tell me a bit more about what you're looking for?",
+    message: generateFallbackClarifyMessage(),
     metadata: {
       proposedIntent: "GENERAL_HELP",
       proposedContract: "GENERAL_RESPONSE",

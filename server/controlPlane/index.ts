@@ -74,6 +74,7 @@ export type ControlPlaneResult = {
   contextLayers: ContextLayers;
   answerContract: AnswerContract;
   contractSelectionMethod: string;
+  clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
 };
 
 export async function runControlPlane(question: string): Promise<ControlPlaneResult> {
@@ -99,5 +100,6 @@ export async function runControlPlane(question: string): Promise<ControlPlaneRes
     contextLayers: layersMeta.layers,
     answerContract: contractResult.contract,
     contractSelectionMethod: contractResult.contractSelectionMethod,
+    clarifyMessage: intentResult.clarifyMessage,
   };
 }

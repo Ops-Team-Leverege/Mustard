@@ -169,8 +169,17 @@ export async function handleOpenAssistant(
         return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
       }
       
+      // Use the smart clarification message from Control Plane (or fallback to friendly message)
+      const clarifyMessage = cpResult.clarifyMessage || `I want to help but I'm not sure what you're looking for. Are you asking about:
+
+• A customer meeting (which company?)
+• PitCrew product info (which feature?)
+• Help with a task (what kind?)
+
+Give me a hint and I'll get you sorted!`;
+      
       return {
-        answer: "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?",
+        answer: clarifyMessage,
         intent: "general_assistance",
         intentClassification: defaultClassification("Clarification required by control plane"),
         controlPlaneIntent: cpResult.intent,
