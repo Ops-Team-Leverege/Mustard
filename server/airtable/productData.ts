@@ -280,9 +280,9 @@ ${knowledge.valueThemes.map(t => `- ${t.name}${t.description ? `: ${t.descriptio
   if (knowledge.valuePropositions.length > 0) {
     const topValueProps = knowledge.valuePropositions
       .sort((a, b) => (b.valueScore || 0) - (a.valueScore || 0))
-      .slice(0, 10);
+      .slice(0, 15);
     sections.push(`=== Key Value Propositions (WHY PitCrew matters) ===
-${topValueProps.map(v => `- ${v.name}${v.description ? `\n  ${v.description.substring(0, 300)}${v.description.length > 300 ? "..." : ""}` : ""}`).join("\n")}`);
+${topValueProps.map(v => `- ${v.name}${v.description ? `\n  ${v.description}` : ""}`).join("\n")}`);
   }
   
   if (knowledge.featureThemes.length > 0) {
@@ -291,11 +291,12 @@ ${knowledge.featureThemes.map(t => `- ${t.name}${t.description ? `: ${t.descript
   }
   
   if (knowledge.features.length > 0) {
-    const liveFeatures = knowledge.features.filter(f => 
-      f.productStatus === "Live" || f.productStatus === "Beta"
+    const availableFeatures = knowledge.features.filter(f => 
+      f.productStatus === "Available Now" || f.productStatus === "Live" || f.productStatus === "Beta"
     );
+    const featuresToShow = availableFeatures.length > 0 ? availableFeatures : knowledge.features;
     sections.push(`=== Product Features (WHAT PitCrew does) ===
-${liveFeatures.slice(0, 15).map(f => `- ${f.name}${f.description ? `: ${f.description.substring(0, 200)}${f.description.length > 200 ? "..." : ""}` : ""}`).join("\n")}`);
+${featuresToShow.slice(0, 20).map(f => `- ${f.name}${f.description ? `: ${f.description}` : ""}`).join("\n")}`);
   }
   
   if (sections.length === 0) {
