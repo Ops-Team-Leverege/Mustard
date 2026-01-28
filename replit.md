@@ -23,8 +23,23 @@ The backend is built with Express.js and TypeScript, exposing a RESTful JSON API
 ### Key Features
 The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`. It also includes a Document Output Feature for generating .docx files for long-form content and specific contract types, with configurable trigger conditions and customizable Slack messages.
 
-### Control Plane Architecture (Intent-Based Routing)
-The system uses an Intent → Context Layers → Answer Contract flow. Intent classification employs keyword fast-paths and an LLM fallback (gpt-4o-mini). It prioritizes classification (e.g., REFUSE, MULTI_MEETING, PRODUCT_KNOWLEDGE) and utilizes intent-gated Context Layers (e.g., product_identity, single_meeting). Answer Contracts define response shape and SSOT mode. The control plane dynamically builds contract chains based on user messages, ensuring ordered execution (Extraction → Analysis → Drafting) and enforcing restriction rules. Safety constraints and failure semantics are enforced at multiple levels, including intent classification, scope resolution, and contract execution, with evidence-based enforcement and ambient context enforcement. LLM-assisted semantic interpretation is used for clarification only when deterministic classification is ambiguous, never for automatic execution.
+### Control Plane Architecture (LLM-First Intent Routing)
+The system uses an LLM-first architecture where Control Plane runs to classify intent from the full message, then routes based on the classified intent. This ensures semantic understanding (e.g., "search all calls about Ivy Lane" correctly routes as MULTI_MEETING, not single-meeting).
+
+**Early Fast Paths (Pre-Control Plane):**
+- Briefing/prep ambiguity detection (handled before intent classification)
+- Binary existence questions (short-circuit for quick responses)
+
+**Routing Flow:**
+1. **Control Plane classifies intent** - Using keyword fast-paths + LLM fallback (gpt-4o-mini)
+2. **CLARIFY intent** → Ask user for clarification
+3. **SINGLE_MEETING + resolved meeting** → SingleMeetingOrchestrator for artifact access
+4. **SINGLE_MEETING without meeting** → Ask which meeting
+5. **MULTI_MEETING, PRODUCT_KNOWLEDGE, etc.** → Open Assistant with appropriate handlers
+
+**Intent Types:** SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, CLARIFY
+
+The control plane dynamically builds contract chains based on user messages, ensuring ordered execution (Extraction → Analysis → Drafting) and enforcing restriction rules. Safety constraints are enforced at multiple levels with evidence-based enforcement.
 
 ## External Dependencies
 
