@@ -134,6 +134,11 @@ const MULTI_MEETING_KEYWORDS = [
   "across meetings",
   "across all meetings",
   "all meetings",
+  "all calls",
+  "all recent calls",
+  "recent calls",
+  "all recent meetings",
+  "recent meetings",
   "trend",
   "over time",
   "historically",
@@ -147,10 +152,16 @@ const MULTI_MEETING_KEYWORDS = [
   "compare meetings",
   "find all",
   "search for",
+  "search all",
+  "search across",
   "which meetings",
+  "which calls",
   "every meeting",
+  "every call",
   "any meetings",
+  "any calls",
   "meetings that mention",
+  "calls that mention",
   "who asked about",
   "everyone who",
 ];
@@ -282,6 +293,8 @@ const MULTI_MEETING_PATTERNS = [
   /\bwhat\s+meetings?\s+(mention|discuss|have|include)\b/i,
   /\bcompare\s+what\s+[\w\s]+\s+said\b/i,
   /\bcompare\s+[\w\s]+\s+and\s+[\w\s]+\s+meetings?\b/i,
+  /\bsearch\s+all\s+(recent\s+)?(calls?|meetings?)\b/i,
+  /\b(all|recent)\s+(calls?|meetings?)\b.*\b(mention|about|discuss)\b/i,
 ];
 
 const PRODUCT_KNOWLEDGE_PATTERNS = [
