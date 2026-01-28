@@ -20,6 +20,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const LEVEREGE_LOGO_PATH = path.join(__dirname, '../assets/leverege-logo.png');
 
+// Try to load logo, with fallback if not found
+function getLeveregeLogo(): Buffer | null {
+  try {
+    // Try primary path
+    if (fs.existsSync(LEVEREGE_LOGO_PATH)) {
+      console.log(`[DocumentGenerator] Logo found at: ${LEVEREGE_LOGO_PATH}`);
+      return fs.readFileSync(LEVEREGE_LOGO_PATH);
+    }
+    
+    // Try alternative paths for production
+    const altPaths = [
+      path.join(process.cwd(), 'server/assets/leverege-logo.png'),
+      path.join(process.cwd(), 'assets/leverege-logo.png'),
+      './server/assets/leverege-logo.png',
+    ];
+    
+    for (const altPath of altPaths) {
+      if (fs.existsSync(altPath)) {
+        console.log(`[DocumentGenerator] Logo found at alternative path: ${altPath}`);
+        return fs.readFileSync(altPath);
+      }
+    }
+    
+    console.warn(`[DocumentGenerator] Logo not found at any path. Tried: ${LEVEREGE_LOGO_PATH}, ${altPaths.join(', ')}`);
+    return null;
+  } catch (error) {
+    console.error(`[DocumentGenerator] Error loading logo: ${error}`);
+    return null;
+  }
+}
+
 interface DocumentConfig {
   generateDocForContracts: string[];
   wordThreshold: number;
@@ -256,19 +287,37 @@ export async function generateDocument(request: DocumentRequest): Promise<Buffer
     sections: [{
       properties: {},
       children: [
-        new Paragraph({
-          children: [
-            new ImageRun({
-              data: fs.readFileSync(LEVEREGE_LOGO_PATH),
-              transformation: {
-                width: 180,
-                height: 45,
-              },
-              type: 'png',
-            }),
-          ],
-          spacing: { after: 200 },
-        }),
+        // Logo paragraph (optional - skipped if logo not found)
+        ...((): Paragraph[] => {
+          const logoData = getLeveregeLogo();
+          if (logoData) {
+            return [new Paragraph({
+              children: [
+                new ImageRun({
+                  data: logoData,
+                  transformation: {
+                    width: 180,
+                    height: 45,
+                  },
+                  type: 'png',
+                }),
+              ],
+              spacing: { after: 200 },
+            })];
+          }
+          // Fallback: text-based header if logo not found
+          return [new Paragraph({
+            children: [
+              new TextRun({
+                text: 'LEVEREGE',
+                bold: true,
+                size: 28,
+                color: '1a365d',
+              }),
+            ],
+            spacing: { after: 200 },
+          })];
+        })(),
         new Paragraph({
           text: request.title,
           heading: HeadingLevel.TITLE,
