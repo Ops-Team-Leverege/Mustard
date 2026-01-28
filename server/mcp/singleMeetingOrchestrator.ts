@@ -1091,28 +1091,31 @@ async function handleDraftingIntent(
   const q = question.toLowerCase();
   const dateSuffix = getMeetingDateSuffix(ctx);
   
-  // Detect what content the user wants in the email
-  const wantsQuestions = /question|ask|concern|issue/.test(q);
-  const wantsNextSteps = /next step|action|follow.?up|commitment|to.?do/.test(q);
-  const wantsSummary = /summary|overview|recap|discussed/.test(q);
-  const wantsProductInfo = /product|feature|pricing|price|integration|capability|how\s+(pitcrew|it)\s+works|benefit|value/.test(q);
-  const isGeneral = !wantsQuestions && !wantsNextSteps && !wantsSummary && !wantsProductInfo;
+  // Smart context detection - analyze the user's request holistically
+  // These aren't mutually exclusive "types" - they're signals for what context to gather
+  const mentionsQuestions = /question|ask|concern|issue|inquir/.test(q);
+  const mentionsActions = /next step|action|follow.?up|commitment|to.?do|deliverable/.test(q);
+  const mentionsMeeting = /meeting|discussion|conversation|call|talked|discussed/.test(q);
+  const mentionsProduct = /product|feature|pricing|price|integration|capability|how\s+(pitcrew|it)\s+works|benefit|value|tier|spec/.test(q);
   
-  console.log(`[SingleMeetingOrchestrator] Draft context: questions=${wantsQuestions}, nextSteps=${wantsNextSteps}, summary=${wantsSummary}, product=${wantsProductInfo}, general=${isGeneral}`);
+  // If nothing specific is mentioned, gather all meeting context
+  const gatherAllMeetingContext = !mentionsQuestions && !mentionsActions && !mentionsMeeting && !mentionsProduct;
   
-  // Fetch relevant data based on what's needed
+  console.log(`[SingleMeetingOrchestrator] Draft signals: questions=${mentionsQuestions}, actions=${mentionsActions}, meeting=${mentionsMeeting}, product=${mentionsProduct}, gatherAll=${gatherAllMeetingContext}`);
+  
+  // Fetch relevant data based on signals - gather context holistically
   const [customerQuestions, actionItems, chunks, productKnowledge] = await Promise.all([
-    (wantsQuestions || isGeneral) ? lookupCustomerQuestions(ctx.meetingId) : Promise.resolve([]),
-    (wantsNextSteps || isGeneral) ? getMeetingActionItems(ctx.meetingId) : Promise.resolve([]),
-    (wantsSummary || isGeneral) ? storage.getChunksForTranscript(ctx.meetingId, 50) : Promise.resolve([]),
-    (wantsProductInfo) ? getComprehensiveProductKnowledge() : Promise.resolve(null),
+    (mentionsQuestions || gatherAllMeetingContext) ? lookupCustomerQuestions(ctx.meetingId) : Promise.resolve([]),
+    (mentionsActions || gatherAllMeetingContext) ? getMeetingActionItems(ctx.meetingId) : Promise.resolve([]),
+    (mentionsMeeting || gatherAllMeetingContext) ? storage.getChunksForTranscript(ctx.meetingId, 50) : Promise.resolve([]),
+    (mentionsProduct) ? getComprehensiveProductKnowledge() : Promise.resolve(null),
   ]);
   
   // Build context for the LLM
   const contextParts: string[] = [];
   
-  // Include summary context if requested or general
-  if ((wantsSummary || isGeneral) && chunks.length > 0) {
+  // Include meeting discussion if mentioned or gathering all
+  if (chunks.length > 0) {
     const transcriptPreview = chunks
       .slice(0, 20)
       .map(c => `[${c.speakerName || "Unknown"}]: ${c.content.substring(0, 200)}`)
@@ -1122,8 +1125,8 @@ async function handleDraftingIntent(
     contextParts.push("");
   }
   
-  // Include customer questions if requested or general
-  if ((wantsQuestions || isGeneral) && customerQuestions.length > 0) {
+  // Include customer questions if available
+  if (customerQuestions.length > 0) {
     contextParts.push("CUSTOMER QUESTIONS FROM THE MEETING:");
     customerQuestions.forEach(cq => {
       const status = cq.status === "OPEN" ? " [OPEN]" : " [ANSWERED]";
@@ -1135,8 +1138,8 @@ async function handleDraftingIntent(
     contextParts.push("");
   }
   
-  // Include action items if requested or general
-  if ((wantsNextSteps || isGeneral) && actionItems.length > 0) {
+  // Include action items if available
+  if (actionItems.length > 0) {
     contextParts.push("ACTION ITEMS / NEXT STEPS FROM THE MEETING:");
     actionItems.forEach(item => {
       contextParts.push(`- ${item.action} (owner: ${item.owner})`);
@@ -1144,8 +1147,8 @@ async function handleDraftingIntent(
     contextParts.push("");
   }
   
-  // Include product knowledge if requested
-  if (wantsProductInfo && productKnowledge) {
+  // Include product knowledge if mentioned
+  if (mentionsProduct && productKnowledge) {
     const formattedProduct = formatProductKnowledgeForPrompt(productKnowledge);
     if (formattedProduct) {
       contextParts.push("PITCREW PRODUCT INFORMATION (from Airtable):");
