@@ -56,11 +56,16 @@ export function clearConfigCache(): void {
 export function shouldGenerateDocument(contract: string, wordCount: number): boolean {
   const config = getDocumentConfig();
   
+  console.log(`[DocumentGenerator] Checking contract="${contract}" against list=${JSON.stringify(config.generateDocForContracts)}, wordCount=${wordCount}, threshold=${config.wordThreshold}`);
+  
   if (config.generateDocForContracts.includes(contract)) {
+    console.log(`[DocumentGenerator] Contract "${contract}" is in doc list - will generate document`);
     return true;
   }
   
-  return wordCount > config.wordThreshold;
+  const byWordCount = wordCount > config.wordThreshold;
+  console.log(`[DocumentGenerator] Contract not in list, checking word count: ${wordCount} > ${config.wordThreshold} = ${byWordCount}`);
+  return byWordCount;
 }
 
 export function getDocumentMessage(contract: string): string {

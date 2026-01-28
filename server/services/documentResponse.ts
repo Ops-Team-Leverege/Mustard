@@ -62,8 +62,13 @@ export async function sendResponseWithDocumentSupport(
   }
   
   try {
+    console.log(`[DocumentResponse] Starting document generation for contract: ${contract}`);
+    
     const docTitle = title || generateTitleFromContract(contract, customerName);
+    console.log(`[DocumentResponse] Document title: ${docTitle}`);
+    
     const sections = contentToSections(content, docTitle);
+    console.log(`[DocumentResponse] Parsed ${sections.length} sections`);
     
     const docBuffer = await generateDocument({
       type: contract,
@@ -78,9 +83,11 @@ export async function sendResponseWithDocumentSupport(
         }),
       },
     });
+    console.log(`[DocumentResponse] Generated document buffer: ${docBuffer.length} bytes`);
     
     const fileName = generateFileName(contract, customerName);
     const slackMessage = getDocumentMessage(contract);
+    console.log(`[DocumentResponse] Uploading to Slack: ${fileName}`);
     
     await uploadSlackFile({
       channel,
@@ -94,7 +101,11 @@ export async function sendResponseWithDocumentSupport(
     console.log(`[DocumentResponse] Successfully uploaded document: ${fileName}`);
     return { type: "document", success: true };
   } catch (error) {
-    console.error("[DocumentResponse] Failed to generate/upload document, falling back to message:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : '';
+    console.error(`[DocumentResponse] FAILED to generate/upload document. Error: ${errorMessage}`);
+    console.error(`[DocumentResponse] Stack trace: ${errorStack}`);
+    console.error("[DocumentResponse] Falling back to plain text message");
     
     try {
       await postSlackMessage({
