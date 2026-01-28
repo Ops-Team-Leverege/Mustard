@@ -29,6 +29,18 @@ import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type Answ
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
+import { getProgressMessage, getProgressDelayMs } from "./progressMessages";
+
+export interface PipelineTiming {
+  intent_classification_ms?: number;
+  entity_resolution_ms?: number;
+  meeting_search_ms?: number;
+  context_building_ms?: number;
+  contract_execution_ms?: number;
+  llm_generation_ms?: number;
+  document_generation_ms?: number | null;
+  total_time_ms?: number;
+}
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
@@ -150,10 +162,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     // 7. Send immediate acknowledgment (UX improvement - reduces perceived latency)
     // Skip Slack API calls in test mode to avoid errors with fake channels
-    // Uses smart acknowledgments that vary based on what the user is asking
+    // Uses general acknowledgments with icons
     const ackMessage = userId
-      ? generateAckWithMention(userId, text)
-      : generateAck(null, text);
+      ? generateAckWithMention(userId)
+      : generateAck(null);
 
     if (!testRun) {
       await postSlackMessage({
@@ -164,6 +176,36 @@ export async function slackEventsHandler(req: Request, res: Response) {
     } else {
       console.log("[Slack] Test mode - skipping acknowledgment message");
     }
+
+    // 7.1 Start pipeline timing and progress message timer
+    const pipelineStartTime = Date.now();
+    let progressMessageSent = false;
+    let progressTimer: ReturnType<typeof setTimeout> | null = null;
+    
+    if (!testRun) {
+      progressTimer = setTimeout(async () => {
+        try {
+          const progressMsg = getProgressMessage();
+          await postSlackMessage({
+            channel,
+            text: progressMsg,
+            thread_ts: threadTs,
+          });
+          progressMessageSent = true;
+          console.log("[Slack] Progress message sent after delay");
+        } catch (err) {
+          console.error("[Slack] Failed to send progress message:", err);
+        }
+      }, getProgressDelayMs());
+    }
+    
+    // Helper to clear progress timer
+    const clearProgressTimer = () => {
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = null;
+      }
+    };
 
     // 7.5 EARLY AMBIGUITY DETECTION (preparation/briefing questions)
     // 
@@ -223,6 +265,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         testRun,
       });
       
+      clearProgressTimer();
       return; // Stop processing - clarification required
     }
 
@@ -308,6 +351,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             testRun,
           });
           
+          clearProgressTimer();
           return; // Done - fast path completed
         }
       }
@@ -432,6 +476,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             testRun,
           });
           
+          clearProgressTimer();
           return; // Done - fast path completed
         }
       }
@@ -515,6 +560,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           testRun,
         });
         
+        clearProgressTimer();
         return; // Stop processing - clarification required
       }
       // If not resolved and no clarification needed, proceed to MCP router
@@ -641,6 +687,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
         
         console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, controlPlane=${openAssistantResultData.controlPlaneIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, ssot=${openAssistantResultData.ssotMode || 'none'}, dataSource=${openAssistantResultData.dataSource}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
       }
+
+      // Clear progress timer now that we have a response ready
+      clearProgressTimer();
+      
+      // Calculate total pipeline time
+      const totalTimeMs = Date.now() - pipelineStartTime;
+      console.log(`[Slack] Pipeline completed in ${totalTimeMs}ms, progressMessageSent=${progressMessageSent}`);
 
       // Post response to Slack (skip in test mode)
       // For Open Assistant responses, use document support to generate .docx for long content
@@ -789,6 +842,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         answerText: responseText,
         metadata: resolvedMetadata,
         testRun,
+        totalTimeMs,
+        progressMessageSent,
       });
     } catch (err) {
       // Detect specific error types for better user messaging

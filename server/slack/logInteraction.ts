@@ -21,6 +21,8 @@ export type LogInteractionParams = {
   metadata: InteractionMetadata;
   testRun?: boolean;
   capabilityName?: string;
+  totalTimeMs?: number;
+  progressMessageSent?: boolean;
 };
 
 export async function logInteraction(params: LogInteractionParams): Promise<void> {
@@ -28,6 +30,13 @@ export async function logInteraction(params: LogInteractionParams): Promise<void
     // Derive capability name from metadata or use provided value
     const capabilityName = params.capabilityName || 
       deriveCapabilityName(params.metadata);
+    
+    // Merge timing data into context layers
+    const contextLayersWithTiming = {
+      ...params.metadata.context_layers,
+      total_time_ms: params.totalTimeMs,
+      progress_message_sent: params.progressMessageSent,
+    };
     
     await storage.insertInteractionLog({
       entryPoint: params.metadata.entry_point,
@@ -52,7 +61,7 @@ export async function logInteraction(params: LogInteractionParams): Promise<void
       answerContract: String(params.metadata.answer_contract),
       contractSelectionMethod: params.metadata.contract_selection_method,
       
-      contextLayers: params.metadata.context_layers,
+      contextLayers: contextLayersWithTiming,
       resolution: params.metadata.resolution,
       evidenceSources: params.metadata.evidence_sources || null,
       llmUsage: params.metadata.llm_usage,
