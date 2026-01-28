@@ -194,8 +194,13 @@ function generateTitleFromContract(contract: AnswerContract, customerName?: stri
       return `Customer Questions Analysis`;
     case AnswerContract.PRODUCT_EXPLANATION:
       return `PitCrew Product Overview`;
+    case AnswerContract.EXTERNAL_RESEARCH:
+      return `${customer} Research Report`;
+    case AnswerContract.SALES_DECK_PREP:
+      return `${customer} Sales Deck Brief`;
     default:
-      return `PitCrew Document - ${customer}`;
+      // Use the customer name as title if available, otherwise generic
+      return customer && customer !== "General" ? `${customer} Report` : `PitCrew Report`;
   }
 }
 

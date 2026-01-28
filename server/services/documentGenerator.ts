@@ -60,7 +60,7 @@ interface DocumentConfig {
 
 interface DocumentSection {
   heading?: string;
-  level?: 1 | 2;
+  level?: 1 | 2 | 3;
   content: string | string[];
 }
 
@@ -232,7 +232,14 @@ function renderSection(section: DocumentSection): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   
   if (section.heading) {
-    const headingLevel = section.level === 1 ? HeadingLevel.HEADING_1 : HeadingLevel.HEADING_2;
+    let headingLevel: typeof HeadingLevel.HEADING_1 | typeof HeadingLevel.HEADING_2 | typeof HeadingLevel.HEADING_3;
+    if (section.level === 1) {
+      headingLevel = HeadingLevel.HEADING_1;
+    } else if (section.level === 3) {
+      headingLevel = HeadingLevel.HEADING_3;
+    } else {
+      headingLevel = HeadingLevel.HEADING_2;
+    }
     paragraphs.push(new Paragraph({
       text: section.heading,
       heading: headingLevel,
@@ -379,7 +386,25 @@ export function contentToSections(content: string, title?: string): DocumentSect
   for (const line of lines) {
     const trimmed = line.trim();
     
-    if (trimmed.startsWith('## ')) {
+    // Skip markdown horizontal rules (---, ___, ***)
+    if (/^[-_*]{3,}$/.test(trimmed)) {
+      continue;
+    }
+    
+    // Handle ### headers (level 3)
+    if (trimmed.startsWith('### ')) {
+      if (currentSection || currentContent.length > 0) {
+        sections.push({
+          heading: currentSection?.heading,
+          level: currentSection?.level || 3,
+          content: currentContent.join('\n'),
+        });
+      }
+      currentSection = { heading: trimmed.substring(4), level: 3, content: '' };
+      currentContent = [];
+    }
+    // Handle ## headers (level 2)
+    else if (trimmed.startsWith('## ')) {
       if (currentSection || currentContent.length > 0) {
         sections.push({
           heading: currentSection?.heading,
@@ -389,7 +414,9 @@ export function contentToSections(content: string, title?: string): DocumentSect
       }
       currentSection = { heading: trimmed.substring(3), level: 2, content: '' };
       currentContent = [];
-    } else if (trimmed.startsWith('# ')) {
+    } 
+    // Handle # headers (level 1)
+    else if (trimmed.startsWith('# ')) {
       if (currentSection || currentContent.length > 0) {
         sections.push({
           heading: currentSection?.heading,
