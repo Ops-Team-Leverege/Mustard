@@ -1,0 +1,66 @@
+Recommended Integration Points:
+
+// In slackEventsHandler function
+
+// 1. Control Plane timing
+logger.startStage('control_plane');
+controlPlaneResult = await runControlPlane(text);
+const cpDuration = logger.endStage('control_plane');
+logger.info('Control Plane completed', {
+  intent: controlPlaneResult.intent,
+  contract: controlPlaneResult.answerContract,
+  duration_ms: cpDuration, // ✅ Track this!
+  method: controlPlaneResult.intentDetectionMethod,
+});
+
+// 2. Meeting resolution timing
+logger.startStage('meeting_resolution');
+const resolution = await resolveMeetingFromSlackMessage(text, threadContext);
+const resolutionDuration = logger.endStage('meeting_resolution');
+logger.debug('Meeting resolution completed', { 
+  resolved: resolution.resolved,
+  duration_ms: resolutionDuration 
+});
+
+// 3. Single meeting orchestrator timing
+logger.startStage('single_meeting');
+const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer);
+const smDuration = logger.endStage('single_meeting');
+logger.info('Single meeting response generated', {
+  intent: result.intent,
+  duration_ms: smDuration
+});
+
+// 4. Open Assistant timing
+logger.startStage('open_assistant');
+openAssistantResultData = await handleOpenAssistant(text, {...});
+const oaDuration = logger.endStage('open_assistant');
+logger.info('Open Assistant response generated', {
+  intent: openAssistantResultData.intent,
+  duration_ms: oaDuration
+});
+Why This Matters for Phase 1:
+
+You'll be able to measure exactly how much time the LLM validation skip saves
+Compare control_plane duration before/after optimization
+Identify if other stages become bottlenecks after optimization
+Log Level Usage Recommendations
+Now that you have log levels, here's how to use them in events.ts:
+
+debug - Verbose details for development:
+
+logger.debug('Meeting resolution attempt', { hasMeetingRef, regexResult, llmResult });
+logger.debug('Thread context lookup', { threadTs, foundContext: !!priorInteraction });
+info - Key milestones (keep current usage):
+
+logger.info('Slack event received', { text: text.substring(0, 100), isReply });
+logger.info('Control Plane completed', { intent, contract });
+logger.info('Request completed successfully', { totalTimeMs });
+warn - Recoverable issues:
+
+
+logger.warn('Thread context lookup failed', { threadTs, error: err.message });
+logger.warn('Progress message already sent', { totalTimeMs });
+error - Actual failures (keep current usage):
+
+logger.error('Pipeline error', err, { errorType, errorCode });

@@ -616,7 +616,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
     if (!threadContext?.meetingId || hasMeetingRef) {
       console.log(`[Slack] Step 0: Meeting resolution (hasMeetingRef=${hasMeetingRef}, regex=${regexResult}, llm=${llmResult})`);
       
+      logger.startStage('meeting_resolution');
       const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
+      const mrDuration = logger.endStage('meeting_resolution');
       
       if (resolution.resolved) {
         resolvedMeeting = {
@@ -625,6 +627,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
           companyName: resolution.companyName,
           meetingDate: resolution.meetingDate,
         };
+        logger.debug('Meeting resolution completed', {
+          resolved: true,
+          meetingId: resolution.meetingId,
+          companyName: resolution.companyName,
+          duration_ms: mrDuration,
+        });
         console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
       } else if (resolution.needsClarification) {
         // Clarification needed - respond and stop processing
@@ -726,12 +734,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // STEP 1: ALWAYS run Control Plane first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Control Plane for intent classification`);
+      logger.startStage('control_plane');
       controlPlaneResult = await runControlPlane(text);
+      const cpDuration = logger.endStage('control_plane');
       logger.info('Control Plane completed', {
         intent: controlPlaneResult.intent,
         contract: controlPlaneResult.answerContract,
         method: controlPlaneResult.intentDetectionMethod,
         resolvedMeetingId: resolvedMeeting?.meetingId,
+        duration_ms: cpDuration,
       });
       console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
       
@@ -779,7 +790,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
           meetingDate: resolvedMeeting.meetingDate,
         };
         
+        logger.startStage('single_meeting');
         const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer);
+        const smDuration = logger.endStage('single_meeting');
         responseText = result.answer;
         capabilityName = `single_meeting_${result.intent}`;
         resolvedCompanyId = singleMeetingContext.companyId;
@@ -794,11 +807,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
         isClarificationRequest = result.isClarificationRequest;
         isBinaryQuestion = result.isBinaryQuestion;
         
+        logger.info('Single meeting response generated', {
+          intent: result.intent,
+          dataSource: result.dataSource,
+          duration_ms: smDuration,
+        });
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
       } else {
         // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, etc.) → Open Assistant
         console.log(`[Slack] Open Assistant mode - intent=${controlPlaneResult.intent}, routing to appropriate handler`);
         
+        logger.startStage('open_assistant');
         openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
           threadId: threadTs,
@@ -811,6 +830,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           } : null,
           controlPlaneResult: controlPlaneResult,
         });
+        const oaDuration = logger.endStage('open_assistant');
         
         responseText = openAssistantResultData.answer;
         capabilityName = `open_assistant_${openAssistantResultData.intent}`;
@@ -824,6 +844,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
           semanticConfidence = openAssistantResultData.singleMeetingResult.semanticConfidence;
         }
         
+        logger.info('Open Assistant response generated', {
+          intent: openAssistantResultData.intent,
+          contract: openAssistantResultData.answerContract,
+          delegated: openAssistantResultData.delegatedToSingleMeeting,
+          duration_ms: oaDuration,
+        });
         console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, controlPlane=${openAssistantResultData.controlPlaneIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
       }
 
