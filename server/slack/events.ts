@@ -367,6 +367,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
     let threadContext: ThreadContext | undefined;
     let awaitingClarification: string | null = null;
     let companyNameFromContext: string | null = null;
+    let storedProposedInterpretation: { intent: string; contract: string; summary: string } | null = null;
+    let originalQuestion: string | null = null;
     
     // Only look up prior context if this is a reply in an existing thread
     if (isReply && shouldReuseThreadContext(text)) {
@@ -383,7 +385,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
           const contextLayers = priorInteraction.contextLayers as Record<string, unknown> | null;
           awaitingClarification = (contextLayers?.awaitingClarification as string) || null;
           companyNameFromContext = (resolution?.company_name as string) || null;
-          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}`);
+          
+          // Check for stored proposed interpretation (for "yes" or numbered responses)
+          storedProposedInterpretation = (contextLayers?.proposedInterpretation as typeof storedProposedInterpretation) || null;
+          originalQuestion = priorInteraction.questionText || null;
+          
+          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}`);
         }
       } catch (err) {
         // Non-fatal - just proceed without context
@@ -479,6 +486,94 @@ export async function slackEventsHandler(req: Request, res: Response) {
           clearProgressTimer();
           return; // Done - fast path completed
         }
+      }
+    }
+    
+    // 8.6 PROPOSED INTERPRETATION FOLLOW-UP (for "yes", "1", etc. responses)
+    //
+    // When the user replies to a clarification with confirmation, execute the stored interpretation.
+    //
+    if (storedProposedInterpretation && originalQuestion) {
+      const lowerText = text.toLowerCase().trim();
+      
+      // Detect confirmation patterns: "yes", "1", "first one", "that", "go ahead", etc.
+      const isConfirmation = /^(yes|yeah|yep|yup|ok|okay|sure|1|first|that|go\s*ahead|do\s*it|please)$/i.test(lowerText) ||
+                            /^(sounds?\s*good|let'?s?\s*do\s*(it|that)|proceed)$/i.test(lowerText);
+      
+      if (isConfirmation) {
+        console.log(`[Slack] Clarification confirmed - using proposed interpretation: intent=${storedProposedInterpretation.intent}, contract=${storedProposedInterpretation.contract}`);
+        
+        // Map intent string to Intent enum
+        const intentMap: Record<string, string> = {
+          "SINGLE_MEETING": "SINGLE_MEETING",
+          "MULTI_MEETING": "MULTI_MEETING", 
+          "PRODUCT_KNOWLEDGE": "PRODUCT_KNOWLEDGE",
+          "EXTERNAL_RESEARCH": "EXTERNAL_RESEARCH",
+          "DOCUMENT_SEARCH": "DOCUMENT_SEARCH",
+          "GENERAL_HELP": "GENERAL_HELP",
+        };
+        
+        const mappedIntent = intentMap[storedProposedInterpretation.intent] || "GENERAL_HELP";
+        
+        // Create synthetic control plane result with the stored interpretation
+        const syntheticControlPlane = {
+          intent: mappedIntent as any,
+          answerContract: storedProposedInterpretation.contract as any,
+          intentDetectionMethod: "clarification_followup",
+          contractSelectionMethod: "clarification_followup",
+          contextLayers: {},
+        };
+        
+        // Route to Open Assistant with the original question and confirmed interpretation
+        const openAssistantResult = await handleOpenAssistant(originalQuestion, {
+          userId: userId || undefined,
+          threadId: threadTs,
+          resolvedMeeting: threadContext?.meetingId ? {
+            meetingId: threadContext.meetingId,
+            companyId: threadContext.companyId || '',
+            companyName: companyNameFromContext || 'Unknown',
+            meetingDate: null,
+          } : null,
+          controlPlaneResult: syntheticControlPlane,
+        });
+        
+        if (!testRun) {
+          await postSlackMessage({
+            channel,
+            text: openAssistantResult.answer,
+            thread_ts: threadTs,
+          });
+        }
+        
+        // Log interaction
+        logInteraction({
+          slackChannelId: channel,
+          slackThreadId: threadTs,
+          slackMessageTs: messageTs,
+          userId: userId || null,
+          companyId: threadContext?.companyId || null,
+          meetingId: threadContext?.meetingId || null,
+          questionText: originalQuestion,
+          answerText: openAssistantResult.answer,
+          metadata: buildInteractionMetadata(
+            { companyId: threadContext?.companyId || undefined, meetingId: threadContext?.meetingId },
+            {
+              entryPoint: "slack",
+              legacyIntent: storedProposedInterpretation.intent.toLowerCase(),
+              answerShape: "summary",
+              dataSource: openAssistantResult.dataSource as any,
+              clarificationState: {
+                awaiting: false,
+                resolvedWith: "confirmed" as any,
+              },
+              testRun,
+            }
+          ),
+          testRun,
+        });
+        
+        clearProgressTimer();
+        return; // Done - clarification follow-up completed
       }
     }
 
@@ -811,13 +906,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
           const actualSsotMode = openAssistantResultData?.ssotMode || "none";
           
           // Use context layers from Control Plane result directly
-          const contextLayers = controlPlaneResult?.contextLayers || {
+          const contextLayers: Record<string, unknown> = controlPlaneResult?.contextLayers || {
             product_identity: true, // Always on
             product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
             single_meeting: actualIntent === "SINGLE_MEETING",
             multi_meeting: actualIntent === "MULTI_MEETING",
             document_context: actualIntent === "DOCUMENT_SEARCH",
           };
+          
+          // Store proposedInterpretation for CLARIFY follow-ups
+          if (actualIntent === "CLARIFY" && controlPlaneResult?.proposedInterpretation) {
+            contextLayers.proposedInterpretation = controlPlaneResult.proposedInterpretation;
+            contextLayers.awaitingClarification = "proposed_interpretation";
+          }
           
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },

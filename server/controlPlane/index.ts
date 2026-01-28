@@ -68,6 +68,12 @@ export {
   type ContractSelectionMethod,
 };
 
+export type ProposedInterpretation = {
+  intent: string;
+  contract: string;
+  summary: string;
+};
+
 export type ControlPlaneResult = {
   intent: Intent;
   intentDetectionMethod: string;
@@ -75,6 +81,7 @@ export type ControlPlaneResult = {
   answerContract: AnswerContract;
   contractSelectionMethod: string;
   clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
+  proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
 };
 
 export async function runControlPlane(question: string): Promise<ControlPlaneResult> {
@@ -101,5 +108,6 @@ export async function runControlPlane(question: string): Promise<ControlPlaneRes
     answerContract: contractResult.contract,
     contractSelectionMethod: contractResult.contractSelectionMethod,
     clarifyMessage: intentResult.clarifyMessage,
+    proposedInterpretation: intentResult.proposedInterpretation,
   };
 }
