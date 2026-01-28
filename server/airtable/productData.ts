@@ -146,3 +146,161 @@ export async function searchProductKnowledge(query: string): Promise<{
     })),
   };
 }
+
+/**
+ * Comprehensive Product Knowledge Result
+ * 
+ * Fetches from ALL product-related Airtable tables and returns
+ * structured data with metadata about which sources were used.
+ */
+export type ProductKnowledgeResult = {
+  features: ProductFeature[];
+  valuePropositions: ProductValueProposition[];
+  valueThemes: Array<{ id: string; name: string; description: string | null }>;
+  featureThemes: Array<{ id: string; name: string; description: string | null; notes: string | null }>;
+  customerSegments: Array<{ id: string; name: string }>;
+  metadata: {
+    tablesQueried: string[];
+    tablesWithData: string[];
+    totalRecords: number;
+  };
+};
+
+/**
+ * Fetch comprehensive product knowledge from all Airtable tables.
+ * 
+ * This is the authoritative source for PRODUCT_KNOWLEDGE intent.
+ * Returns data from:
+ * - pitcrew_airtable_features (WHAT PitCrew does)
+ * - pitcrew_airtable_value_propositions (WHY PitCrew matters)
+ * - pitcrew_airtable_value_themes (Grouped value themes)
+ * - pitcrew_airtable_feature_themes (Grouped feature themes)
+ * - pitcrew_airtable_customer_segments (WHO uses PitCrew)
+ */
+export async function getComprehensiveProductKnowledge(): Promise<ProductKnowledgeResult> {
+  const tablesQueried = [
+    "pitcrew_airtable_features",
+    "pitcrew_airtable_value_propositions",
+    "pitcrew_airtable_value_themes",
+    "pitcrew_airtable_feature_themes",
+    "pitcrew_airtable_customer_segments",
+  ];
+  const tablesWithData: string[] = [];
+  
+  const [features, valueProps, valueThemes, featureThemes, customerSegments] = await Promise.all([
+    getFeatures(),
+    getValuePropositions(),
+    getValueThemes(),
+    getFeatureThemes(),
+    getCustomerSegments(),
+  ]);
+  
+  const formattedFeatures = features.map(r => ({
+    id: r.airtableId,
+    name: r.name,
+    description: r.description ?? null,
+    productStatus: r.productStatus ?? null,
+    proTier: r.proTier ?? null,
+    advancedTier: r.advancedTier ?? null,
+    enterpriseTier: r.enterpriseTier ?? null,
+    type: (r.type as "Feature" | "Add-On") ?? null,
+    hideFromPricingList: r.hideFromPricingList ?? false,
+  }));
+  
+  const formattedValueProps = valueProps.map(r => ({
+    id: r.airtableId,
+    name: r.name,
+    description: r.description ?? null,
+    valueScore: r.valueToCustomer ?? null,
+    requiresPosIntegration: r.requiresPosIntegration ?? false,
+  }));
+  
+  const formattedValueThemes = valueThemes.map(r => ({
+    id: r.airtableId,
+    name: r.name,
+    description: r.description ?? null,
+  }));
+  
+  const formattedFeatureThemes = featureThemes.map(r => ({
+    id: r.airtableId,
+    name: r.name,
+    description: r.description ?? null,
+    notes: r.notes ?? null,
+  }));
+  
+  const formattedCustomerSegments = customerSegments.map(r => ({
+    id: r.airtableId,
+    name: r.name,
+  }));
+  
+  if (formattedFeatures.length > 0) tablesWithData.push("pitcrew_airtable_features");
+  if (formattedValueProps.length > 0) tablesWithData.push("pitcrew_airtable_value_propositions");
+  if (formattedValueThemes.length > 0) tablesWithData.push("pitcrew_airtable_value_themes");
+  if (formattedFeatureThemes.length > 0) tablesWithData.push("pitcrew_airtable_feature_themes");
+  if (formattedCustomerSegments.length > 0) tablesWithData.push("pitcrew_airtable_customer_segments");
+  
+  const totalRecords = formattedFeatures.length + formattedValueProps.length + 
+    formattedValueThemes.length + formattedFeatureThemes.length + formattedCustomerSegments.length;
+  
+  console.log(`[ProductData] Fetched ${totalRecords} records from ${tablesWithData.length}/${tablesQueried.length} tables`);
+  
+  return {
+    features: formattedFeatures,
+    valuePropositions: formattedValueProps,
+    valueThemes: formattedValueThemes,
+    featureThemes: formattedFeatureThemes,
+    customerSegments: formattedCustomerSegments,
+    metadata: {
+      tablesQueried,
+      tablesWithData,
+      totalRecords,
+    },
+  };
+}
+
+/**
+ * Format product knowledge into a prompt-friendly string.
+ * 
+ * This creates a structured text block that can be injected into LLM prompts
+ * to provide authoritative product information.
+ */
+export function formatProductKnowledgeForPrompt(knowledge: ProductKnowledgeResult): string {
+  const sections: string[] = [];
+  
+  if (knowledge.customerSegments.length > 0) {
+    sections.push(`=== Customer Segments (WHO uses PitCrew) ===
+${knowledge.customerSegments.map(s => `- ${s.name}`).join("\n")}`);
+  }
+  
+  if (knowledge.valueThemes.length > 0) {
+    sections.push(`=== Value Themes (High-Level Benefits) ===
+${knowledge.valueThemes.map(t => `- ${t.name}${t.description ? `: ${t.description}` : ""}`).join("\n")}`);
+  }
+  
+  if (knowledge.valuePropositions.length > 0) {
+    const topValueProps = knowledge.valuePropositions
+      .sort((a, b) => (b.valueScore || 0) - (a.valueScore || 0))
+      .slice(0, 10);
+    sections.push(`=== Key Value Propositions (WHY PitCrew matters) ===
+${topValueProps.map(v => `- ${v.name}${v.description ? `\n  ${v.description.substring(0, 300)}${v.description.length > 300 ? "..." : ""}` : ""}`).join("\n")}`);
+  }
+  
+  if (knowledge.featureThemes.length > 0) {
+    sections.push(`=== Feature Themes (Capability Categories) ===
+${knowledge.featureThemes.map(t => `- ${t.name}${t.description ? `: ${t.description}` : ""}`).join("\n")}`);
+  }
+  
+  if (knowledge.features.length > 0) {
+    const liveFeatures = knowledge.features.filter(f => 
+      f.productStatus === "Live" || f.productStatus === "Beta"
+    );
+    sections.push(`=== Product Features (WHAT PitCrew does) ===
+${liveFeatures.slice(0, 15).map(f => `- ${f.name}${f.description ? `: ${f.description.substring(0, 200)}${f.description.length > 200 ? "..." : ""}` : ""}`).join("\n")}`);
+  }
+  
+  if (sections.length === 0) {
+    return "No product knowledge data available in database.";
+  }
+  
+  return sections.join("\n\n");
+}

@@ -760,6 +760,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 dataSource: dataSource as string,
                 delegatedToSingleMeeting: Boolean(semanticAnswerUsed),
               },
+              evidenceSources: openAssistantResultData?.evidenceSources?.map(s => ({ type: s })),
               testRun,
               meetingDetection,
             }

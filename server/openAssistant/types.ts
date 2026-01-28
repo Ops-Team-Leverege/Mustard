@@ -69,6 +69,7 @@ export type OpenAssistantResult = {
   artifactMatches?: ArtifactSearchResult;
   singleMeetingResult?: SingleMeetingResult;
   delegatedToSingleMeeting: boolean;
+  evidenceSources?: string[];
 };
 
 /**

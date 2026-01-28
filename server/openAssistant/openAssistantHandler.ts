@@ -30,6 +30,7 @@ import {
 } from "./types";
 import { findRelevantMeetings, searchAcrossMeetings } from "./meetingResolver";
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
+import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
 
 export type { EvidenceSource, IntentClassification, OpenAssistantContext, OpenAssistantResult };
 
@@ -474,6 +475,9 @@ async function handleMultiMeetingIntent(
 
 /**
  * Handle PRODUCT_KNOWLEDGE intent.
+ * 
+ * Fetches REAL product data from Airtable tables (synced to database)
+ * and injects it into the prompt for authoritative answers.
  */
 async function handleProductKnowledgeIntent(
   userMessage: string,
@@ -483,36 +487,51 @@ async function handleProductKnowledgeIntent(
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
   
-  // USE CONTROL PLANE CONTRACT when provided
   const actualContract = contract || AnswerContract.PRODUCT_EXPLANATION;
   
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: `${AMBIENT_PRODUCT_CONTEXT}
+  // Fetch REAL product data from Airtable tables
+  const productKnowledge = await getComprehensiveProductKnowledge();
+  const productDataPrompt = formatProductKnowledgeForPrompt(productKnowledge);
+  
+  console.log(`[OpenAssistant] Product knowledge loaded: ${productKnowledge.metadata.totalRecords} records from ${productKnowledge.metadata.tablesWithData.join(", ")}`);
+  
+  const hasProductData = productKnowledge.metadata.totalRecords > 0;
+  
+  const systemPrompt = hasProductData
+    ? `${AMBIENT_PRODUCT_CONTEXT}
+
+=== AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable) ===
+${productDataPrompt}
 
 You are answering a product knowledge question about PitCrew.
 
-AUTHORITY RULES:
-- For general "how does it work" questions: Provide high-level explanations about purpose, value, and outcomes
-- For specific feature questions: Say what you know at a high level, but add "I'd recommend checking our product documentation for the latest details"
-- For pricing questions: Say "For current pricing information, please check with the sales team or product documentation"
-- For integration questions: Provide general framing but note that specific integration details should be verified
+AUTHORITY RULES (with product data available):
+- Use the product knowledge above as your authoritative source
+- For questions about features, value propositions, or customer segments: Answer directly from the data
+- For pricing questions: Say "For current pricing information, please check with the sales team"
+- For integration specifics not in the data: Note that details should be verified with the product team
 
-NEVER fabricate specific:
-- Pricing numbers or tiers
-- Integration compatibility claims
-- Feature availability by tier
-- Technical specifications
+When answering:
+- Synthesize the product knowledge naturally into your response
+- Don't just list features — explain how they address the user's question
+- Keep responses conversational and helpful`
+    : `${AMBIENT_PRODUCT_CONTEXT}
 
-Keep responses helpful but appropriately bounded by what can be safely stated without authoritative product data.`,
-      },
-      {
-        role: "user",
-        content: userMessage,
-      },
+You are answering a product knowledge question about PitCrew.
+
+NOTE: No product data is currently available in the database. Provide high-level framing only.
+
+AUTHORITY RULES (without product data):
+- Provide only general, high-level explanations about PitCrew's purpose and value
+- Add "I'd recommend checking our product documentation for specific details"
+- For pricing: Say "For current pricing information, please check with the sales team"
+- NEVER fabricate specific features, pricing, or integration claims`;
+
+  const response = await openai.chat.completions.create({
+    model: "gpt-5",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
     ],
   });
 
@@ -524,9 +543,10 @@ Keep responses helpful but appropriately bounded by what can be safely stated wi
     intentClassification: classification,
     controlPlaneIntent: Intent.PRODUCT_KNOWLEDGE,
     answerContract: actualContract,
-    ssotMode: "descriptive",
+    ssotMode: hasProductData ? "authoritative" : "descriptive",
     dataSource: "product_ssot",
     delegatedToSingleMeeting: false,
+    evidenceSources: hasProductData ? productKnowledge.metadata.tablesWithData : undefined,
   };
 }
 
