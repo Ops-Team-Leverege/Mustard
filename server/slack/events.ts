@@ -587,7 +587,24 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // MULTI-CONTEXT MODE:
     // Otherwise, use MCP router for cross-meeting and analytics capabilities.
     //
-    const isSingleMeetingMode = Boolean(resolvedMeeting);
+    // OVERRIDE: If user explicitly requests multi-meeting behavior (search all, 
+    // recent calls, etc.), use Open Assistant even if a meeting/company was detected.
+    const MULTI_MEETING_OVERRIDE_PATTERNS = [
+      /\bsearch\s+all\b/i,
+      /\ball\s+(recent\s+)?(calls?|meetings?)\b/i,
+      /\brecent\s+(calls?|meetings?)\b/i,
+      /\bacross\s+(all\s+)?(calls?|meetings?)\b/i,
+      /\bfind\s+all\b/i,
+      /\bevery\s+(call|meeting)\b/i,
+      /\bwhich\s+(calls?|meetings?)\b/i,
+    ];
+    const hasMultiMeetingOverride = MULTI_MEETING_OVERRIDE_PATTERNS.some(p => p.test(text));
+    
+    if (hasMultiMeetingOverride && resolvedMeeting) {
+      console.log(`[Slack] Multi-meeting override detected - forcing Open Assistant mode despite resolved meeting`);
+    }
+    
+    const isSingleMeetingMode = Boolean(resolvedMeeting) && !hasMultiMeetingOverride;
 
     try {
       let responseText: string;
