@@ -18,6 +18,7 @@
 import type { Request, Response } from "express";
 import { verifySlackSignature } from "./verify";
 import { postSlackMessage } from "./slackApi";
+import { sendResponseWithDocumentSupport } from "../services/documentResponse";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
@@ -640,13 +641,28 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
 
       // Post response to Slack (skip in test mode)
-      const botReply = testRun 
-        ? { ts: `test-${Date.now()}` } 
-        : await postSlackMessage({
-            channel,
-            text: responseText,
-            thread_ts: threadTs,
-          });
+      // For Open Assistant responses, use document support to generate .docx for long content
+      let botReply: { ts: string };
+      if (testRun) {
+        botReply = { ts: `test-${Date.now()}` };
+      } else if (openAssistantResultData?.answerContract && !isSingleMeetingMode) {
+        // Open Assistant responses may generate documents for specific contracts or long content
+        const docResult = await sendResponseWithDocumentSupport({
+          channel,
+          threadTs,
+          content: responseText,
+          contract: openAssistantResultData.answerContract,
+          customerName: resolvedMeeting?.companyName,
+        });
+        // Document upload doesn't return a message ts, so we generate a placeholder
+        botReply = { ts: docResult.type === "document" ? `doc-${Date.now()}` : `msg-${Date.now()}` };
+      } else {
+        botReply = await postSlackMessage({
+          channel,
+          text: responseText,
+          thread_ts: threadTs,
+        });
+      }
 
       // Log interaction with structured metadata (write-only, non-blocking)
       // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
