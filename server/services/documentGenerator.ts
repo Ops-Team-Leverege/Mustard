@@ -18,35 +18,34 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const LEVEREGE_LOGO_PATH = path.join(__dirname, '../assets/leverege-logo.png');
 
-// Try to load logo, with fallback if not found
+// Resolve logo path once at initialization
+const LEVEREGE_LOGO_PATH = (() => {
+  const possiblePaths = [
+    path.join(__dirname, '../assets/leverege-logo.png'),
+    path.join(process.cwd(), 'server/assets/leverege-logo.png'),
+    path.join(__dirname, '../../server/assets/leverege-logo.png'),
+    path.join(process.cwd(), 'assets/leverege-logo.png'),
+  ];
+  
+  for (const logoPath of possiblePaths) {
+    if (fs.existsSync(logoPath)) {
+      console.log(`[DocumentGenerator] Found logo at: ${logoPath}`);
+      return logoPath;
+    }
+  }
+  
+  console.error(`[DocumentGenerator] Logo not found in any of these paths:`, possiblePaths);
+  return null;
+})();
+
+// Load logo buffer with graceful fallback
 function getLeveregeLogo(): Buffer | null {
+  if (!LEVEREGE_LOGO_PATH) return null;
   try {
-    // Try primary path
-    if (fs.existsSync(LEVEREGE_LOGO_PATH)) {
-      console.log(`[DocumentGenerator] Logo found at: ${LEVEREGE_LOGO_PATH}`);
-      return fs.readFileSync(LEVEREGE_LOGO_PATH);
-    }
-    
-    // Try alternative paths for production
-    const altPaths = [
-      path.join(process.cwd(), 'server/assets/leverege-logo.png'),
-      path.join(process.cwd(), 'assets/leverege-logo.png'),
-      './server/assets/leverege-logo.png',
-    ];
-    
-    for (const altPath of altPaths) {
-      if (fs.existsSync(altPath)) {
-        console.log(`[DocumentGenerator] Logo found at alternative path: ${altPath}`);
-        return fs.readFileSync(altPath);
-      }
-    }
-    
-    console.warn(`[DocumentGenerator] Logo not found at any path. Tried: ${LEVEREGE_LOGO_PATH}, ${altPaths.join(', ')}`);
-    return null;
+    return fs.readFileSync(LEVEREGE_LOGO_PATH);
   } catch (error) {
-    console.error(`[DocumentGenerator] Error loading logo: ${error}`);
+    console.error(`[DocumentGenerator] Error reading logo: ${error}`);
     return null;
   }
 }

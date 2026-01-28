@@ -1,0 +1,106 @@
+Fix Document Generation Logo Issue
+Problem
+Document generation is failing with "[Document generation encountered an issue - showing text instead]" due to logo path resolution issues in 
+documentGenerator.ts
+.
+
+Root Cause
+The logo path resolution is fragile and fails in certain deployment environments, causing the entire document generation to crash when it can't load the LEVEREGE logo.
+
+Fix Instructions
+1. Update Logo Path Resolution in 
+documentGenerator.ts
+Replace the logo path constant (around line 21):
+
+// REPLACE THIS:
+const LEVEREGE_LOGO_PATH = path.join(__dirname, '../assets/leverege-logo.png');
+
+// WITH THIS:
+const LEVEREGE_LOGO_PATH = (() => {
+  // Try multiple possible paths
+  const possiblePaths = [
+    path.join(__dirname, '../assets/leverege-logo.png'),
+    path.join(process.cwd(), 'server/assets/leverege-logo.png'),
+    path.join(__dirname, '../../server/assets/leverege-logo.png'),
+  ];
+  
+  for (const logoPath of possiblePaths) {
+    if (fs.existsSync(logoPath)) {
+      console.log(`[DocumentGenerator] Found logo at: ${logoPath}`);
+      return logoPath;
+    }
+  }
+  
+  console.error(`[DocumentGenerator] Logo not found in any of these paths:`, possiblePaths);
+  return null;
+})();
+2. Add Graceful Logo Fallback in generateDocument Function
+Find the generateDocument function (around line 260) and replace the logo section:
+
+// REPLACE THIS SECTION:
+export async function generateDocument(request: DocumentRequest): Promise<Buffer> {
+  const doc = new Document({
+    // ... styles ...
+    sections: [{
+      properties: {},
+      children: [
+        new Paragraph({
+          children: [
+            new ImageRun({
+              data: fs.readFileSync(LEVEREGE_LOGO_PATH),
+              transformation: {
+                width: 180,
+                height: 45,
+              },
+              type: 'png',
+            }),
+          ],
+          spacing: { after: 200 },
+        }),
+
+// WITH THIS:
+export async function generateDocument(request: DocumentRequest): Promise<Buffer> {
+  console.log(`[DocumentGenerator] Starting document generation for: ${request.title}`);
+  console.log(`[DocumentGenerator] Logo path available: ${LEVEREGE_LOGO_PATH ? 'Yes' : 'No'}`);
+  
+  // Create header paragraph with or without logo
+  const headerParagraph = LEVEREGE_LOGO_PATH ? 
+    new Paragraph({
+      children: [
+        new ImageRun({
+          data: fs.readFileSync(LEVEREGE_LOGO_PATH),
+          transformation: {
+            width: 180,
+            height: 45,
+          },
+          type: 'png',
+        }),
+      ],
+      spacing: { after: 200 },
+    }) :
+    new Paragraph({
+      children: [
+        new TextRun({
+          text: 'LEVEREGE',
+          bold: true,
+          size: 28,
+          color: '1a365d',
+        }),
+      ],
+      spacing: { after: 200 },
+    });
+
+  const doc = new Document({
+    // ... styles (keep existing) ...
+    sections: [{
+      properties: {},
+      children: [
+        headerParagraph,
+Expected Results
+After this fix:
+
+✅ Document generation will work even if logo file can't be loaded
+✅ Product knowledge queries will generate .docx documents
+✅ No more "[Document generation encountered an issue...]" error messages
+✅ Graceful fallback to text "LEVEREGE" header if logo unavailable
+✅ Better logging for debugging path issues
