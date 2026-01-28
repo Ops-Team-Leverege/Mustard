@@ -294,9 +294,19 @@ ${knowledge.featureThemes.map(t => `- ${t.name}${t.description ? `: ${t.descript
     const availableFeatures = knowledge.features.filter(f => 
       f.productStatus === "Available Now" || f.productStatus === "Live" || f.productStatus === "Beta"
     );
-    const featuresToShow = availableFeatures.length > 0 ? availableFeatures : knowledge.features;
-    sections.push(`=== Product Features (WHAT PitCrew does) ===
-${featuresToShow.slice(0, 20).map(f => `- ${f.name}${f.description ? `: ${f.description}` : ""}`).join("\n")}`);
+    const roadmapFeatures = knowledge.features.filter(f => 
+      f.productStatus && !["Available Now", "Live", "Beta"].includes(f.productStatus)
+    );
+    
+    if (availableFeatures.length > 0) {
+      sections.push(`=== Current Product Features (Available Now) ===
+${availableFeatures.map(f => `- ${f.name}${f.description ? `: ${f.description}` : ""}`).join("\n")}`);
+    }
+    
+    if (roadmapFeatures.length > 0) {
+      sections.push(`=== Roadmap Features (Planned/In Development) ===
+${roadmapFeatures.map(f => `- ${f.name} [${f.productStatus}]${f.description ? `: ${f.description}` : ""}`).join("\n")}`);
+    }
   }
   
   if (sections.length === 0) {
