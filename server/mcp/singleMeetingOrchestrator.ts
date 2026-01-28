@@ -60,7 +60,7 @@ type OrchestratorActionItem = {
  * 
  * @deprecated Direct use is discouraged. Prefer receiving contracts from Control Plane.
  */
-type InternalHandlerType = "extractive" | "aggregative" | "summary";
+type InternalHandlerType = "extractive" | "aggregative" | "summary" | "drafting";
 
 export type SingleMeetingContext = {
   meetingId: string;
@@ -1077,6 +1077,104 @@ async function handleAggregativeIntent(
 }
 
 /**
+ * Handle drafting intent (emails, responses about meeting content).
+ * Fetches relevant meeting data and uses LLM to generate a draft.
+ */
+async function handleDraftingIntent(
+  ctx: SingleMeetingContext,
+  question: string,
+  contract?: AnswerContract
+): Promise<SingleMeetingResult> {
+  console.log(`[SingleMeetingOrchestrator] Drafting handler: contract=${contract}`);
+  
+  // Fetch customer questions and action items for context
+  const [customerQuestions, actionItems] = await Promise.all([
+    lookupCustomerQuestions(ctx.meetingId),
+    getMeetingActionItems(ctx.meetingId),
+  ]);
+  
+  const dateSuffix = getMeetingDateSuffix(ctx);
+  
+  // Build context for the LLM
+  const contextParts: string[] = [];
+  
+  if (customerQuestions.length > 0) {
+    contextParts.push("CUSTOMER QUESTIONS FROM THE MEETING:");
+    customerQuestions.forEach(q => {
+      const status = q.status === "OPEN" ? " [OPEN]" : " [ANSWERED]";
+      contextParts.push(`- "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}${status}`);
+      if (q.status === "ANSWERED" && q.answerEvidence) {
+        contextParts.push(`  Answer: ${q.answerEvidence}`);
+      }
+    });
+    contextParts.push("");
+  }
+  
+  if (actionItems.length > 0) {
+    contextParts.push("ACTION ITEMS FROM THE MEETING:");
+    actionItems.forEach(item => {
+      contextParts.push(`- ${item.action} (owner: ${item.owner})`);
+    });
+    contextParts.push("");
+  }
+  
+  if (contextParts.length === 0) {
+    return {
+      answer: `I couldn't find any customer questions or action items from this meeting${dateSuffix} to include in the draft.`,
+      intent: "drafting",
+      dataSource: "not_found",
+    };
+  }
+  
+  const meetingContext = contextParts.join("\n");
+  
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    temperature: 0.7,
+    messages: [
+      {
+        role: "system",
+        content: `You are drafting a professional follow-up email for Leverege sales team.
+
+MEETING CONTEXT:
+- Company: ${ctx.companyName}
+- Date: ${ctx.meetingDate || "recent meeting"}
+
+${meetingContext}
+
+DRAFTING RULES:
+1. Write a professional, warm follow-up email
+2. Address the specific questions or concerns raised in the meeting
+3. Reference action items if relevant
+4. Keep it concise but thorough
+5. End with a clear next step or call to action
+6. Use the customer's name if known from the context
+7. Sign as "[Your name]" - let the sender fill in
+
+Format the email with:
+- Subject line (prefix with "Subject:")
+- Greeting
+- Body (2-3 short paragraphs)
+- Closing with next step
+- Signature placeholder`,
+      },
+      {
+        role: "user",
+        content: question,
+      },
+    ],
+  });
+  
+  const draft = response.choices[0]?.message?.content || "Unable to generate draft.";
+  
+  return {
+    answer: `Here's a draft follow-up email for ${ctx.companyName}${dateSuffix}:\n\n${draft}`,
+    intent: "drafting",
+    dataSource: "customer_questions",
+  };
+}
+
+/**
  * Handle summary intent (explicit opt-in only).
  * Uses GPT-5 for narrative summary generation.
  */
@@ -1285,6 +1383,9 @@ function deriveHandlerFromContract(contract: AnswerContract): InternalHandlerTyp
       return "aggregative";
     case AnswerContract.MEETING_SUMMARY:
       return "summary";
+    case AnswerContract.DRAFT_EMAIL:
+    case AnswerContract.DRAFT_RESPONSE:
+      return "drafting";
     default:
       return "extractive";
   }
@@ -1456,6 +1557,11 @@ export async function handleSingleMeetingQuestion(
     case "summary":
       const summaryResult = await handleSummaryIntent(ctx);
       return { ...summaryResult, isSemanticDebug: isSemantic };
+    
+    case "drafting": {
+      const draftResult = await handleDraftingIntent(ctx, question, contract);
+      return { ...draftResult, isSemanticDebug: isSemantic };
+    }
     
     default:
       return {

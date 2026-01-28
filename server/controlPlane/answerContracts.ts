@@ -394,25 +394,41 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
 };
 
 const SINGLE_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
+  // Drafting patterns (check BEFORE generic "follow up")
+  "follow up email": AnswerContract.DRAFT_EMAIL,
+  "follow-up email": AnswerContract.DRAFT_EMAIL,
+  "prepare a follow up": AnswerContract.DRAFT_EMAIL,
+  "prepare a follow-up": AnswerContract.DRAFT_EMAIL,
+  "draft an email": AnswerContract.DRAFT_EMAIL,
+  "write an email": AnswerContract.DRAFT_EMAIL,
+  "prepare an email": AnswerContract.DRAFT_EMAIL,
+  "help me answer": AnswerContract.DRAFT_RESPONSE,
+  "draft a response": AnswerContract.DRAFT_RESPONSE,
+  "respond to": AnswerContract.DRAFT_RESPONSE,
+  
+  // Summary patterns
   "summary": AnswerContract.MEETING_SUMMARY,
   "summarize": AnswerContract.MEETING_SUMMARY,
   "overview": AnswerContract.MEETING_SUMMARY,
+  
+  // Action item patterns
   "action items": AnswerContract.NEXT_STEPS,
   "next steps": AnswerContract.NEXT_STEPS,
   "commitments": AnswerContract.NEXT_STEPS,
-  "follow up": AnswerContract.NEXT_STEPS,
+  "follow up": AnswerContract.NEXT_STEPS,  // Generic "follow up" - lower priority
   "to-do": AnswerContract.NEXT_STEPS,
+  
+  // Attendee patterns
   "attendees": AnswerContract.ATTENDEES,
   "who was on": AnswerContract.ATTENDEES,
   "who attended": AnswerContract.ATTENDEES,
   "participants": AnswerContract.ATTENDEES,
+  
+  // Customer questions patterns
   "customer questions": AnswerContract.CUSTOMER_QUESTIONS,
   "what did they ask": AnswerContract.CUSTOMER_QUESTIONS,
   "questions asked": AnswerContract.CUSTOMER_QUESTIONS,
   "what questions": AnswerContract.CUSTOMER_QUESTIONS,
-  "help me answer": AnswerContract.DRAFT_RESPONSE,
-  "draft a response": AnswerContract.DRAFT_RESPONSE,
-  "respond to": AnswerContract.DRAFT_RESPONSE,
 };
 
 const PRODUCT_KNOWLEDGE_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
@@ -443,6 +459,11 @@ const GENERAL_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "compose an email": AnswerContract.DRAFT_EMAIL,
   "email template": AnswerContract.DRAFT_EMAIL,
   "help me write": AnswerContract.DRAFT_EMAIL,
+  "follow up email": AnswerContract.DRAFT_EMAIL,
+  "follow-up email": AnswerContract.DRAFT_EMAIL,
+  "prepare an email": AnswerContract.DRAFT_EMAIL,
+  "prepare a follow up": AnswerContract.DRAFT_EMAIL,
+  "prepare a follow-up": AnswerContract.DRAFT_EMAIL,
 };
 
 /**
