@@ -314,6 +314,7 @@ VALID INTENTS:
 - SINGLE_MEETING: Questions about a specific meeting or conversation
 - MULTI_MEETING: Questions across multiple meetings (trends, patterns)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product capabilities
+- EXTERNAL_RESEARCH: Research on external companies (earnings calls, news, priorities, public info)
 - DOCUMENT_SEARCH: Looking for specific documents
 - GENERAL_HELP: Drafting, writing, general assistance
 - REFUSE: Clearly out-of-scope requests
@@ -322,6 +323,7 @@ VALID CONTRACTS per intent:
 - SINGLE_MEETING: MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, EXTRACTIVE_FACT, AGGREGATIVE_LIST
 - MULTI_MEETING: PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY, CROSS_MEETING_QUESTIONS
 - PRODUCT_KNOWLEDGE: PRODUCT_EXPLANATION, FEATURE_VERIFICATION, FAQ_ANSWER
+- EXTERNAL_RESEARCH: EXTERNAL_RESEARCH, SALES_DECK_PREP, VALUE_PROPOSITION
 - GENERAL_HELP: GENERAL_RESPONSE, DRAFT_RESPONSE, DRAFT_EMAIL, VALUE_PROPOSITION
 
 RESPONSE FORMAT (JSON):
@@ -356,6 +358,9 @@ COMMON PATTERNS:
 - "what about [company]" → SINGLE_MEETING or MULTI_MEETING depending on context
 - "pricing/cost/price" → PRODUCT_KNOWLEDGE with partial pricing model info
 - "[company] + [topic]" → SINGLE_MEETING with company-specific search
+- "research [company]" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
+- "slide deck for [external company]" or "pitch deck" → EXTERNAL_RESEARCH with SALES_DECK_PREP contract
+- "find their strategic priorities" or "public statements" → EXTERNAL_RESEARCH
 
 EXAMPLES:
 
@@ -435,6 +440,37 @@ Response: {
       "intent": "GENERAL_HELP",
       "contract": "DRAFT_RESPONSE",
       "description": "Help structuring a quote or proposal",
+      "hint": ""
+    }
+  ]
+}
+
+User: "Research Costco and create a slide deck for their leadership team"
+Response: {
+  "proposedIntent": "EXTERNAL_RESEARCH",
+  "proposedContract": "SALES_DECK_PREP",
+  "confidence": 0.9,
+  "interpretation": "research Costco's public priorities and create a sales pitch deck",
+  "questionForm": "You want me to research Costco's strategic priorities and create a slide deck to pitch PitCrew to their leadership?",
+  "canPartialAnswer": false,
+  "partialAnswer": "",
+  "alternatives": []
+}
+
+User: "Do research on that customer including recent earnings calls"
+Response: {
+  "proposedIntent": "EXTERNAL_RESEARCH",
+  "proposedContract": "EXTERNAL_RESEARCH",
+  "confidence": 0.85,
+  "interpretation": "research external company using public sources like earnings calls",
+  "questionForm": "You want me to research this company's recent earnings calls and public statements?",
+  "canPartialAnswer": false,
+  "partialAnswer": "",
+  "alternatives": [
+    {
+      "intent": "MULTI_MEETING",
+      "contract": "PATTERN_ANALYSIS",
+      "description": "Search our meeting notes about this company instead",
       "hint": ""
     }
   ]
