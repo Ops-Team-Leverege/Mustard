@@ -1083,6 +1083,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
         stack: fullStack,
         text: text.substring(0, 100),
       });
+      
+      // Also log to database for production debugging
+      try {
+        await storage.rawQuery(`
+          INSERT INTO error_logs (error_type, error_message, error_stack, request_text, context)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [errorType, errorMessage, fullStack, text.substring(0, 500), JSON.stringify({
+          channel,
+          threadTs,
+          userId,
+          controlPlaneIntent: controlPlaneResult?.intent,
+          controlPlaneContract: controlPlaneResult?.answerContract,
+        })]);
+      } catch (dbLogErr) {
+        console.error('[PIPELINE ERROR] Failed to log to database:', dbLogErr);
+      }
 
       if (!testRun) {
         await postSlackMessage({
