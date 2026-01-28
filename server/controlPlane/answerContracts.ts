@@ -122,6 +122,11 @@ export enum AnswerContract {
   DRAFT_EMAIL = "DRAFT_EMAIL",
   
   // ============================================================================
+  // Product Knowledge contracts (chainable - can be used in contract chains)
+  // ============================================================================
+  PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE",     // Fetch product data for chain context
+  
+  // ============================================================================
   // Authoritative contracts (SSOT mode: authoritative)
   // ============================================================================
   FEATURE_VERIFICATION = "FEATURE_VERIFICATION",
@@ -343,6 +348,16 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     requiresCitation: false,
     responseFormat: "text",
     emptyResultBehavior: "clarify",  // Can ask for clarification
+  },
+  
+  // Product Knowledge contract (chainable)
+  [AnswerContract.PRODUCT_KNOWLEDGE]: {
+    ssotMode: "authoritative",
+    requiresEvidence: false,  // Fetches from Airtable SSOT
+    allowsSummary: true,
+    requiresCitation: true,   // Must cite source tables
+    responseFormat: "text",
+    emptyResultBehavior: "return_empty",  // Can return empty if no matching data
   },
   
   // General/Legacy contracts
@@ -569,6 +584,7 @@ const CONTRACT_PHASES: Record<AnswerContract, TaskPhase> = {
   [AnswerContract.EXTRACTIVE_FACT]: "extraction",
   [AnswerContract.AGGREGATIVE_LIST]: "extraction",
   [AnswerContract.CROSS_MEETING_QUESTIONS]: "extraction",
+  [AnswerContract.PRODUCT_KNOWLEDGE]: "extraction",  // Fetches product data for chain context
   
   // Analysis phase
   [AnswerContract.PATTERN_ANALYSIS]: "analysis",
