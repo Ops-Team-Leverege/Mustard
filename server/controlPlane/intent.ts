@@ -641,10 +641,10 @@ Classify into exactly ONE intent:
 - MULTI_MEETING: Questions across multiple meetings (trends, aggregates, comparisons)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - DOCUMENT_SEARCH: Questions about documentation, contracts, specs
-- EXTERNAL_RESEARCH: Requests to research external companies, prospects, earnings calls, public statements, market info
+- EXTERNAL_RESEARCH: Requests to research external companies, prospects, earnings calls, public statements, market info. INCLUDES multi-step requests like "research X and create slides" or "find their priorities and draft talking points"
 - GENERAL_HELP: Greetings, meta questions, general assistance requests
 - REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
-- CLARIFY: Request combines multiple intents that need to be split
+- CLARIFY: ONLY when request combines truly CONFLICTING intents (e.g., asking about a past meeting AND researching a different external company simultaneously)
 
 CRITICAL RULES:
 1. If ANY person name appears (Tyler, Randy, Robert, etc.) → likely SINGLE_MEETING
@@ -654,7 +654,8 @@ CRITICAL RULES:
 5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
 6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
 7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
-8. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
+8. Multi-step requests within ONE intent are NOT CLARIFY - handle as that single intent
+9. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
 
 EXAMPLES:
 - "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
@@ -664,9 +665,10 @@ EXAMPLES:
 - "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
 - "Research Costco and their priorities" → EXTERNAL_RESEARCH
 - "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
+- "Research Costco earnings, find their priorities, and draft slides connecting to PitCrew" → EXTERNAL_RESEARCH (multi-step, same intent)
 - "Find their recent earnings calls" → EXTERNAL_RESEARCH
 - "What's the weather?" → REFUSE
-- "Summarize the meeting and email it" → CLARIFY (needs split)
+- "What did Les Schwab say AND research Costco priorities" → CLARIFY (conflicting: past meeting + external research)
 
 Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation"}`;
 
