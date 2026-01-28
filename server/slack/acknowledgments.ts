@@ -1,8 +1,8 @@
 /**
  * Smart Acknowledgments
  * 
- * Generates context-aware, varied acknowledgment messages based on what the user is asking.
- * Uses simple keyword matching (no LLM needed) for instant response.
+ * Generates general, varied acknowledgment messages with friendly icons.
+ * Simplified approach - no keyword matching needed, always accurate.
  * 
  * Config-driven via config/acknowledgments.json
  */
@@ -10,16 +10,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface AckPattern {
-  name: string;
-  keywords: string[];
-  messages: string[];
-}
-
 interface AckConfig {
-  patterns: AckPattern[];
-  fallback: string[];
-  fallbackNoUser: string[];
+  messages: string[];
+  messagesNoUser: string[];
 }
 
 let configCache: AckConfig | null = null;
@@ -42,32 +35,19 @@ function pickRandom<T>(arr: T[]): T {
 }
 
 /**
- * Generate a context-aware acknowledgment message.
+ * Generate a friendly acknowledgment message.
  * 
  * @param user - The user's display name or mention (e.g., "@Silvina"), or null for no mention
- * @param message - The user's message to analyze
- * @returns A contextual acknowledgment string
+ * @returns A general acknowledgment string with icon
  */
-export function generateAck(user: string | null, message: string): string {
+export function generateAck(user: string | null): string {
   const config = getAckConfig();
-  const messageLower = message.toLowerCase();
-  
-  for (const pattern of config.patterns) {
-    if (pattern.keywords.some(kw => messageLower.includes(kw))) {
-      const template = pickRandom(pattern.messages);
-      if (user) {
-        return template.replace('{user}', user);
-      } else {
-        return template.replace(', {user}', '').replace('{user} ', '').replace('{user}', '');
-      }
-    }
-  }
   
   if (user) {
-    const template = pickRandom(config.fallback);
+    const template = pickRandom(config.messages);
     return template.replace('{user}', user);
   } else {
-    return pickRandom(config.fallbackNoUser);
+    return pickRandom(config.messagesNoUser);
   }
 }
 
@@ -75,9 +55,8 @@ export function generateAck(user: string | null, message: string): string {
  * Generate acknowledgment with @ mention format.
  * 
  * @param userId - The Slack user ID (e.g., "U12345")
- * @param message - The user's message to analyze
- * @returns A contextual acknowledgment string with Slack mention
+ * @returns A general acknowledgment string with Slack mention and icon
  */
-export function generateAckWithMention(userId: string, message: string): string {
-  return generateAck(`<@${userId}>`, message);
+export function generateAckWithMention(userId: string): string {
+  return generateAck(`<@${userId}>`);
 }

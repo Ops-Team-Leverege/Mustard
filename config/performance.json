@@ -1,0 +1,14 @@
+{
+  "alerts": {
+    "slow_request": {
+      "threshold_ms": 60000,
+      "alert_channel": "#operations-testing_notifications",
+      "enabled": false
+    },
+    "bottleneck_stage": {
+      "threshold_ms": 25000,
+      "alert_channel": "#operations-testing_notifications",
+      "enabled": false
+    }
+  }
+}
