@@ -688,13 +688,63 @@ async function searchTranscriptSnippets(
  */
 async function handleExtractiveIntent(
   ctx: SingleMeetingContext,
-  question: string
+  question: string,
+  contract?: AnswerContract
 ): Promise<SingleMeetingResult> {
   const startTime = Date.now();
   
   // Detect question type FIRST to minimize unnecessary DB calls
   const isAttendee = isAttendeeQuestion(question);
   const isAction = isActionItemQuestion(question);
+  
+  // FAST PATH: Customer questions - when contract explicitly requests OR question pattern matches
+  const isCustomerQuestionsRequest = contract === AnswerContract.CUSTOMER_QUESTIONS || 
+    /customer questions?|questions?\s+from\s+(the|this)\s+(meeting|call)|what\s+did\s+(they|the customer)\s+ask/i.test(question);
+  
+  if (isCustomerQuestionsRequest) {
+    console.log(`[SingleMeetingOrchestrator] Fast path: customer questions (contract=${contract})`);
+    const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
+    console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
+    
+    if (customerQuestions.length === 0) {
+      const dateSuffix = getMeetingDateSuffix(ctx);
+      return {
+        answer: `No customer questions were identified in this meeting${dateSuffix}.`,
+        intent: "extractive",
+        dataSource: "customer_questions",
+      };
+    }
+    
+    const lines: string[] = [];
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    lines.push(`*Customer Questions — ${ctx.companyName}${dateSuffix}*`);
+    
+    const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
+    const answeredQuestions = customerQuestions.filter(q => q.status === "ANSWERED");
+    
+    if (openQuestions.length > 0) {
+      lines.push("\n*Open Questions:*");
+      openQuestions.forEach(q => {
+        lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+      });
+    }
+    
+    if (answeredQuestions.length > 0) {
+      lines.push("\n*Answered Questions:*");
+      answeredQuestions.slice(0, 10).forEach(q => {
+        lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+      });
+      if (answeredQuestions.length > 10) {
+        lines.push(`_...and ${answeredQuestions.length - 10} more_`);
+      }
+    }
+    
+    return {
+      answer: lines.join("\n"),
+      intent: "extractive",
+      dataSource: "customer_questions",
+    };
+  }
   
   // FAST PATH: Attendee questions only need transcript metadata
   if (isAttendee) {
@@ -1324,7 +1374,7 @@ export async function handleSingleMeetingQuestion(
   
   switch (handlerType) {
     case "extractive": {
-      const result = await handleExtractiveIntent(ctx, question);
+      const result = await handleExtractiveIntent(ctx, question, contract);
       
       // STEP 6: If artifacts fail AND question is semantic → use LLM semantic answer
       console.log(`[SingleMeetingOrchestrator] STEP6-CHECK: dataSource=${result.dataSource}, isSemantic=${isSemantic}, shouldTrigger=${result.dataSource === "not_found" && isSemantic}`);
