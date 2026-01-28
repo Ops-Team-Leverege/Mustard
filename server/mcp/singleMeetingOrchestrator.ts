@@ -35,6 +35,7 @@ import { OpenAI } from "openai";
 import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
 import { AnswerContract } from "../controlPlane/answerContracts";
+import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -1094,15 +1095,17 @@ async function handleDraftingIntent(
   const wantsQuestions = /question|ask|concern|issue/.test(q);
   const wantsNextSteps = /next step|action|follow.?up|commitment|to.?do/.test(q);
   const wantsSummary = /summary|overview|recap|discussed/.test(q);
-  const isGeneral = !wantsQuestions && !wantsNextSteps && !wantsSummary;
+  const wantsProductInfo = /product|feature|pricing|price|integration|capability|how\s+(pitcrew|it)\s+works|benefit|value/.test(q);
+  const isGeneral = !wantsQuestions && !wantsNextSteps && !wantsSummary && !wantsProductInfo;
   
-  console.log(`[SingleMeetingOrchestrator] Draft context: questions=${wantsQuestions}, nextSteps=${wantsNextSteps}, summary=${wantsSummary}, general=${isGeneral}`);
+  console.log(`[SingleMeetingOrchestrator] Draft context: questions=${wantsQuestions}, nextSteps=${wantsNextSteps}, summary=${wantsSummary}, product=${wantsProductInfo}, general=${isGeneral}`);
   
   // Fetch relevant data based on what's needed
-  const [customerQuestions, actionItems, chunks] = await Promise.all([
+  const [customerQuestions, actionItems, chunks, productKnowledge] = await Promise.all([
     (wantsQuestions || isGeneral) ? lookupCustomerQuestions(ctx.meetingId) : Promise.resolve([]),
     (wantsNextSteps || isGeneral) ? getMeetingActionItems(ctx.meetingId) : Promise.resolve([]),
     (wantsSummary || isGeneral) ? storage.getChunksForTranscript(ctx.meetingId, 50) : Promise.resolve([]),
+    (wantsProductInfo) ? getComprehensiveProductKnowledge() : Promise.resolve(null),
   ]);
   
   // Build context for the LLM
@@ -1141,9 +1144,19 @@ async function handleDraftingIntent(
     contextParts.push("");
   }
   
+  // Include product knowledge if requested
+  if (wantsProductInfo && productKnowledge) {
+    const formattedProduct = formatProductKnowledgeForPrompt(productKnowledge);
+    if (formattedProduct) {
+      contextParts.push("PITCREW PRODUCT INFORMATION (from Airtable):");
+      contextParts.push(formattedProduct);
+      contextParts.push("");
+    }
+  }
+  
   if (contextParts.length === 0) {
     return {
-      answer: `I couldn't find enough meeting content${dateSuffix} to draft this email. Try asking for a specific type of email (e.g., "draft an email about the next steps").`,
+      answer: `I couldn't find enough meeting content${dateSuffix} to draft this email. Try asking for a specific type of email (e.g., "draft an email about the next steps" or "draft an email about our features").`,
       intent: "drafting",
       dataSource: "not_found",
     };
@@ -1169,10 +1182,12 @@ DRAFTING RULES:
 1. Write a professional, warm follow-up email
 2. Address the specific questions or concerns raised in the meeting
 3. Reference action items if relevant
-4. Keep it concise but thorough
-5. End with a clear next step or call to action
-6. Use the customer's name if known from the context
-7. Sign as "[Your name]" - let the sender fill in
+4. If product information is provided, use it to answer customer questions accurately
+5. For pricing questions: mention "per-store flat monthly fee" model but defer specific dollar amounts to a follow-up call
+6. Keep it concise but thorough
+7. End with a clear next step or call to action
+8. Use the customer's name if known from the context
+9. Sign as "[Your name]" - let the sender fill in
 
 Format the email with:
 - Subject line (prefix with "Subject:")
