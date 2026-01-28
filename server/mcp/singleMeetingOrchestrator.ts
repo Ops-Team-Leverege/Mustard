@@ -1087,31 +1087,54 @@ async function handleDraftingIntent(
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Drafting handler: contract=${contract}`);
   
-  // Fetch customer questions and action items for context
-  const [customerQuestions, actionItems] = await Promise.all([
-    lookupCustomerQuestions(ctx.meetingId),
-    getMeetingActionItems(ctx.meetingId),
-  ]);
-  
+  const q = question.toLowerCase();
   const dateSuffix = getMeetingDateSuffix(ctx);
+  
+  // Detect what content the user wants in the email
+  const wantsQuestions = /question|ask|concern|issue/.test(q);
+  const wantsNextSteps = /next step|action|follow.?up|commitment|to.?do/.test(q);
+  const wantsSummary = /summary|overview|recap|discussed/.test(q);
+  const isGeneral = !wantsQuestions && !wantsNextSteps && !wantsSummary;
+  
+  console.log(`[SingleMeetingOrchestrator] Draft context: questions=${wantsQuestions}, nextSteps=${wantsNextSteps}, summary=${wantsSummary}, general=${isGeneral}`);
+  
+  // Fetch relevant data based on what's needed
+  const [customerQuestions, actionItems, chunks] = await Promise.all([
+    (wantsQuestions || isGeneral) ? lookupCustomerQuestions(ctx.meetingId) : Promise.resolve([]),
+    (wantsNextSteps || isGeneral) ? getMeetingActionItems(ctx.meetingId) : Promise.resolve([]),
+    (wantsSummary || isGeneral) ? storage.getChunksForTranscript(ctx.meetingId, 50) : Promise.resolve([]),
+  ]);
   
   // Build context for the LLM
   const contextParts: string[] = [];
   
-  if (customerQuestions.length > 0) {
+  // Include summary context if requested or general
+  if ((wantsSummary || isGeneral) && chunks.length > 0) {
+    const transcriptPreview = chunks
+      .slice(0, 20)
+      .map(c => `[${c.speakerName || "Unknown"}]: ${c.content.substring(0, 200)}`)
+      .join("\n");
+    contextParts.push("MEETING DISCUSSION PREVIEW:");
+    contextParts.push(transcriptPreview);
+    contextParts.push("");
+  }
+  
+  // Include customer questions if requested or general
+  if ((wantsQuestions || isGeneral) && customerQuestions.length > 0) {
     contextParts.push("CUSTOMER QUESTIONS FROM THE MEETING:");
-    customerQuestions.forEach(q => {
-      const status = q.status === "OPEN" ? " [OPEN]" : " [ANSWERED]";
-      contextParts.push(`- "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}${status}`);
-      if (q.status === "ANSWERED" && q.answerEvidence) {
-        contextParts.push(`  Answer: ${q.answerEvidence}`);
+    customerQuestions.forEach(cq => {
+      const status = cq.status === "OPEN" ? " [OPEN]" : " [ANSWERED]";
+      contextParts.push(`- "${cq.questionText}"${cq.askedByName ? ` (asked by ${cq.askedByName})` : ""}${status}`);
+      if (cq.status === "ANSWERED" && cq.answerEvidence) {
+        contextParts.push(`  Answer: ${cq.answerEvidence}`);
       }
     });
     contextParts.push("");
   }
   
-  if (actionItems.length > 0) {
-    contextParts.push("ACTION ITEMS FROM THE MEETING:");
+  // Include action items if requested or general
+  if ((wantsNextSteps || isGeneral) && actionItems.length > 0) {
+    contextParts.push("ACTION ITEMS / NEXT STEPS FROM THE MEETING:");
     actionItems.forEach(item => {
       contextParts.push(`- ${item.action} (owner: ${item.owner})`);
     });
@@ -1120,7 +1143,7 @@ async function handleDraftingIntent(
   
   if (contextParts.length === 0) {
     return {
-      answer: `I couldn't find any customer questions or action items from this meeting${dateSuffix} to include in the draft.`,
+      answer: `I couldn't find enough meeting content${dateSuffix} to draft this email. Try asking for a specific type of email (e.g., "draft an email about the next steps").`,
       intent: "drafting",
       dataSource: "not_found",
     };
