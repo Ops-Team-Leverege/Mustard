@@ -507,8 +507,8 @@ You are answering a product knowledge question about PitCrew.
 
 AUTHORITY RULES (with product data available):
 - Use the product knowledge above as your authoritative source
-- For questions about features, value propositions, or customer segments: Answer directly from the data
-- For pricing questions: Say "For current pricing information, please check with the sales team"
+- For questions about features, value propositions, pricing, or customer segments: Answer directly from the data
+- For specific dollar amounts or custom pricing: Say "For specific pricing details, please check with the sales team"
 - For integration specifics not in the data: Note that details should be verified with the product team
 
 When answering:
