@@ -9,6 +9,9 @@ if (!fs.existsSync(LOG_DIR)) {
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+const LOG_LEVELS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
+const CURRENT_LOG_LEVEL = (process.env.LOG_LEVEL as LogLevel) || 'info';
+
 interface LogMeta {
   correlationId?: string;
   channel?: string;
@@ -27,6 +30,8 @@ export function generateCorrelationId(): string {
 }
 
 export function logToFile(level: LogLevel, message: string, meta?: LogMeta): void {
+  if (LOG_LEVELS[level] < LOG_LEVELS[CURRENT_LOG_LEVEL]) return;
+  
   const logEntry = {
     timestamp: new Date().toISOString(),
     level,
@@ -43,8 +48,9 @@ export function logToFile(level: LogLevel, message: string, meta?: LogMeta): voi
     console.error('[SlackLogger] Failed to write to log file:', err);
   }
   
+  const correlationPrefix = meta?.correlationId ? `[${meta.correlationId}] ` : '';
   const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
-  console.log(`[${level.toUpperCase()}] ${message}${metaStr}`);
+  console.log(`[${level.toUpperCase()}] ${correlationPrefix}${message}${metaStr}`);
 }
 
 export function logInfo(message: string, meta?: LogMeta): void {
@@ -69,6 +75,7 @@ export class RequestLogger {
   private channel?: string;
   private threadTs?: string;
   private userId?: string;
+  private stages: Map<string, number> = new Map();
 
   constructor(channel?: string, threadTs?: string, userId?: string) {
     this.correlationId = generateCorrelationId();
@@ -87,6 +94,18 @@ export class RequestLogger {
       duration: Date.now() - this.startTime,
       ...extra
     };
+  }
+
+  startStage(name: string): void {
+    this.stages.set(name, Date.now());
+  }
+
+  endStage(name: string): number {
+    const start = this.stages.get(name);
+    if (!start) return 0;
+    const duration = Date.now() - start;
+    this.stages.delete(name);
+    return duration;
   }
 
   info(message: string, extra?: Partial<LogMeta>): void {
