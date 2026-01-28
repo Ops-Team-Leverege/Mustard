@@ -1,0 +1,20 @@
+{
+  "generateDocForContracts": [
+    "VALUE_PROPOSITION",
+    "MEETING_SUMMARY",
+    "COMPARISON",
+    "DRAFT_EMAIL",
+    "PATTERN_ANALYSIS"
+  ],
+  "wordThreshold": 300,
+  "fileNamePattern": "{customer}_{type}_{date}.docx",
+  "messages": {
+    "VALUE_PROPOSITION": "Here's your value proposition doc — ready to edit and make it your own.",
+    "MEETING_SUMMARY": "Here's your meeting summary — ready to share or add your notes.",
+    "COMPARISON": "Here's your comparison doc — ready to share with the team.",
+    "DRAFT_EMAIL": "Here's your email draft — ready to copy and personalize.",
+    "PATTERN_ANALYSIS": "Here's your pattern analysis — ready to review and share.",
+    "default": "Here's your document — ready to edit and share."
+  },
+  "closing": "Can I help with anything else?"
+}

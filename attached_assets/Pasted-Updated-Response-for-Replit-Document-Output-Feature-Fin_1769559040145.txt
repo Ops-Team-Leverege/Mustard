@@ -1,0 +1,64 @@
+Updated Response for Replit
+
+Document Output Feature - Final Spec
+Let's keep this simple for v1:
+What to Build
+
+Generate .docx for these contracts:
+
+VALUE_PROPOSITION
+MEETING_SUMMARY
+COMPARISON
+DRAFT_EMAIL
+PATTERN_ANALYSIS
+Also any response > 300 words
+
+
+Clean formatting - headings + bullets, no fancy templates. One Leverege-branded base template.
+Upload to Slack with a friendly message:
+
+📄 ACE_Value_Proposition_2026-01-27.docx
+
+Here's your value proposition doc — ready to edit and make it your own. 
+Can I help with anything else?
+
+Message varies slightly by type:
+
+Meeting summary → "ready to share or add your notes"
+Email draft → "ready to copy and personalize"
+Comparison → "ready to share with the team"
+
+
+
+What NOT to Build (for now)
+
+❌ Pre-generation questions (skip the state management complexity)
+❌ Smart context detection
+❌ Document versioning
+❌ Customer-specific templates
+
+⚠️ Important: No Hardcoding
+To avoid adding technical debt, please externalize to config files:
+DataConfig LocationContracts that trigger docsconfig/documents.jsonWord threshold (300)config/documents.jsonMessage templates by typeconfig/documents.jsonFile naming patternconfig/documents.json
+Example config/documents.json:
+json{
+  "generateDocForContracts": [
+    "VALUE_PROPOSITION",
+    "MEETING_SUMMARY",
+    "COMPARISON", 
+    "DRAFT_EMAIL",
+    "PATTERN_ANALYSIS"
+  ],
+  "wordThreshold": 300,
+  "fileNamePattern": "{customer}_{type}_{date}.docx",
+  "messages": {
+    "VALUE_PROPOSITION": "Here's your value proposition doc — ready to edit and make it your own.",
+    "MEETING_SUMMARY": "Here's your meeting summary — ready to share or add your notes.",
+    "DRAFT_EMAIL": "Here's your email draft — ready to copy and personalize.",
+    "default": "Here's your document — ready to edit and share."
+  },
+  "closing": "Can I help with anything else?"
+}
+This way we can tune behavior without code deploys.
+Why Keep It Simple
+Users haven't seen doc output yet. Ship the basic version, see what they actually need, then iterate. Don't build features for problems that don't exist.
