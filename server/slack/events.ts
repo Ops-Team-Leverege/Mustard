@@ -1073,10 +1073,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         userMessage = "Sorry — I hit an internal error while processing that request.";
       }
       
-      // Log with full context to persistent file
+      // Log with full context to persistent file AND console
+      const fullStack = err instanceof Error ? err.stack : undefined;
+      console.error(`[PIPELINE ERROR] ${errorType}:`, errorMessage, fullStack);
       logger.error('Pipeline error', err, {
         errorType,
         errorCode,
+        errorMessage,
+        stack: fullStack,
         text: text.substring(0, 100),
       });
 
