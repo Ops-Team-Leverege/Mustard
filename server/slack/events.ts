@@ -970,6 +970,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         progressMessageSent,
       });
     } catch (err) {
+      // CRITICAL: Cancel progress timer to prevent sending progress message after error
+      clearProgressTimer();
+      
       // Detect specific error types for better user messaging
       const errorMessage = err instanceof Error ? err.message : String(err);
       const errorCode = (err as any)?.code || (err as any)?.status;
