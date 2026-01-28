@@ -55,27 +55,35 @@ export async function findRelevantMeetings(
     };
   }
 
+  // Limit per company to prevent unbounded loads for large customers
+  // Downstream processing (e.g., searchAcrossMeetings) may further reduce this
+  const MAX_MEETINGS_PER_COMPANY = 25;
+  
   const meetings: SingleMeetingContext[] = [];
   for (const company of companyMatches) {
+    // Fetch recent transcripts for the company (bounded to prevent perf issues)
     const transcriptRows = await storage.rawQuery(`
       SELECT t.id, t.meeting_date, c.name as company_name, c.id as company_id
       FROM transcripts t
       JOIN companies c ON t.company_id = c.id
       WHERE t.company_id = $1
       ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
-      LIMIT 1
-    `, [company.id]);
+      LIMIT $2
+    `, [company.id, MAX_MEETINGS_PER_COMPANY]);
 
     if (transcriptRows && transcriptRows.length > 0) {
-      const row = transcriptRows[0];
-      meetings.push({
-        meetingId: row.id as string,
-        companyId: row.company_id as string,
-        companyName: row.company_name as string,
-        meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
-      });
+      for (const row of transcriptRows) {
+        meetings.push({
+          meetingId: row.id as string,
+          companyId: row.company_id as string,
+          companyName: row.company_name as string,
+          meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+        });
+      }
     }
   }
+  
+  console.log(`[MeetingResolver] Found ${meetings.length} total meetings for ${companyMatches.length} companies`);
 
   return {
     meetings,

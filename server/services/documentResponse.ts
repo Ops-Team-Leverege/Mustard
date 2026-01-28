@@ -33,10 +33,57 @@ interface DocumentResponseResult {
   error?: string;
 }
 
+// Contracts that should never generate documents - conversational responses only
+const NON_DOCUMENT_CONTRACTS: AnswerContract[] = [
+  AnswerContract.CLARIFY,
+  AnswerContract.REFUSE,
+];
+
+/**
+ * Fallback check for error content that might slip through contract-based gating.
+ * Used as a safety net when contract doesn't indicate error but content does.
+ */
+function isErrorOrClarificationContent(content: string): boolean {
+  const errorPatterns = [
+    /I need more data/i,
+    /Found \d+ meeting\(s\), but need at least/i,
+    /I couldn't find/i,
+    /Could you (please )?clarify/i,
+    /Please (try|provide|specify)/i,
+    /I searched .* but (couldn't|found no)/i,
+  ];
+  
+  return errorPatterns.some(pattern => pattern.test(content));
+}
+
 export async function sendResponseWithDocumentSupport(
   params: DocumentResponseParams
 ): Promise<DocumentResponseResult> {
   const { channel, threadTs, content, contract, customerName, title } = params;
+  
+  // Primary check: Don't generate documents for CLARIFY/REFUSE contracts
+  const isNonDocContract = NON_DOCUMENT_CONTRACTS.includes(contract);
+  // Fallback check: Content-based detection for edge cases
+  const isErrorContent = isErrorOrClarificationContent(content);
+  
+  if (isNonDocContract || isErrorContent) {
+    console.log(`[DocumentResponse] Skipping document: contract=${contract} (nonDoc=${isNonDocContract}), errorContent=${isErrorContent}`);
+    try {
+      await postSlackMessage({
+        channel,
+        text: content,
+        thread_ts: threadTs,
+      });
+      return { type: "message", success: true };
+    } catch (error) {
+      console.error("[DocumentResponse] Failed to post message:", error);
+      return { 
+        type: "message", 
+        success: false, 
+        error: error instanceof Error ? error.message : "Unknown error" 
+      };
+    }
+  }
   
   const wordCount = countWords(content);
   const shouldGenerate = shouldGenerateDocument(contract, wordCount);
