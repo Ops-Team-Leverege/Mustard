@@ -655,7 +655,8 @@ CRITICAL RULES:
 6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
 7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
 8. Focus on the PRIMARY ask - what information source is needed? Past meetings? External research? Product docs?
-9. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
+9. PRODUCT_KNOWLEDGE is always available as a follow-up. If request combines EXTERNAL_RESEARCH + "connect to PitCrew offerings" → classify as EXTERNAL_RESEARCH (product info will be added automatically)
+10. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
 
 EXAMPLES:
 - "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
