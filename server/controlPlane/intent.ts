@@ -847,12 +847,55 @@ async function classifyWithInterpretation(
   try {
     const interpretation = await interpretAmbiguousQuery(question, failureReason);
     
-    console.log(`[IntentClassifier] LLM interpretation: intent=${interpretation.proposedInterpretation.intent}, confidence=${interpretation.metadata.confidence}`);
+    const proposedIntent = interpretation.proposedInterpretation.intent;
+    const confidence = interpretation.metadata.confidence;
+    
+    console.log(`[IntentClassifier] LLM interpretation: intent=${proposedIntent}, confidence=${confidence}`);
+    
+    // HIGH CONFIDENCE PATH: Use LLM's proposed intent when confident
+    // Threshold 0.6 chosen to allow reasonable certainty while not being too strict
+    const CONFIDENCE_THRESHOLD = 0.6;
+    
+    if (confidence >= CONFIDENCE_THRESHOLD && proposedIntent !== "CLARIFY") {
+      // Map string intent to Intent enum
+      const intentMap: Record<string, Intent> = {
+        "SINGLE_MEETING": Intent.SINGLE_MEETING,
+        "MULTI_MEETING": Intent.MULTI_MEETING,
+        "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
+        "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
+        "DOCUMENT_SEARCH": Intent.DOCUMENT_SEARCH,
+        "GENERAL_HELP": Intent.GENERAL_HELP,
+        "REFUSE": Intent.REFUSE,
+        "CLARIFY": Intent.CLARIFY,
+      };
+      
+      const resolvedIntent = intentMap[proposedIntent] || Intent.GENERAL_HELP;
+      
+      console.log(`[IntentClassifier] Using LLM's proposed intent: ${resolvedIntent} (confidence ${confidence} >= ${CONFIDENCE_THRESHOLD})`);
+      
+      return {
+        intent: resolvedIntent,
+        intentDetectionMethod: "llm",
+        confidence: confidence,
+        reason: interpretation.proposedInterpretation.summary,
+        proposedInterpretation: interpretation.proposedInterpretation,
+        alternatives: interpretation.alternatives,
+        decisionMetadata: {
+          matchedSignals: originalResult?.decisionMetadata?.matchedSignals,
+          rejectedIntents: originalResult?.decisionMetadata?.rejectedIntents,
+          singleIntentViolation: originalResult?.decisionMetadata?.singleIntentViolation,
+          llmInterpretation: interpretation.metadata,
+        },
+      };
+    }
+    
+    // LOW CONFIDENCE PATH: Ask for clarification but provide interpretation
+    console.log(`[IntentClassifier] Requesting clarification (confidence ${confidence} < ${CONFIDENCE_THRESHOLD})`);
     
     return {
       intent: Intent.CLARIFY,
       intentDetectionMethod: "llm",
-      confidence: interpretation.metadata.confidence,
+      confidence: confidence,
       reason: interpretation.message,
       proposedInterpretation: interpretation.proposedInterpretation,
       alternatives: interpretation.alternatives,
