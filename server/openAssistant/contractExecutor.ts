@@ -123,16 +123,19 @@ export async function executeContractChain(
       console.log(`[ContractExecutor] Contract ${contract} returned no evidence (count=${executionResult.evidenceCount}, meetingsContributing=${executionResult.meetingsWithEvidence}), applying emptyResultBehavior: ${constraints.emptyResultBehavior}`);
       decision.executionOutcome = "empty_evidence";
       
+      const topicClause = topic ? ` about "${topic}"` : '';
+      const companyNames = Array.from(new Set(meetings.map(m => m.companyName))).join(", ");
+      
       if (constraints.emptyResultBehavior === "refuse") {
         executionDecisions.push(decision);
         return {
-          finalOutput: `I couldn't find reliable information to answer your question about ${getContractHeader(contract).toLowerCase()}. I searched ${meetings.length} meeting(s) but found no matching evidence. Please try rephrasing or narrowing your question.`,
+          finalOutput: `I couldn't find any discussion${topicClause} in the ${meetings.length} ${companyNames} meeting(s) I searched. It may not have been discussed, or you might want to try different search terms.`,
           chainResults: [{ contract: AnswerContract.REFUSE, output: "Empty evidence - refused" }]
         };
       } else if (constraints.emptyResultBehavior === "clarify") {
         executionDecisions.push(decision);
         return {
-          finalOutput: `I searched ${meetings.length} meeting(s) but couldn't find specific evidence for your question. Could you clarify what you're looking for or try a different search?`,
+          finalOutput: `I searched ${meetings.length} ${companyNames} meeting(s) but couldn't find any discussion${topicClause}. Would you like me to search for something else, or can you provide more details?`,
           chainResults: [{ contract: AnswerContract.CLARIFY, output: "Empty evidence - clarification needed" }]
         };
       }

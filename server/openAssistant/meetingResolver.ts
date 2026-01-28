@@ -326,6 +326,7 @@ export async function searchAcrossMeetings(
   topic?: string
 ): Promise<string> {
   const { handleSingleMeetingQuestion } = await import("../mcp/singleMeetingOrchestrator");
+  const { semanticAnswerSingleMeeting } = await import("../slack/semanticAnswerSingleMeeting");
   
   // If topic is provided, create a focused query
   const focusedQuery = topic 
@@ -342,20 +343,49 @@ export async function searchAcrossMeetings(
 
   for (const meeting of meetings.slice(0, 5)) {
     try {
-      const result = await handleSingleMeetingQuestion(meeting, focusedQuery, false);
+      let answer: string;
+      let isNotFound = false;
+      
+      if (topic) {
+        // When searching for a specific topic, use semantic search directly on transcript
+        // This bypasses artifact handlers which may not contain the topic
+        console.log(`[MeetingResolver] Using semantic search for topic "${topic}" in meeting ${meeting.meetingId}`);
+        try {
+          const semanticResult = await semanticAnswerSingleMeeting(
+            meeting.meetingId,
+            meeting.companyName,
+            focusedQuery,
+            meeting.meetingDate
+          );
+          answer = semanticResult.answer;
+          // Check if semantic search found nothing
+          isNotFound = semanticResult.confidence === "low" && 
+            (answer.toLowerCase().includes("not discussed") || 
+             answer.toLowerCase().includes("not mentioned") ||
+             answer.toLowerCase().includes("no discussion"));
+        } catch (err) {
+          console.error(`[MeetingResolver] Semantic search failed for ${meeting.meetingId}:`, err);
+          continue;
+        }
+      } else {
+        // No topic - use standard handler
+        const result = await handleSingleMeetingQuestion(meeting, focusedQuery, false);
+        answer = result.answer;
+        isNotFound = result.dataSource === "not_found";
+      }
+      
       // Filter out "not found" AND "not discussed" responses
-      const isNotFound = result.dataSource === "not_found";
-      const isNotDiscussed = topic && result.answer.toLowerCase().includes("not discussed");
+      const isNotDiscussed = topic && answer.toLowerCase().includes("not discussed");
       
       // CRITICAL: When topic is provided, verify the answer actually mentions the topic
       // This prevents returning generic artifacts that don't relate to the topic
-      const answerMentionsTopic = !topic || result.answer.toLowerCase().includes(topic.toLowerCase());
+      const answerMentionsTopic = !topic || answer.toLowerCase().includes(topic.toLowerCase());
       
       if (!isNotFound && !isNotDiscussed && answerMentionsTopic) {
         allResults.push({
           companyName: meeting.companyName,
           meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
-          answer: result.answer,
+          answer: answer,
         });
       } else if (topic && !answerMentionsTopic) {
         console.log(`[MeetingResolver] Filtered out result for ${meeting.companyName} - answer doesn't mention topic "${topic}"`);
