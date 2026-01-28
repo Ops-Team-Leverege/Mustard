@@ -1,0 +1,121 @@
+# Smart Acknowledgments Spec
+
+## Problem
+
+Current acknowledgment is robotic and repetitive:
+
+> "On it, @Silvina — let me check that for you."
+
+Every. Single. Time. 🤖
+
+## Solution
+
+Context-aware, varied acknowledgments based on what the user is asking.
+
+## User Experience
+
+| User Says | Acknowledgment |
+|-----------|----------------|
+| "Summarize the Les Schwab meeting" | "Got it, @Silvina — pulling up that conversation..." |
+| "How does PitCrew work?" | "Good question, @Silvina — let me break that down..." |
+| "What were the action items from ACE?" | "On it, @Silvina — gathering those action items..." |
+| "Compare ACE and Les Schwab" | "Good thinking, @Silvina — comparing those now..." |
+| "Draft an email to Tyler" | "Happy to help, @Silvina — drafting now..." |
+| "asdfqwerty" | "On it, @Silvina — looking into that..." (fallback) |
+
+## Implementation
+
+Simple keyword matching (no LLM needed, instant response):
+
+```typescript
+// server/slack/acknowledgments.ts
+import ackConfig from '../config/acknowledgments.json';
+
+export function generateAck(user: string, message: string): string {
+  const messageLower = message.toLowerCase();
+  
+  // Find matching pattern
+  for (const pattern of ackConfig.patterns) {
+    if (pattern.keywords.some(kw => messageLower.includes(kw))) {
+      const template = pickRandom(pattern.messages);
+      return template.replace('{user}', user);
+    }
+  }
+  
+  // Fallback
+  const template = pickRandom(ackConfig.fallback);
+  return template.replace('{user}', user);
+}
+
+function pickRandom<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+```
+
+## Config (No Hardcoding!)
+
+```json
+// config/acknowledgments.json
+{
+  "patterns": [
+    {
+      "name": "meeting",
+      "keywords": ["meeting", "call", "conversation", "discussed", "summary", "summarize", "recap"],
+      "messages": [
+        "Got it, {user} — pulling up that conversation...",
+        "On it, {user} — checking that meeting...",
+        "Sure thing, {user} — let me find what was discussed..."
+      ]
+    },
+    {
+      "name": "product",
+      "keywords": ["how does", "explain", "pitcrew", "pricing", "integrate", "feature", "work"],
+      "messages": [
+        "Good question, {user} — let me break that down...",
+        "Happy to explain, {user} — one sec...",
+        "Absolutely, {user} — pulling together the details..."
+      ]
+    },
+    {
+      "name": "action_items",
+      "keywords": ["action items", "next steps", "follow up", "tasks", "todo", "action"],
+      "messages": [
+        "On it, {user} — gathering those action items...",
+        "Got it, {user} — pulling up the next steps...",
+        "Sure thing, {user} — checking what needs to happen..."
+      ]
+    },
+    {
+      "name": "compare",
+      "keywords": ["compare", "difference", "versus", "vs", "analyze", "pattern", "trend"],
+      "messages": [
+        "Good thinking, {user} — comparing those now...",
+        "Interesting question, {user} — let me analyze that...",
+        "On it, {user} — pulling the data together..."
+      ]
+    },
+    {
+      "name": "draft",
+      "keywords": ["draft", "write", "compose", "email", "message", "create"],
+      "messages": [
+        "Happy to help, {user} — drafting now...",
+        "On it, {user} — putting that together...",
+        "Sure thing, {user} — working on that draft..."
+      ]
+    }
+  ],
+  "fallback": [
+    "On it, {user} — let me check that for you...",
+    "Got it, {user} — looking into that...",
+    "Sure thing, {user} — give me a moment...",
+    "Happy to help, {user} — checking that out..."
+  ]
+}
+```
+
+## Key Points
+
+- ⚡ **No LLM** - instant response, zero latency
+- 🎲 **Varied** - random selection from matching category
+- 🎯 **Contextual** - matches what user is asking about
+- 📁 **Config-driven** - no hardcoding, easy to tune

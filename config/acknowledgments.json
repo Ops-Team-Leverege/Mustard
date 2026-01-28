@@ -1,0 +1,73 @@
+{
+  "patterns": [
+    {
+      "name": "meeting",
+      "keywords": ["meeting", "call", "conversation", "discussed", "summary", "summarize", "recap"],
+      "messages": [
+        "Got it, {user} — pulling up that conversation...",
+        "On it, {user} — checking that meeting...",
+        "Sure thing, {user} — let me find what was discussed..."
+      ]
+    },
+    {
+      "name": "product",
+      "keywords": ["how does", "explain", "pitcrew", "pricing", "integrate", "feature", "work"],
+      "messages": [
+        "Good question, {user} — let me break that down...",
+        "Happy to explain, {user} — one sec...",
+        "Absolutely, {user} — pulling together the details..."
+      ]
+    },
+    {
+      "name": "action_items",
+      "keywords": ["action items", "next steps", "follow up", "tasks", "todo", "action"],
+      "messages": [
+        "On it, {user} — gathering those action items...",
+        "Got it, {user} — pulling up the next steps...",
+        "Sure thing, {user} — checking what needs to happen..."
+      ]
+    },
+    {
+      "name": "compare",
+      "keywords": ["compare", "difference", "versus", "vs", "analyze", "pattern", "trend"],
+      "messages": [
+        "Good thinking, {user} — comparing those now...",
+        "Interesting question, {user} — let me analyze that...",
+        "On it, {user} — pulling the data together..."
+      ]
+    },
+    {
+      "name": "draft",
+      "keywords": ["draft", "write", "compose", "email", "message", "create"],
+      "messages": [
+        "Happy to help, {user} — drafting now...",
+        "On it, {user} — putting that together...",
+        "Sure thing, {user} — working on that draft..."
+      ]
+    },
+    {
+      "name": "questions",
+      "keywords": ["questions", "asked", "customer questions", "what did they ask"],
+      "messages": [
+        "On it, {user} — pulling up those questions...",
+        "Got it, {user} — checking what they asked...",
+        "Sure thing, {user} — gathering those questions..."
+      ]
+    },
+    {
+      "name": "attendees",
+      "keywords": ["attendees", "who was", "participants", "people"],
+      "messages": [
+        "Got it, {user} — checking who was there...",
+        "On it, {user} — pulling up the attendees...",
+        "Sure thing, {user} — let me see who joined..."
+      ]
+    }
+  ],
+  "fallback": [
+    "On it, {user} — let me check that for you...",
+    "Got it, {user} — looking into that...",
+    "Sure thing, {user} — give me a moment...",
+    "Happy to help, {user} — checking that out..."
+  ]
+}
