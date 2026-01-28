@@ -39,6 +39,7 @@ export enum Intent {
   MULTI_MEETING = "MULTI_MEETING",
   PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE",
   DOCUMENT_SEARCH = "DOCUMENT_SEARCH",
+  EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH",
   GENERAL_HELP = "GENERAL_HELP",
   REFUSE = "REFUSE",
   CLARIFY = "CLARIFY",
@@ -248,6 +249,28 @@ const DOCUMENT_SEARCH_KEYWORDS = [
   "agreement",
 ];
 
+const EXTERNAL_RESEARCH_KEYWORDS = [
+  "do research on",
+  "research on",
+  "research that customer",
+  "recent earnings",
+  "earnings call",
+  "public statements",
+  "their priorities",
+  "their strategic",
+  "industry trends",
+  "market research",
+  "competitor research",
+  "company research",
+  "find out their",
+  "find out about",
+  "look up",
+  "slide deck for",
+  "sales deck for",
+  "pitch deck for",
+  "presentation for",
+];
+
 const GENERAL_HELP_KEYWORDS = [
   "what can you do",
   "commands",
@@ -316,6 +339,17 @@ const PRODUCT_KNOWLEDGE_PATTERNS = [
   /\bupdat(e|ing)\s+(our|the|my)\s+(pricing|faq|copy|website)\b/i,
   /\bwrite\s+(a\s+section|copy)\s+about\s+pitcrew\b/i,
   /\b(help\s+me\s+)?write\s+about\s+(pitcrew|our\s+product)\b/i,
+];
+
+const EXTERNAL_RESEARCH_PATTERNS = [
+  /\bdo\s+research\s+on\s+(that\s+)?(customer|company|prospect)\b/i,
+  /\bresearch\s+(on\s+)?[\w\s]+\s+(to\s+find|including|and)\b/i,
+  /\b(recent\s+)?earnings\s+(calls?|reports?)\b/i,
+  /\bpublic\s+statements?\b/i,
+  /\b(their|company'?s?)\s+(priorities|strategy|strategic)\b/i,
+  /\bcreating\s+a\s+(slide|sales|pitch)\s+deck\s+for\b/i,
+  /\bslide\s+deck\s+for\s+[\w\s]+\s+to\s+sell\b/i,
+  /\bselling?\s+(to|their)\s+(leadership|team|executive)\b/i,
 ];
 
 const REFUSE_PATTERNS = [
@@ -603,17 +637,20 @@ Classify into exactly ONE intent:
 - MULTI_MEETING: Questions across multiple meetings (trends, aggregates, comparisons)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - DOCUMENT_SEARCH: Questions about documentation, contracts, specs
+- EXTERNAL_RESEARCH: Requests to research external companies, prospects, earnings calls, public statements, market info
 - GENERAL_HELP: Greetings, meta questions, general assistance requests
 - REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
 - CLARIFY: Request combines multiple intents that need to be split
 
 CRITICAL RULES:
 1. If ANY person name appears (Tyler, Randy, Robert, etc.) → likely SINGLE_MEETING
-2. If ANY company name appears (Les Schwab, ACE, Walmart, etc.) → likely SINGLE_MEETING
+2. If ANY company name appears in context of "our meeting with X" → likely SINGLE_MEETING
 3. "What did X say/mention/ask" → SINGLE_MEETING
 4. "Find all" or "across meetings" → MULTI_MEETING
 5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
-6. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
+6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
+7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
+8. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
 
 EXAMPLES:
 - "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
@@ -621,6 +658,9 @@ EXAMPLES:
 - "Find all meetings that mention Walmart" → MULTI_MEETING
 - "What is PitCrew pricing?" → PRODUCT_KNOWLEDGE
 - "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
+- "Research Costco and their priorities" → EXTERNAL_RESEARCH
+- "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
+- "Find their recent earnings calls" → EXTERNAL_RESEARCH
 - "What's the weather?" → REFUSE
 - "Summarize the meeting and email it" → CLARIFY (needs split)
 

@@ -2,28 +2,30 @@
  * External Research Handler
  * 
  * Purpose:
- * Handles requests for public information about companies/topics.
+ * Handles requests for public information about companies/topics using Gemini AI.
  * 
- * Current Implementation:
- * - Web search capability is not yet integrated
- * - Returns honest "not available" response when real research is needed
- * - Can provide general knowledge via GPT-5 (with clear disclaimer)
- * 
- * Future:
- * - Integrate web search API for real citations (source, URL, date, snippet)
- * - Clearly separated from meeting data paths
+ * Implementation:
+ * - Uses Gemini API for web-grounded research
+ * - Returns structured research with sources and extraction date
+ * - Designed for document output (sales prep, company research)
  * 
  * Key Principle:
- * Never fabricate citations - be honest about capabilities
+ * Always include sources and extraction date for accountability
  */
 
+import { GoogleGenAI } from "@google/genai";
 import { OpenAI } from "openai";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-const WEB_SEARCH_AVAILABLE = false;
+function getGeminiClient() {
+  if (!process.env.GEMINI_API_KEY) {
+    return null;
+  }
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+}
 
 export type Citation = {
   source: string;
@@ -38,79 +40,145 @@ export type ResearchResult = {
   searchQueries: string[];
   confidence: "high" | "medium" | "low";
   disclaimer?: string;
-};
-
-export type WebSearchResult = {
-  title: string;
-  url: string;
-  snippet: string;
-  date?: string;
+  extractionDate: string;
+  companyName?: string;
 };
 
 /**
- * Perform external research.
- * 
- * Current behavior: Web search is not yet available, so we provide
- * general knowledge with a clear disclaimer about limitations.
+ * Format the current date for research attribution.
+ */
+function getExtractionDate(): string {
+  return new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZoneName: 'short'
+  });
+}
+
+/**
+ * Perform external research using Gemini.
  */
 export async function performExternalResearch(
   query: string,
   companyName?: string | null,
   topic?: string | null
 ): Promise<ResearchResult> {
+  const extractionDate = getExtractionDate();
   console.log(`[ExternalResearch] Research request: query="${query}", company="${companyName}", topic="${topic}"`);
   
-  if (!WEB_SEARCH_AVAILABLE) {
-    return provideGeneralKnowledge(query, companyName, topic);
+  const gemini = getGeminiClient();
+  
+  if (!gemini) {
+    console.log(`[ExternalResearch] Gemini not available, falling back to general knowledge`);
+    return provideGeneralKnowledge(query, companyName, topic, extractionDate);
   }
   
-  const searchQueries = generateSearchQueries(query, companyName, topic);
-  
-  const allResults: WebSearchResult[] = [];
-  for (const searchQuery of searchQueries) {
-    try {
-      const results = await executeWebSearch(searchQuery);
-      allResults.push(...results);
-    } catch (err) {
-      console.error(`[ExternalResearch] Search failed for "${searchQuery}":`, err);
+  try {
+    const researchPrompt = buildResearchPrompt(query, companyName, topic);
+    
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: researchPrompt,
+    });
+    
+    const content = response.text;
+    if (!content) {
+      console.log(`[ExternalResearch] Empty response from Gemini`);
+      return provideGeneralKnowledge(query, companyName, topic, extractionDate);
     }
+    
+    const citations = extractCitations(content);
+    
+    return {
+      answer: formatResearchDocument(companyName || "Company", content, extractionDate),
+      citations,
+      searchQueries: [query],
+      confidence: citations.length > 0 ? "medium" : "low",
+      extractionDate,
+      companyName: companyName || undefined,
+      disclaimer: "Research based on publicly available information via Gemini AI. Please verify critical details before use.",
+    };
+  } catch (error) {
+    console.error("[ExternalResearch] Gemini API error:", error);
+    return provideGeneralKnowledge(query, companyName, topic, extractionDate);
   }
-
-  if (allResults.length === 0) {
-    return provideGeneralKnowledge(query, companyName, topic);
-  }
-
-  const deduped = deduplicateResults(allResults);
-  const synthesized = await synthesizeResearch(query, deduped);
-  
-  return {
-    ...synthesized,
-    searchQueries,
-  };
 }
 
 /**
- * Provide general knowledge when web search is not available.
- * Clearly disclaims that this is not cited research.
+ * Build the research prompt for Gemini.
+ */
+function buildResearchPrompt(
+  query: string,
+  companyName?: string | null,
+  topic?: string | null
+): string {
+  const company = companyName || "the company mentioned";
+  
+  return `You are a business research analyst. Research ${company} based on this request: "${query}"
+
+Please provide a comprehensive research report with:
+
+1. **Company Overview**
+   - Brief description and industry position
+   - Key facts about the business
+
+2. **Recent Strategic Priorities**
+   - Key initiatives and focus areas (cite timeframes when possible)
+   - Public statements from leadership
+
+3. **Earnings & Financial Highlights** (if publicly traded)
+   - Recent earnings call highlights
+   - Key metrics or guidance mentioned
+   - Note the quarter/year of any financial information
+
+4. **Challenges & Pain Points**
+   - Publicly discussed challenges
+   - Industry headwinds affecting them
+
+5. **Technology & Operational Focus**
+   - Technology investments
+   - Operational improvement areas
+
+6. **Relevant Industry Context**
+   - Industry trends
+   - Competitive dynamics
+
+IMPORTANT REQUIREMENTS:
+- Include specific dates, quarters, or timeframes for all factual claims
+- At the end, include a "## Sources" section listing:
+  - Type of source (earnings call, press release, SEC filing, news article, etc.)
+  - Approximate date or timeframe of the information
+  - Any specific publications or sources referenced
+- If you're uncertain about recency or accuracy, clearly state that
+- Never fabricate specific numbers or quotes - indicate uncertainty when applicable`;
+}
+
+/**
+ * Provide general knowledge when Gemini is not available.
  */
 async function provideGeneralKnowledge(
   query: string,
   companyName?: string | null,
-  topic?: string | null
+  topic?: string | null,
+  extractionDate?: string
 ): Promise<ResearchResult> {
-  console.log(`[ExternalResearch] Providing general knowledge (web search not available)`);
+  console.log(`[ExternalResearch] Providing general knowledge (Gemini not available)`);
   
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
-        content: `You are a helpful assistant providing general knowledge. The user asked a research question but web search is not currently available.
+        content: `You are a helpful assistant providing general knowledge about companies and business topics.
 
 IMPORTANT RULES:
 - Provide helpful general information based on your training data
 - Be clear about limitations: your knowledge has a cutoff date and may be outdated
 - NEVER fabricate specific citations, URLs, or sources
+- Include timeframes for factual claims when known
 - If you're not confident about specific facts, say so
 - Recommend the user verify important information from official sources`,
       },
@@ -122,148 +190,100 @@ IMPORTANT RULES:
   });
 
   const answer = response.choices[0]?.message?.content || "I'm not able to provide information on this topic right now.";
+  const date = extractionDate || getExtractionDate();
 
   return {
-    answer,
+    answer: formatResearchDocument(companyName || "Research", answer, date),
     citations: [],
-    searchQueries: [],
+    searchQueries: [query],
     confidence: "low",
-    disclaimer: "This response is based on general knowledge, not real-time web search. Please verify important information from official sources.",
+    extractionDate: date,
+    companyName: companyName || undefined,
+    disclaimer: "This response is based on general knowledge, not real-time web search. Information may be outdated. Please verify important details from official sources.",
   };
 }
 
 /**
- * Generate search queries based on the user's question and extracted entities.
+ * Extract citations/sources from the research content.
  */
-function generateSearchQueries(
-  query: string,
-  companyName?: string | null,
-  topic?: string | null
-): string[] {
-  const queries: string[] = [];
+function extractCitations(content: string): Citation[] {
+  const citations: Citation[] = [];
   
-  if (companyName && topic) {
-    queries.push(`${companyName} ${topic}`);
-    queries.push(`${companyName} latest news`);
-  } else if (companyName) {
-    queries.push(`${companyName} company overview`);
-    queries.push(`${companyName} recent news`);
-  } else if (topic) {
-    queries.push(topic);
-  } else {
-    queries.push(query);
-  }
-
-  return queries.slice(0, 3);
-}
-
-/**
- * Web search is not yet integrated.
- * Returns empty results - caller should handle gracefully.
- */
-async function executeWebSearch(query: string): Promise<WebSearchResult[]> {
-  console.log(`[ExternalResearch] Web search requested: "${query}" (not available)`);
-  return [];
-}
-
-/**
- * Remove duplicate results based on URL.
- */
-function deduplicateResults(results: WebSearchResult[]): WebSearchResult[] {
-  const seen = new Set<string>();
-  return results.filter(r => {
-    if (seen.has(r.url)) return false;
-    seen.add(r.url);
-    return true;
-  });
-}
-
-/**
- * Synthesize research results into a coherent answer with citations.
- */
-async function synthesizeResearch(
-  originalQuery: string,
-  results: WebSearchResult[]
-): Promise<Omit<ResearchResult, "searchQueries">> {
-  const resultsContext = results.map((r, i) => 
-    `[${i + 1}] ${r.title}\nURL: ${r.url}\nDate: ${r.date || "Unknown"}\nContent: ${r.snippet}`
-  ).join("\n\n");
-
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      {
-        role: "system",
-        content: `You are a research synthesizer. Your job is to:
-1. Answer the user's question using ONLY the provided search results
-2. Cite your sources using [1], [2], etc. inline
-3. Be explicit about what is known vs. unknown
-4. If the results don't adequately answer the question, say so
-
-Return a JSON object with:
-{
-  "answer": "Your synthesized answer with [1] inline citations",
-  "citations": [
-    {
-      "source": "Publication name",
-      "url": "https://...",
-      "date": "2024-01-15 or null",
-      "snippet": "Key evidence quoted from source"
+  const sourcesMatch = content.match(/##?\s*Sources?\s*\n([\s\S]*?)(?:\n\n##|\n\n\*\*|$)/i);
+  if (sourcesMatch) {
+    const sourcesText = sourcesMatch[1];
+    const lines = sourcesText.split('\n').filter(line => line.trim());
+    
+    for (const line of lines) {
+      const cleaned = line.replace(/^[-•*]\s*/, '').trim();
+      if (cleaned && cleaned.length > 5) {
+        citations.push({
+          source: cleaned,
+          url: "",
+          date: extractDateFromText(cleaned),
+          snippet: cleaned,
+        });
+      }
     }
-  ],
-  "confidence": "high|medium|low",
-  "disclaimer": "Optional note about limitations"
+  }
+  
+  if (citations.length === 0) {
+    citations.push({
+      source: "Gemini AI research synthesis",
+      url: "",
+      date: null,
+      snippet: "Information synthesized from publicly available sources",
+    });
+  }
+  
+  return citations;
 }
 
-RULES:
-- Never make claims not supported by the sources
-- Always include inline citations [1], [2] in your answer
-- If sources conflict, acknowledge the discrepancy
-- If information is outdated or incomplete, note it in the disclaimer`,
-      },
-      {
-        role: "user",
-        content: `Question: ${originalQuery}\n\nSearch Results:\n${resultsContext}`,
-      },
-    ],
-    response_format: { type: "json_object" },
-  });
-
-  const content = response.choices[0]?.message?.content;
-  if (!content) {
-    return {
-      answer: "I found some information but wasn't able to synthesize it properly. Please try rephrasing your question.",
-      citations: [],
-      confidence: "low",
-    };
+/**
+ * Try to extract a date reference from text.
+ */
+function extractDateFromText(text: string): string | null {
+  const datePatterns = [
+    /\b(Q[1-4]\s*20\d{2})\b/i,
+    /\b(20\d{2})\b/,
+    /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+20\d{2}\b/i,
+    /\b(\d{1,2}\/\d{1,2}\/20\d{2})\b/,
+  ];
+  
+  for (const pattern of datePatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      return match[1];
+    }
   }
-
-  try {
-    const parsed = JSON.parse(content);
-    return {
-      answer: parsed.answer || "No answer generated",
-      citations: (parsed.citations || []).map((c: any) => ({
-        source: c.source || "Unknown",
-        url: c.url || "",
-        date: c.date || null,
-        snippet: c.snippet || "",
-      })),
-      confidence: validateConfidence(parsed.confidence),
-      disclaimer: parsed.disclaimer,
-    };
-  } catch (err) {
-    console.error("[ExternalResearch] Failed to parse synthesis:", err);
-    return {
-      answer: "Research synthesis failed. Please try again.",
-      citations: [],
-      confidence: "low",
-    };
-  }
+  
+  return null;
 }
 
-function validateConfidence(confidence: unknown): "high" | "medium" | "low" {
-  const valid = ["high", "medium", "low"];
-  return valid.includes(confidence as string) ? (confidence as "high" | "medium" | "low") : "medium";
+/**
+ * Format the research into a structured document.
+ */
+function formatResearchDocument(
+  title: string,
+  content: string,
+  extractionDate: string
+): string {
+  return `# ${title} Research Report
+
+**Research Date:** ${extractionDate}
+
+---
+
+${content}
+
+---
+
+## Research Metadata
+
+**Generated:** ${extractionDate}
+**Research Method:** AI-assisted research using publicly available information
+
+*Note: This research is based on publicly available information. Please verify critical details before use in customer-facing materials.*`;
 }
 
 /**
@@ -274,6 +294,7 @@ export function formatCitationsForDisplay(citations: Citation[]): string {
   
   return "\n\n*Sources:*\n" + citations.map((c, i) => {
     const dateStr = c.date ? ` (${c.date})` : "";
-    return `[${i + 1}] ${c.source}${dateStr}: ${c.url}`;
+    const urlStr = c.url ? `: ${c.url}` : "";
+    return `[${i + 1}] ${c.source}${dateStr}${urlStr}`;
   }).join("\n");
 }

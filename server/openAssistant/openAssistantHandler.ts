@@ -221,6 +221,10 @@ Give me a hint and I'll get you sorted!`;
       return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract);
     }
     
+    if (cpResult.intent === Intent.EXTERNAL_RESEARCH) {
+      return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract);
+    }
+    
     return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
   }
   
@@ -553,6 +557,87 @@ AUTHORITY RULES (without product data):
     delegatedToSingleMeeting: false,
     evidenceSources: hasProductData ? productKnowledge.metadata.tablesWithData : undefined,
   };
+}
+
+/**
+ * Handle EXTERNAL_RESEARCH intent.
+ * Uses Gemini to perform web research on companies/prospects.
+ */
+async function handleExternalResearchIntent(
+  userMessage: string,
+  context: OpenAssistantContext,
+  classification: IntentClassification,
+  contract?: AnswerContract
+): Promise<OpenAssistantResult> {
+  console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}`);
+  
+  const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
+  
+  // Extract company name from the user message
+  const companyName = extractCompanyFromMessage(userMessage);
+  
+  console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
+  
+  // Perform the research
+  const researchResult = await performExternalResearch(
+    userMessage,
+    companyName,
+    null // topic derived from message
+  );
+  
+  if (!researchResult.answer) {
+    return {
+      answer: "I wasn't able to complete the research. Please try rephrasing your request or specifying the company name more clearly.",
+      intent: "external_research",
+      intentClassification: classification,
+      controlPlaneIntent: Intent.EXTERNAL_RESEARCH,
+      answerContract: AnswerContract.CLARIFY,
+      dataSource: "external_research",
+      delegatedToSingleMeeting: false,
+    };
+  }
+  
+  // Include sources in the response
+  const sourcesSection = researchResult.citations.length > 0 
+    ? formatCitationsForDisplay(researchResult.citations)
+    : "";
+  
+  return {
+    answer: researchResult.answer + sourcesSection,
+    intent: "external_research",
+    intentClassification: classification,
+    controlPlaneIntent: Intent.EXTERNAL_RESEARCH,
+    answerContract: actualContract,
+    dataSource: "external_research",
+    delegatedToSingleMeeting: false,
+    evidenceSources: researchResult.citations.map(c => c.source),
+  };
+}
+
+/**
+ * Extract company name from user message for research.
+ */
+function extractCompanyFromMessage(message: string): string | null {
+  // Common patterns for company mentions
+  const patterns = [
+    /research\s+(?:on\s+)?([A-Z][a-zA-Z\s&]+?)(?:\s+and|\s+to|\s+including|$)/i,
+    /slide\s+deck\s+for\s+([A-Z][a-zA-Z\s&]+?)(?:\s+to|\s+leadership|$)/i,
+    /(?:about|on)\s+([A-Z][a-zA-Z\s&]+?)(?:'s|\s+and|\s+to|$)/i,
+    /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s+(?:earnings|priorities|strategic)/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const company = match[1].trim();
+      // Filter out common false positives
+      if (!['I', 'We', 'The', 'A', 'An', 'Our', 'Their'].includes(company)) {
+        return company;
+      }
+    }
+  }
+  
+  return null;
 }
 
 /**

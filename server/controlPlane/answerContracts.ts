@@ -128,6 +128,12 @@ export enum AnswerContract {
   FAQ_ANSWER = "FAQ_ANSWER",
   
   // ============================================================================
+  // External Research contracts (uses web search via Gemini)
+  // ============================================================================
+  EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH",   // Web research on companies/prospects
+  SALES_DECK_PREP = "SALES_DECK_PREP",       // Research + value prop matching for sales
+  
+  // ============================================================================
   // General contracts
   // ============================================================================
   DOCUMENT_ANSWER = "DOCUMENT_ANSWER",
@@ -348,6 +354,24 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "text",
     emptyResultBehavior: "return_empty",
   },
+  // External Research contracts (uses web search via Gemini)
+  [AnswerContract.EXTERNAL_RESEARCH]: {
+    ssotMode: "descriptive",
+    requiresEvidence: false,
+    allowsSummary: true,
+    requiresCitation: false,
+    responseFormat: "text",
+    emptyResultBehavior: "clarify",
+  },
+  [AnswerContract.SALES_DECK_PREP]: {
+    ssotMode: "descriptive",
+    requiresEvidence: false,
+    allowsSummary: true,
+    requiresCitation: false,
+    responseFormat: "structured",
+    emptyResultBehavior: "clarify",
+  },
+  
   [AnswerContract.DOCUMENT_ANSWER]: {
     ssotMode: "none",
     requiresEvidence: true,
@@ -550,6 +574,10 @@ const CONTRACT_PHASES: Record<AnswerContract, TaskPhase> = {
   [AnswerContract.PATTERN_ANALYSIS]: "analysis",
   [AnswerContract.COMPARISON]: "analysis",
   [AnswerContract.TREND_SUMMARY]: "analysis",
+  
+  // Research phase (external web research)
+  [AnswerContract.EXTERNAL_RESEARCH]: "analysis",
+  [AnswerContract.SALES_DECK_PREP]: "analysis",
   
   // Drafting phase
   [AnswerContract.PRODUCT_EXPLANATION]: "drafting",
