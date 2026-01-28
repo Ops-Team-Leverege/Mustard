@@ -495,8 +495,17 @@ async function handleProductKnowledgeIntent(
   const actualContract = contract || AnswerContract.PRODUCT_EXPLANATION;
   
   // Fetch REAL product data from Airtable tables
-  const productKnowledge = await getComprehensiveProductKnowledge();
-  const productDataPrompt = formatProductKnowledgeForPrompt(productKnowledge);
+  let productKnowledge;
+  let productDataPrompt;
+  try {
+    console.log(`[OpenAssistant] Fetching product knowledge from database...`);
+    productKnowledge = await getComprehensiveProductKnowledge();
+    productDataPrompt = formatProductKnowledgeForPrompt(productKnowledge);
+    console.log(`[OpenAssistant] Product knowledge fetch successful`);
+  } catch (dbError) {
+    console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE database error:`, dbError);
+    throw new Error(`Product knowledge database error: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
+  }
   
   console.log(`[OpenAssistant] Product knowledge loaded: ${productKnowledge.metadata.totalRecords} records from ${productKnowledge.metadata.tablesWithData.join(", ")}`);
   
@@ -537,15 +546,22 @@ AUTHORITY RULES (without product data):
 - For pricing: Say "For current pricing information, please check with the sales team"
 - NEVER fabricate specific features, pricing, or integration claims`;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-5",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-  });
-
-  const answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
+  let answer: string;
+  try {
+    console.log(`[OpenAssistant] Calling GPT-5 for product knowledge response...`);
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    });
+    answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
+    console.log(`[OpenAssistant] GPT-5 response received (${answer.length} chars)`);
+  } catch (openaiError) {
+    console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE OpenAI error:`, openaiError);
+    throw new Error(`OpenAI API error in product knowledge: ${openaiError instanceof Error ? openaiError.message : String(openaiError)}`);
+  }
 
   return {
     answer,
