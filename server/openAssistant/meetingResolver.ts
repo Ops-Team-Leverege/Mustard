@@ -15,6 +15,14 @@ export type MeetingSearchResult = {
   topic?: string; // Topic to filter content (e.g., "cameras" from "about cameras")
 };
 
+export type ChunkSearchResult = {
+  transcriptId: string;
+  companyName: string;
+  meetingDate: Date | null;
+  speakerName: string | null;
+  content: string;
+};
+
 /**
  * Find relevant meetings based on company/person names in the query.
  * Uses fuzzy matching on company names and contact names.
@@ -317,8 +325,64 @@ async function searchContacts(searchTerms: string[]): Promise<SingleMeetingConte
 }
 
 /**
+ * Fast chunk-based search for a specific topic across meetings.
+ * Uses SQL keyword search on transcript_chunks - much faster than LLM calls.
+ * Returns relevant excerpts grouped by meeting.
+ */
+async function searchChunksForTopic(
+  meetings: SingleMeetingContext[],
+  topic: string
+): Promise<Map<string, ChunkSearchResult[]>> {
+  const { storage } = await import("../storage");
+  
+  const meetingIds = meetings.map(m => m.meetingId);
+  if (meetingIds.length === 0) return new Map();
+  
+  // Use parameterized query for safety
+  const placeholders = meetingIds.map((_, i) => `$${i + 1}`).join(", ");
+  const topicParam = `$${meetingIds.length + 1}`;
+  
+  const query = `
+    SELECT 
+      tc.transcript_id,
+      c.name as company_name,
+      tc.meeting_date,
+      tc.speaker_name,
+      tc.content
+    FROM transcript_chunks tc
+    JOIN companies c ON tc.company_id = c.id
+    WHERE tc.transcript_id IN (${placeholders})
+      AND LOWER(tc.content) LIKE '%' || LOWER(${topicParam}) || '%'
+    ORDER BY tc.transcript_id, tc.chunk_index
+    LIMIT 20
+  `;
+  
+  const rows = await storage.rawQuery(query, [...meetingIds, topic]);
+  
+  const results = new Map<string, ChunkSearchResult[]>();
+  if (rows) {
+    for (const row of rows) {
+      const transcriptId = row.transcript_id as string;
+      if (!results.has(transcriptId)) {
+        results.set(transcriptId, []);
+      }
+      results.get(transcriptId)!.push({
+        transcriptId,
+        companyName: row.company_name as string,
+        meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+        speakerName: row.speaker_name as string | null,
+        content: row.content as string,
+      });
+    }
+  }
+  
+  console.log(`[MeetingResolver] Chunk search for "${topic}": found ${rows?.length || 0} chunks across ${results.size} meetings`);
+  return results;
+}
+
+/**
  * Search across multiple meetings for relevant information.
- * When topic is provided, creates a focused query about that topic.
+ * When topic is provided, uses fast chunk-based search instead of LLM calls.
  */
 export async function searchAcrossMeetings(
   userMessage: string,
@@ -326,15 +390,42 @@ export async function searchAcrossMeetings(
   topic?: string
 ): Promise<string> {
   const { handleSingleMeetingQuestion } = await import("../mcp/singleMeetingOrchestrator");
-  const { semanticAnswerSingleMeeting } = await import("../slack/semanticAnswerSingleMeeting");
-  
-  // If topic is provided, create a focused query
-  const focusedQuery = topic 
-    ? `Find any discussion, questions, or information about "${topic}" in this meeting. What was discussed or asked about ${topic}? If ${topic} was not mentioned, say "not discussed".`
-    : userMessage;
   
   console.log(`[MeetingResolver] Searching across ${meetings.length} meetings${topic ? ` for topic: "${topic}"` : ''}`);
   
+  // FAST PATH: When topic is provided, use chunk-based keyword search (no LLM calls)
+  if (topic) {
+    const chunkResults = await searchChunksForTopic(meetings, topic);
+    
+    if (chunkResults.size === 0) {
+      const companyNames = Array.from(new Set(meetings.map(m => m.companyName))).join(", ");
+      return `I searched across ${meetings.length} ${companyNames} meeting(s) but couldn't find any discussion about "${topic}".`;
+    }
+    
+    // Format chunk results grouped by meeting
+    const formattedResults: string[] = [];
+    const entries = Array.from(chunkResults.entries());
+    for (const [transcriptId, chunks] of entries) {
+      const firstChunk = chunks[0];
+      const meetingDate = firstChunk.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date";
+      
+      // Format each chunk with speaker attribution
+      const excerpts = chunks.slice(0, 3).map((chunk: ChunkSearchResult) => {
+        const speaker = chunk.speakerName ? `**${chunk.speakerName}**: ` : '';
+        // Trim content to reasonable length and highlight topic
+        const content = chunk.content.length > 300 
+          ? chunk.content.substring(0, 300) + "..."
+          : chunk.content;
+        return `${speaker}_"${content}"_`;
+      }).join("\n\n");
+      
+      formattedResults.push(`**${firstChunk.companyName}** (${meetingDate}):\n${excerpts}`);
+    }
+    
+    return `Here's what I found about "${topic}" across ${chunkResults.size} meeting(s):\n\n${formattedResults.join("\n\n---\n\n")}`;
+  }
+  
+  // SLOW PATH: No topic - use standard handler (may involve LLM)
   const allResults: Array<{
     companyName: string;
     meetingDate: string;
@@ -343,52 +434,13 @@ export async function searchAcrossMeetings(
 
   for (const meeting of meetings.slice(0, 5)) {
     try {
-      let answer: string;
-      let isNotFound = false;
-      
-      if (topic) {
-        // When searching for a specific topic, use semantic search directly on transcript
-        // This bypasses artifact handlers which may not contain the topic
-        console.log(`[MeetingResolver] Using semantic search for topic "${topic}" in meeting ${meeting.meetingId}`);
-        try {
-          const semanticResult = await semanticAnswerSingleMeeting(
-            meeting.meetingId,
-            meeting.companyName,
-            focusedQuery,
-            meeting.meetingDate
-          );
-          answer = semanticResult.answer;
-          // Check if semantic search found nothing
-          isNotFound = semanticResult.confidence === "low" && 
-            (answer.toLowerCase().includes("not discussed") || 
-             answer.toLowerCase().includes("not mentioned") ||
-             answer.toLowerCase().includes("no discussion"));
-        } catch (err) {
-          console.error(`[MeetingResolver] Semantic search failed for ${meeting.meetingId}:`, err);
-          continue;
-        }
-      } else {
-        // No topic - use standard handler
-        const result = await handleSingleMeetingQuestion(meeting, focusedQuery, false);
-        answer = result.answer;
-        isNotFound = result.dataSource === "not_found";
-      }
-      
-      // Filter out "not found" AND "not discussed" responses
-      const isNotDiscussed = topic && answer.toLowerCase().includes("not discussed");
-      
-      // CRITICAL: When topic is provided, verify the answer actually mentions the topic
-      // This prevents returning generic artifacts that don't relate to the topic
-      const answerMentionsTopic = !topic || answer.toLowerCase().includes(topic.toLowerCase());
-      
-      if (!isNotFound && !isNotDiscussed && answerMentionsTopic) {
+      const result = await handleSingleMeetingQuestion(meeting, userMessage, false);
+      if (result.dataSource !== "not_found") {
         allResults.push({
           companyName: meeting.companyName,
           meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
-          answer: answer,
+          answer: result.answer,
         });
-      } else if (topic && !answerMentionsTopic) {
-        console.log(`[MeetingResolver] Filtered out result for ${meeting.companyName} - answer doesn't mention topic "${topic}"`);
       }
     } catch (err) {
       console.error(`[MeetingResolver] Error searching meeting ${meeting.meetingId}:`, err);
@@ -396,8 +448,7 @@ export async function searchAcrossMeetings(
   }
 
   if (allResults.length === 0) {
-    const topicNote = topic ? ` specifically about "${topic}"` : '';
-    return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information${topicNote}.`;
+    return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information related to your question.`;
   }
 
   const formattedResults = allResults.map(r => 
