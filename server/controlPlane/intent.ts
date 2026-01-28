@@ -529,6 +529,14 @@ async function classifyByKeyword(question: string): Promise<IntentClassification
     matchedSignals.push(productPatternMatch ? "product_pattern" : "product_keyword");
   }
   
+  // Check EXTERNAL_RESEARCH patterns (research on companies, earnings calls, slide decks)
+  const externalResearchPatternMatch = matchesPatterns(question, EXTERNAL_RESEARCH_PATTERNS);
+  const externalResearchKeywordMatch = matchesKeywords(lower, EXTERNAL_RESEARCH_KEYWORDS);
+  if (externalResearchPatternMatch || externalResearchKeywordMatch) {
+    matchingIntents.push(Intent.EXTERNAL_RESEARCH);
+    matchedSignals.push(externalResearchPatternMatch ? "external_research_pattern" : "external_research_keyword");
+  }
+  
   // HARDENING: If multiple mutually exclusive intents match → CLARIFY (single-intent invariant)
   // MULTI_MEETING and SINGLE_MEETING are mutually exclusive
   // PRODUCT_KNOWLEDGE with MEETING intents is ambiguous
@@ -560,6 +568,9 @@ async function classifyByKeyword(question: string): Promise<IntentClassification
     }
     if (selectedIntent !== Intent.PRODUCT_KNOWLEDGE && !productPatternMatch && !productKeywordMatch) {
       rejectedIntents.push({ intent: Intent.PRODUCT_KNOWLEDGE, reason: "no product-knowledge patterns/keywords matched" });
+    }
+    if (selectedIntent !== Intent.EXTERNAL_RESEARCH && !externalResearchPatternMatch && !externalResearchKeywordMatch) {
+      rejectedIntents.push({ intent: Intent.EXTERNAL_RESEARCH, reason: "no external-research patterns/keywords matched" });
     }
     
     console.log(`[IntentClassifier] Decision: ${selectedIntent} (signals: ${matchedSignals.join(", ")})`);

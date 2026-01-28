@@ -658,6 +658,17 @@ const TASK_KEYWORDS: Array<{
   { pattern: /draft\s+(an?\s+)?email|write\s+(an?\s+)?email|email\s+template/i, task: "draft_email", 
     contracts: [AnswerContract.DRAFT_EMAIL],
     intent: [Intent.GENERAL_HELP] },
+  
+  // External research tasks
+  { pattern: /research|earnings\s+call|public\s+statement|their\s+priorit/i, task: "external_research", 
+    contracts: [AnswerContract.EXTERNAL_RESEARCH],
+    intent: [Intent.EXTERNAL_RESEARCH] },
+  { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for/i, task: "sales_deck_prep", 
+    contracts: [AnswerContract.SALES_DECK_PREP],
+    intent: [Intent.EXTERNAL_RESEARCH] },
+  { pattern: /value\s+prop|connect.*pitcrew|align.*offering|match.*product/i, task: "product_connection", 
+    contracts: [AnswerContract.PRODUCT_KNOWLEDGE],
+    intent: [Intent.EXTERNAL_RESEARCH, Intent.GENERAL_HELP] },
 ];
 
 /**
@@ -834,6 +845,8 @@ function getDefaultContract(intent: Intent, scope: ChainBuildScope): AnswerContr
       return AnswerContract.PATTERN_ANALYSIS;
     case Intent.PRODUCT_KNOWLEDGE:
       return AnswerContract.PRODUCT_EXPLANATION;
+    case Intent.EXTERNAL_RESEARCH:
+      return AnswerContract.EXTERNAL_RESEARCH;
     case Intent.GENERAL_HELP:
       return AnswerContract.GENERAL_RESPONSE;
     default:
