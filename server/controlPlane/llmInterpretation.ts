@@ -231,6 +231,7 @@ VALID INTENTS:
 - SINGLE_MEETING: Questions about what happened in a specific meeting (what did X say, summary, next steps)
 - MULTI_MEETING: Questions across multiple meetings (search all calls, find patterns, compare)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
+- EXTERNAL_RESEARCH: Research on external companies (earnings calls, news, priorities, public info)
 - DOCUMENT_SEARCH: Looking for specific documents
 - GENERAL_HELP: Drafting emails, general assistance
 - REFUSE: Out-of-scope requests (weather, jokes, personal info)
@@ -239,6 +240,7 @@ KEY DISTINCTIONS:
 - "search all calls" or "recent calls" → MULTI_MEETING (not SINGLE_MEETING or GENERAL_HELP)
 - "what did X say" → SINGLE_MEETING
 - "how does PitCrew work" → PRODUCT_KNOWLEDGE
+- "research Costco" or "their earnings calls" → EXTERNAL_RESEARCH
 - "draft an email" → GENERAL_HELP
 
 Respond with JSON:

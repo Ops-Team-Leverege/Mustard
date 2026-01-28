@@ -1020,6 +1020,29 @@ function selectContractByKeyword(
     };
   }
 
+  if (intent === Intent.EXTERNAL_RESEARCH) {
+    // Check for slide deck / pitch deck keywords
+    if (lower.includes("slide") || lower.includes("deck") || lower.includes("pitch")) {
+      return {
+        contract: AnswerContract.SALES_DECK_PREP,
+        contractSelectionMethod: "keyword",
+        constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DECK_PREP],
+      };
+    }
+    if (lower.includes("value prop")) {
+      return {
+        contract: AnswerContract.VALUE_PROPOSITION,
+        contractSelectionMethod: "keyword",
+        constraints: CONTRACT_CONSTRAINTS[AnswerContract.VALUE_PROPOSITION],
+      };
+    }
+    return {
+      contract: AnswerContract.EXTERNAL_RESEARCH,
+      contractSelectionMethod: "default",
+      constraints: CONTRACT_CONSTRAINTS[AnswerContract.EXTERNAL_RESEARCH],
+    };
+  }
+
   if (intent === Intent.DOCUMENT_SEARCH) {
     return {
       contract: AnswerContract.DOCUMENT_ANSWER,

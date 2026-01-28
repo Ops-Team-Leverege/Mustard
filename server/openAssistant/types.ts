@@ -118,6 +118,8 @@ export function deriveEvidenceSource(cpIntent: Intent): EvidenceSource {
       return "meeting_data";
     case Intent.PRODUCT_KNOWLEDGE:
       return "general_assistance";
+    case Intent.EXTERNAL_RESEARCH:
+      return "general_assistance"; // External research uses web sources
     case Intent.DOCUMENT_SEARCH:
       return "general_assistance";
     case Intent.GENERAL_HELP:

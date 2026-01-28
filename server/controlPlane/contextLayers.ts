@@ -94,6 +94,12 @@ export function computeContextLayers(intent: Intent): ContextLayerMetadata {
       reason += "document_context enabled for DOCUMENT_SEARCH intent.";
       break;
 
+    case Intent.EXTERNAL_RESEARCH:
+      // External research can chain with product knowledge
+      layers.product_ssot = true;
+      reason += "product_ssot enabled for EXTERNAL_RESEARCH (for value prop chaining).";
+      break;
+
     case Intent.GENERAL_HELP:
       reason += "No additional layers for GENERAL_HELP intent.";
       break;
