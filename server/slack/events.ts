@@ -521,7 +521,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
           answerContract: storedProposedInterpretation.contract as any,
           intentDetectionMethod: "clarification_followup",
           contractSelectionMethod: "clarification_followup",
-          contextLayers: {},
+          contextLayers: {
+            product_identity: true,
+            product_ssot: false,
+            single_meeting: mappedIntent === "SINGLE_MEETING",
+            multi_meeting: mappedIntent === "MULTI_MEETING",
+            document_context: mappedIntent === "DOCUMENT_SEARCH",
+          },
         };
         
         // Route to Open Assistant with the original question and confirmed interpretation
