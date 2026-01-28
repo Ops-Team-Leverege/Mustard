@@ -4,7 +4,8 @@
     "MEETING_SUMMARY",
     "COMPARISON",
     "DRAFT_EMAIL",
-    "PATTERN_ANALYSIS"
+    "PATTERN_ANALYSIS",
+    "PRODUCT_EXPLANATION"
   ],
   "wordThreshold": 300,
   "fileNamePattern": "{customer}_{type}_{date}.docx",
@@ -14,6 +15,7 @@
     "COMPARISON": "Here's your comparison doc — ready to share with the team.",
     "DRAFT_EMAIL": "Here's your email draft — ready to copy and personalize.",
     "PATTERN_ANALYSIS": "Here's your pattern analysis — ready to review and share.",
+    "PRODUCT_EXPLANATION": "Here's your product explainer — ready to use in your pitch.",
     "default": "Here's your document — ready to edit and share."
   },
   "closing": "Can I help with anything else?"
