@@ -30,6 +30,7 @@ import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./lo
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
 import { getProgressMessage, getProgressDelayMs } from "./progressMessages";
+import { RequestLogger } from "../utils/slackLogger";
 
 export interface PipelineTiming {
   intent_classification_ms?: number;
@@ -157,6 +158,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const text = cleanMention(String(event.text || ""));
     const userId = String(event.user || "");
     const isReply = Boolean(event.thread_ts); // True if this is a reply in an existing thread
+
+    // Initialize structured logger for this request
+    const logger = new RequestLogger(channel, threadTs, userId);
+    logger.info('Slack event received', { 
+      text: text.substring(0, 100),
+      isReply,
+      testRun
+    });
 
     console.log(`Processing: "${text}" in channel ${channel} (isReply=${isReply})`);
 
@@ -718,6 +727,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // STEP 1: ALWAYS run Control Plane first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Control Plane for intent classification`);
       controlPlaneResult = await runControlPlane(text);
+      logger.info('Control Plane completed', {
+        intent: controlPlaneResult.intent,
+        contract: controlPlaneResult.answerContract,
+        method: controlPlaneResult.intentDetectionMethod,
+        resolvedMeetingId: resolvedMeeting?.meetingId,
+      });
       console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
       
       // STEP 2: Handle CLARIFY intent - ask user for clarification
@@ -912,13 +927,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
           const actualSsotMode = openAssistantResultData?.ssotMode || "none";
           
           // Use context layers from Control Plane result directly
-          const contextLayers: Record<string, unknown> = controlPlaneResult?.contextLayers || {
+          const contextLayers = (controlPlaneResult?.contextLayers || {
             product_identity: true, // Always on
             product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
             single_meeting: actualIntent === "SINGLE_MEETING",
             multi_meeting: actualIntent === "MULTI_MEETING",
             document_context: actualIntent === "DOCUMENT_SEARCH",
-          };
+          }) as any;
           
           // Store proposedInterpretation for CLARIFY follow-ups
           if (actualIntent === "CLARIFY" && controlPlaneResult?.proposedInterpretation) {
@@ -975,6 +990,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         totalTimeMs,
         progressMessageSent,
       });
+      
+      // Log successful completion
+      logger.info('Request completed successfully', {
+        intent: controlPlaneResult?.intent,
+        contract: controlPlaneResult?.answerContract,
+        responseLength: responseText?.length,
+        totalTimeMs,
+      });
     } catch (err) {
       // CRITICAL: Cancel progress timer to prevent sending progress message after error
       clearProgressTimer();
@@ -984,31 +1007,33 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const errorCode = (err as any)?.code || (err as any)?.status;
       
       let userMessage: string;
-      let logPrefix: string;
+      let errorType: string;
       
       // OpenAI quota/rate limit errors
       if (errorCode === 'insufficient_quota' || errorCode === 429 || 
           errorMessage.includes('exceeded your current quota') ||
           errorMessage.includes('rate limit')) {
-        logPrefix = "[OpenAI Quota Error]";
+        errorType = "openai_quota";
         userMessage = "I can't process this right now — the AI service quota has been exceeded. Please contact an admin to check the OpenAI billing settings.";
       } 
       // OpenAI API key errors
       else if (errorCode === 401 || errorMessage.includes('Incorrect API key') || 
                errorMessage.includes('invalid_api_key')) {
-        logPrefix = "[OpenAI Auth Error]";
+        errorType = "openai_auth";
         userMessage = "I can't process this right now — there's an issue with the AI service configuration. Please contact an admin.";
       }
       // Generic errors
       else {
-        logPrefix = "[MCP Error]";
+        errorType = "internal";
         userMessage = "Sorry — I hit an internal error while processing that request.";
       }
       
-      console.error(`${logPrefix} ${errorMessage}`);
-      if (err instanceof Error && err.stack) {
-        console.error(`${logPrefix} Stack:`, err.stack);
-      }
+      // Log with full context to persistent file
+      logger.error('Pipeline error', err, {
+        errorType,
+        errorCode,
+        text: text.substring(0, 100),
+      });
 
       if (!testRun) {
         await postSlackMessage({
