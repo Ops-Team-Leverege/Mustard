@@ -1088,27 +1088,16 @@ async function handleDraftingIntent(
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Drafting handler: contract=${contract}`);
   
-  const q = question.toLowerCase();
   const dateSuffix = getMeetingDateSuffix(ctx);
   
-  // Smart context detection - analyze the user's request holistically
-  // These aren't mutually exclusive "types" - they're signals for what context to gather
-  const mentionsQuestions = /question|ask|concern|issue|inquir/.test(q);
-  const mentionsActions = /next step|action|follow.?up|commitment|to.?do|deliverable/.test(q);
-  const mentionsMeeting = /meeting|discussion|conversation|call|talked|discussed/.test(q);
-  const mentionsProduct = /product|feature|pricing|price|integration|capability|how\s+(pitcrew|it)\s+works|benefit|value|tier|spec/.test(q);
+  // Fetch ALL context in parallel - it's all DB queries, let the LLM decide what's relevant
+  console.log(`[SingleMeetingOrchestrator] Drafting: fetching all context for meeting ${ctx.meetingId}`);
   
-  // If nothing specific is mentioned, gather all meeting context
-  const gatherAllMeetingContext = !mentionsQuestions && !mentionsActions && !mentionsMeeting && !mentionsProduct;
-  
-  console.log(`[SingleMeetingOrchestrator] Draft signals: questions=${mentionsQuestions}, actions=${mentionsActions}, meeting=${mentionsMeeting}, product=${mentionsProduct}, gatherAll=${gatherAllMeetingContext}`);
-  
-  // Fetch relevant data based on signals - gather context holistically
   const [customerQuestions, actionItems, chunks, productKnowledge] = await Promise.all([
-    (mentionsQuestions || gatherAllMeetingContext) ? lookupCustomerQuestions(ctx.meetingId) : Promise.resolve([]),
-    (mentionsActions || gatherAllMeetingContext) ? getMeetingActionItems(ctx.meetingId) : Promise.resolve([]),
-    (mentionsMeeting || gatherAllMeetingContext) ? storage.getChunksForTranscript(ctx.meetingId, 50) : Promise.resolve([]),
-    (mentionsProduct) ? getComprehensiveProductKnowledge() : Promise.resolve(null),
+    lookupCustomerQuestions(ctx.meetingId),
+    getMeetingActionItems(ctx.meetingId),
+    storage.getChunksForTranscript(ctx.meetingId, 50),
+    getComprehensiveProductKnowledge(),
   ]);
   
   // Build context for the LLM
@@ -1147,8 +1136,8 @@ async function handleDraftingIntent(
     contextParts.push("");
   }
   
-  // Include product knowledge if mentioned
-  if (mentionsProduct && productKnowledge) {
+  // Include product knowledge
+  if (productKnowledge) {
     const formattedProduct = formatProductKnowledgeForPrompt(productKnowledge);
     if (formattedProduct) {
       contextParts.push("PITCREW PRODUCT INFORMATION (from Airtable):");
