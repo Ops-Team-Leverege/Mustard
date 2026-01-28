@@ -731,12 +731,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let controlPlaneResult: ControlPlaneResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
       let usedSingleMeetingMode = false;
+      
+      // Stage timing tracking
+      let cpDuration = 0;
+      let smDuration = 0;
+      let oaDuration = 0;
 
       // STEP 1: ALWAYS run Control Plane first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Control Plane for intent classification`);
       logger.startStage('control_plane');
       controlPlaneResult = await runControlPlane(text);
-      const cpDuration = logger.endStage('control_plane');
+      cpDuration = logger.endStage('control_plane');
       logger.info('Control Plane completed', {
         intent: controlPlaneResult.intent,
         contract: controlPlaneResult.answerContract,
@@ -792,7 +797,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         
         logger.startStage('single_meeting');
         const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer);
-        const smDuration = logger.endStage('single_meeting');
+        smDuration = logger.endStage('single_meeting');
         responseText = result.answer;
         capabilityName = `single_meeting_${result.intent}`;
         resolvedCompanyId = singleMeetingContext.companyId;
@@ -830,7 +835,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           } : null,
           controlPlaneResult: controlPlaneResult,
         });
-        const oaDuration = logger.endStage('open_assistant');
+        oaDuration = logger.endStage('open_assistant');
         
         responseText = openAssistantResultData.answer;
         capabilityName = `open_assistant_${openAssistantResultData.intent}`;
@@ -1017,13 +1022,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
         progressMessageSent,
       });
       
-      // Log successful completion
+      // Log successful completion with stage breakdown
       logger.info('Request completed successfully', {
         intent: controlPlaneResult?.intent,
         contract: controlPlaneResult?.answerContract,
         responseLength: responseText?.length,
         totalTimeMs,
+        stages: {
+          control_plane: cpDuration,
+          handler: smDuration || oaDuration,
+        },
       });
+      
+      // Track progress message overhead
+      if (progressMessageSent) {
+        logger.debug('Progress message was sent', { 
+          delayMs: getProgressDelayMs(),
+          totalTimeMs,
+        });
+      }
     } catch (err) {
       // CRITICAL: Cancel progress timer to prevent sending progress message after error
       clearProgressTimer();
