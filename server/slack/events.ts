@@ -645,6 +645,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Post response to Slack (skip in test mode)
       // For Open Assistant responses, use document support to generate .docx for long content
       let botReply: { ts: string };
+      console.log(`[Slack] Document decision: testRun=${testRun}, contract=${openAssistantResultData?.answerContract || 'none'}, isSingleMeetingMode=${isSingleMeetingMode}, hasOpenAssistantData=${!!openAssistantResultData}`);
       if (testRun) {
         botReply = { ts: `test-${Date.now()}` };
       } else if (openAssistantResultData?.answerContract && !isSingleMeetingMode) {
