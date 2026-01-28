@@ -21,10 +21,12 @@
 import { OpenAI } from "openai";
 import { 
   interpretAmbiguousQuery,
+  validateLowConfidenceIntent,
   type ClarifyWithInterpretation,
   type LLMInterpretationAlternative,
   type IntentString,
   type ContractString,
+  type IntentValidationResult,
 } from "./llmInterpretation";
 import { storage } from "../storage";
 
@@ -42,7 +44,7 @@ export enum Intent {
   CLARIFY = "CLARIFY",
 }
 
-export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "default";
+export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "llm_validated" | "default";
 
 /**
  * Structured decision metadata for observability.
@@ -63,6 +65,13 @@ export type IntentDecisionMetadata = {
     failureReason: string;
     interpretationSource: "llm_fallback" | "ambiguity_resolution";
   };
+  llmValidation?: {                    // LLM validation for low-confidence matches
+    confirmed: boolean;
+    suggestedIntent?: string;
+    reason: string;
+  };
+  originalIntent?: Intent;             // Original intent before LLM override
+  originalReason?: string;             // Original reason before LLM override
 };
 
 /**
@@ -674,6 +683,36 @@ Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "b
   }
 }
 
+// Low-confidence threshold for LLM validation
+const LOW_CONFIDENCE_THRESHOLD = 0.88;
+
+// Detection methods that are considered "weak" and need validation
+const WEAK_DETECTION_METHODS = ["keyword", "entity"];
+
+function needsLLMValidation(result: IntentClassificationResult): boolean {
+  // High-confidence pattern matches don't need validation
+  if (result.intentDetectionMethod === "pattern" && result.confidence >= 0.9) {
+    return false;
+  }
+  
+  // CLARIFY and REFUSE intents don't need validation
+  if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
+    return false;
+  }
+  
+  // Weak detection methods need validation
+  if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
+    return true;
+  }
+  
+  // Low confidence matches need validation
+  if (result.confidence < LOW_CONFIDENCE_THRESHOLD) {
+    return true;
+  }
+  
+  return false;
+}
+
 export async function classifyIntent(question: string): Promise<IntentClassificationResult> {
   const keywordResult = await classifyByKeyword(question);
   
@@ -686,6 +725,48 @@ export async function classifyIntent(question: string): Promise<IntentClassifica
       // Use LLM interpretation to provide helpful clarification
       console.log(`[IntentClassifier] Ambiguous match detected, using LLM interpretation for clarification`);
       return classifyWithInterpretation(question, "multi_intent_ambiguity", keywordResult);
+    }
+    
+    // Check if this low-confidence match needs LLM validation
+    if (needsLLMValidation(keywordResult)) {
+      console.log(`[IntentClassifier] Low-confidence match (${keywordResult.intentDetectionMethod}, conf=${keywordResult.confidence}), validating with LLM...`);
+      
+      const validation = await validateLowConfidenceIntent(
+        question,
+        keywordResult.intent as IntentString,
+        keywordResult.reason || "No reason provided",
+        keywordResult.decisionMetadata?.matchedSignals || []
+      );
+      
+      if (validation.confirmed) {
+        console.log(`[IntentClassifier] LLM confirmed: ${keywordResult.intent}`);
+        return {
+          ...keywordResult,
+          decisionMetadata: {
+            ...keywordResult.decisionMetadata,
+            llmValidation: { confirmed: true, reason: validation.reason },
+          },
+        };
+      } else if (validation.suggestedIntent) {
+        // LLM suggests a different intent - use it
+        console.log(`[IntentClassifier] LLM override: ${keywordResult.intent} -> ${validation.suggestedIntent}`);
+        const newIntent = Intent[validation.suggestedIntent as keyof typeof Intent];
+        return {
+          intent: newIntent,
+          intentDetectionMethod: "llm_validated",
+          confidence: validation.confidence,
+          reason: validation.reason,
+          decisionMetadata: {
+            originalIntent: keywordResult.intent,
+            originalReason: keywordResult.reason,
+            llmValidation: {
+              confirmed: false,
+              suggestedIntent: validation.suggestedIntent,
+              reason: validation.reason,
+            },
+          },
+        };
+      }
     }
     
     console.log(`[IntentClassifier] Keyword match: ${keywordResult.intent}`);

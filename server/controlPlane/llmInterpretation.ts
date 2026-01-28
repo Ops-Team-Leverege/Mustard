@@ -182,6 +182,110 @@ function generateFallbackClarifyMessage(): string {
 Give me a hint and I'll get you sorted!`;
 }
 
+export type IntentValidationResult = {
+  confirmed: boolean;
+  suggestedIntent?: IntentString;
+  suggestedContract?: ContractString;
+  confidence: number;
+  reason: string;
+};
+
+/**
+ * LLM Validation for Low-Confidence Matches
+ * 
+ * Purpose:
+ * When the deterministic classifier matches but with low confidence (single signal,
+ * keyword-only match), validate semantically with LLM before executing.
+ * 
+ * Behavior:
+ * - If LLM confirms the deterministic match → return confirmed: true
+ * - If LLM suggests a different intent → return confirmed: false with suggestion
+ * - On error → default to confirmed: true (fail-open to avoid blocking)
+ * 
+ * This does NOT ask the user - it's a semantic validation layer.
+ */
+export async function validateLowConfidenceIntent(
+  question: string,
+  deterministicIntent: IntentString,
+  deterministicReason: string,
+  matchedSignals: string[]
+): Promise<IntentValidationResult> {
+  const systemPrompt = `You are validating an intent classification. A deterministic classifier matched a user question, but the match was low-confidence.
+
+CONTEXT: PitCrew sells vision AI to automotive service businesses. Users ask about customer meetings, product features, and need help with tasks.
+
+THE DETERMINISTIC CLASSIFIER CHOSE:
+Intent: ${deterministicIntent}
+Reason: ${deterministicReason}
+Signals: ${matchedSignals.join(", ")}
+
+YOUR JOB: Determine if this classification is semantically correct.
+
+VALID INTENTS:
+- SINGLE_MEETING: Questions about what happened in a specific meeting (what did X say, summary, next steps)
+- MULTI_MEETING: Questions across multiple meetings (search all calls, find patterns, compare)
+- PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
+- DOCUMENT_SEARCH: Looking for specific documents
+- GENERAL_HELP: Drafting emails, general assistance
+- REFUSE: Out-of-scope requests (weather, jokes, personal info)
+
+KEY DISTINCTIONS:
+- "search all calls" or "recent calls" → MULTI_MEETING (not SINGLE_MEETING or GENERAL_HELP)
+- "what did X say" → SINGLE_MEETING
+- "how does PitCrew work" → PRODUCT_KNOWLEDGE
+- "draft an email" → GENERAL_HELP
+
+Respond with JSON:
+{
+  "confirmed": true/false,
+  "suggestedIntent": "INTENT_NAME" (only if confirmed=false),
+  "suggestedContract": "CONTRACT_NAME" (only if confirmed=false),
+  "confidence": 0.0-1.0,
+  "reason": "brief explanation"
+}
+
+If confirmed=true, suggestedIntent/suggestedContract can be omitted.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `User question: "${question}"` },
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      console.warn("[LLMValidation] Empty response, defaulting to confirmed");
+      return { confirmed: true, confidence: 0.5, reason: "LLM returned empty response" };
+    }
+
+    const parsed = JSON.parse(content);
+    console.log(`[LLMValidation] Result: confirmed=${parsed.confirmed}, reason="${parsed.reason}"`);
+
+    // Validate suggestedIntent if provided
+    if (!parsed.confirmed && parsed.suggestedIntent && !isValidIntent(parsed.suggestedIntent)) {
+      console.warn(`[LLMValidation] Invalid suggested intent: ${parsed.suggestedIntent}, defaulting to confirmed`);
+      return { confirmed: true, confidence: 0.5, reason: "LLM suggested invalid intent" };
+    }
+
+    return {
+      confirmed: parsed.confirmed ?? true,
+      suggestedIntent: parsed.suggestedIntent,
+      suggestedContract: parsed.suggestedContract,
+      confidence: parsed.confidence ?? 0.7,
+      reason: parsed.reason ?? "No reason provided",
+    };
+  } catch (error) {
+    console.error("[LLMValidation] Error:", error);
+    // Fail-open: if validation fails, trust the deterministic classifier
+    return { confirmed: true, confidence: 0.5, reason: "LLM validation error, defaulting to confirmed" };
+  }
+}
+
 export async function interpretAmbiguousQuery(
   question: string,
   failureReason: string
