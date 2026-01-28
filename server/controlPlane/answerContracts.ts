@@ -663,10 +663,10 @@ const TASK_KEYWORDS: Array<{
   { pattern: /research|earnings\s+call|public\s+statement|their\s+priorit/i, task: "external_research", 
     contracts: [AnswerContract.EXTERNAL_RESEARCH],
     intent: [Intent.EXTERNAL_RESEARCH] },
-  { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for/i, task: "sales_deck_prep", 
+  { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for|draft.*slides?|create.*slides?/i, task: "sales_deck_prep", 
     contracts: [AnswerContract.SALES_DECK_PREP],
     intent: [Intent.EXTERNAL_RESEARCH] },
-  { pattern: /value\s+prop|connect.*pitcrew|align.*offering|match.*product/i, task: "product_connection", 
+  { pattern: /value\s+prop|connect.*pitcrew|align.*offering|match.*product|our\s+offer|pitcrew\s+offer/i, task: "product_connection", 
     contracts: [AnswerContract.PRODUCT_KNOWLEDGE],
     intent: [Intent.EXTERNAL_RESEARCH, Intent.GENERAL_HELP] },
 ];
