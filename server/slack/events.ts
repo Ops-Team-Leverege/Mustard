@@ -580,31 +580,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     // 10. Process request
     // 
-    // SINGLE-MEETING MODE:
-    // When meeting is resolved (from thread or temporal language),
-    // use SingleMeetingOrchestrator for read-only artifact routing.
+    // LLM-FIRST ARCHITECTURE:
+    // Always run Control Plane first to classify intent from the FULL message.
+    // This ensures semantic understanding (e.g., "search all calls about Ivy Lane" 
+    // is correctly classified as MULTI_MEETING, not single-meeting).
     // 
-    // MULTI-CONTEXT MODE:
-    // Otherwise, use MCP router for cross-meeting and analytics capabilities.
-    //
-    // OVERRIDE: If user explicitly requests multi-meeting behavior (search all, 
-    // recent calls, etc.), use Open Assistant even if a meeting/company was detected.
-    const MULTI_MEETING_OVERRIDE_PATTERNS = [
-      /\bsearch\s+all\b/i,
-      /\ball\s+(recent\s+)?(calls?|meetings?)\b/i,
-      /\brecent\s+(calls?|meetings?)\b/i,
-      /\bacross\s+(all\s+)?(calls?|meetings?)\b/i,
-      /\bfind\s+all\b/i,
-      /\bevery\s+(call|meeting)\b/i,
-      /\bwhich\s+(calls?|meetings?)\b/i,
-    ];
-    const hasMultiMeetingOverride = MULTI_MEETING_OVERRIDE_PATTERNS.some(p => p.test(text));
-    
-    if (hasMultiMeetingOverride && resolvedMeeting) {
-      console.log(`[Slack] Multi-meeting override detected - forcing Open Assistant mode despite resolved meeting`);
-    }
-    
-    const isSingleMeetingMode = Boolean(resolvedMeeting) && !hasMultiMeetingOverride;
+    // Routing is then based on classified intent:
+    // - SINGLE_MEETING + resolved meeting → SingleMeetingOrchestrator
+    // - MULTI_MEETING → Open Assistant (cross-meeting search)
+    // - CLARIFY → Ask user for clarification
+    // - Other intents → Open Assistant with appropriate handlers
 
     try {
       let responseText: string;
@@ -627,9 +612,37 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Control Plane and Open Assistant results (for metadata logging)
       let controlPlaneResult: ControlPlaneResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
+      let usedSingleMeetingMode = false;
 
-      if (isSingleMeetingMode && resolvedMeeting) {
-        // SINGLE-MEETING MODE: Use orchestrator with read-only artifact access
+      // STEP 1: ALWAYS run Control Plane first to classify intent from full message
+      console.log(`[Slack] LLM-first architecture - running Control Plane for intent classification`);
+      controlPlaneResult = await runControlPlane(text);
+      console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
+      
+      // STEP 2: Handle CLARIFY intent - ask user for clarification
+      if (controlPlaneResult.intent === "CLARIFY") {
+        const clarifyMessage = controlPlaneResult.clarifyMessage 
+          || "I'm not sure what you're asking. Could you please clarify?";
+        responseText = clarifyMessage;
+        capabilityName = "clarify";
+        intentClassification = "clarify";
+        dataSource = "none";
+        isClarificationRequest = true;
+        console.log(`[Slack] Clarification requested: ${clarifyMessage}`);
+      }
+      // STEP 3: Handle SINGLE_MEETING without resolved meeting - ask for clarification
+      else if (controlPlaneResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {
+        responseText = "Which meeting are you asking about? Please mention the company name or a specific meeting date.";
+        capabilityName = "clarify_meeting";
+        intentClassification = "single_meeting_clarify";
+        dataSource = "none";
+        isClarificationRequest = true;
+        console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification`);
+      }
+      // STEP 4: Route based on classified intent
+      else if (controlPlaneResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
+        // SINGLE_MEETING intent with resolved meeting → use SingleMeetingOrchestrator
+        usedSingleMeetingMode = true;
         console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
         
         // Check for pending summary offer from last interaction in this thread
@@ -637,7 +650,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
         if (threadTs) {
           const lastInteraction = await storage.getLastInteractionByThread(threadTs);
           if (lastInteraction) {
-            // Check resolution JSON for pending offer
             const resolution = lastInteraction.resolution as Record<string, unknown> | null;
             hasPendingOffer = resolution?.pendingOffer === "summary";
             console.log(`[Slack] Thread has pending offer: ${hasPendingOffer}`);
@@ -663,19 +675,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
         semanticConfidence = result.semanticConfidence;
         isSemanticDebug = result.isSemanticDebug;
         semanticError = result.semanticError;
-        // Conversational behavior flags
         isClarificationRequest = result.isClarificationRequest;
         isBinaryQuestion = result.isBinaryQuestion;
         
-        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}, isSemanticDebug=${isSemanticDebug}, semanticError=${semanticError || 'none'}, clarification=${isClarificationRequest || false}, binary=${isBinaryQuestion || false}`);
+        console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
       } else {
-        // OPEN ASSISTANT MODE: Intent-driven routing for non-meeting requests
-        // Step 1: Control plane intent classification (keyword fast-paths + LLM fallback)
-        // Step 2: Route to appropriate handler based on intent
-        console.log(`[Slack] Open Assistant mode - running full control plane pipeline`);
-        
-        controlPlaneResult = await runControlPlane(text);
-        console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
+        // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, etc.) → Open Assistant
+        console.log(`[Slack] Open Assistant mode - intent=${controlPlaneResult.intent}, routing to appropriate handler`);
         
         openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
@@ -702,7 +708,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           semanticConfidence = openAssistantResultData.singleMeetingResult.semanticConfidence;
         }
         
-        console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, controlPlane=${openAssistantResultData.controlPlaneIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, ssot=${openAssistantResultData.ssotMode || 'none'}, dataSource=${openAssistantResultData.dataSource}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
+        console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, controlPlane=${openAssistantResultData.controlPlaneIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
       }
 
       // Clear progress timer now that we have a response ready
@@ -716,18 +722,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // For Open Assistant responses, use document support to generate .docx for long content
       let botReply: { ts: string };
       const hasContract = !!openAssistantResultData?.answerContract;
-      const willGenerateDoc = hasContract && !isSingleMeetingMode;
+      const willGenerateDoc = hasContract && !usedSingleMeetingMode;
       console.log(`[Slack] === DOCUMENT DECISION ===`);
       console.log(`[Slack] testRun: ${testRun}`);
       console.log(`[Slack] contract: ${openAssistantResultData?.answerContract || 'NONE'}`);
-      console.log(`[Slack] isSingleMeetingMode: ${isSingleMeetingMode}`);
+      console.log(`[Slack] usedSingleMeetingMode: ${usedSingleMeetingMode}`);
       console.log(`[Slack] hasOpenAssistantData: ${!!openAssistantResultData}`);
       console.log(`[Slack] hasContract: ${hasContract}`);
       console.log(`[Slack] willGenerateDoc: ${willGenerateDoc}`);
       console.log(`[Slack] === END DOCUMENT DECISION ===`);
       if (testRun) {
         botReply = { ts: `test-${Date.now()}` };
-      } else if (openAssistantResultData?.answerContract && !isSingleMeetingMode) {
+      } else if (openAssistantResultData?.answerContract && !usedSingleMeetingMode) {
         // Open Assistant responses may generate documents for specific contracts or long content
         const docResult = await sendResponseWithDocumentSupport({
           channel,
@@ -749,7 +755,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Log interaction with structured metadata (write-only, non-blocking)
       // Note: slackMessageTs captures the bot's reply timestamp for audit purposes
       const resolvedMetadata = (() => {
-        if (isSingleMeetingMode) {
+        if (usedSingleMeetingMode) {
           // Map dataSource to our structured format
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
           

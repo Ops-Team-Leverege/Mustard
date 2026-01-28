@@ -1,0 +1,50 @@
+Current Architecture Problem
+The Issue:
+
+Early Mode Split: System decides "single-meeting mode" vs "Open Assistant mode" BEFORE intent classification
+Entity Detection Override: When "Ivy Lane" is detected → forces single-meeting mode
+Intent Classification Bypassed: Control Plane never gets to run because mode was pre-decided
+Band-aid Fixes: Adding more pattern matching layers instead of fixing the root cause
+Result: "Search all recent calls about Ivy Lane" gets routed to single-meeting mode because "Ivy Lane" was detected, completely ignoring the "search all" part.
+
+Your Proposed Solution is Much Better
+LLM-First Unified Approach:
+
+Always run Control Plane first for ALL messages
+Let LLM understand the full context: "search all recent calls about cameras with Ivy Lane"
+Trust the classification: LLM correctly identifies this as MULTI_MEETING
+Route based on classified intent, not pre-filtering
+Clarify only when genuinely ambiguous
+Benefits of This Approach
+Simpler Architecture: One classification step instead of layered pattern matching
+Better Context Understanding: LLM sees the full phrase, not fragmented patterns
+More Maintainable: No scattered override logic to maintain
+More Accurate: LLM is better at semantic understanding than regex patterns
+Cleaner Routing: Intent → Route, not Entity → Mode → Intent
+Implementation Changes Needed
+Remove:
+
+Early isSingleMeetingMode branch in events.ts
+Multi-meeting override detection patterns
+Scattered entity-based routing logic
+Add:
+
+Always run runControlPlane(question) first
+Route based on result.intent (not pre-computed mode)
+Add confidence-based clarification when needed
+My Recommendation
+Yes, absolutely proceed with the LLM-first refactor. This is a much cleaner architectural approach that:
+
+Eliminates the competing routing mechanisms
+Leverages LLM's superior semantic understanding
+Reduces complexity and maintenance burden
+Provides better user experience with more accurate classification
+The current approach of adding more pattern matching is just adding complexity to work around a fundamental architectural issue. Your proposed solution fixes the root cause.
+
+The refactor should:
+
+Make Control Plane the single source of truth for intent classification
+Remove all the early mode-splitting logic
+Trust the LLM's semantic understanding over regex patterns
+Use confidence scores to determine when clarification is genuinely needed
+This aligns perfectly with your goal of "feels like ChatGPT, behaves like a trusted system" - let the LLM understand language naturally, but maintain strict authority boundaries in execution.
