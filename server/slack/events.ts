@@ -606,6 +606,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // If resolved → proceed to single-meeting mode
     //
     let resolvedMeeting: { meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null } | null = null;
+    let mrDuration = 0; // Meeting resolution timing
     
     // Only attempt temporal resolution if:
     // - No thread context exists, OR
@@ -618,7 +619,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       
       logger.startStage('meeting_resolution');
       const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
-      const mrDuration = logger.endStage('meeting_resolution');
+      mrDuration = logger.endStage('meeting_resolution');
       
       if (resolution.resolved) {
         resolvedMeeting = {
@@ -1029,6 +1030,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         responseLength: responseText?.length,
         totalTimeMs,
         stages: {
+          meeting_resolution: mrDuration,
           control_plane: cpDuration,
           handler: smDuration || oaDuration,
         },
