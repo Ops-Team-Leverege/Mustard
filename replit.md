@@ -24,20 +24,38 @@ The backend is built with Express.js and TypeScript, exposing a RESTful JSON API
 The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`. It also includes a Document Output Feature for generating .docx files for long-form content and specific contract types, with configurable trigger conditions and customizable Slack messages.
 
 ### Control Plane Architecture (LLM-First Intent Routing)
-The system uses an LLM-first architecture where Control Plane runs to classify intent from the full message, then routes based on the classified intent. This ensures semantic understanding (e.g., "search all calls about Ivy Lane" correctly routes as MULTI_MEETING, not single-meeting).
+
+**CRITICAL: The system uses LLM-FIRST classification, NOT keyword matching.**
+
+The Control Plane classifies intent using an LLM (gpt-4o-mini) that understands semantic meaning. This ensures requests like "research Costco and create a slide deck" correctly route to EXTERNAL_RESEARCH, not based on keyword matching but on understanding the full request.
+
+**Architecture Principles:**
+- **LLM classifies ALL intents** - The LLM prompt includes examples for each intent type
+- **NO keyword-based intent detection** - Keywords are ONLY used for contract selection AFTER intent is classified
+- **Semantic understanding** - "search all calls about Ivy Lane" → MULTI_MEETING (not single-meeting)
 
 **Early Fast Paths (Pre-Control Plane):**
 - Briefing/prep ambiguity detection (handled before intent classification)
 - Binary existence questions (short-circuit for quick responses)
 
 **Routing Flow:**
-1. **Control Plane classifies intent** - Using keyword fast-paths + LLM fallback (gpt-4o-mini)
+1. **Control Plane LLM classifies intent** - Uses gpt-4o-mini with full message context
 2. **CLARIFY intent** → Ask user for clarification
 3. **SINGLE_MEETING + resolved meeting** → SingleMeetingOrchestrator for artifact access
 4. **SINGLE_MEETING without meeting** → Ask which meeting
-5. **MULTI_MEETING, PRODUCT_KNOWLEDGE, etc.** → Open Assistant with appropriate handlers
+5. **EXTERNAL_RESEARCH** → Gemini web research + product knowledge chaining
+6. **MULTI_MEETING, PRODUCT_KNOWLEDGE, etc.** → Open Assistant with appropriate handlers
 
-**Intent Types:** SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, CLARIFY
+**Intent Types:** SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, EXTERNAL_RESEARCH, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, CLARIFY
+
+**Contract Chains:**
+Contracts are task-level operations that can be chained. Both EXTERNAL_RESEARCH and PRODUCT_KNOWLEDGE are available as:
+- **Standalone intents** - When that's the primary task
+- **Chainable contracts** - When other intents need to incorporate that data
+
+Example chains:
+- `EXTERNAL_RESEARCH` intent → `[EXTERNAL_RESEARCH, PRODUCT_KNOWLEDGE, SALES_DECK_PREP]`
+- `SINGLE_MEETING` intent → `[CUSTOMER_QUESTIONS, PRODUCT_KNOWLEDGE, DRAFT_RESPONSE]`
 
 The control plane dynamically builds contract chains based on user messages, ensuring ordered execution (Extraction → Analysis → Drafting) and enforcing restriction rules. Safety constraints are enforced at multiple levels with evidence-based enforcement.
 
