@@ -12,6 +12,7 @@ import type { IntentClassification } from "./types";
 export type MeetingSearchResult = {
   meetings: SingleMeetingContext[];
   searchedFor: string;
+  topic?: string; // Topic to filter content (e.g., "cameras" from "about cameras")
 };
 
 /**
@@ -25,14 +26,16 @@ export async function findRelevantMeetings(
   const { storage } = await import("../storage");
   
   const searchTerms = extractSearchTerms(userMessage);
-  console.log(`[MeetingResolver] Searching for meetings with terms: ${searchTerms.join(", ")}`);
+  const topic = extractTopic(userMessage);
+  console.log(`[MeetingResolver] Searching for meetings with terms: ${searchTerms.join(", ")}${topic ? `, topic: "${topic}"` : ''}`);
   
   if (searchTerms.length === 0) {
     console.log(`[MeetingResolver] No search terms extracted, trying fallback word search`);
     const fallbackMeetings = await fallbackMeetingSearch(userMessage);
     return { 
       meetings: fallbackMeetings, 
-      searchedFor: "(fallback search)" 
+      searchedFor: "(fallback search)",
+      topic,
     };
   }
 
@@ -44,6 +47,7 @@ export async function findRelevantMeetings(
       return {
         meetings: contactMatches,
         searchedFor: searchTerms.join(", "),
+        topic,
       };
     }
     
@@ -51,7 +55,8 @@ export async function findRelevantMeetings(
     const fallbackMeetings = await fallbackMeetingSearch(userMessage);
     return { 
       meetings: fallbackMeetings, 
-      searchedFor: searchTerms.join(", ") + " (+ fallback)" 
+      searchedFor: searchTerms.join(", ") + " (+ fallback)",
+      topic,
     };
   }
 
@@ -88,6 +93,7 @@ export async function findRelevantMeetings(
   return {
     meetings,
     searchedFor: searchTerms.join(", "),
+    topic,
   };
 }
 
@@ -203,6 +209,53 @@ export function extractSearchTerms(message: string): string[] {
 }
 
 /**
+ * Extract topic from user message for content filtering.
+ * Handles patterns like:
+ * - "about cameras" → "cameras"
+ * - "regarding pricing" → "pricing"
+ * - "related to security" → "security"
+ * - "discuss cameras" → "cameras"
+ */
+export function extractTopic(message: string): string | undefined {
+  const msg = message.toLowerCase();
+  
+  // Patterns to extract topic after specific phrases
+  const topicPatterns = [
+    /\babout\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\bregarding\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\brelated\s+to\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\bconcerning\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\bdiscuss(?:ed|ing)?\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\btalk(?:ed|ing)?\s+about\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\btalk(?:ed|ing)?\s+(?:\w+\s+)?about\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\bmentioned\s+([a-z]+(?:\s+[a-z]+)?)/i,
+    /\bask(?:ed|ing)?\s+about\s+([a-z]+(?:\s+[a-z]+)?)/i,
+  ];
+  
+  // Words to filter out - common non-topic words
+  const nonTopicWords = new Set([
+    "the", "this", "that", "them", "they", "their", "it", "its", 
+    "any", "all", "some", "many", "few", "what", "which", "who",
+    "meetings", "meeting", "calls", "call", "conversation", "conversations",
+    "recent", "latest", "last", "previous", "answer", "response",
+  ]);
+  
+  for (const pattern of topicPatterns) {
+    const match = msg.match(pattern);
+    if (match && match[1]) {
+      const topic = match[1].trim();
+      // Filter out non-topic words
+      if (!nonTopicWords.has(topic) && topic.length >= 3) {
+        console.log(`[MeetingResolver] Extracted topic: "${topic}" from pattern: ${pattern.source}`);
+        return topic;
+      }
+    }
+  }
+  
+  return undefined;
+}
+
+/**
  * Search companies by fuzzy name matching.
  */
 async function searchCompanies(searchTerms: string[]): Promise<Array<{ id: string; name: string }>> {
@@ -265,14 +318,21 @@ async function searchContacts(searchTerms: string[]): Promise<SingleMeetingConte
 
 /**
  * Search across multiple meetings for relevant information.
+ * When topic is provided, creates a focused query about that topic.
  */
 export async function searchAcrossMeetings(
   userMessage: string,
-  meetings: SingleMeetingContext[]
+  meetings: SingleMeetingContext[],
+  topic?: string
 ): Promise<string> {
   const { handleSingleMeetingQuestion } = await import("../mcp/singleMeetingOrchestrator");
   
-  console.log(`[MeetingResolver] Searching across ${meetings.length} meetings`);
+  // If topic is provided, create a focused query
+  const focusedQuery = topic 
+    ? `Find any discussion, questions, or information about "${topic}" in this meeting. What was discussed or asked about ${topic}? If ${topic} was not mentioned, say "not discussed".`
+    : userMessage;
+  
+  console.log(`[MeetingResolver] Searching across ${meetings.length} meetings${topic ? ` for topic: "${topic}"` : ''}`);
   
   const allResults: Array<{
     companyName: string;
@@ -282,8 +342,12 @@ export async function searchAcrossMeetings(
 
   for (const meeting of meetings.slice(0, 5)) {
     try {
-      const result = await handleSingleMeetingQuestion(meeting, userMessage, false);
-      if (result.dataSource !== "not_found") {
+      const result = await handleSingleMeetingQuestion(meeting, focusedQuery, false);
+      // Filter out "not found" AND "not discussed" responses
+      const isNotFound = result.dataSource === "not_found";
+      const isNotDiscussed = topic && result.answer.toLowerCase().includes("not discussed");
+      
+      if (!isNotFound && !isNotDiscussed) {
         allResults.push({
           companyName: meeting.companyName,
           meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
@@ -296,12 +360,14 @@ export async function searchAcrossMeetings(
   }
 
   if (allResults.length === 0) {
-    return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information related to your question.`;
+    const topicNote = topic ? ` specifically about "${topic}"` : '';
+    return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information${topicNote}.`;
   }
 
   const formattedResults = allResults.map(r => 
     `**${r.companyName}** (${r.meetingDate}):\n${r.answer}`
   ).join("\n\n---\n\n");
 
-  return `Here's what I found across ${allResults.length} meeting(s):\n\n${formattedResults}`;
+  const topicNote = topic ? ` related to "${topic}"` : '';
+  return `Here's what I found${topicNote} across ${allResults.length} meeting(s):\n\n${formattedResults}`;
 }

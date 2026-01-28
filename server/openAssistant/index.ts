@@ -16,6 +16,6 @@
 export { performExternalResearch, formatCitationsForDisplay, type ResearchResult, type Citation } from "./externalResearch";
 export { searchArtifactsSemanticly, searchArtifactsAcrossMeetings, formatArtifactResults, type ArtifactSearchResult } from "./semanticArtifactSearch";
 export { handleOpenAssistant, shouldUseOpenAssistant, type OpenAssistantContext, type OpenAssistantResult } from "./openAssistantHandler";
-export { findRelevantMeetings, searchAcrossMeetings, extractSearchTerms, type MeetingSearchResult } from "./meetingResolver";
+export { findRelevantMeetings, searchAcrossMeetings, extractSearchTerms, extractTopic, type MeetingSearchResult } from "./meetingResolver";
 export { executeContractChain, mapOrchestratorIntentToContract, type CoverageContext } from "./contractExecutor";
 export { type EvidenceSource, type IntentClassification, defaultClassification, deriveEvidenceSource } from "./types";

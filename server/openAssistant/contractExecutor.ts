@@ -43,7 +43,8 @@ interface ContractExecutionResult {
 export async function executeContractChain(
   chain: ContractChain,
   userMessage: string,
-  meetings: SingleMeetingContext[]
+  meetings: SingleMeetingContext[],
+  topic?: string
 ): Promise<{ finalOutput: string; chainResults: Array<{ contract: AnswerContract; output: string }> }> {
   const chainResults: Array<{ contract: AnswerContract; output: string }> = [];
   const executionDecisions: ContractExecutionDecision[] = [];
@@ -112,7 +113,8 @@ export async function executeContractChain(
       meetings,
       contextForContract,
       constraints,
-      coverage
+      coverage,
+      topic
     );
     
     decision.evidenceCount = executionResult.evidenceCount;
@@ -226,7 +228,8 @@ async function executeMultiMeetingContract(
   meetings: SingleMeetingContext[],
   previousContext: string,
   constraints: { ssotMode: SSOTMode; responseFormat: string; requiresCitation: boolean },
-  coverage?: CoverageContext
+  coverage?: CoverageContext,
+  topic?: string
 ): Promise<ContractExecutionResult> {
   const actualEvidence = await fetchActualEvidence(contract, meetings);
   console.log(`[executeMultiMeetingContract] ${contract}: actual evidence count=${actualEvidence.count}, meetingsWithEvidence=${actualEvidence.meetingsWithEvidence}`);
@@ -249,7 +252,7 @@ async function executeMultiMeetingContract(
   const contractPrompt = getContractPrompt(contract, previousContext, coverage);
   const fullQuery = contractPrompt ? `${contractPrompt}\n\nUser question: ${userMessage}` : userMessage;
   
-  const rawOutput = await searchAcrossMeetings(fullQuery, meetings);
+  const rawOutput = await searchAcrossMeetings(fullQuery, meetings, topic);
   
   if (isExtractionContract) {
     return {

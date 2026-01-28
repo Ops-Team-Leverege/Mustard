@@ -383,9 +383,9 @@ async function handleMeetingDataIntent(
   };
   
   const chain = selectMultiMeetingContractChain(userMessage, scope);
-  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (coverage: ${scope.coverage.matchingMeetingsCount} meetings)`);
+  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (coverage: ${scope.coverage.matchingMeetingsCount} meetings)${meetingSearch.topic ? ` topic: "${meetingSearch.topic}"` : ''}`);
   
-  const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings);
+  const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings, meetingSearch.topic);
   
   return {
     answer: chainResult.finalOutput,
@@ -461,7 +461,8 @@ async function handleMultiMeetingIntent(
   const chainResult = await executeContractChain(
     { contracts: contractChain, primaryContract, selectionMethod: "keyword" },
     userMessage,
-    meetingSearch.meetings
+    meetingSearch.meetings,
+    meetingSearch.topic
   );
   
   return {
