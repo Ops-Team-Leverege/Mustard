@@ -1,0 +1,362 @@
+# Acknowledgments, Progress Messages & Pipeline Timing
+
+## Overview
+
+Three updates to improve UX and observability:
+
+1. **Simplify acknowledgments** — General messages instead of context-specific (avoids mismatch)
+2. **Add progress messages** — One message after 15s if still waiting
+3. **Pipeline timing** — Track each stage to find bottlenecks
+4. **Performance alerting** — Ready but disabled by default
+
+---
+
+## 1. Acknowledgments (Update Existing)
+
+### Current Problem
+
+Context-specific messages like "pulling up that meeting..." can mismatch with the actual response.
+
+### Solution
+
+General messages that are always accurate + icons for personality:
+
+```json
+// config/acknowledgments.json
+{
+  "messages": [
+    "👍 On it, {user}...",
+    "🔍 Got it, {user} — looking into that...",
+    "⏳ Sure thing, {user} — give me a moment...",
+    "💼 Happy to help, {user}...",
+    "🎯 On it, {user} — let me check...",
+    "✨ Got it, {user} — working on it...",
+    "🧠 Sure thing, {user} — one sec...",
+    "📂 On it, {user}...",
+    "🔎 Got it, {user} — looking into it...",
+    "💡 Happy to help, {user} — one moment...",
+    "👀 Let me take a look, {user}...",
+    "🙌 On it, {user}...",
+    "✅ Got it, {user} — checking now...",
+    "🚀 Sure thing, {user}..."
+  ]
+}
+```
+
+### Implementation
+
+```typescript
+// Simplified — no keyword matching needed
+export function generateAck(user: string): string {
+  const template = pickRandom(ackConfig.messages);
+  return template.replace('{user}', user);
+}
+```
+
+---
+
+## 2. Progress Messages (New)
+
+### Problem
+
+Responses sometimes take 40-90 seconds. Users see nothing and wonder if it's broken.
+
+### Solution
+
+Send **one** friendly progress message after **15 seconds** of waiting.
+
+### User Experience
+
+```
+0s   "👍 On it, @Silvina..."
+
+15s  "🔍 Still digging — hang tight..."
+
+45s  [actual response or document]
+```
+
+### Config
+
+```json
+// config/progress.json
+{
+  "delaySeconds": 15,
+  "messages": [
+    "🔍 Still digging — hang tight...",
+    "⏳ Taking a bit longer than usual — almost there...",
+    "📚 Lots to look through — still on it...",
+    "🔎 Still searching — one moment...",
+    "⚙️ Working on it — pulling everything together...",
+    "🧠 Thinking through this one — bear with me...",
+    "📝 Almost there — just putting it together...",
+    "💼 Still gathering the info — hang tight...",
+    "🔄 Processing — this one's a bit complex...",
+    "✨ Polishing up your answer — almost done...",
+    "🎯 Still on it — almost there...",
+    "👀 Still looking — one more moment...",
+    "📂 Digging through the details — hang tight...",
+    "💡 Working through this — nearly there...",
+    "🚀 Still working — thanks for your patience...",
+    "🙌 Almost got it — just a bit longer..."
+  ]
+}
+```
+
+### Implementation
+
+```typescript
+// After sending acknowledgment, set a timer
+const progressTimer = setTimeout(() => {
+  const msg = pickRandom(progressConfig.messages);
+  postToThread(channel, thread, msg);
+  progressMessageSent = true;
+}, progressConfig.delaySeconds * 1000);
+
+// Clear if response finishes before timer fires
+clearTimeout(progressTimer);
+```
+
+---
+
+## 3. Pipeline Timing (New)
+
+### Problem
+
+We only know total response time, not *where* the bottleneck is.
+
+### Solution
+
+Track each stage of the pipeline to identify slow spots.
+
+### Pipeline Stages
+
+```
+User Message
+    ↓
+[Stage 1] Intent Classification     →  1,200ms
+    ↓
+[Stage 2] Entity Resolution         →    800ms
+    ↓
+[Stage 3] Meeting Search            → 12,000ms  ← BOTTLENECK
+    ↓
+[Stage 4] Context Layer Building    →  2,500ms
+    ↓
+[Stage 5] Contract Execution        →  8,000ms
+    ↓
+[Stage 6] LLM Response Generation   → 15,000ms
+    ↓
+[Stage 7] Document Generation       →  3,000ms
+    ↓
+Response Sent
+                            TOTAL:    43,500ms
+```
+
+### Schema Update
+
+```typescript
+// Add to interaction log
+interface InteractionLog {
+  // ... existing fields
+  
+  // Timing
+  total_time_ms: number;
+  progress_message_sent: boolean;
+  pipeline_timing: {
+    intent_classification_ms: number;
+    entity_resolution_ms: number;
+    meeting_search_ms: number;
+    context_building_ms: number;
+    contract_execution_ms: number;
+    llm_generation_ms: number;
+    document_generation_ms: number | null;  // null if no doc generated
+  };
+}
+```
+
+### Example Log Entry
+
+```json
+{
+  "question_text": "Summarize the Les Schwab meeting",
+  "answer_contract": "MEETING_SUMMARY",
+  "total_time_ms": 43500,
+  "progress_message_sent": true,
+  "pipeline_timing": {
+    "intent_classification_ms": 1200,
+    "entity_resolution_ms": 800,
+    "meeting_search_ms": 12000,
+    "context_building_ms": 2500,
+    "contract_execution_ms": 8000,
+    "llm_generation_ms": 15000,
+    "document_generation_ms": 3000
+  }
+}
+```
+
+### Implementation
+
+Wrap each pipeline stage with timing:
+
+```typescript
+const timing: PipelineTiming = {};
+
+// Stage 1: Intent Classification
+const start1 = Date.now();
+const intent = await classifyIntent(message);
+timing.intent_classification_ms = Date.now() - start1;
+
+// Stage 2: Entity Resolution
+const start2 = Date.now();
+const entities = await resolveEntities(message);
+timing.entity_resolution_ms = Date.now() - start2;
+
+// Stage 3: Meeting Search
+const start3 = Date.now();
+const meetings = await searchMeetings(entities);
+timing.meeting_search_ms = Date.now() - start3;
+
+// Stage 4: Context Building
+const start4 = Date.now();
+const context = await buildContextLayers(intent, entities, meetings);
+timing.context_building_ms = Date.now() - start4;
+
+// Stage 5: Contract Execution
+const start5 = Date.now();
+const result = await executeContract(contract, context);
+timing.contract_execution_ms = Date.now() - start5;
+
+// Stage 6: LLM Generation
+const start6 = Date.now();
+const response = await generateResponse(result);
+timing.llm_generation_ms = Date.now() - start6;
+
+// Stage 7: Document Generation (if applicable)
+if (shouldGenerateDoc) {
+  const start7 = Date.now();
+  await generateDocument(response);
+  timing.document_generation_ms = Date.now() - start7;
+}
+
+// Log total
+timing.total_time_ms = Object.values(timing).reduce((a, b) => a + (b || 0), 0);
+```
+
+### Example Analysis Queries
+
+```sql
+-- Average time by stage
+SELECT 
+  ROUND(AVG((pipeline_timing->>'intent_classification_ms')::int)) as intent,
+  ROUND(AVG((pipeline_timing->>'entity_resolution_ms')::int)) as entity,
+  ROUND(AVG((pipeline_timing->>'meeting_search_ms')::int)) as meeting_search,
+  ROUND(AVG((pipeline_timing->>'context_building_ms')::int)) as context,
+  ROUND(AVG((pipeline_timing->>'contract_execution_ms')::int)) as execution,
+  ROUND(AVG((pipeline_timing->>'llm_generation_ms')::int)) as llm,
+  ROUND(AVG((pipeline_timing->>'document_generation_ms')::int)) as doc
+FROM interaction_log;
+
+-- Find slowest stage per contract type
+SELECT 
+  answer_contract,
+  ROUND(AVG((pipeline_timing->>'meeting_search_ms')::int)) as avg_meeting_search,
+  ROUND(AVG((pipeline_timing->>'llm_generation_ms')::int)) as avg_llm
+FROM interaction_log
+GROUP BY answer_contract
+ORDER BY avg_llm DESC;
+
+-- How often do we hit the 15s progress message?
+SELECT 
+  COUNT(*) as total,
+  SUM(CASE WHEN progress_message_sent THEN 1 ELSE 0 END) as hit_progress,
+  ROUND(100.0 * SUM(CASE WHEN progress_message_sent THEN 1 ELSE 0 END) / COUNT(*), 1) as pct
+FROM interaction_log;
+
+-- Requests over 30 seconds — where's the time going?
+SELECT 
+  question_text,
+  total_time_ms,
+  pipeline_timing
+FROM interaction_log
+WHERE total_time_ms > 30000
+ORDER BY total_time_ms DESC
+LIMIT 10;
+```
+
+---
+
+## 4. Performance Alerting (Disabled by Default)
+
+### Purpose
+
+Ready-to-enable alerting for slow requests and bottleneck stages.
+
+### Config
+
+```json
+// config/performance.json
+{
+  "alerts": {
+    "slow_request": {
+      "threshold_ms": 60000,
+      "alert_channel": "#operations-testing_notifications",
+      "enabled": false
+    },
+    "bottleneck_stage": {
+      "threshold_ms": 25000,
+      "alert_channel": "#operations-testing_notifications",
+      "enabled": false
+    }
+  }
+}
+```
+
+### Implementation
+
+```typescript
+// After logging interaction, check for alerts (only if enabled)
+const perfConfig = loadConfig('performance.json');
+
+if (perfConfig.alerts.slow_request.enabled && totalTime > perfConfig.alerts.slow_request.threshold_ms) {
+  await postSlackMessage({
+    channel: perfConfig.alerts.slow_request.alert_channel,
+    text: `🐌 **Slow Request Alert**\nRequest took ${(totalTime/1000).toFixed(1)}s\nQuery: "${text.substring(0, 50)}..."`
+  });
+}
+
+if (perfConfig.alerts.bottleneck_stage.enabled) {
+  Object.entries(timing).forEach(([stage, time]) => {
+    if (time > perfConfig.alerts.bottleneck_stage.threshold_ms) {
+      await postSlackMessage({
+        channel: perfConfig.alerts.bottleneck_stage.alert_channel,
+        text: `⚠️ **Bottleneck Alert**\n${stage} took ${(time/1000).toFixed(1)}s`
+      });
+    }
+  });
+}
+```
+
+### When to Enable
+
+Once we have timing data and understand normal performance, we can:
+1. Review the data to set appropriate thresholds
+2. Enable alerts via config change (no code deploy needed)
+
+---
+
+## Summary
+
+| Feature | Messages/Stages | Config | Status |
+|---------|-----------------|--------|--------|
+| Acknowledgments | 14 variations | `config/acknowledgments.json` | Update |
+| Progress | 16 variations | `config/progress.json` | New |
+| Pipeline Timing | 7 stages | Logged to DB | New |
+| Performance Alerts | 2 alert types | `config/performance.json` | New (disabled) |
+
+### Key Points
+
+- ✅ **General messages** — No mismatch risk
+- ✅ **Icons** — Adds personality
+- ✅ **Config-driven** — Easy to tune
+- ✅ **One progress message only** — Not spammy
+- ✅ **Stage-level timing** — Find real bottlenecks
+- ✅ **Alerting ready** — Disabled until we know thresholds
