@@ -347,12 +347,18 @@ export async function searchAcrossMeetings(
       const isNotFound = result.dataSource === "not_found";
       const isNotDiscussed = topic && result.answer.toLowerCase().includes("not discussed");
       
-      if (!isNotFound && !isNotDiscussed) {
+      // CRITICAL: When topic is provided, verify the answer actually mentions the topic
+      // This prevents returning generic artifacts that don't relate to the topic
+      const answerMentionsTopic = !topic || result.answer.toLowerCase().includes(topic.toLowerCase());
+      
+      if (!isNotFound && !isNotDiscussed && answerMentionsTopic) {
         allResults.push({
           companyName: meeting.companyName,
           meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
           answer: result.answer,
         });
+      } else if (topic && !answerMentionsTopic) {
+        console.log(`[MeetingResolver] Filtered out result for ${meeting.companyName} - answer doesn't mention topic "${topic}"`);
       }
     } catch (err) {
       console.error(`[MeetingResolver] Error searching meeting ${meeting.meetingId}:`, err);
