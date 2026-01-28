@@ -51,12 +51,13 @@ export type ResearchResult = {
  * Format the current date for research attribution.
  */
 function getExtractionDate(): string {
-  return new Date().toLocaleDateString('en-US', {
+  return new Date().toLocaleString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'America/New_York',
     timeZoneName: 'short'
   });
 }
