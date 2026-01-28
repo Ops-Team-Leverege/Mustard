@@ -107,10 +107,13 @@ export async function sendResponseWithDocumentSupport(
     console.error(`[DocumentResponse] Stack trace: ${errorStack}`);
     console.error("[DocumentResponse] Falling back to plain text message");
     
+    // Add visible indicator that document generation failed
+    const fallbackContent = `${content}\n\n_[Document generation encountered an issue - showing text instead]_`;
+    
     try {
       await postSlackMessage({
         channel,
-        text: content,
+        text: fallbackContent,
         thread_ts: threadTs,
       });
       return { type: "message", success: true };
@@ -142,6 +145,8 @@ function generateTitleFromContract(contract: AnswerContract, customerName?: stri
       return `Trend Summary - ${customer}`;
     case AnswerContract.CROSS_MEETING_QUESTIONS:
       return `Customer Questions Analysis`;
+    case AnswerContract.PRODUCT_EXPLANATION:
+      return `PitCrew Product Overview`;
     default:
       return `PitCrew Document - ${customer}`;
   }
