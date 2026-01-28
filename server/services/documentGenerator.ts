@@ -60,11 +60,16 @@ export function clearConfigCache(): void {
 }
 
 export function shouldGenerateDocument(contract: string, wordCount: number): boolean {
+  // Force reload config to avoid stale cache
+  clearConfigCache();
   const config = getDocumentConfig();
   
-  console.log(`[DocumentGenerator] Checking contract="${contract}" against list=${JSON.stringify(config.generateDocForContracts)}, wordCount=${wordCount}, threshold=${config.wordThreshold}`);
+  console.log(`[DocumentGenerator] Checking contract="${contract}" (type: ${typeof contract}) against list=${JSON.stringify(config.generateDocForContracts)}, wordCount=${wordCount}, threshold=${config.wordThreshold}`);
   
-  if (config.generateDocForContracts.includes(contract)) {
+  const isInList = config.generateDocForContracts.includes(contract);
+  console.log(`[DocumentGenerator] Contract "${contract}" in list: ${isInList}, exact match test: ${config.generateDocForContracts.some(c => c === contract)}`);
+  
+  if (isInList) {
     console.log(`[DocumentGenerator] Contract "${contract}" is in doc list - will generate document`);
     return true;
   }
