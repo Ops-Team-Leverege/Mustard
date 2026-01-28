@@ -21,10 +21,13 @@ const openai = new OpenAI({
 });
 
 function getGeminiClient() {
-  if (!process.env.GEMINI_API_KEY) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.warn("[ExternalResearch] GEMINI_API_KEY not found in environment");
     return null;
   }
-  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  console.log("[ExternalResearch] Gemini client initialized successfully");
+  return new GoogleGenAI({ apiKey });
 }
 
 export type Citation = {
