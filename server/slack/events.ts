@@ -19,6 +19,7 @@ import type { Request, Response } from "express";
 import { verifySlackSignature } from "./verify";
 import { postSlackMessage } from "./slackApi";
 import { sendResponseWithDocumentSupport } from "../services/documentResponse";
+import { generateAckWithMention, generateAck } from "./acknowledgments";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
@@ -149,9 +150,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     // 7. Send immediate acknowledgment (UX improvement - reduces perceived latency)
     // Skip Slack API calls in test mode to avoid errors with fake channels
+    // Uses smart acknowledgments that vary based on what the user is asking
     const ackMessage = userId
-      ? `On it, <@${userId}> — let me check that for you.`
-      : `On it — let me check that for you.`;
+      ? generateAckWithMention(userId, text)
+      : generateAck(null, text);
 
     if (!testRun) {
       await postSlackMessage({

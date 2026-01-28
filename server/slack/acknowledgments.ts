@@ -19,6 +19,7 @@ interface AckPattern {
 interface AckConfig {
   patterns: AckPattern[];
   fallback: string[];
+  fallbackNoUser: string[];
 }
 
 let configCache: AckConfig | null = null;
@@ -43,23 +44,31 @@ function pickRandom<T>(arr: T[]): T {
 /**
  * Generate a context-aware acknowledgment message.
  * 
- * @param user - The user's display name or mention (e.g., "@Silvina")
+ * @param user - The user's display name or mention (e.g., "@Silvina"), or null for no mention
  * @param message - The user's message to analyze
  * @returns A contextual acknowledgment string
  */
-export function generateAck(user: string, message: string): string {
+export function generateAck(user: string | null, message: string): string {
   const config = getAckConfig();
   const messageLower = message.toLowerCase();
   
   for (const pattern of config.patterns) {
     if (pattern.keywords.some(kw => messageLower.includes(kw))) {
       const template = pickRandom(pattern.messages);
-      return template.replace('{user}', user);
+      if (user) {
+        return template.replace('{user}', user);
+      } else {
+        return template.replace(', {user}', '').replace('{user} ', '').replace('{user}', '');
+      }
     }
   }
   
-  const template = pickRandom(config.fallback);
-  return template.replace('{user}', user);
+  if (user) {
+    const template = pickRandom(config.fallback);
+    return template.replace('{user}', user);
+  } else {
+    return pickRandom(config.fallbackNoUser);
+  }
 }
 
 /**

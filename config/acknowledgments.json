@@ -69,5 +69,11 @@
     "Got it, {user} — looking into that...",
     "Sure thing, {user} — give me a moment...",
     "Happy to help, {user} — checking that out..."
+  ],
+  "fallbackNoUser": [
+    "On it — let me check that for you...",
+    "Got it — looking into that...",
+    "Sure thing — give me a moment...",
+    "Happy to help — checking that out..."
   ]
 }
