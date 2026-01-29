@@ -106,3 +106,9 @@ The control plane dynamically builds contract chains based on user messages, ens
 **Authentication**: Header `X-Airtable-Secret`
 **Behavior**: Waits for sync, auto-discovers new tables, and auto-adds new columns.
 **Trigger**: Zapier automation on Airtable record changes.
+
+## Recent Changes (January 2026)
+
+### Bug Fixes
+- **SQL DISTINCT Fix**: Fixed PostgreSQL error 42P10 in `meetingResolver.ts` - queries using `SELECT DISTINCT` with `ORDER BY COALESCE(t.meeting_date, t.created_at)` now include the COALESCE expression as `sort_date` in the SELECT clause.
+- **Intent Classification Fix**: FAQ/website copy update requests now correctly route to `PRODUCT_KNOWLEDGE` instead of `MULTI_MEETING`. Added keywords: "frequently asked questions", "faq", "update copy", "value props" to product knowledge patterns. Removed overly generic "frequently" keyword from multi-meeting patterns.

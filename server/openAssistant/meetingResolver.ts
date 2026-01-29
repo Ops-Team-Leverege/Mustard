@@ -133,11 +133,12 @@ async function fallbackMeetingSearch(message: string): Promise<SingleMeetingCont
   
   for (const word of words.slice(0, 5)) {
     const rows = await storage.rawQuery(`
-      SELECT DISTINCT t.id as meeting_id, t.meeting_date, c.id as company_id, c.name as company_name
+      SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, c.id as company_id, c.name as company_name,
+             COALESCE(t.meeting_date, t.created_at) as sort_date
       FROM transcripts t
       JOIN companies c ON t.company_id = c.id
       WHERE c.name ILIKE $1
-      ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+      ORDER BY sort_date DESC
       LIMIT 2
     `, [`%${word}%`]);
     
@@ -298,12 +299,13 @@ async function searchContacts(searchTerms: string[]): Promise<SingleMeetingConte
 
   for (const term of searchTerms) {
     const rows = await storage.rawQuery(`
-      SELECT DISTINCT t.id as meeting_id, t.meeting_date, c.id as company_id, c.name as company_name
+      SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, c.id as company_id, c.name as company_name,
+             COALESCE(t.meeting_date, t.created_at) as sort_date
       FROM transcripts t
       JOIN companies c ON t.company_id = c.id
       LEFT JOIN contacts ct ON ct.company_id = c.id
       WHERE ct.name ILIKE $1
-      ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+      ORDER BY sort_date DESC
       LIMIT 3
     `, [`%${term}%`]);
 

@@ -154,7 +154,6 @@ const MULTI_MEETING_KEYWORDS = [
   "historically",
   "patterns",
   "how many times",
-  "frequently",
   "common questions",
   "recurring",
   "aggregate",
@@ -177,6 +176,17 @@ const MULTI_MEETING_KEYWORDS = [
 ];
 
 const PRODUCT_KNOWLEDGE_KEYWORDS = [
+  // FAQ and content updates (prioritize over meeting patterns)
+  "frequently asked questions",
+  "faq",
+  "faqs",
+  "update the faq",
+  "update our faq",
+  "update copy",
+  "updating copy",
+  "website copy",
+  "value props",
+  "value propositions",
   // Direct product questions
   "what is pitcrew",
   "what does pitcrew do",
