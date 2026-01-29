@@ -98,22 +98,26 @@ const AGGREGATE_CONTRACTS = [
   AnswerContract.TREND_SUMMARY,
 ];
 
-// Patterns that indicate time range is specified
+// Patterns that indicate time range is EXPLICITLY specified
+// Note: "recent/recently" is too vague - always ask for clarification
 const TIME_RANGE_PATTERNS = [
   /\b(last|past)\s+(week|month|quarter|year|\d+\s*days?)\b/i,
   /\b(this|current)\s+(week|month|quarter|year)\b/i,
-  /\b(since|from|after|before)\s+\w+/i,
-  /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i,
-  /\b(q[1-4]|20[0-9]{2})\b/i,
-  /\b(all\s+time|ever|always)\b/i,
-  /\b(recent|recently)\b/i,
+  /\b(since|from|after|before)\s+(january|february|march|april|may|june|july|august|september|october|november|december|\d{4})/i,
+  /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b/i,
+  /\b(q[1-4])\s*['"]?\d{2,4}\b/i, // Q1 2024, Q1'24
+  /\b20[0-9]{2}\b/i, // Year like 2024, 2025
+  /\b(all\s+time|ever|historically)\b/i,
 ];
 
 // Patterns that indicate customer scope is specified
+// Case-insensitive, supports multi-word company names
 const CUSTOMER_SCOPE_PATTERNS = [
-  /\b(all\s+customers?|every\s+customer|across\s+all)\b/i,
-  /\bfor\s+[A-Z][a-z]+/i, // "for Costco", "for Amazon"
+  /\b(all\s+customers?|every\s+customer|across\s+all|everyone)\b/i,
+  /\bfor\s+[\w\s]+(?:inc|llc|corp|company|co\b)/i, // "for Acme Inc", "for Big Corp"
+  /\bfor\s+\w+[\w\s]*\b/i, // "for Costco", "for Ivy Lane"
   /\b(specific|particular)\s+customer/i,
+  /\b(with|from)\s+\w+[\w\s]*\s+(calls?|meetings?)\b/i, // "with Costco calls"
 ];
 
 function hasTimeRange(question: string): boolean {
