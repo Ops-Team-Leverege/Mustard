@@ -360,12 +360,13 @@ const EXTERNAL_RESEARCH_PATTERNS = [
   /\bcreating\s+a\s+(slide|sales|pitch)\s+deck\s+for\b/i,
   /\bslide\s+deck\s+for\s+[\w\s]+\s+to\s+sell\b/i,
   /\bselling?\s+(to|their)\s+(leadership|team|executive)\b/i,
-  // URL detection - when user provides a specific URL to analyze/compare
-  /https?:\/\/[\w\-\.]+\.\w+[\w\/\-\.\?\=\&]*/i,
-  // Website comparison patterns
-  /\b(compare|check|review|analyze)\s+(the\s+)?(website|page|site|url)\b/i,
-  /\bwebsite\s+on\s+https?:/i,
-  /\bon\s+https?:.*\b(update|compare|check|faq|copy)\b/i,
+  // External company research patterns - must indicate researching a DIFFERENT company
+  // NOT just any URL (user's own website should use PRODUCT_KNOWLEDGE)
+  /\bresearch\s+(the\s+)?(company|website|site)\s+(at\s+)?https?:/i,
+  /\bresearch\s+https?:\/\/(?!.*leverege)/i,  // Research URL that's NOT leverege.com
+  /\b(competitor|competitive)\s+(analysis|research|comparison)\b/i,
+  /\banalyze\s+(their|the)\s+(company|business|website)\b/i,
+  /\bwhat\s+(does|do)\s+[\w\s]+\s+(company\s+)?(do|offer|sell)\b/i,
 ];
 
 const REFUSE_PATTERNS = [
