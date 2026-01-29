@@ -383,7 +383,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
     let storedProposedInterpretation: { intent: string; contract: string; summary: string } | null = null;
     let originalQuestion: string | null = null;
     let lastResponseType: string | null = null;
-    let priorAnswerText: string | null = null;
     
     // Only look up prior context if this is a reply in an existing thread
     if (isReply && shouldReuseThreadContext(text)) {
@@ -407,7 +406,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
           
           // Track what the last response was about (for follow-up context)
           lastResponseType = (contextLayers?.lastResponseType as string) || null;
-          priorAnswerText = priorInteraction.answerText || null;
           
           console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}, lastResponseType=${lastResponseType}`);
         }
@@ -619,21 +617,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
       if (wantsToAnswerQuestions) {
         console.log(`[Slack] Detected "answer those questions" follow-up - routing to product knowledge + draft response`);
         
-        // Extract questions from prior response (already formatted in the thread)
-        // This avoids an extra database call since we have the formatted questions from the prior interaction
+        // Query database for customer questions from the meeting (single source of truth)
         let questionList: string | null = null;
         
-        if (priorAnswerText) {
-          // Extract the "Open Questions:" section from the prior response
-          const openQuestionsMatch = priorAnswerText.match(/\*Open Questions:\*\n([\s\S]*?)(?=\n\*|$)/);
-          if (openQuestionsMatch) {
-            questionList = openQuestionsMatch[1].trim();
+        try {
+          const customerQuestions = await storage.getCustomerQuestionsByTranscript(threadContext.meetingId);
+          const unansweredQuestions = customerQuestions.filter(q => !q.answerEvidence);
+          
+          if (unansweredQuestions.length > 0) {
+            questionList = unansweredQuestions
+              .map(q => `• ${q.questionText}${q.askedByName ? ` (asked by ${q.askedByName})` : ''}`)
+              .join('\n');
           }
+        } catch (error) {
+          console.error('[Slack] Error fetching customer questions:', error);
         }
         
         if (!questionList) {
-          // Fallback: no questions found in prior response
-          const noQuestionsResponse = "I don't see any open questions from the prior response. Would you like me to look up the customer questions from this meeting?";
+          // No unanswered questions found
+          const noQuestionsResponse = "I don't see any unanswered customer questions from this meeting. All questions may have been addressed, or there might not be any recorded questions.";
           if (!testRun) {
             await postSlackMessage({
               channel,
@@ -645,23 +647,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
           return;
         }
         
-        // Route to Open Assistant with PRODUCT_KNOWLEDGE contract to draft responses
-        const syntheticControlPlane = {
-          intent: "PRODUCT_KNOWLEDGE" as any,
-          answerContract: "DRAFT_RESPONSE" as any,
-          intentDetectionMethod: "followup_pattern",
-          contractSelectionMethod: "followup_pattern",
-          contextLayers: {
-            product_identity: true,
-            product_ssot: true, // Use product knowledge to answer
-            single_meeting: true,
-            multi_meeting: false,
-            document_context: false,
-          },
-        };
-        
         // Construct a detailed question for the LLM with the actual questions
         const enhancedQuestion = `Using PitCrew product knowledge, help draft responses to these customer questions from the meeting with ${companyNameFromContext || 'this company'}:\n\n${questionList}`;
+        
+        // Use actual Control Plane for proper intent classification and contract selection
+        const controlPlaneResult = await runControlPlane(enhancedQuestion);
         
         const openAssistantResult = await handleOpenAssistant(enhancedQuestion, {
           userId: userId || undefined,
@@ -672,7 +662,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: companyNameFromContext || 'Unknown',
             meetingDate: null,
           },
-          controlPlaneResult: syntheticControlPlane,
+          controlPlaneResult,
         });
         
         if (!testRun) {

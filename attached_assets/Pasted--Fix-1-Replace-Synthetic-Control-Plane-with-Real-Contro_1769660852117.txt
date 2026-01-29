@@ -1,0 +1,191 @@
+🔧 Fix 1: Replace Synthetic Control Plane with Real Control Plane
+File: 
+events.ts
+ Location: Lines ~650-675
+
+REPLACE THIS:
+
+// Route to Open Assistant with PRODUCT_KNOWLEDGE contract to draft responses 
+const syntheticControlPlane = {
+  intent: "PRODUCT_KNOWLEDGE" as any,
+  answerContract: "DRAFT_RESPONSE" as any,
+  intentDetectionMethod: "followup_pattern",
+  contractSelectionMethod: "followup_pattern",
+  contextLayers: {
+    product_identity: true,
+    product_ssot: true, // Use product knowledge to answer
+    single_meeting: true,
+    multi_meeting: false,
+    document_context: false,
+  },
+};
+
+// Construct a detailed question for the LLM with the actual questions
+const enhancedQuestion = `Using PitCrew product knowledge, help draft responses to these customer questions from the meeting with ${companyNameFromContext || 'this company'}:\n\n${questionList}`;
+
+const openAssistantResult = await handleOpenAssistant(enhancedQuestion, {
+  userId: userId || undefined,
+  threadId: threadTs,
+  resolvedMeeting: {
+    meetingId: threadContext.meetingId,
+    companyId: threadContext.companyId,
+    companyName: companyNameFromContext || 'Unknown',
+    meetingDate: null,
+  },
+  controlPlaneResult: syntheticControlPlane,
+});
+WITH THIS:
+
+// Construct a detailed question for the LLM with the actual questions
+const enhancedQuestion = `Using PitCrew product knowledge, help draft responses to these customer questions from the meeting with ${companyNameFromContext || 'this company'}:\n\n${questionList}`;
+
+// Use actual Control Plane for proper intent classification and contract selection
+const controlPlaneResult = await runControlPlane(enhancedQuestion, {
+  userId: userId || undefined,
+  threadId: threadTs,
+  resolvedMeeting: {
+    meetingId: threadContext.meetingId,
+    companyId: threadContext.companyId,
+    companyName: companyNameFromContext || 'Unknown',
+    meetingDate: null,
+  },
+});
+
+const openAssistantResult = await handleOpenAssistant(enhancedQuestion, {
+  userId: userId || undefined,
+  threadId: threadTs,
+  resolvedMeeting: {
+    meetingId: threadContext.meetingId,
+    companyId: threadContext.companyId,
+    companyName: companyNameFromContext || 'Unknown',
+    meetingDate: null,
+  },
+  controlPlaneResult,
+});
+🔧 Fix 2: Replace LLM Output Parsing with Database Query
+File: 
+events.ts
+ Location: Lines ~625-645
+
+REPLACE THIS:
+
+// Extract questions from prior response (already formatted in the thread)
+// This avoids an extra database call since we have the formatted questions from the prior interaction
+let questionList: string | null = null;
+
+if (priorAnswerText) {
+  // Extract the "Open Questions:" section from the prior response
+  const openQuestionsMatch = priorAnswerText.match(/\*Open Questions:\*\n([\s\S]*?)(?=\n\*|$)/);
+  if (openQuestionsMatch) {
+    questionList = openQuestionsMatch[1].trim();
+  }
+}
+
+if (!questionList) {
+  // Fallback: no questions found in prior response
+  const noQuestionsResponse = "I don't see any open questions from the prior response. Would you like me to look up the customer questions from this meeting?";
+  if (!testRun) {
+    await postSlackMessage({
+      channel,
+      text: noQuestionsResponse,
+      thread_ts: threadTs,
+    });
+  }
+  clearProgressTimer();
+  return;
+}
+WITH THIS:
+
+// Query database for customer questions from the meeting
+let questionList: string | null = null;
+
+try {
+  const customerQuestions = await storage.getCustomerQuestionsByMeeting(threadContext.meetingId);
+  const unansweredQuestions = customerQuestions.filter(q => !q.answerEvidence);
+  
+  if (unansweredQuestions.length > 0) {
+    questionList = unansweredQuestions
+      .map(q => `• ${q.questionText}${q.askedByName ? ` (asked by ${q.askedByName})` : ''}`)
+      .join('\n');
+  }
+} catch (error) {
+  console.error('[Slack] Error fetching customer questions:', error);
+}
+
+if (!questionList) {
+  // No unanswered questions found
+  const noQuestionsResponse = "I don't see any unanswered customer questions from this meeting. All questions may have been addressed, or there might not be any recorded questions.";
+  if (!testRun) {
+    await postSlackMessage({
+      channel,
+      text: noQuestionsResponse,
+      thread_ts: threadTs,
+    });
+  }
+  clearProgressTimer();
+  return;
+}
+🔧 Fix 3: Add Missing Import
+File: 
+events.ts
+ Location: Top of file with other imports
+
+ADD THIS IMPORT:
+
+import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
+Note: This import might already exist - check the existing imports first.
+
+🔧 Fix 4: Update Storage Method (If Needed)
+File: 
+storage.ts
+ Location: Add this method if it doesn't exist
+
+ADD THIS METHOD (if getCustomerQuestionsByMeeting doesn't exist):
+
+async getCustomerQuestionsByMeeting(meetingId: string) {
+  return this.db
+    .select({
+      questionText: customerQuestions.questionText,
+      askedByName: customerQuestions.askedByName,
+      answerEvidence: customerQuestions.answerEvidence,
+    })
+    .from(customerQuestions)
+    .where(eq(customerQuestions.transcriptId, meetingId))
+    .orderBy(customerQuestions.createdAt);
+}
+🔧 Fix 5: Clean Up Metadata Handling (Optional)
+File: 
+interactionMetadata.ts
+ Location: Lines ~229-235
+
+CURRENT CODE:
+
+// Merge lastResponseType into context_layers for follow-up handling
+const contextLayers = execution.controlPlane?.contextLayers || defaultContextLayers;
+if (execution.lastResponseType) {
+  (contextLayers as any).lastResponseType = execution.lastResponseType;
+}
+IMPROVED VERSION (removes type safety bypass):
+
+// Build context layers with follow-up tracking
+const contextLayers = {
+  ...(execution.controlPlane?.contextLayers || defaultContextLayers),
+  ...(execution.lastResponseType && { lastResponseType: execution.lastResponseType }),
+};
+✅ What These Changes Accomplish
+1. Maintains Architectural Integrity
+✅ Uses real Control Plane for intent classification
+✅ Follows proper contract selection logic
+✅ Maintains deterministic routing
+2. Improves Reliability
+✅ Eliminates brittle text parsing of LLM output
+✅ Uses database as single source of truth
+✅ Handles edge cases properly (no questions, query errors)
+3. Keeps Good Thread Memory Pattern
+✅ Maintains lastResponseType tracking (consistent with existing patterns)
+✅ Keeps pattern-based routing (consistent with clarification handling)
+✅ Preserves entity context reuse (exactly how system already works)
+4. Better User Experience
+✅ More accurate question retrieval from database
+✅ Proper handling of answered vs unanswered questions
+✅ Better error handling and user feedback

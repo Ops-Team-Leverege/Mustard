@@ -226,11 +226,11 @@ export function buildInteractionMetadata(
     document_context: false,
   };
   
-  // Merge lastResponseType into context_layers for follow-up handling
-  const contextLayers = execution.controlPlane?.contextLayers || defaultContextLayers;
-  if (execution.lastResponseType) {
-    (contextLayers as any).lastResponseType = execution.lastResponseType;
-  }
+  // Build context layers with follow-up tracking
+  const contextLayers = {
+    ...(execution.controlPlane?.contextLayers || defaultContextLayers),
+    ...(execution.lastResponseType && { lastResponseType: execution.lastResponseType }),
+  };
   
   return {
     entry_point: execution.entryPoint,
