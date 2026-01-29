@@ -331,8 +331,10 @@ The Airtable data describes the PRICING MODEL (structure), not the actual DOLLAR
 
 RESPONSE GUIDELINES:
 - Match your response format to the user's request (list, paragraph, comparison, draft, etc.)
-- Synthesize information naturally - don't just dump data
-- Be conversational unless the user requests structured output
+- For "explain", "overview", or "pitch" requests: Be COMPREHENSIVE - include all relevant value propositions, key features, and customer segments from the data
+- For client-facing explanations: Structure your response with clear sections (What it is, Who it's for, Key Benefits, Key Features)
+- Use SPECIFIC details from the product data - don't summarize away the richness
+- Only be brief if the user asks a narrow, specific question
 
 WEBSITE CONTENT RULES (CRITICAL):
 - This data is from the PRODUCT KNOWLEDGE DATABASE (Airtable), NOT from the live website
