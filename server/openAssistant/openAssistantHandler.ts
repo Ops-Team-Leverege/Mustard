@@ -19,6 +19,7 @@ import { performExternalResearch, formatCitationsForDisplay, type ResearchResult
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../controlPlane/answerContracts";
+import { MODEL_ASSIGNMENTS, getModelDescription } from "../config/models";
 
 import { 
   type EvidenceSource, 
@@ -102,7 +103,7 @@ async function generatePersonalizedProgress(
   
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
       messages: [
         {
           role: "system",
@@ -511,17 +512,17 @@ AUTHORITY RULES (without product data):
 
   try {
     const startTime = Date.now();
-    console.log(`[OpenAssistant] Calling gpt-4o for product knowledge response (prompt: ${systemPrompt.length} chars, streaming: ${!!streamingContext})...`);
+    console.log(`[OpenAssistant] Calling ${getModelDescription(MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE)} for product knowledge response (prompt: ${systemPrompt.length} chars, streaming: ${!!streamingContext})...`);
     
     // Use streaming when Slack context is available
     const answer = await streamOpenAIResponse(
-      "gpt-4o",
+      MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
       systemPrompt,
       userMessage,
       streamingContext
     );
     
-    console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+    console.log(`[OpenAssistant] ${getModelDescription(MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE)} response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
     return answer || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
   } catch (openaiError) {
     console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE OpenAI error:`, openaiError);
@@ -1233,14 +1234,14 @@ You are a helpful business assistant for the PitCrew team. Provide clear, profes
 
 If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.${meetingContextStr}${threadContextSection}${draftingInstructions}`;
   
-  console.log(`[OpenAssistant] Calling gpt-4o for general assistance (streaming: ${!!context.slackStreaming})...`);
+  console.log(`[OpenAssistant] Calling ${getModelDescription(MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE)} for general assistance (streaming: ${!!context.slackStreaming})...`);
   const answer = await streamOpenAIResponse(
-    "gpt-4o",
+    MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
     systemPrompt,
     userMessage,
     context.slackStreaming
   );
-  console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+  console.log(`[OpenAssistant] ${getModelDescription(MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE)} response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
 
   // Build personalized progress message for drafting contracts
   let progressMessage: string | undefined;
