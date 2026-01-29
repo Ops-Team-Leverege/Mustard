@@ -83,6 +83,64 @@ Use this conversation context to provide relevant, continuous responses. Referen
 }
 
 /**
+ * Generate a personalized progress message using a quick LLM call.
+ * Uses gpt-4o-mini for speed - this should complete in <1 second.
+ * Falls back to a default message if LLM fails.
+ */
+async function generatePersonalizedProgress(
+  userMessage: string,
+  intentType: 'product' | 'research' | 'draft_email' | 'draft_response' | 'multi_meeting' | 'general'
+): Promise<string> {
+  const defaultMessages: Record<typeof intentType, string> = {
+    product: "I'm checking our product database now.",
+    research: "I'm researching that for you now.",
+    draft_email: "I'm drafting your email now.",
+    draft_response: "I'm drafting your response now.",
+    multi_meeting: "I'm analyzing the relevant meetings now.",
+    general: "I'm working on that for you now.",
+  };
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
+The message should:
+- Be warm and conversational (not robotic)
+- Reference what they're asking about specifically
+- End with a brief reassurance you're working on it
+- NOT use emojis
+- NOT start with "I'm" (vary the opener)
+
+Examples:
+- "Let me dig into our camera integration specs for you - pulling that info now."
+- "Good question about pricing! Gathering the latest details from our database."
+- "Checking what we know about network requirements - one moment."
+- "Looking into how that feature works - I'll have an answer shortly."`
+        },
+        {
+          role: "user",
+          content: `Question type: ${intentType}\nUser's question: "${userMessage.substring(0, 150)}"`
+        }
+      ],
+      max_tokens: 50,
+      temperature: 0.7,
+    });
+    
+    const generated = response.choices[0]?.message?.content?.trim();
+    if (generated && generated.length > 10 && generated.length < 150) {
+      return generated;
+    }
+    return defaultMessages[intentType];
+  } catch (error) {
+    console.log(`[OpenAssistant] Progress message generation failed, using default`);
+    return defaultMessages[intentType];
+  }
+}
+
+/**
  * Generate a user-friendly progress message for contract chains.
  * Only generates a message when there are multiple contracts to execute.
  * 
@@ -979,10 +1037,8 @@ async function handleProductKnowledgeIntent(
   
   const hasProductData = snapshotResult.recordCount > 0;
   
-  // Build progress message for product knowledge query
-  const progressMessage = hasProductData 
-    ? `I'm reviewing our product database to answer your question. This may take a moment.`
-    : `I'll do my best to answer your product question, but I'm working with limited data right now.`;
+  // Generate personalized progress message (runs quickly in parallel conceptually)
+  const progressMessage = await generatePersonalizedProgress(userMessage, 'product');
   
   let answer: string;
   
@@ -1040,23 +1096,8 @@ async function handleExternalResearchIntent(
   
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
   
-  // Build progress message for user
-  const progressParts: string[] = [];
-  if (companyName) {
-    progressParts.push(`I'll search the web for information about ${companyName}.`);
-  } else {
-    progressParts.push(`I'll search the web for the information you need.`);
-  }
-  
-  if (actualContract === AnswerContract.SALES_DOCS_PREP) {
-    progressParts.push(`I'll gather their strategic priorities, recent news, and key data to help with your presentation.`);
-  } else if (actualContract === AnswerContract.VALUE_PROPOSITION) {
-    progressParts.push(`I'll combine external research with our product knowledge to build a tailored value proposition.`);
-  } else {
-    progressParts.push(`I'll gather relevant information and include my sources.`);
-  }
-  
-  const progressMessage = progressParts.join(' ');
+  // Generate personalized progress message
+  const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
   
   // Perform the research
   const researchResult = await performExternalResearch(
@@ -1201,12 +1242,11 @@ If you're unsure whether something requires evidence, err on the side of asking 
   );
   console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
 
-  // Build progress message based on contract type
+  // Build personalized progress message for drafting contracts
   let progressMessage: string | undefined;
   if (isDraftingContract) {
-    progressMessage = actualContract === AnswerContract.DRAFT_EMAIL 
-      ? `I'm drafting the email now. This will take a moment.`
-      : `I'm drafting the response now. This will take a moment.`;
+    const intentType = actualContract === AnswerContract.DRAFT_EMAIL ? 'draft_email' : 'draft_response';
+    progressMessage = await generatePersonalizedProgress(userMessage, intentType);
   }
 
   return {
