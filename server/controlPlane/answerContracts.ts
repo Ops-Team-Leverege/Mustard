@@ -441,6 +441,11 @@ const SINGLE_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "draft an email": AnswerContract.DRAFT_EMAIL,
   "write an email": AnswerContract.DRAFT_EMAIL,
   "prepare an email": AnswerContract.DRAFT_EMAIL,
+  "thank you email": AnswerContract.DRAFT_EMAIL,
+  "thank-you email": AnswerContract.DRAFT_EMAIL,
+  "thanks email": AnswerContract.DRAFT_EMAIL,
+  "write a thank you": AnswerContract.DRAFT_EMAIL,
+  "write thank you": AnswerContract.DRAFT_EMAIL,
   "help me answer": AnswerContract.DRAFT_RESPONSE,
   "draft a response": AnswerContract.DRAFT_RESPONSE,
   "respond to": AnswerContract.DRAFT_RESPONSE,
@@ -503,6 +508,21 @@ const GENERAL_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "prepare an email": AnswerContract.DRAFT_EMAIL,
   "prepare a follow up": AnswerContract.DRAFT_EMAIL,
   "prepare a follow-up": AnswerContract.DRAFT_EMAIL,
+  "thank you email": AnswerContract.DRAFT_EMAIL,
+  "thank-you email": AnswerContract.DRAFT_EMAIL,
+  "thanks email": AnswerContract.DRAFT_EMAIL,
+  "write a thank you": AnswerContract.DRAFT_EMAIL,
+  "write thank you": AnswerContract.DRAFT_EMAIL,
+  // Meeting prep patterns
+  "prep me for": AnswerContract.SALES_DECK_PREP,
+  "prep for meeting": AnswerContract.SALES_DECK_PREP,
+  "prepare me for": AnswerContract.SALES_DECK_PREP,
+  "prepare for meeting": AnswerContract.SALES_DECK_PREP,
+  "meeting prep": AnswerContract.SALES_DECK_PREP,
+  "get me ready for": AnswerContract.SALES_DECK_PREP,
+  "ready for meeting": AnswerContract.SALES_DECK_PREP,
+  "briefing for": AnswerContract.SALES_DECK_PREP,
+  "brief me on": AnswerContract.SALES_DECK_PREP,
 };
 
 /**
