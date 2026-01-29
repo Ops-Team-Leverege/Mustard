@@ -155,11 +155,11 @@ function generateSmartClarifyMessage(
     response += `If so—${partialAnswer}\n\n`;
   }
   
-  // Offer specific alternatives if available
+  // Offer specific alternatives if available (numbered so user can reply with a number)
   if (hasAlternatives) {
     response += "Or did you mean:\n";
-    alternatives.forEach(alt => {
-      response += `• ${alt.description}`;
+    alternatives.forEach((alt, index) => {
+      response += `${index + 1}. ${alt.description}`;
       if (alt.hint) response += ` (${alt.hint})`;
       response += "\n";
     });
@@ -168,7 +168,7 @@ function generateSmartClarifyMessage(
   
   // Friendly close with clear instructions
   if (hasAlternatives) {
-    response += "Reply with a number (1, 2, 3...) or describe what you need!";
+    response += "Reply with a number or describe what you need!";
   } else if (confidence < 0.8) {
     response += "Let me know if that's right, or tell me more!";
   } else {

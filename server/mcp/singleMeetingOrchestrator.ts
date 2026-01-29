@@ -744,10 +744,9 @@ async function handleExtractiveIntent(
       }
     }
     
-    // Offer to show answers if there are any answered questions with evidence
-    const hasAnswerEvidence = answeredQuestions.some(q => q.answerEvidence);
-    if (hasAnswerEvidence) {
-      lines.push("\n_Reply with a number (1, 2, 3...) or describe what you need!_");
+    // Offer to help with specific questions if there are any
+    if (openQuestions.length > 0 || answeredQuestions.length > 0) {
+      lines.push("\n_Ask me about any specific question for more details!_");
     }
     
     return {
@@ -1022,10 +1021,9 @@ async function handleAggregativeIntent(
       }
     }
     
-    // Offer to show answers if there are any answered questions with evidence
-    const hasAnswerEvidence = answeredQuestions.some(q => q.answerEvidence);
-    if (hasAnswerEvidence) {
-      lines.push("\n_Reply with a number (1, 2, 3...) or describe what you need!_");
+    // Offer to help with specific questions if there are any
+    if (openQuestions.length > 0 || answeredQuestions.length > 0) {
+      lines.push("\n_Ask me about any specific question for more details!_");
     }
     
     return {
