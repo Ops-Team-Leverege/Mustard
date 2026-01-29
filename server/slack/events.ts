@@ -615,11 +615,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // Only attempt temporal resolution if:
     // - No thread context exists, OR
     // - Message explicitly uses temporal language
+    // - A company name is mentioned (auto-select most recent meeting)
     const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
     const meetingDetection = { regexResult, llmCalled, llmResult, llmLatencyMs };
     
-    if (!threadContext?.meetingId || hasMeetingRef) {
-      console.log(`[Slack] Step 0: Meeting resolution (hasMeetingRef=${hasMeetingRef}, regex=${regexResult}, llm=${llmResult})`);
+    // Also check if a company is mentioned - if so, we can auto-resolve to most recent meeting
+    const companyMentioned = await extractCompanyFromMessage(text);
+    const shouldAttemptResolution = !threadContext?.meetingId || hasMeetingRef || companyMentioned !== null;
+    
+    if (shouldAttemptResolution) {
+      console.log(`[Slack] Step 0: Meeting resolution (hasMeetingRef=${hasMeetingRef}, regex=${regexResult}, llm=${llmResult}, companyMentioned=${companyMentioned?.companyName || 'none'})`);
       
       logger.startStage('meeting_resolution');
       const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
