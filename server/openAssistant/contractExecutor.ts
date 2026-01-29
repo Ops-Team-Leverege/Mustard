@@ -4,6 +4,10 @@
  * Executes ContractChain with authority and evidence threshold enforcement.
  * No routing, intent logic, or meeting resolution - purely focused on
  * executing contracts and enforcing constraints.
+ * 
+ * KEY ARCHITECTURE:
+ * - Extraction contracts: Return raw data from meetings
+ * - Synthesis contracts: Gather data, then use LLM to analyze patterns/trends
  */
 
 import { AnswerContract, type SSOTMode, getContractConstraints, type ContractChain } from "../controlPlane/answerContracts";
@@ -11,6 +15,19 @@ import type { SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
 import { storage } from "../storage";
 import { searchAcrossMeetings } from "./meetingResolver";
 import type { ContractExecutionDecision } from "./types";
+import { OpenAI } from "openai";
+import { MODEL_ASSIGNMENTS } from "../config/models";
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+
+// Contracts that require LLM synthesis after gathering raw data
+const SYNTHESIS_CONTRACTS = [
+  AnswerContract.PATTERN_ANALYSIS,
+  AnswerContract.TREND_SUMMARY,
+  AnswerContract.CROSS_MEETING_QUESTIONS,
+];
 
 /**
  * Coverage metadata for language qualification.
@@ -237,13 +254,14 @@ async function executeMultiMeetingContract(
   const actualEvidence = await fetchActualEvidence(contract, meetings);
   console.log(`[executeMultiMeetingContract] ${contract}: actual evidence count=${actualEvidence.count}, meetingsWithEvidence=${actualEvidence.meetingsWithEvidence}`);
   
-  const isExtractionContract = [
-    AnswerContract.CROSS_MEETING_QUESTIONS,
+  // Extraction-only contracts (no synthesis needed)
+  // Note: CROSS_MEETING_QUESTIONS needs synthesis, so it's NOT in this list
+  const isExtractionOnlyContract = [
     AnswerContract.CUSTOMER_QUESTIONS,
     AnswerContract.ATTENDEES,
   ].includes(contract);
   
-  if (isExtractionContract && actualEvidence.count === 0) {
+  if (isExtractionOnlyContract && actualEvidence.count === 0) {
     return {
       output: `No ${contract === AnswerContract.ATTENDEES ? 'attendee information' : 'customer questions'} found in the searched meetings.`,
       evidenceFound: false,
@@ -257,12 +275,39 @@ async function executeMultiMeetingContract(
   
   const rawOutput = await searchAcrossMeetings(fullQuery, meetings, topic);
   
-  if (isExtractionContract) {
+  if (isExtractionOnlyContract) {
     return {
       output: rawOutput,
       evidenceFound: actualEvidence.count > 0,
       evidenceCount: actualEvidence.count,
       meetingsWithEvidence: actualEvidence.meetingsWithEvidence,
+    };
+  }
+  
+  // SYNTHESIS STEP: For analysis contracts, synthesize raw excerpts into insights
+  if (SYNTHESIS_CONTRACTS.includes(contract)) {
+    console.log(`[ContractExecutor] Applying synthesis step for ${contract}`);
+    // Compute accurate coverage from meetings if not provided
+    const uniqueCompanyIds = new Set(meetings.map(m => m.companyId));
+    const effectiveCoverage = coverage || { 
+      totalMeetings: meetings.length, 
+      uniqueCompanies: uniqueCompanyIds.size 
+    };
+    const synthesizedOutput = await synthesizeAnalysis(
+      contract,
+      userMessage,
+      rawOutput,
+      meetings,
+      effectiveCoverage
+    );
+    
+    const evidenceResult = analyzeOutputForEvidence(contract, synthesizedOutput, meetings.length);
+    
+    return {
+      output: synthesizedOutput,
+      evidenceFound: evidenceResult.found,
+      evidenceCount: evidenceResult.count,
+      meetingsWithEvidence: evidenceResult.meetingsContributing,
     };
   }
   
@@ -470,5 +515,144 @@ export function mapOrchestratorIntentToContract(
       return AnswerContract.MEETING_SUMMARY;
     default:
       return chainPrimaryContract;
+  }
+}
+
+/**
+ * Synthesize raw excerpts into structured analysis using LLM.
+ * 
+ * This is the key step that transforms raw transcript excerpts into
+ * actionable insights with patterns, frequencies, and groupings.
+ */
+async function synthesizeAnalysis(
+  contract: AnswerContract,
+  userMessage: string,
+  rawExcerpts: string,
+  meetings: SingleMeetingContext[],
+  coverage: CoverageContext
+): Promise<string> {
+  const uniqueCompanies = Array.from(new Set(meetings.map(m => m.companyName)));
+  const companyList = uniqueCompanies.slice(0, 5).join(", ") + (uniqueCompanies.length > 5 ? ` and ${uniqueCompanies.length - 5} more` : "");
+  
+  const synthesisPrompt = getSynthesisPrompt(contract, coverage, companyList);
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: MODEL_ASSIGNMENTS.MULTI_MEETING_SYNTHESIS,
+      messages: [
+        {
+          role: "system",
+          content: synthesisPrompt,
+        },
+        {
+          role: "user",
+          content: `USER QUESTION: ${userMessage}\n\n=== RAW DATA FROM ${coverage.totalMeetings} MEETINGS ===\n${rawExcerpts}`,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+    
+    const synthesis = response.choices[0]?.message?.content || rawExcerpts;
+    console.log(`[ContractExecutor] Synthesis complete for ${contract} (${synthesis.length} chars)`);
+    return synthesis;
+  } catch (error) {
+    console.error(`[ContractExecutor] Synthesis failed, returning raw excerpts:`, error);
+    return rawExcerpts;
+  }
+}
+
+/**
+ * Get contract-specific synthesis prompts.
+ * These prompts instruct the LLM how to transform raw excerpts into insights.
+ * Includes coverage qualification to ensure appropriate confidence levels.
+ */
+function getSynthesisPrompt(contract: AnswerContract, coverage: CoverageContext, companyList: string): string {
+  const baseContext = `You are analyzing customer call data from ${coverage.totalMeetings} meetings across ${coverage.uniqueCompanies} companies (${companyList}).`;
+  const coverageQualification = getCoverageQualification(coverage);
+  
+  switch (contract) {
+    case AnswerContract.PATTERN_ANALYSIS:
+      return `${baseContext}
+${coverageQualification}
+
+Your task is to identify PATTERNS and RECURRING THEMES across all the meeting excerpts.
+
+OUTPUT FORMAT:
+**Key Patterns Across ${coverage.totalMeetings} Calls:**
+
+1. **[Pattern Name]** (mentioned in X/${coverage.totalMeetings} calls)
+   - Brief description of the pattern
+   - Representative quote if available
+
+2. **[Pattern Name]** (mentioned in X/${coverage.totalMeetings} calls)
+   - Brief description
+   - Representative quote
+
+RULES:
+- Group similar concerns/questions together into patterns
+- Count how many meetings mention each pattern (estimate if exact count unclear)
+- Prioritize patterns by frequency (most common first)
+- Include 1-2 representative quotes per pattern
+- Be specific about what customers are asking or concerned about
+- Limit to 5-7 most significant patterns
+- If data is insufficient to identify clear patterns, say so explicitly`;
+
+    case AnswerContract.TREND_SUMMARY:
+      return `${baseContext}
+${coverageQualification}
+
+Your task is to identify TRENDS and CHANGES OVER TIME in customer discussions.
+
+OUTPUT FORMAT:
+**Trends Across ${coverage.totalMeetings} Calls:**
+
+1. **[Trend Name]**
+   - How this has evolved over time
+   - Earlier vs more recent discussions
+
+2. **[Trend Name]**
+   - Direction of change
+   - Notable shifts
+
+RULES:
+- Look for topics that appear more/less frequently over time
+- Note any shifts in customer sentiment or priorities
+- Identify emerging concerns vs declining ones
+- If meeting dates are visible in the data, reference them
+- If temporal data is insufficient or dates are unclear, explicitly state: "Temporal trends cannot be determined from this data - consider organizing by theme instead"
+- Do not fabricate timeline information`;
+
+    case AnswerContract.CROSS_MEETING_QUESTIONS:
+      return `${baseContext}
+${coverageQualification}
+
+Your task is to consolidate and categorize CUSTOMER QUESTIONS from across meetings.
+
+OUTPUT FORMAT:
+**Customer Questions Across ${coverage.totalMeetings} Calls:**
+
+**[Category 1: e.g., Technical/Integration]** (X questions)
+- Question 1 (from [Company])
+- Question 2 (from [Company])
+
+**[Category 2: e.g., Pricing/Business]** (X questions)
+- Question 1 (from [Company])
+- Question 2 (from [Company])
+
+RULES:
+- Group questions by theme/category
+- Include the company name for each question
+- Consolidate similar questions (don't repeat variations)
+- Note if a question came up in multiple meetings
+- Prioritize unanswered or recurring questions
+- If no clear questions are found, say so rather than inventing them`;
+
+    default:
+      return `${baseContext}
+${coverageQualification}
+
+Analyze the provided meeting excerpts and synthesize the key insights relevant to the user's question.
+Be specific, cite evidence, and organize your response clearly.`;
   }
 }
