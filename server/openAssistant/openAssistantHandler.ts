@@ -61,6 +61,28 @@ const ALLOWED_DOMAINS = [
 ];
 
 /**
+ * Build thread context section for LLM prompts
+ * Provides conversation history for context-aware responses
+ */
+function buildThreadContextSection(context: OpenAssistantContext): string {
+  if (!context.threadMessages || context.threadMessages.length === 0) {
+    return '';
+  }
+  
+  const messages = context.threadMessages.map(msg => {
+    const speaker = msg.isBot ? 'PitCrew Sauce' : 'User';
+    return `${speaker}: ${msg.text}`;
+  }).join('\n');
+  
+  return `
+## Previous Conversation in This Thread
+${messages}
+
+Use this conversation context to provide relevant, continuous responses. Reference specific details mentioned earlier when applicable.
+`;
+}
+
+/**
  * Validate URL for safety (SSRF protection)
  * Uses strict domain allowlist to prevent SSRF attacks.
  */
@@ -308,8 +330,10 @@ async function getProductKnowledgeResponse(
   userMessage: string,
   productDataPrompt: string,
   hasProductData: boolean,
-  streamingContext?: SlackStreamingContext
+  streamingContext?: SlackStreamingContext,
+  threadContext?: string
 ): Promise<string> {
+  const threadContextSection = threadContext || '';
   const systemPrompt = hasProductData
     ? `${AMBIENT_PRODUCT_CONTEXT}
 
@@ -340,7 +364,7 @@ WEBSITE CONTENT RULES (CRITICAL):
 - This data is from the PRODUCT KNOWLEDGE DATABASE (Airtable), NOT from the live website
 - NEVER claim something is "on the website" or "currently exists on the site" - you cannot see the website
 - If the user asks about website content, clearly label this as "Product Knowledge (from database)" not "Existing on Website"
-- If they want a website comparison, ask them to provide the URL so you can analyze the live content`
+- If they want a website comparison, ask them to provide the URL so you can analyze the live content${threadContextSection}`
     : `${AMBIENT_PRODUCT_CONTEXT}
 
 You are answering a product knowledge question about PitCrew.
@@ -351,7 +375,7 @@ AUTHORITY RULES (without product data):
 - Provide only general, high-level explanations about PitCrew's purpose and value
 - Add "I'd recommend checking our product documentation for specific details"
 - For pricing: Say "For current pricing information, please check with the sales team"
-- NEVER fabricate specific features, pricing, or integration claims`;
+- NEVER fabricate specific features, pricing, or integration claims${threadContextSection}`;
 
   try {
     const startTime = Date.now();
@@ -859,6 +883,9 @@ async function handleProductKnowledgeIntent(
   
   let answer: string;
   
+  // Build thread context for conversation continuity
+  const threadContextSection = buildThreadContextSection(context);
+  
   // If URL detected + product data available → use Gemini for web-based analysis
   if (websiteUrl && hasProductData) {
     console.log(`[OpenAssistant] URL detected with product data - trying Gemini for website analysis`);
@@ -870,11 +897,11 @@ async function handleProductKnowledgeIntent(
     } else {
       // Gemini failed - fall back to gpt-4o without website content
       console.log(`[OpenAssistant] Gemini unavailable - falling back to gpt-4o`);
-      answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming);
+      answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, threadContextSection);
     }
   } else {
     // No URL - use gpt-4o directly
-    answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming);
+    answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, threadContextSection);
   }
 
   return {
@@ -1007,22 +1034,18 @@ async function handleGeneralAssistanceIntent(
   
   const startTime = Date.now();
   
-  // Build thread context string for drafting
-  let threadContextStr = "";
-  if (isDraftingContract && context.threadMessages && context.threadMessages.length > 1) {
-    const prevMessages = context.threadMessages.slice(0, -1); // Exclude current message
-    threadContextStr = "\n\n=== CONVERSATION CONTEXT ===\nUse this context from the thread to inform your draft:\n\n";
-    for (const msg of prevMessages) {
-      const role = msg.isBot ? "Assistant" : "User";
-      threadContextStr += `${role}: ${msg.text}\n\n`;
-    }
-    threadContextStr += "=== END CONTEXT ===\n\nIMPORTANT: Use the specific details from the conversation above (customer names, action items, topics discussed) in your draft. Do NOT use generic placeholders.";
-    console.log(`[OpenAssistant] Including ${prevMessages.length} thread messages for drafting context`);
+  // Build thread context for conversation continuity
+  const threadContextSection = buildThreadContextSection(context);
+  
+  // Additional instructions for drafting contracts
+  let draftingInstructions = "";
+  if (isDraftingContract && threadContextSection) {
+    draftingInstructions = "\n\nIMPORTANT: Use the specific details from the conversation above (customer names, action items, topics discussed) in your draft. Do NOT use generic placeholders.";
   }
   
   // Add meeting context if available
   let meetingContextStr = "";
-  if (isDraftingContract && context.resolvedMeeting) {
+  if (context.resolvedMeeting) {
     const meeting = context.resolvedMeeting;
     meetingContextStr = `\n\nMeeting Context: ${meeting.companyName}${meeting.meetingDate ? ` (${meeting.meetingDate.toLocaleDateString()})` : ''}`;
   }
@@ -1044,7 +1067,7 @@ You are a helpful business assistant for the PitCrew team. Provide clear, profes
 - Making claims that require Product SSOT or meeting evidence
 - Implying you have access to specific meeting data
 
-If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.${meetingContextStr}${threadContextStr}`;
+If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.${meetingContextStr}${threadContextSection}${draftingInstructions}`;
   
   console.log(`[OpenAssistant] Calling gpt-4o for general assistance (streaming: ${!!context.slackStreaming})...`);
   const answer = await streamOpenAIResponse(
