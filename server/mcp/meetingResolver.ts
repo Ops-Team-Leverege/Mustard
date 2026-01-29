@@ -19,6 +19,7 @@
 
 import { storage } from "../storage";
 import { OpenAI } from "openai";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -669,7 +670,7 @@ async function llmMeetingReferenceClassifier(question: string): Promise<boolean>
   
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.MEETING_RESOLUTION,
       messages: [
         {
           role: "system",

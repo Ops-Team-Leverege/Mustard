@@ -19,6 +19,7 @@
  */
 
 import { OpenAI } from "openai";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 import { 
   interpretAmbiguousQuery,
   validateLowConfidenceIntent,
@@ -718,7 +719,7 @@ Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "b
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: question },

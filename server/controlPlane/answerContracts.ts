@@ -27,7 +27,7 @@
  * ============================================================================
  * A contract chain is an ordered execution plan that describes how to fulfill
  * a request within a SINGLE intent and scope.
- * 
+ *
  * What it is:
  * - Each contract performs one task with fixed output shape
  * - Each contract has explicit authority rules
@@ -86,6 +86,7 @@
 import { OpenAI } from "openai";
 import { Intent } from "./intent";
 import { ContextLayers } from "./contextLayers";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -1121,7 +1122,7 @@ Respond with JSON: {"contract": "CONTRACT_NAME", "reason": "brief explanation"}`
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.CONTRACT_SELECTION,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: question },

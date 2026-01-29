@@ -19,6 +19,7 @@
 import OpenAI from "openai";
 import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
+import { LLM_MODELS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -378,7 +379,7 @@ export async function semanticAnswerSingleMeeting(
   
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: LLM_MODELS.HEAVY_ANALYSIS,
       max_completion_tokens: 500,
       messages: [
         {

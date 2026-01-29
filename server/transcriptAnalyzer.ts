@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import type { Category } from "@shared/schema";
+import { MODEL_ASSIGNMENTS } from "./config/models";
 
-// Using OpenAI blueprint - the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY,
   timeout: 180000, // 3 minutes timeout for very long transcripts
@@ -195,7 +195,7 @@ IMPORTANT:
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-5", // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      model: MODEL_ASSIGNMENTS.TRANSCRIPT_ANALYSIS,
       // Note: gpt-5 only supports temperature=1 (default), so we don't override temperature/top_p here
       messages: [
         {

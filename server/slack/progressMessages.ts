@@ -13,6 +13,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import OpenAI from 'openai';
+import { MODEL_ASSIGNMENTS } from '../config/models';
 
 const openai = new OpenAI();
 
@@ -89,7 +90,7 @@ export async function generatePersonalizedProgressMessage(
 ): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
       messages: [
         {
           role: "system",

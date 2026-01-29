@@ -15,6 +15,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { OpenAI } from "openai";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -172,7 +173,7 @@ async function provideGeneralKnowledge(
   console.log(`[ExternalResearch] Providing general knowledge (Gemini not available)`);
   
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: MODEL_ASSIGNMENTS.EXTERNAL_RESEARCH,
     messages: [
       {
         role: "system",

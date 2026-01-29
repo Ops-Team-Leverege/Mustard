@@ -30,6 +30,11 @@
  * but should be migrated to Control Plane routing.
  */
 
+import { MODEL_ASSIGNMENTS, LLM_MODELS } from "../config/models";
+
+/**
+ */
+
 import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { MeetingActionItem as DbActionItem } from "@shared/schema";
@@ -1202,7 +1207,7 @@ async function handleDraftingIntent(
   const meetingContext = contextParts.join("\n");
   
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: MODEL_ASSIGNMENTS.SINGLE_MEETING_RESPONSE,
     temperature: 0.7,
     messages: [
       {
@@ -1271,7 +1276,7 @@ async function handleSummaryIntent(
     .join("\n\n");
   
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: LLM_MODELS.HEAVY_ANALYSIS,
     messages: [
       {
         role: "system",
@@ -1530,7 +1535,7 @@ Be concise but thorough. Prioritize accuracy over completeness.`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: MODEL_ASSIGNMENTS.SINGLE_MEETING_RESPONSE,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: questionsForAssessment.join("\n") },

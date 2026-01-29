@@ -19,6 +19,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import type { TranscriptChunk, CustomerQuestion } from "@shared/schema";
+import { MODEL_ASSIGNMENTS, getModelDescription } from "../config/models";
 
 const openai = new OpenAI();
 
@@ -121,7 +122,7 @@ Return JSON with: resolution_status, answer_text, answered_by_name, evidence_quo
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: MODEL_ASSIGNMENTS.QUESTION_ANSWER_RESOLUTION,
       temperature: 0,
       response_format: { type: "json_object" },
       messages: [

@@ -23,6 +23,7 @@
  */
 
 import { OpenAI } from "openai";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -256,7 +257,7 @@ If confirmed=true, suggestedIntent/suggestedContract can be omitted.`;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.LLM_INTERPRETATION,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `User question: "${question}"` },
@@ -516,7 +517,7 @@ Response: {
     messages.push({ role: "user", content: question });
     
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.LLM_INTERPRETATION,
       messages,
       temperature: 0.3,
       response_format: { type: "json_object" },

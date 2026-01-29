@@ -23,6 +23,7 @@
 import OpenAI from "openai";
 import { z } from "zod";
 import type { TranscriptChunk } from "@shared/schema";
+import { MODEL_ASSIGNMENTS, getModelDescription } from "../config/models";
 
 const openai = new OpenAI();
 
@@ -190,7 +191,7 @@ async function extractFromBatch(
   const formattedTranscript = formatChunksForExtraction(chunks);
   
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: MODEL_ASSIGNMENTS.CUSTOMER_QUESTION_EXTRACTION,
     temperature: 0,
     max_tokens: 4096,
     response_format: { type: "json_object" },
@@ -243,7 +244,7 @@ export async function extractCustomerQuestions(
   let allQuestions: CustomerQuestionResult[] = [];
   
   if (chunks.length <= BATCH_SIZE) {
-    console.log(`[CustomerQuestions] Extracting from ${chunks.length} chunks using gpt-4o temp=0`);
+    console.log(`[CustomerQuestions] Extracting from ${chunks.length} chunks using ${getModelDescription(MODEL_ASSIGNMENTS.CUSTOMER_QUESTION_EXTRACTION)} temp=0`);
     allQuestions = await extractFromBatch(chunks, 1, 1);
   } else {
     const totalBatches = Math.ceil(chunks.length / BATCH_SIZE);

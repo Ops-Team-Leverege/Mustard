@@ -18,6 +18,7 @@ import {
 } from "./documentGenerator";
 import { AnswerContract } from "../controlPlane/answerContracts";
 import OpenAI from 'openai';
+import { MODEL_ASSIGNMENTS } from '../config/models';
 
 const openai = new OpenAI();
 
@@ -186,7 +187,7 @@ export async function sendResponseWithDocumentSupport(
 async function generateTitleWithLLM(query: string, contract?: AnswerContract): Promise<string | null> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.DOCUMENT_TITLE_GENERATION,
       messages: [
         {
           role: "system",

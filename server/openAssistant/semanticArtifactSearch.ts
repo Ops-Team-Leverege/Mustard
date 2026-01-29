@@ -15,6 +15,7 @@
 import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { CustomerQuestion, MeetingActionItem, Product } from "@shared/schema";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -143,7 +144,7 @@ async function rankByRelevance<T extends CustomerQuestion | MeetingActionItem>(
   });
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: MODEL_ASSIGNMENTS.ARTIFACT_SEARCH,
     messages: [
       {
         role: "system",
@@ -203,7 +204,7 @@ async function checkSummaryRelevance(
   topic: string
 ): Promise<{ isRelevant: boolean; reason: string }> {
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: MODEL_ASSIGNMENTS.ARTIFACT_SEARCH,
     messages: [
       {
         role: "system",

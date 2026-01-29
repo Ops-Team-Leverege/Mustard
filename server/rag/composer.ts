@@ -25,6 +25,7 @@
  */
 
 import { OpenAI } from "openai";
+import { MODEL_ASSIGNMENTS, LLM_MODELS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -198,7 +199,7 @@ export async function composeMeetingSummary(
   const transcript = formatTranscript(chunks);
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: MODEL_ASSIGNMENTS.RAG_COMPOSITION,
     temperature: 0, // Deterministic extraction
     top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
@@ -298,7 +299,7 @@ export async function selectRepresentativeQuotes(
   const transcript = formatTranscript(customerChunks);
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: MODEL_ASSIGNMENTS.RAG_COMPOSITION,
     temperature: 0, // Deterministic extraction
     top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
@@ -364,7 +365,7 @@ export async function answerMeetingQuestion(
   const transcript = formatTranscript(chunks);
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: MODEL_ASSIGNMENTS.RAG_COMPOSITION,
     temperature: 0, // Deterministic extraction
     top_p: 0.1, // Restrict vocabulary for consistency
     messages: [
@@ -516,7 +517,7 @@ export async function extractMeetingActionStates(
     : "";
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o", // Higher quality model for action extraction
+    model: MODEL_ASSIGNMENTS.ACTION_ITEM_EXTRACTION,
     temperature: 0, // Deterministic extraction - same input = same output
     top_p: 0.1, // Restrict vocabulary for consistency
     messages: [

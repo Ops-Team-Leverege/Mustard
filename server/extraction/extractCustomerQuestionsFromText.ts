@@ -7,6 +7,7 @@
 
 import OpenAI from "openai";
 import { CustomerQuestionResultSchema, ExtractionOutputSchema, type CustomerQuestionResult, requiresContext } from "./extractCustomerQuestions";
+import { MODEL_ASSIGNMENTS, getModelDescription } from "../config/models";
 
 const openai = new OpenAI();
 
@@ -59,11 +60,11 @@ export async function extractCustomerQuestionsFromText(
     ? transcriptText.slice(0, 100000) + "\n\n[TRANSCRIPT TRUNCATED]"
     : transcriptText;
 
-  console.log(`[CustomerQuestions] Extracting from raw text (${transcriptText.length} chars) using gpt-4o temp=0`);
+  console.log(`[CustomerQuestions] Extracting from raw text (${transcriptText.length} chars) using ${getModelDescription(MODEL_ASSIGNMENTS.CUSTOMER_QUESTION_EXTRACTION)} temp=0`);
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: MODEL_ASSIGNMENTS.CUSTOMER_QUESTION_EXTRACTION,
       temperature: 0,
       response_format: { type: "json_object" },
       messages: [

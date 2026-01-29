@@ -18,6 +18,11 @@
  * Important architectural rule:
  * - LLM usage here is limited to "decide what capability to call"
  * - Any LLM-based interpretation of retrieved data MUST live in the RAG composer layer
+ */
+
+import { MODEL_ASSIGNMENTS } from "../config/models";
+
+/**
  *   (see server/rag/composers.ts)
  *
  * Rationale:
@@ -80,7 +85,7 @@ Examples of when to NOT call a capability:
 - "What can you do?" → meta question about capabilities`;
 
    const response = await openai.chat.completions.create({
-     model: "gpt-4o-mini",
+     model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
      messages: [
        { role: "system", content: systemPrompt },
        { role: "user", content: text },
