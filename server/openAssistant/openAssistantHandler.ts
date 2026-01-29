@@ -76,16 +76,35 @@ AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable):
 ${productDataPrompt}
 
 TASK:
-1. Fetch and analyze the content from the provided URL
-2. Compare the website content against the authoritative product knowledge
-3. For update/refresh requests: clearly identify what is NEW (in product knowledge but missing from website) vs what EXISTS (already on the website)
-4. For verification requests: confirm accuracy of website content against product knowledge
-5. For drafting requests: create new content based on both sources
+You MUST perform a two-step analysis:
 
-RESPONSE GUIDELINES:
-- Match your response format to the user's request (comparison, verification, draft, etc.)
-- Be specific about what content exists vs what is new
-- Cite the product knowledge when making factual claims`,
+STEP 1 - FETCH THE LIVE WEBSITE:
+First, fetch and read the actual content from the provided URL. Extract and list what currently exists on the live site. This is critical - do NOT assume or guess what's on the website.
+
+STEP 2 - COMPARE WITH PRODUCT KNOWLEDGE:
+After fetching the live content, compare it against the authoritative product knowledge above.
+
+OUTPUT FORMAT (required for comparison/update requests):
+
+**Currently on the Live Website:**
+[List the actual items/content you found on the live site - be specific with exact text/questions]
+
+**In Product Knowledge (Airtable):**
+[List the relevant items from the product knowledge database]
+
+**Gap Analysis:**
+| Content | On Live Site? | In Product Knowledge? | Action Needed |
+|---------|---------------|----------------------|---------------|
+[Compare each item and indicate what matches, what's missing, what's outdated]
+
+**Recommendations:**
+[Based on the gap analysis, provide specific recommendations]
+
+CRITICAL RULES:
+- NEVER claim something is "on the website" without actually fetching and verifying it
+- Always clearly distinguish between "data from live website" vs "data from product knowledge"
+- If you cannot access the website, explicitly state this limitation
+- Quote exact text from the live site when possible`,
     });
 
     const content = response.text;
@@ -132,7 +151,13 @@ The Airtable data describes the PRICING MODEL (structure), not the actual DOLLAR
 RESPONSE GUIDELINES:
 - Match your response format to the user's request (list, paragraph, comparison, draft, etc.)
 - Synthesize information naturally - don't just dump data
-- Be conversational unless the user requests structured output`
+- Be conversational unless the user requests structured output
+
+WEBSITE CONTENT RULES (CRITICAL):
+- This data is from the PRODUCT KNOWLEDGE DATABASE (Airtable), NOT from the live website
+- NEVER claim something is "on the website" or "currently exists on the site" - you cannot see the website
+- If the user asks about website content, clearly label this as "Product Knowledge (from database)" not "Existing on Website"
+- If they want a website comparison, ask them to provide the URL so you can analyze the live content`
     : `${AMBIENT_PRODUCT_CONTEXT}
 
 You are answering a product knowledge question about PitCrew.
