@@ -196,7 +196,7 @@ function generateTitleFromContract(contract: AnswerContract, customerName?: stri
       return `PitCrew Product Overview`;
     case AnswerContract.EXTERNAL_RESEARCH:
       return `${customer} Research Report`;
-    case AnswerContract.SALES_DECK_PREP:
+    case AnswerContract.SALES_DOCS_PREP:
       return `${customer} Sales Deck Brief`;
     default:
       // Use the customer name as title if available, otherwise generic

@@ -136,7 +136,7 @@ export enum AnswerContract {
   // External Research contracts (uses web search via Gemini)
   // ============================================================================
   EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH",   // Web research on companies/prospects
-  SALES_DECK_PREP = "SALES_DECK_PREP",       // Research + value prop matching for sales
+  SALES_DOCS_PREP = "SALES_DOCS_PREP",       // Research + value prop matching for sales
   
   // ============================================================================
   // General contracts
@@ -378,7 +378,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "text",
     emptyResultBehavior: "clarify",
   },
-  [AnswerContract.SALES_DECK_PREP]: {
+  [AnswerContract.SALES_DOCS_PREP]: {
     ssotMode: "descriptive",
     requiresEvidence: false,
     allowsSummary: true,
@@ -513,16 +513,6 @@ const GENERAL_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "thanks email": AnswerContract.DRAFT_EMAIL,
   "write a thank you": AnswerContract.DRAFT_EMAIL,
   "write thank you": AnswerContract.DRAFT_EMAIL,
-  // Meeting prep patterns
-  "prep me for": AnswerContract.SALES_DECK_PREP,
-  "prep for meeting": AnswerContract.SALES_DECK_PREP,
-  "prepare me for": AnswerContract.SALES_DECK_PREP,
-  "prepare for meeting": AnswerContract.SALES_DECK_PREP,
-  "meeting prep": AnswerContract.SALES_DECK_PREP,
-  "get me ready for": AnswerContract.SALES_DECK_PREP,
-  "ready for meeting": AnswerContract.SALES_DECK_PREP,
-  "briefing for": AnswerContract.SALES_DECK_PREP,
-  "brief me on": AnswerContract.SALES_DECK_PREP,
 };
 
 /**
@@ -613,7 +603,7 @@ const CONTRACT_PHASES: Record<AnswerContract, TaskPhase> = {
   
   // Research phase (external web research)
   [AnswerContract.EXTERNAL_RESEARCH]: "analysis",
-  [AnswerContract.SALES_DECK_PREP]: "analysis",
+  [AnswerContract.SALES_DOCS_PREP]: "analysis",
   
   // Drafting phase
   [AnswerContract.PRODUCT_EXPLANATION]: "drafting",
@@ -683,8 +673,8 @@ const TASK_KEYWORDS: Array<{
   { pattern: /research|earnings\s+call|public\s+statement|their\s+priorit/i, task: "external_research", 
     contracts: [AnswerContract.EXTERNAL_RESEARCH],
     intent: [Intent.EXTERNAL_RESEARCH] },
-  { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for|draft.*slides?|create.*slides?/i, task: "sales_deck_prep", 
-    contracts: [AnswerContract.SALES_DECK_PREP],
+  { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for|draft.*slides?|create.*slides?/i, task: "sales_docs_prep", 
+    contracts: [AnswerContract.SALES_DOCS_PREP],
     intent: [Intent.EXTERNAL_RESEARCH] },
   { pattern: /value\s+prop|connect.*pitcrew|align.*offering|match.*product|our\s+offer|pitcrew\s+offer/i, task: "product_connection", 
     contracts: [AnswerContract.PRODUCT_KNOWLEDGE],
@@ -1044,9 +1034,9 @@ function selectContractByKeyword(
     // Check for slide deck / pitch deck keywords
     if (lower.includes("slide") || lower.includes("deck") || lower.includes("pitch")) {
       return {
-        contract: AnswerContract.SALES_DECK_PREP,
+        contract: AnswerContract.SALES_DOCS_PREP,
         contractSelectionMethod: "keyword",
-        constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DECK_PREP],
+        constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DOCS_PREP],
       };
     }
     if (lower.includes("value prop")) {
