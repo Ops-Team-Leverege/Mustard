@@ -1017,15 +1017,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
         }
         
         // Send progress message if available (for long operations like external research, KB-assisted answers)
+        // ONLY send if no generic timer-based progress messages have been sent yet
+        // This prevents message duplication and confusing message order
         const progressMessage = openAssistantResultData.progressMessage || 
           openAssistantResultData.singleMeetingResult?.progressMessage;
-        if (progressMessage && !testRun) {
-          console.log(`[Slack] Sending progress message for operation: "${progressMessage.substring(0, 50)}..."`);
+        if (progressMessage && !testRun && progressMessageCount === 0) {
+          console.log(`[Slack] Sending operation-specific progress message: "${progressMessage.substring(0, 50)}..."`);
           await postSlackMessage({
             channel,
             text: progressMessage,
             thread_ts: threadTs,
           });
+        } else if (progressMessage && progressMessageCount > 0) {
+          console.log(`[Slack] Skipping operation-specific progress (${progressMessageCount} generic messages already sent)`);
         }
         
         logger.info('Open Assistant response generated', {

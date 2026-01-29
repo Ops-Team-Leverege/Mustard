@@ -85,7 +85,11 @@ Use this conversation context to provide relevant, continuous responses. Referen
 /**
  * Generate a user-friendly progress message for contract chains.
  * Only generates a message when there are multiple contracts to execute.
+ * 
+ * Length limit: 200 chars to keep messages concise in Slack.
  */
+const MAX_PROGRESS_MESSAGE_LENGTH = 200;
+
 function generateContractChainProgress(
   contracts: AnswerContract[],
   contextHint?: string
@@ -94,44 +98,54 @@ function generateContractChainProgress(
     return undefined;
   }
   
-  // Map contracts to user-friendly descriptions
+  // Map contracts to user-friendly descriptions (short versions for length control)
   const contractDescriptions: Record<AnswerContract, string> = {
-    [AnswerContract.MEETING_SUMMARY]: "summarizing the meeting",
+    [AnswerContract.MEETING_SUMMARY]: "summarizing",
     [AnswerContract.NEXT_STEPS]: "extracting action items",
     [AnswerContract.ATTENDEES]: "identifying attendees",
-    [AnswerContract.CUSTOMER_QUESTIONS]: "finding customer questions",
-    [AnswerContract.EXTRACTIVE_FACT]: "extracting specific facts",
-    [AnswerContract.AGGREGATIVE_LIST]: "compiling the list",
+    [AnswerContract.CUSTOMER_QUESTIONS]: "finding questions",
+    [AnswerContract.EXTRACTIVE_FACT]: "extracting facts",
+    [AnswerContract.AGGREGATIVE_LIST]: "compiling",
     [AnswerContract.PATTERN_ANALYSIS]: "analyzing patterns",
-    [AnswerContract.COMPARISON]: "comparing across meetings",
+    [AnswerContract.COMPARISON]: "comparing",
     [AnswerContract.TREND_SUMMARY]: "identifying trends",
-    [AnswerContract.CROSS_MEETING_QUESTIONS]: "gathering questions across meetings",
-    [AnswerContract.PRODUCT_EXPLANATION]: "explaining product details",
-    [AnswerContract.VALUE_PROPOSITION]: "crafting value propositions",
-    [AnswerContract.DRAFT_RESPONSE]: "drafting a response",
-    [AnswerContract.DRAFT_EMAIL]: "drafting an email",
+    [AnswerContract.CROSS_MEETING_QUESTIONS]: "gathering questions",
+    [AnswerContract.PRODUCT_EXPLANATION]: "explaining details",
+    [AnswerContract.VALUE_PROPOSITION]: "crafting value props",
+    [AnswerContract.DRAFT_RESPONSE]: "drafting response",
+    [AnswerContract.DRAFT_EMAIL]: "drafting email",
     [AnswerContract.FEATURE_VERIFICATION]: "verifying features",
     [AnswerContract.FAQ_ANSWER]: "answering from FAQs",
-    [AnswerContract.PRODUCT_KNOWLEDGE]: "gathering product knowledge",
-    [AnswerContract.PRODUCT_INFO]: "retrieving product information",
-    [AnswerContract.EXTERNAL_RESEARCH]: "researching external sources",
-    [AnswerContract.SALES_DOCS_PREP]: "preparing sales materials",
-    [AnswerContract.DOCUMENT_ANSWER]: "searching documents",
-    [AnswerContract.GENERAL_RESPONSE]: "preparing a response",
-    [AnswerContract.NOT_FOUND]: "searching for information",
-    [AnswerContract.REFUSE]: "reviewing the request",
-    [AnswerContract.CLARIFY]: "understanding the request",
+    [AnswerContract.PRODUCT_KNOWLEDGE]: "gathering product info",
+    [AnswerContract.PRODUCT_INFO]: "retrieving info",
+    [AnswerContract.EXTERNAL_RESEARCH]: "researching",
+    [AnswerContract.SALES_DOCS_PREP]: "preparing materials",
+    [AnswerContract.DOCUMENT_ANSWER]: "searching docs",
+    [AnswerContract.GENERAL_RESPONSE]: "preparing response",
+    [AnswerContract.NOT_FOUND]: "searching",
+    [AnswerContract.REFUSE]: "reviewing",
+    [AnswerContract.CLARIFY]: "understanding",
   };
   
   const steps = contracts.map(c => contractDescriptions[c] || c.toLowerCase().replace(/_/g, ' '));
   
   // Build a natural-sounding progress message
+  let message: string;
   if (steps.length === 2) {
-    return `This will take a moment—I'll be ${steps[0]}, then ${steps[1]}.`;
+    message = `This will take a moment—I'll be ${steps[0]}, then ${steps[1]}.`;
+  } else if (steps.length === 3) {
+    message = `This will take a moment—I'll be ${steps[0]}, ${steps[1]}, then ${steps[2]}.`;
   } else {
-    const lastStep = steps.pop();
-    return `This will take a moment—I'll be ${steps.join(', ')}, and then ${lastStep}.`;
+    // For 4+ steps, only show first 3 and indicate there's more
+    message = `This will take a moment—I'll be ${steps[0]}, ${steps[1]}, ${steps[2]}, and more.`;
   }
+  
+  // Enforce length limit
+  if (message.length > MAX_PROGRESS_MESSAGE_LENGTH) {
+    message = message.substring(0, MAX_PROGRESS_MESSAGE_LENGTH - 3) + '...';
+  }
+  
+  return message;
 }
 
 /**
