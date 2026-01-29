@@ -1014,6 +1014,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
           resolvedMeetingId = resolvedMeeting?.meetingId || null;
           semanticAnswerUsed = openAssistantResultData.singleMeetingResult.semanticAnswerUsed;
           semanticConfidence = openAssistantResultData.singleMeetingResult.semanticConfidence;
+          
+          // Send progress message if available (for chained operations like KB-assisted answers)
+          const progressMessage = openAssistantResultData.singleMeetingResult.progressMessage;
+          if (progressMessage && !testRun) {
+            console.log(`[Slack] Sending progress message for chained operation: "${progressMessage.substring(0, 50)}..."`);
+            await postSlackMessage({
+              channel,
+              text: progressMessage,
+              thread_ts: threadTs,
+            });
+          }
         }
         
         logger.info('Open Assistant response generated', {

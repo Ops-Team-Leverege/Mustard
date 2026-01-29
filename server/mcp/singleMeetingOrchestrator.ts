@@ -82,6 +82,7 @@ export type SingleMeetingResult = {
   semanticError?: string; // DEBUG: Capture error message if semantic layer fails
   isClarificationRequest?: boolean; // True when bot is asking user to clarify ambiguous question
   isBinaryQuestion?: boolean; // True when bot detected a yes/no question
+  progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for chained operations)
 };
 
 /**
@@ -1453,6 +1454,20 @@ async function generateKBAssistedCustomerQuestionAnswers(
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Generating KB-assisted answers: ${openQuestions.length} open, ${answeredQuestions.length} answered`);
   
+  // Build user-friendly progress message explaining what we're doing
+  const progressParts: string[] = [];
+  progressParts.push(`I found ${openQuestions.length + answeredQuestions.length} customer question${openQuestions.length + answeredQuestions.length !== 1 ? 's' : ''} from your ${ctx.companyName} meeting.`);
+  
+  if (answeredQuestions.length > 0 && openQuestions.length > 0) {
+    progressParts.push(`I'll check the ${answeredQuestions.length} answered question${answeredQuestions.length !== 1 ? 's' : ''} for accuracy and provide suggested answers for the ${openQuestions.length} open one${openQuestions.length !== 1 ? 's' : ''}.`);
+  } else if (answeredQuestions.length > 0) {
+    progressParts.push(`I'll assess the ${answeredQuestions.length} answered question${answeredQuestions.length !== 1 ? 's' : ''} for correctness against our product knowledge.`);
+  } else if (openQuestions.length > 0) {
+    progressParts.push(`I'll provide suggested answers for the ${openQuestions.length} open question${openQuestions.length !== 1 ? 's' : ''} using our product knowledge.`);
+  }
+  
+  const progressMessage = progressParts.join(' ');
+  
   // Fetch product knowledge for assessment
   let productKnowledge = "";
   try {
@@ -1533,6 +1548,7 @@ Be concise but thorough. Prioritize accuracy over completeness.`;
       answer: header + answer,
       intent: "extractive",
       dataSource: "customer_questions",
+      progressMessage,
     };
   } catch (err) {
     console.error(`[SingleMeetingOrchestrator] LLM error in KB-assisted answers:`, err);
