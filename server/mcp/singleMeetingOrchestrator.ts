@@ -735,13 +735,19 @@ async function handleExtractiveIntent(
     }
     
     if (answeredQuestions.length > 0) {
-      lines.push("\n*Answered Questions:*");
+      lines.push("\n*Answered in Meeting:*");
       answeredQuestions.slice(0, 10).forEach(q => {
         lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
       });
       if (answeredQuestions.length > 10) {
         lines.push(`_...and ${answeredQuestions.length - 10} more_`);
       }
+    }
+    
+    // Offer to show answers if there are any answered questions with evidence
+    const hasAnswerEvidence = answeredQuestions.some(q => q.answerEvidence);
+    if (hasAnswerEvidence) {
+      lines.push("\n_Reply with a number (1, 2, 3...) or describe what you need!_");
     }
     
     return {
@@ -1007,13 +1013,19 @@ async function handleAggregativeIntent(
     }
     
     if (answeredQuestions.length > 0) {
-      lines.push("\n*Answered Questions:*");
+      lines.push("\n*Answered in Meeting:*");
       answeredQuestions.slice(0, 5).forEach(q => {
         lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
       });
       if (answeredQuestions.length > 5) {
         lines.push(`_...and ${answeredQuestions.length - 5} more_`);
       }
+    }
+    
+    // Offer to show answers if there are any answered questions with evidence
+    const hasAnswerEvidence = answeredQuestions.some(q => q.answerEvidence);
+    if (hasAnswerEvidence) {
+      lines.push("\n_Reply with a number (1, 2, 3...) or describe what you need!_");
     }
     
     return {

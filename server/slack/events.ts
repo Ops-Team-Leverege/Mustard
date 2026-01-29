@@ -382,6 +382,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     let companyNameFromContext: string | null = null;
     let storedProposedInterpretation: { intent: string; contract: string; summary: string } | null = null;
     let originalQuestion: string | null = null;
+    let lastResponseType: string | null = null;
     
     // Only look up prior context if this is a reply in an existing thread
     if (isReply && shouldReuseThreadContext(text)) {
@@ -403,7 +404,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
           storedProposedInterpretation = (contextLayers?.proposedInterpretation as typeof storedProposedInterpretation) || null;
           originalQuestion = priorInteraction.questionText || null;
           
-          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}`);
+          // Track what the last response was about (for follow-up context)
+          lastResponseType = (contextLayers?.lastResponseType as string) || null;
+          
+          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}, lastResponseType=${lastResponseType}`);
         }
       } catch (err) {
         // Non-fatal - just proceed without context
@@ -593,6 +597,114 @@ export async function slackEventsHandler(req: Request, res: Response) {
         
         clearProgressTimer();
         return; // Done - clarification follow-up completed
+      }
+    }
+    
+    // 8.7 "ANSWER THOSE QUESTIONS" FOLLOW-UP HANDLING
+    //
+    // When the user asks to "answer" the questions after receiving customer questions,
+    // route to PRODUCT_KNOWLEDGE + DRAFT_RESPONSE to provide helpful answers.
+    //
+    if (lastResponseType === "customer_questions" && threadContext?.meetingId && threadContext?.companyId) {
+      const lowerText = text.toLowerCase().trim();
+      
+      // Detect "answer those questions" type patterns - MUST reference questions explicitly
+      // Patterns: "answer those questions", "help with these questions", "respond to the questions"
+      // Also: "can you answer them?" (short form referring to questions)
+      const wantsToAnswerQuestions = /\b(answer|help\s*with|respond\s*to|draft|address)\b.{0,20}\b(those|these|the)\b.{0,10}\b(questions?)\b/i.test(lowerText) ||
+                                     /\b(answer|help\s*with|respond\s*to)\s+(them|those|these)\b/i.test(lowerText);
+      
+      if (wantsToAnswerQuestions) {
+        console.log(`[Slack] Detected "answer those questions" follow-up - routing to product knowledge + draft response`);
+        
+        // Fetch the actual customer questions from this meeting to include in the prompt
+        const customerQuestions = await storage.getCustomerQuestionsByTranscript(threadContext.meetingId);
+        const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
+        
+        if (openQuestions.length === 0) {
+          // No open questions to answer
+          const noOpenQuestionsResponse = "All the questions from this meeting have already been answered. Would you like me to show the answers, or help with something else?";
+          if (!testRun) {
+            await postSlackMessage({
+              channel,
+              text: noOpenQuestionsResponse,
+              thread_ts: threadTs,
+            });
+          }
+          clearProgressTimer();
+          return;
+        }
+        
+        // Build a question list for the LLM
+        const questionList = openQuestions
+          .map((q, i) => `${i + 1}. "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}`)
+          .join("\n");
+        
+        // Route to Open Assistant with PRODUCT_KNOWLEDGE contract to draft responses
+        const syntheticControlPlane = {
+          intent: "PRODUCT_KNOWLEDGE" as any,
+          answerContract: "DRAFT_RESPONSE" as any,
+          intentDetectionMethod: "followup_pattern",
+          contractSelectionMethod: "followup_pattern",
+          contextLayers: {
+            product_identity: true,
+            product_ssot: true, // Use product knowledge to answer
+            single_meeting: true,
+            multi_meeting: false,
+            document_context: false,
+          },
+        };
+        
+        // Construct a detailed question for the LLM with the actual questions
+        const enhancedQuestion = `Using PitCrew product knowledge, help draft responses to these customer questions from the meeting with ${companyNameFromContext || 'this company'}:\n\n${questionList}`;
+        
+        const openAssistantResult = await handleOpenAssistant(enhancedQuestion, {
+          userId: userId || undefined,
+          threadId: threadTs,
+          resolvedMeeting: {
+            meetingId: threadContext.meetingId,
+            companyId: threadContext.companyId,
+            companyName: companyNameFromContext || 'Unknown',
+            meetingDate: null,
+          },
+          controlPlaneResult: syntheticControlPlane,
+        });
+        
+        if (!testRun) {
+          await postSlackMessage({
+            channel,
+            text: openAssistantResult.answer,
+            thread_ts: threadTs,
+          });
+        }
+        
+        logInteraction({
+          slackChannelId: channel,
+          slackThreadId: threadTs,
+          slackMessageTs: messageTs,
+          userId: userId || null,
+          companyId: threadContext.companyId,
+          meetingId: threadContext.meetingId,
+          questionText: text,
+          answerText: openAssistantResult.answer,
+          metadata: buildInteractionMetadata(
+            { companyId: threadContext.companyId, companyName: companyNameFromContext || undefined, meetingId: threadContext.meetingId },
+            {
+              entryPoint: "slack",
+              legacyIntent: "content",
+              answerShape: "summary",
+              dataSource: "product_ssot",
+              llmPurposes: ["general_assistance"],
+              companySource: "thread",
+              meetingSource: "thread",
+              testRun,
+            }
+          ),
+          testRun,
+        });
+        
+        clearProgressTimer();
+        return; // Done - fast path completed
       }
     }
 
@@ -961,6 +1073,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               semanticAnswerUsed,
               semanticConfidence,
               pendingOffer,
+              lastResponseType: dataSource, // Track for follow-up context
               testRun,
               meetingDetection,
             }
@@ -1019,6 +1132,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 delegatedToSingleMeeting: Boolean(semanticAnswerUsed),
               },
               evidenceSources: openAssistantResultData?.evidenceSources?.map(s => ({ type: s })),
+              lastResponseType: dataSource, // Track for follow-up context
               testRun,
               meetingDetection,
             }

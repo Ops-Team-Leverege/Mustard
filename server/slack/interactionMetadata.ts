@@ -201,6 +201,7 @@ export function buildInteractionMetadata(
     semanticConfidence?: string;
     awaitingClarification?: ClarificationType;
     pendingOffer?: string;
+    lastResponseType?: string; // For follow-up context (e.g., "customer_questions")
     testRun?: boolean;
     meetingDetection?: {
       regexResult: boolean;
@@ -225,6 +226,12 @@ export function buildInteractionMetadata(
     document_context: false,
   };
   
+  // Merge lastResponseType into context_layers for follow-up handling
+  const contextLayers = execution.controlPlane?.contextLayers || defaultContextLayers;
+  if (execution.lastResponseType) {
+    (contextLayers as any).lastResponseType = execution.lastResponseType;
+  }
+  
   return {
     entry_point: execution.entryPoint,
     
@@ -236,7 +243,7 @@ export function buildInteractionMetadata(
     
     contract_chain: execution.controlPlane?.contractChain,
     
-    context_layers: execution.controlPlane?.contextLayers || defaultContextLayers,
+    context_layers: contextLayers,
     
     answer_shape: execution.answerShape,
     
