@@ -1,0 +1,159 @@
+================================================================================
+              ADVANCED TEST SCENARIOS - RESULTS REPORT
+                         January 29, 2026
+================================================================================
+
+EXECUTIVE SUMMARY
+-----------------
+Total Tests: 50 (of 80 expected - some may have been filtered)
+Zero "I need more context" generic responses ✅
+Document generation working (12%)
+
+CONTRACT DISTRIBUTION
+---------------------
+  GENERAL_RESPONSE: 16
+  PATTERN_ANALYSIS: 10
+  PRODUCT_EXPLANATION: 6
+  EXTRACTIVE_FACT: 5
+  DRAFT_EMAIL: 3
+  EXTERNAL_RESEARCH: 2
+  NEXT_STEPS: 2
+  SALES_DECK_PREP: 1
+  VALUE_PROPOSITION: 1
+  MEETING_SUMMARY: 1
+  CUSTOMER_QUESTIONS: 1
+  TREND_SUMMARY: 1
+  CROSS_MEETING_QUESTIONS: 1
+
+INTENT DETECTION
+----------------
+  MULTI_MEETING: 12
+  SINGLE_MEETING: 9
+  GENERAL_HELP: 9
+  PRODUCT_KNOWLEDGE: 7
+  content: 5
+  EXTERNAL_RESEARCH: 3
+  prep: 2
+  next_steps: 2
+  unknown: 1
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+✅ WHAT'S WORKING WELL:
+
+1. MULTI-MEETING SEARCH (PATTERN_ANALYSIS)
+   - 10 queries correctly routed to PATTERN_ANALYSIS
+   - Successfully searching across multiple meetings
+   - Example: "What promises have we made to Les Schwab?"
+     → Found 3 meetings, extracted relevant commitments
+
+2. EMAIL DRAFTING (DRAFT_EMAIL / GENERAL_RESPONSE)
+   - Professional email drafts generated
+   - Proper subject lines and structure
+   - Example: "Write a thank you email to ACE"
+     → Full professional email with proper formatting
+
+3. EXTERNAL RESEARCH
+   - 2 queries successfully triggered EXTERNAL_RESEARCH
+   - Generated research reports with company data
+   - Example: "What are Canadian Tire's digital transformation goals?"
+     → Full research report generated
+
+4. PRODUCT KNOWLEDGE
+   - 6 queries correctly routed to PRODUCT_EXPLANATION
+   - Using product SSOT when available
+   - Example: "What's our positioning on security features?"
+     → Detailed product positioning response
+
+5. NO GENERIC CLARIFICATIONS
+   - 0% "I need more context" responses
+   - Smart clarification working (asks specific questions)
+
+
+⚠️ ISSUES TO ADDRESS:
+
+1. SINGLE MEETING CLARIFICATION (10 instances)
+   Questions like "What action items came out of the ACE weekly call?"
+   Response: "Which meeting are you asking about?"
+   
+   ISSUE: Should search for the most recent ACE meeting, not ask for clarification.
+   The user mentioned "ACE" - system should find the latest ACE meeting.
+
+2. SLOW RESPONSES
+   Average: 15.9 seconds
+   Max: 95 seconds (security positioning question)
+   
+   Queries hitting product_ssot taking 30-90+ seconds.
+
+3. GENERAL_RESPONSE OVERUSE (16 instances)
+   Some queries getting GENERAL_RESPONSE when they should get:
+   - DRAFT_EMAIL for email requests
+   - MEETING_PREP for prep requests
+
+
+================================================================================
+SPECIFIC ISSUES
+================================================================================
+
+SINGLE MEETING QUERIES ASKING FOR CLARIFICATION:
+(Should find most recent meeting with that company)
+
+| Question | Should Do |
+|----------|-----------|
+| "What action items came out of the ACE weekly call?" | Find latest ACE meeting → extract action items |
+| "What did Brian Buch ask us to follow up on?" | Search for Brian Buch in meetings → extract |
+| "What open items for tomorrow's ACE call?" | Find latest ACE meeting → prep |
+| "What did we promise to deliver to ACE?" | Search ACE meetings → extract commitments |
+| "What's the timeline we agreed to with Les Schwab?" | Search Les Schwab meetings → extract timeline |
+
+ROOT CAUSE: 
+- Intent is SINGLE_MEETING but no specific meeting date provided
+- System asks for clarification instead of searching for most recent match
+- Should default to "most recent meeting with [company]"
+
+
+================================================================================
+TIMING ANALYSIS
+================================================================================
+
+Average Response Time: 15.9 seconds
+Max Response Time: 95 seconds
+Min Response Time: 0.6 seconds
+
+SLOWEST QUERIES:
+1. 95s - "What's our positioning on security features vs dedicated security systems?"
+2. 88s - "Research quick lube industry benchmarks for cycle time"
+3. 66s - "I'm updating copy on our website. What are our current value props?"
+4. 39s - "A customer asked if PitCrew works with their existing security cameras"
+5. 34s - "Les Schwab's IT team asked about minimum bandwidth requirements"
+
+PATTERN: Product knowledge queries with SSOT lookup are slowest.
+
+
+================================================================================
+RECOMMENDATIONS
+================================================================================
+
+1. FIX SINGLE MEETING FALLBACK
+   When intent is SINGLE_MEETING and company is mentioned but no date:
+   → Find most recent meeting with that company
+   → Don't ask for clarification
+
+2. IMPROVE CONTRACT ROUTING
+   - "Write a thank you email" → DRAFT_EMAIL (not GENERAL_RESPONSE)
+   - "Prep me for meeting" → MEETING_PREP (not GENERAL_RESPONSE)
+
+3. OPTIMIZE PRODUCT_SSOT QUERIES
+   - 95 second response time is too slow
+   - Investigate caching or query optimization
+
+4. ADD MEETING_PREP CONTRACT
+   - Currently falling back to GENERAL_RESPONSE or PATTERN_ANALYSIS
+   - Should have dedicated contract for prep scenarios
+
+
+================================================================================
+                              END OF REPORT
+================================================================================
