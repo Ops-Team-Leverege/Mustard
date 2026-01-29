@@ -19,7 +19,7 @@ import { performExternalResearch, formatCitationsForDisplay, type ResearchResult
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../controlPlane/answerContracts";
-import { MODEL_ASSIGNMENTS, getModelDescription } from "../config/models";
+import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 
 import { 
   type EvidenceSource, 
@@ -394,7 +394,7 @@ ${productDataPrompt.substring(0, 2000)}${productDataPrompt.length > 2000 ? '\n\n
   
   try {
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: MODEL_ASSIGNMENTS.WEBSITE_ANALYSIS,
       contents: `You are helping analyze website content against authoritative product knowledge.
 
 USER REQUEST: ${userMessage}

@@ -56,6 +56,20 @@ export const LLM_MODELS = {
   STREAMING_RESPONSE: "gpt-4o",
 } as const;
 
+/**
+ * Gemini model constants for web-grounded research.
+ * Gemini is used for external research with real-time web access.
+ */
+export const GEMINI_MODELS = {
+  /**
+   * Fast Gemini model with web grounding capabilities.
+   * Used for external company research, website analysis, and real-time web data.
+   */
+  FLASH: "gemini-2.5-flash",
+} as const;
+
+export type GeminiModelType = typeof GEMINI_MODELS[keyof typeof GEMINI_MODELS];
+
 export type LLMModelType = typeof LLM_MODELS[keyof typeof LLM_MODELS];
 
 /**
@@ -115,4 +129,8 @@ export const MODEL_ASSIGNMENTS = {
   EXECUTIVE_SUMMARY: LLM_MODELS.HEAVY_ANALYSIS,
   COMPLEX_SYNTHESIS: LLM_MODELS.HEAVY_ANALYSIS,
   SEMANTIC_ANSWER_SYNTHESIS: LLM_MODELS.HEAVY_ANALYSIS,
+  
+  // Gemini - Web-grounded research tasks
+  EXTERNAL_RESEARCH_WEB: GEMINI_MODELS.FLASH,
+  WEBSITE_ANALYSIS: GEMINI_MODELS.FLASH,
 } as const;

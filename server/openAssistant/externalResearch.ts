@@ -15,7 +15,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { OpenAI } from "openai";
-import { MODEL_ASSIGNMENTS } from "../config/models";
+import { MODEL_ASSIGNMENTS, GEMINI_MODELS } from "../config/models";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -85,7 +85,7 @@ export async function performExternalResearch(
     const researchPrompt = buildResearchPrompt(query, companyName, topic);
     
     const response = await gemini.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: MODEL_ASSIGNMENTS.EXTERNAL_RESEARCH_WEB,
       contents: researchPrompt,
     });
     
