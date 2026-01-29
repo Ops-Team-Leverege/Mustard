@@ -1,0 +1,58 @@
+🚨 Critical Maintainability Issues Found
+1. HARDCODED RULES EPIDEMIC
+Most Critical Issues:
+
+Progress Messages: 20-second delay and 4-message limit hardcoded
+Document Generation: 300-word threshold and contract list in JSON config
+Evidence Thresholds: Meeting count requirements (2, 3, 5) hardcoded per contract
+LLM Model Selection: Model names scattered across 10+ files with no central registry
+Confidence Thresholds: 0.85/0.70 action item confidence tiers hardcoded
+Impact: Cannot optimize without redeployment; no A/B testing capability; locked into specific providers.
+
+2. ARCHITECTURAL VIOLATIONS
+Control Plane Authority Violations (Most Serious):
+
+// server/slack/events.ts lines 500-550 - VIOLATION
+const syntheticControlPlane = {
+  intent: mappedIntent as any,
+  answerContract: storedProposedInterpretation.contract as any,
+  // ... bypassing actual Control Plane
+};
+Intent Classification Leakage:
+
+Control Plane classifies intent
+BUT: 4 other files also make intent-like decisions
+Result: Inconsistent behavior, hard to audit
+Contract Selection Duplication:
+
+Primary selection in answerContracts.ts
+Duplicate logic in contractExecutor.ts and events.ts
+Result: Maintenance nightmare
+3. BRITTLE IMPLEMENTATIONS
+String-Based Contract Matching:
+
+// server/services/documentGenerator.ts - BRITTLE
+const isInList = config.generateDocForContracts.includes(contract);
+No enum validation, case-sensitive, silent failures.
+
+Regex-Based Intent Classification:
+
+50+ regex patterns with overlapping matches
+No priority ordering or conflict detection
+Example: "follow up" matches both SINGLE_MEETING and NEXT_STEPS
+Evidence Detection Heuristics:
+
+// BRITTLE: Counting question marks as evidence
+case AnswerContract.CROSS_MEETING_QUESTIONS:
+  evidenceCount = (output.match(/\?/g) || []).length;
+4. CONFIGURATION FRAGMENTATION
+Configuration scattered across:
+
+progress.json
+ - progress messages
+documents.json
+ - document generation
+Environment variables - API keys
+Hardcoded in code - thresholds, timeouts
+Database - product SSOT
+No single source of truth; no audit trail.
