@@ -805,7 +805,7 @@ async function handleMeetingDataIntent(
     console.log(`[OpenAssistant] Scope resolution failed: SINGLE_MEETING intent, searched for: "${meetingSearch.searchedFor || 'nothing specific'}", candidates found: 0`);
     console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria)`);
     return {
-      answer: `I couldn't find any meetings matching your query. ${meetingSearch.searchedFor ? `I searched for: "${meetingSearch.searchedFor}"` : ''}\n\nCould you provide more details? For example:\n- The company or customer name\n- When the meeting took place\n- Who you spoke with`,
+      answer: `I searched${meetingSearch.searchedFor ? ` for "${meetingSearch.searchedFor}"` : ''} but didn't find any matching call transcripts in the system.\n\nThis could mean:\n- No transcripts have been uploaded yet for that customer or topic\n- The meeting you're looking for uses a different name or spelling\n\nYou can check the Transcripts page to see what's available, or try asking about a specific customer by name.`,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.CLARIFY,
@@ -926,7 +926,7 @@ async function handleMultiMeetingIntent(
     console.log(`[OpenAssistant] Scope resolution failed: MULTI_MEETING intent, searched for: "${meetingSearch.searchedFor || 'all meetings'}", candidates found: 0`);
     console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria for cross-meeting analysis)`);
     return {
-      answer: `I couldn't find any meetings matching your query for cross-meeting analysis. ${meetingSearch.searchedFor ? `I searched for: "${meetingSearch.searchedFor}"` : ''}\n\nCould you provide more details? For example:\n- Specific companies or customers\n- A time period to search within\n- Topics or themes to look for`,
+      answer: `I looked across all available transcripts${meetingSearch.searchedFor ? ` (searched for: "${meetingSearch.searchedFor}")` : ''} but didn't find any matching data for this analysis.\n\nThis could mean:\n- There are no transcripts uploaded yet that match your criteria\n- The topic you're asking about hasn't come up in recorded calls\n\nYou can check the Transcripts page to see what call data is available, or try a different question about specific customers or topics that have been discussed.`,
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.CLARIFY,

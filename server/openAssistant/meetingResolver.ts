@@ -23,15 +23,35 @@ export type ChunkSearchResult = {
   content: string;
 };
 
+// Patterns indicating user wants ALL customers (no filtering by company)
+const ALL_CUSTOMERS_PATTERNS = [
+  /\b(all\s+customers?|every\s+customer|across\s+all|everyone|all\s+calls?|all\s+meetings?)\b/i,
+  /\b(across\s+customers?|across\s+companies|across\s+the\s+board)\b/i,
+];
+
 /**
  * Find relevant meetings based on company/person names in the query.
  * Uses fuzzy matching on company names and contact names.
+ * Special case: "all customers" returns all available transcripts.
  */
 export async function findRelevantMeetings(
   userMessage: string,
   classification: IntentClassification
 ): Promise<MeetingSearchResult> {
   const { storage } = await import("../storage");
+  
+  // Check for "all customers" scope - return all available transcripts
+  const wantsAllCustomers = ALL_CUSTOMERS_PATTERNS.some(p => p.test(userMessage));
+  if (wantsAllCustomers) {
+    console.log(`[MeetingResolver] "All customers" detected - fetching all available transcripts`);
+    const allMeetings = await fetchAllRecentTranscripts();
+    const topic = extractTopic(userMessage);
+    return {
+      meetings: allMeetings,
+      searchedFor: "all customers",
+      topic,
+    };
+  }
   
   const searchTerms = extractSearchTerms(userMessage);
   const topic = extractTopic(userMessage);
@@ -103,6 +123,41 @@ export async function findRelevantMeetings(
     searchedFor: searchTerms.join(", "),
     topic,
   };
+}
+
+/**
+ * Fetch all recent transcripts for "all customers" scope.
+ * Returns a bounded set of recent transcripts across all companies.
+ */
+async function fetchAllRecentTranscripts(): Promise<SingleMeetingContext[]> {
+  const { storage } = await import("../storage");
+  
+  const MAX_TOTAL_TRANSCRIPTS = 100; // Reasonable limit for cross-meeting analysis
+  
+  const rows = await storage.rawQuery(`
+    SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, 
+           c.id as company_id, c.name as company_name,
+           COALESCE(t.meeting_date, t.created_at) as sort_date
+    FROM transcripts t
+    JOIN companies c ON t.company_id = c.id
+    ORDER BY sort_date DESC
+    LIMIT $1
+  `, [MAX_TOTAL_TRANSCRIPTS]);
+  
+  if (!rows || rows.length === 0) {
+    console.log(`[MeetingResolver] No transcripts found in database`);
+    return [];
+  }
+  
+  const meetings: SingleMeetingContext[] = rows.map((row: any) => ({
+    meetingId: row.meeting_id as string,
+    companyId: row.company_id as string,
+    companyName: row.company_name as string,
+    meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+  }));
+  
+  console.log(`[MeetingResolver] Fetched ${meetings.length} transcripts for "all customers" scope`);
+  return meetings;
 }
 
 /**
