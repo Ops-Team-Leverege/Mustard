@@ -531,11 +531,17 @@ async function handleProductKnowledgeIntent(
   
   const hasProductData = productKnowledge.metadata.totalRecords > 0;
   
+  // Build website content section if URL was fetched
+  const websiteSection = websiteContent && websiteUrl
+    ? `\n\n=== WEBSITE CONTENT (fetched from ${websiteUrl}) ===
+${websiteContent.slice(0, 15000)}${websiteContent.length > 15000 ? '\n[... content truncated ...]' : ''}`
+    : '';
+
   const systemPrompt = hasProductData
     ? `${AMBIENT_PRODUCT_CONTEXT}
 
 === AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable) ===
-${productDataPrompt}
+${productDataPrompt}${websiteSection}
 
 You are answering a product knowledge question about PitCrew.
 
@@ -543,6 +549,11 @@ AUTHORITY RULES (with product data available):
 - Use the product knowledge above as your authoritative source
 - For questions about features, value propositions, or customer segments: Answer directly from the data
 - For integration specifics not in the data: Note that details should be verified with the product team
+${websiteContent ? `
+WEBSITE CONTENT CONTEXT:
+- The user has shared a URL and its content is provided above
+- Use both the product knowledge AND the website content to answer their question
+- If comparing: identify differences, gaps, or areas for improvement based on the user's request` : ''}
 
 PRICING RULES (CRITICAL - distinguish these two cases):
 1. "How is PitCrew priced?" / "What's the pricing model?" → USE the Airtable data (e.g., "per-store flat monthly fee, unlimited seats")
