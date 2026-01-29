@@ -83,6 +83,58 @@ Use this conversation context to provide relevant, continuous responses. Referen
 }
 
 /**
+ * Generate a user-friendly progress message for contract chains.
+ * Only generates a message when there are multiple contracts to execute.
+ */
+function generateContractChainProgress(
+  contracts: AnswerContract[],
+  contextHint?: string
+): string | undefined {
+  if (contracts.length <= 1) {
+    return undefined;
+  }
+  
+  // Map contracts to user-friendly descriptions
+  const contractDescriptions: Record<AnswerContract, string> = {
+    [AnswerContract.MEETING_SUMMARY]: "summarizing the meeting",
+    [AnswerContract.NEXT_STEPS]: "extracting action items",
+    [AnswerContract.ATTENDEES]: "identifying attendees",
+    [AnswerContract.CUSTOMER_QUESTIONS]: "finding customer questions",
+    [AnswerContract.EXTRACTIVE_FACT]: "extracting specific facts",
+    [AnswerContract.AGGREGATIVE_LIST]: "compiling the list",
+    [AnswerContract.PATTERN_ANALYSIS]: "analyzing patterns",
+    [AnswerContract.COMPARISON]: "comparing across meetings",
+    [AnswerContract.TREND_SUMMARY]: "identifying trends",
+    [AnswerContract.CROSS_MEETING_QUESTIONS]: "gathering questions across meetings",
+    [AnswerContract.PRODUCT_EXPLANATION]: "explaining product details",
+    [AnswerContract.VALUE_PROPOSITION]: "crafting value propositions",
+    [AnswerContract.DRAFT_RESPONSE]: "drafting a response",
+    [AnswerContract.DRAFT_EMAIL]: "drafting an email",
+    [AnswerContract.FEATURE_VERIFICATION]: "verifying features",
+    [AnswerContract.FAQ_ANSWER]: "answering from FAQs",
+    [AnswerContract.PRODUCT_KNOWLEDGE]: "gathering product knowledge",
+    [AnswerContract.PRODUCT_INFO]: "retrieving product information",
+    [AnswerContract.EXTERNAL_RESEARCH]: "researching external sources",
+    [AnswerContract.SALES_DOCS_PREP]: "preparing sales materials",
+    [AnswerContract.DOCUMENT_ANSWER]: "searching documents",
+    [AnswerContract.GENERAL_RESPONSE]: "preparing a response",
+    [AnswerContract.NOT_FOUND]: "searching for information",
+    [AnswerContract.REFUSE]: "reviewing the request",
+    [AnswerContract.CLARIFY]: "understanding the request",
+  };
+  
+  const steps = contracts.map(c => contractDescriptions[c] || c.toLowerCase().replace(/_/g, ' '));
+  
+  // Build a natural-sounding progress message
+  if (steps.length === 2) {
+    return `This will take a moment—I'll be ${steps[0]}, then ${steps[1]}.`;
+  } else {
+    const lastStep = steps.pop();
+    return `This will take a moment—I'll be ${steps.join(', ')}, and then ${lastStep}.`;
+  }
+}
+
+/**
  * Validate URL for safety (SSRF protection)
  * Uses strict domain allowlist to prevent SSRF attacks.
  */
@@ -646,6 +698,9 @@ async function handleMeetingDataIntent(
       console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
     }
     
+    // Generate progress message for multi-step contract chains
+    const chainProgress = generateContractChainProgress(contractChain);
+    
     // Pass the primary contract to the orchestrator to skip deprecated classification
     const singleMeetingResult = await handleSingleMeetingQuestion(
       context.resolvedMeeting,
@@ -665,6 +720,7 @@ async function handleMeetingDataIntent(
       dataSource: "meeting_artifacts",
       singleMeetingResult,
       delegatedToSingleMeeting: true,
+      progressMessage: chainProgress || singleMeetingResult.progressMessage,
     };
   }
 
@@ -712,6 +768,9 @@ async function handleMeetingDataIntent(
       console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
     }
     
+    // Generate progress message for multi-step contract chains
+    const chainProgress = generateContractChainProgress(contractChain);
+    
     // Pass the primary contract to the orchestrator
     const singleMeetingResult = await handleSingleMeetingQuestion(
       meeting,
@@ -731,6 +790,7 @@ async function handleMeetingDataIntent(
       dataSource: "meeting_artifacts",
       singleMeetingResult,
       delegatedToSingleMeeting: true,
+      progressMessage: chainProgress || singleMeetingResult.progressMessage,
     };
   }
 
@@ -752,6 +812,13 @@ async function handleMeetingDataIntent(
   const chain = selectMultiMeetingContractChain(userMessage, scope);
   console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (coverage: ${scope.coverage.matchingMeetingsCount} meetings)${meetingSearch.topic ? ` topic: "${meetingSearch.topic}"` : ''}`);
   
+  // Build progress message: multi-meeting context + contract chain steps (if multiple)
+  const meetingProgress = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}.`;
+  const chainProgress = generateContractChainProgress(chain.contracts);
+  const progressMessage = chainProgress 
+    ? `${meetingProgress} ${chainProgress}` 
+    : `${meetingProgress} I'll analyze them and compile the insights.`;
+  
   const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings, meetingSearch.topic);
   
   return {
@@ -765,6 +832,7 @@ async function handleMeetingDataIntent(
     dataSource: "meeting_artifacts",
     artifactMatches: undefined,
     delegatedToSingleMeeting: false,
+    progressMessage,
   };
 }
 
@@ -808,9 +876,6 @@ async function handleMultiMeetingIntent(
     },
   };
   
-  // Build progress message for multi-meeting search
-  const progressMessage = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}. I'll analyze them and compile the insights.`;
-  
   // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
@@ -827,6 +892,13 @@ async function handleMultiMeetingIntent(
     contractChain = chain.contracts;
     console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
   }
+  
+  // Build progress message: multi-meeting context + contract chain steps (if multiple)
+  const meetingProgress = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}.`;
+  const chainProgress = generateContractChainProgress(contractChain);
+  const progressMessage = chainProgress 
+    ? `${meetingProgress} ${chainProgress}` 
+    : `${meetingProgress} I'll analyze them and compile the insights.`;
   
   const chainResult = await executeContractChain(
     { contracts: contractChain, primaryContract, selectionMethod: "keyword" },
