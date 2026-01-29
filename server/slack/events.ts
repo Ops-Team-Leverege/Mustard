@@ -133,17 +133,35 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const event = payload.event;
     console.log("Event type:", event?.type);
 
-    // 5. Only handle app_mention events (bot must be @mentioned to respond)
+    // 5. Handle app_mention events AND direct messages (DMs)
+    // - app_mention: Bot was @mentioned in a channel
+    // - message: Could be a DM (channel_type: "im") or other message
     // Test runs bypass this check to allow automated testing
     const testRun = isTestRun(req);
     const eventType = event?.type;
-    if (eventType !== "app_mention" && !testRun) {
-      console.log("[Slack] Ignoring non-app_mention event:", eventType);
+    const channelType = event?.channel_type;
+    const isDirectMessage = eventType === "message" && channelType === "im";
+    const isAppMention = eventType === "app_mention";
+    
+    // Ignore bot's own messages to prevent loops
+    const botId = event?.bot_id;
+    if (botId) {
+      console.log("[Slack] Ignoring bot message (preventing loop)");
+      return;
+    }
+    
+    // Only process app_mentions, DMs, or test runs
+    if (!isAppMention && !isDirectMessage && !testRun) {
+      console.log(`[Slack] Ignoring event: type=${eventType}, channel_type=${channelType}`);
       return;
     }
     
     if (testRun) {
-      console.log("[Slack] Test run mode - bypassing app_mention check");
+      console.log("[Slack] Test run mode - bypassing event type check");
+    } else if (isDirectMessage) {
+      console.log("[Slack] Processing direct message");
+    } else {
+      console.log("[Slack] Processing app_mention");
     }
 
     // 6. Dedupe events
@@ -156,7 +174,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // For thread replies, use thread_ts (parent message); otherwise use ts (this message starts a thread)
     const threadTs = String(event.thread_ts || event.ts);
     const messageTs = String(event.ts); // This specific message's timestamp
-    const text = cleanMention(String(event.text || ""));
+    // For DMs, don't strip @mention (users don't need to mention bot in DMs)
+    // For app_mention, strip the @mention from the beginning
+    const rawText = String(event.text || "");
+    const text = isDirectMessage ? rawText.trim() : cleanMention(rawText);
     const userId = String(event.user || "");
     const isReply = Boolean(event.thread_ts); // True if this is a reply in an existing thread
 
