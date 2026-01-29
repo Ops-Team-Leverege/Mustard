@@ -30,7 +30,7 @@ import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./lo
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 import type { SlackStreamingContext } from "../openAssistant/types";
 import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
-import { getProgressMessage, getProgressDelayMs } from "./progressMessages";
+import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
 
 export interface PipelineTiming {
@@ -905,6 +905,42 @@ export async function slackEventsHandler(req: Request, res: Response) {
         duration_ms: cpDuration,
       });
       console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
+      
+      // EARLY PROGRESS MESSAGE: Send personalized progress right after intent classification
+      // This happens BEFORE expensive operations, so users see relevant context quickly
+      // Only for intents that involve expensive operations (not CLARIFY, REFUSE, etc.)
+      const expensiveIntents = ['SINGLE_MEETING', 'MULTI_MEETING', 'PRODUCT_KNOWLEDGE', 'EXTERNAL_RESEARCH', 'GENERAL_HELP'];
+      if (!testRun && expensiveIntents.includes(controlPlaneResult.intent || '')) {
+        // Map control plane intent to progress intent type
+        const intentToProgressType: Record<string, ProgressIntentType> = {
+          'SINGLE_MEETING': 'single_meeting',
+          'MULTI_MEETING': 'multi_meeting',
+          'PRODUCT_KNOWLEDGE': 'product',
+          'EXTERNAL_RESEARCH': 'research',
+          'GENERAL_HELP': 'general',
+        };
+        const progressType = intentToProgressType[controlPlaneResult.intent || ''] || 'general';
+        
+        // Generate and send personalized progress immediately (don't await in blocking way)
+        // This runs quickly (<500ms) and makes the experience feel more human
+        generatePersonalizedProgressMessage(text, progressType).then(async (personalizedProgress) => {
+          if (progressMessageCount === 0) {
+            try {
+              await postSlackMessage({
+                channel,
+                text: personalizedProgress,
+                thread_ts: threadTs,
+              });
+              progressMessageCount++;
+              console.log(`[Slack] Early personalized progress sent: "${personalizedProgress.substring(0, 50)}..."`);
+            } catch (err) {
+              console.error(`[Slack] Failed to send early progress:`, err);
+            }
+          }
+        }).catch(err => {
+          console.log(`[Slack] Personalized progress generation failed:`, err);
+        });
+      }
       
       // STEP 2: Handle CLARIFY intent - ask user for clarification
       if (controlPlaneResult.intent === "CLARIFY") {

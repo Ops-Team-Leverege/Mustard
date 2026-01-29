@@ -17,6 +17,9 @@ import {
   contentToSections 
 } from "./documentGenerator";
 import { AnswerContract } from "../controlPlane/answerContracts";
+import OpenAI from 'openai';
+
+const openai = new OpenAI();
 
 interface DocumentResponseParams {
   channel: string;
@@ -112,7 +115,7 @@ export async function sendResponseWithDocumentSupport(
   try {
     console.log(`[DocumentResponse] Starting document generation for contract: ${contract}`);
     
-    const docTitle = title || generateTitleFromQuery(userQuery, contract, customerName);
+    const docTitle = title || await generateTitleFromQuery(userQuery, contract, customerName);
     console.log(`[DocumentResponse] Document title: ${docTitle}`);
     
     const sections = contentToSections(content, docTitle);
@@ -176,17 +179,65 @@ export async function sendResponseWithDocumentSupport(
 }
 
 /**
- * Extract a concise topic from the user's query for use in titles.
- * Removes filler words and extracts the core subject.
+ * Use LLM to generate a clear, professional document title from the user's query.
+ * This is more reliable than regex-based extraction for complex questions.
+ * Falls back to contract-based title if LLM fails.
+ */
+async function generateTitleWithLLM(query: string, contract?: AnswerContract): Promise<string | null> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `Generate a clear, concise document title (3-8 words) from the user's question.
+
+Rules:
+- Capture the core topic/question being asked
+- Use title case (capitalize major words)
+- Do NOT include "PitCrew:" prefix - that's added separately
+- Keep it professional and descriptive
+- Preserve key question words when they add meaning (e.g., "What to Ask About X")
+- Remove filler like "Can you tell me" but keep substantive question words
+
+Examples:
+- "what should I ask the customer to validate if their cameras are supported?" → "What to Ask About Camera Compatibility"
+- "how does PitCrew handle network connections?" → "Network Connection Handling"
+- "tell me about the integration pipeline" → "Integration Pipeline Overview"
+- "what are the value props for fleet management?" → "Fleet Management Value Propositions"`
+        },
+        {
+          role: "user",
+          content: query.substring(0, 200)
+        }
+      ],
+      max_tokens: 30,
+      temperature: 0.3,
+    });
+    
+    const generated = response.choices[0]?.message?.content?.trim();
+    if (generated && generated.length >= 5 && generated.length <= 80) {
+      return generated;
+    }
+    return null;
+  } catch (error) {
+    console.log(`[DocumentResponse] LLM title generation failed, using fallback`);
+    return null;
+  }
+}
+
+/**
+ * Simple fallback topic extraction using regex.
+ * Used when LLM title generation is not available.
  */
 function extractTopicFromQuery(query?: string): string | null {
   if (!query || query.length < 5) return null;
   
-  // Remove common question starters, filler phrases, and leading punctuation (from "@bot, how...")
+  // Clean leading punctuation and whitespace
   let topic = query
-    .replace(/^[\s,;:\-]+/, '') // Remove leading whitespace and punctuation
+    .replace(/^[\s,;:\-]+/, '')
     .replace(/^(what|how|can you|please|could you|tell me|explain|give me|show me|i need|i want)\s+(is|are|about|the|a|an)?\s*/gi, '')
-    .replace(/^[\s,;:\-]+/, '') // Clean up any punctuation left after removing words
+    .replace(/^[\s,;:\-]+/, '')
     .replace(/\?+$/g, '')
     .trim();
   
@@ -195,7 +246,7 @@ function extractTopicFromQuery(query?: string): string | null {
     topic = topic.charAt(0).toUpperCase() + topic.slice(1);
   }
   
-  // If topic is too long, truncate at a sensible word boundary
+  // Truncate if too long
   if (topic.length > 50) {
     const words = topic.split(' ').slice(0, 6);
     topic = words.join(' ');
@@ -206,8 +257,9 @@ function extractTopicFromQuery(query?: string): string | null {
 
 /**
  * Generate a document title based on the user's query, falling back to contract-based title.
+ * Uses LLM for better title generation when query is provided.
  */
-function generateTitleFromQuery(query?: string, contract?: AnswerContract, customerName?: string): string {
+async function generateTitleFromQuery(query?: string, contract?: AnswerContract, customerName?: string): Promise<string> {
   const customer = customerName || "General";
   
   // For most contracts, use contract-based title (more professional than query extraction)
@@ -221,11 +273,21 @@ function generateTitleFromQuery(query?: string, contract?: AnswerContract, custo
     return generateTitleFromContract(contract, customerName);
   }
   
-  const topic = extractTopicFromQuery(query);
+  // Try LLM-based title generation first (better quality)
+  if (query) {
+    const llmTitle = await generateTitleWithLLM(query, contract);
+    if (llmTitle) {
+      // For product-related queries, prefix with PitCrew
+      if (contract === AnswerContract.PRODUCT_EXPLANATION) {
+        return `PitCrew: ${llmTitle}`;
+      }
+      return llmTitle;
+    }
+  }
   
-  // If we have a clear topic from the query, use it
+  // Fallback to regex-based extraction
+  const topic = extractTopicFromQuery(query);
   if (topic) {
-    // For product-related queries, prefix with PitCrew
     if (contract === AnswerContract.PRODUCT_EXPLANATION) {
       return `PitCrew: ${topic}`;
     }
