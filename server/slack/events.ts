@@ -17,7 +17,7 @@
 
 import type { Request, Response } from "express";
 import { verifySlackSignature } from "./verify";
-import { postSlackMessage } from "./slackApi";
+import { postSlackMessage, fetchThreadHistory } from "./slackApi";
 import { sendResponseWithDocumentSupport } from "../services/documentResponse";
 import { generateAckWithMention, generateAck } from "./acknowledgments";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
@@ -861,7 +861,20 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // STEP 1: ALWAYS run Control Plane first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Control Plane for intent classification`);
       logger.startStage('control_plane');
-      controlPlaneResult = await runControlPlane(text);
+      
+      // Fetch thread history for context-aware intent classification
+      let threadContextForCP: { messages: Array<{ text: string; isBot: boolean }> } | undefined;
+      if (threadTs) {
+        const threadHistory = await fetchThreadHistory(channel, threadTs, 10);
+        if (threadHistory.length > 0) {
+          threadContextForCP = {
+            messages: threadHistory.map(m => ({ text: m.text, isBot: m.isBot })),
+          };
+          console.log(`[Slack] Fetched ${threadHistory.length} messages from thread for context`);
+        }
+      }
+      
+      controlPlaneResult = await runControlPlane(text, threadContextForCP);
       cpDuration = logger.endStage('control_plane');
       logger.info('Control Plane completed', {
         intent: controlPlaneResult.intent,

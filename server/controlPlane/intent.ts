@@ -803,7 +803,17 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
   return false;
 }
 
-export async function classifyIntent(question: string): Promise<IntentClassificationResult> {
+export type ThreadContext = {
+  messages: Array<{
+    text: string;
+    isBot: boolean;
+  }>;
+};
+
+export async function classifyIntent(
+  question: string,
+  threadContext?: ThreadContext
+): Promise<IntentClassificationResult> {
   const keywordResult = await classifyByKeyword(question);
   
   if (keywordResult) {
@@ -814,7 +824,7 @@ export async function classifyIntent(question: string): Promise<IntentClassifica
     if (isAmbiguousClarify) {
       // Use LLM interpretation to provide helpful clarification
       console.log(`[IntentClassifier] Ambiguous match detected, using LLM interpretation for clarification`);
-      return classifyWithInterpretation(question, "multi_intent_ambiguity", keywordResult);
+      return classifyWithInterpretation(question, "multi_intent_ambiguity", keywordResult, threadContext);
     }
     
     // Check if this low-confidence match needs LLM validation
@@ -865,7 +875,7 @@ export async function classifyIntent(question: string): Promise<IntentClassifica
 
   // No keyword match - use LLM interpretation for intelligent clarification
   console.log(`[IntentClassifier] No keyword match, using LLM interpretation for clarification`);
-  return classifyWithInterpretation(question, "no_intent_match", null);
+  return classifyWithInterpretation(question, "no_intent_match", null, threadContext);
 }
 
 /**
@@ -886,10 +896,11 @@ export async function classifyIntent(question: string): Promise<IntentClassifica
 async function classifyWithInterpretation(
   question: string,
   failureReason: string,
-  originalResult: IntentClassificationResult | null
+  originalResult: IntentClassificationResult | null,
+  threadContext?: ThreadContext
 ): Promise<IntentClassificationResult> {
   try {
-    const interpretation = await interpretAmbiguousQuery(question, failureReason);
+    const interpretation = await interpretAmbiguousQuery(question, failureReason, threadContext);
     
     const proposedIntent = interpretation.proposedInterpretation.intent;
     const confidence = interpretation.metadata.confidence;

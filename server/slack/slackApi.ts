@@ -90,6 +90,60 @@ export async function updateSlackMessage(params: UpdateMessageParams): Promise<v
   }
 }
 
+export type ThreadMessage = {
+  ts: string;
+  user: string;
+  text: string;
+  isBot: boolean;
+};
+
+type ConversationsRepliesResponse = {
+  ok: boolean;
+  error?: string;
+  messages?: Array<{
+    ts: string;
+    user?: string;
+    bot_id?: string;
+    text?: string;
+  }>;
+};
+
+export async function fetchThreadHistory(
+  channel: string,
+  threadTs: string,
+  limit: number = 10
+): Promise<ThreadMessage[]> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    throw new Error("Missing SLACK_BOT_TOKEN");
+  }
+
+  const response = await fetch(
+    `https://slack.com/api/conversations.replies?channel=${channel}&ts=${threadTs}&limit=${limit}`,
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    }
+  );
+
+  const data = (await response.json()) as ConversationsRepliesResponse;
+
+  if (!data.ok) {
+    console.error(`[SlackAPI] Failed to fetch thread: ${data.error}`);
+    return [];
+  }
+
+  return (data.messages || []).map(msg => ({
+    ts: msg.ts,
+    user: msg.user || msg.bot_id || "unknown",
+    text: msg.text || "",
+    isBot: !!msg.bot_id,
+  }));
+}
+
 export async function uploadSlackFile(params: UploadFileParams): Promise<UploadFileResponse> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {

@@ -74,6 +74,13 @@ export type ProposedInterpretation = {
   summary: string;
 };
 
+export type ThreadContext = {
+  messages: Array<{
+    text: string;
+    isBot: boolean;
+  }>;
+};
+
 export type ControlPlaneResult = {
   intent: Intent;
   intentDetectionMethod: string;
@@ -84,8 +91,11 @@ export type ControlPlaneResult = {
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
 };
 
-export async function runControlPlane(question: string): Promise<ControlPlaneResult> {
-  const intentResult = await classifyIntent(question);
+export async function runControlPlane(
+  question: string,
+  threadContext?: ThreadContext
+): Promise<ControlPlaneResult> {
+  const intentResult = await classifyIntent(question, threadContext);
   
   console.log(`[ControlPlane] Intent: ${intentResult.intent} (${intentResult.intentDetectionMethod})`);
   

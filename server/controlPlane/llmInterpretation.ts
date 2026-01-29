@@ -294,9 +294,17 @@ If confirmed=true, suggestedIntent/suggestedContract can be omitted.`;
   }
 }
 
+export type ThreadContext = {
+  messages: Array<{
+    text: string;
+    isBot: boolean;
+  }>;
+};
+
 export async function interpretAmbiguousQuery(
   question: string,
-  failureReason: string
+  failureReason: string,
+  threadContext?: ThreadContext
 ): Promise<ClarifyWithInterpretation> {
   const systemPrompt = `You are a helpful assistant for PitCrew's sales team. Your job is to make smart clarifications that are conversational and helpful—never robotic dead ends.
 
@@ -479,12 +487,29 @@ Response: {
 }`;
 
   try {
+    // Build messages array with thread context if available
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: systemPrompt },
+    ];
+    
+    // Include thread history for context (skip the current message, it's added last)
+    if (threadContext?.messages && threadContext.messages.length > 1) {
+      const historyMessages = threadContext.messages.slice(0, -1); // Exclude current message
+      for (const msg of historyMessages) {
+        messages.push({
+          role: msg.isBot ? "assistant" : "user",
+          content: msg.text,
+        });
+      }
+      console.log(`[LLMInterpretation] Including ${historyMessages.length} messages from thread history`);
+    }
+    
+    // Add current question
+    messages.push({ role: "user", content: question });
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: question },
-      ],
+      messages,
       temperature: 0.3,
       response_format: { type: "json_object" },
     });
