@@ -706,8 +706,11 @@ async function handleExtractiveIntent(
   const isCustomerQuestionsRequest = contract === AnswerContract.CUSTOMER_QUESTIONS || 
     /customer questions?|questions?\s+from\s+(the|this)\s+(meeting|call)|what\s+did\s+(they|the customer)\s+ask/i.test(question);
   
+  // Detect if user wants KB-assisted answers (answer the questions, verify answers, check correctness)
+  const wantsKBAnswers = /answer\s+(the|those|these|customer)?\s*questions?|help\s+(me\s+)?(answer|respond)|check\s+(for\s+)?correct|verify|assess|validate/i.test(question);
+  
   if (isCustomerQuestionsRequest) {
-    console.log(`[SingleMeetingOrchestrator] Fast path: customer questions (contract=${contract})`);
+    console.log(`[SingleMeetingOrchestrator] Fast path: customer questions (contract=${contract}, wantsKBAnswers=${wantsKBAnswers})`);
     const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
     console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
     
@@ -720,12 +723,19 @@ async function handleExtractiveIntent(
       };
     }
     
+    const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
+    const answeredQuestions = customerQuestions.filter(q => q.status === "ANSWERED");
+    
+    // If user wants KB-assisted answers, provide assessments and answers
+    if (wantsKBAnswers) {
+      console.log(`[SingleMeetingOrchestrator] User requested KB-assisted answers for customer questions`);
+      return await generateKBAssistedCustomerQuestionAnswers(ctx, openQuestions, answeredQuestions);
+    }
+    
+    // Standard customer questions listing
     const lines: string[] = [];
     const dateSuffix = getMeetingDateSuffix(ctx);
     lines.push(`*Customer Questions — ${ctx.companyName}${dateSuffix}*`);
-    
-    const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
-    const answeredQuestions = customerQuestions.filter(q => q.status === "ANSWERED");
     
     if (openQuestions.length > 0) {
       lines.push("\n*Open Questions:*");
@@ -1408,6 +1418,110 @@ function isSemanticQuestion(question: string): boolean {
     /\b(?:the\s+)?(?:thing|stuff|item)\s+(?:they|we|you)\s+(?:mentioned|discussed|talked)\b/,
   ];
   return semanticPatterns.some(p => p.test(q));
+}
+
+/**
+ * Generate KB-assisted answers for customer questions.
+ * 
+ * For answered questions: Shows Q + A (from meeting) + Assessment from product KB
+ * For open questions: Provides suggested answer from product KB
+ */
+async function generateKBAssistedCustomerQuestionAnswers(
+  ctx: SingleMeetingContext,
+  openQuestions: Array<{ questionText: string; askedByName?: string | null; answerEvidence?: string | null }>,
+  answeredQuestions: Array<{ questionText: string; askedByName?: string | null; answerEvidence?: string | null; answeredByName?: string | null }>
+): Promise<SingleMeetingResult> {
+  console.log(`[SingleMeetingOrchestrator] Generating KB-assisted answers: ${openQuestions.length} open, ${answeredQuestions.length} answered`);
+  
+  // Fetch product knowledge for assessment
+  let productKnowledge = "";
+  try {
+    const pkResult = await getComprehensiveProductKnowledge();
+    productKnowledge = formatProductKnowledgeForPrompt(pkResult);
+    console.log(`[SingleMeetingOrchestrator] Product knowledge loaded for assessment (${productKnowledge.length} chars)`);
+  } catch (err) {
+    console.error(`[SingleMeetingOrchestrator] Failed to load product knowledge:`, err);
+    productKnowledge = "Product knowledge unavailable - provide best-effort answers.";
+  }
+  
+  // Format questions for LLM
+  const questionsForAssessment: string[] = [];
+  
+  if (answeredQuestions.length > 0) {
+    questionsForAssessment.push("## Questions Answered in Meeting (assess for correctness):");
+    answeredQuestions.forEach((q, i) => {
+      const answer = q.answerEvidence || "[Answer not recorded]";
+      const answerer = q.answeredByName ? ` (answered by ${q.answeredByName})` : "";
+      questionsForAssessment.push(`${i + 1}. Q: "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+      questionsForAssessment.push(`   A (from meeting)${answerer}: ${answer}`);
+    });
+  }
+  
+  if (openQuestions.length > 0) {
+    questionsForAssessment.push("\n## Open Questions (provide answers from product knowledge):");
+    openQuestions.forEach((q, i) => {
+      questionsForAssessment.push(`${i + 1}. Q: "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+    });
+  }
+  
+  const systemPrompt = `You are helping a sales team review customer questions from a meeting and provide accurate product-based responses.
+
+PRODUCT KNOWLEDGE (use this as your source of truth):
+${productKnowledge}
+
+YOUR TASK:
+1. For ANSWERED questions: Assess the answer given in the meeting against the product knowledge.
+   - If the answer is correct: Mark as ✅ Correct
+   - If the answer is partially correct or needs clarification: Mark as ⚠️ Needs Clarification and explain
+   - If the answer is incorrect: Mark as ❌ Incorrect and provide the correct answer
+   
+2. For OPEN questions: Provide a suggested answer based on the product knowledge.
+   - If you can answer from the product data: Provide a clear, accurate answer
+   - If you can't answer from the data: Say "I'd need to verify this with the product team"
+
+FORMAT YOUR RESPONSE:
+For each question, use this structure:
+
+**Answered Questions Assessment:**
+1. Q: [question]
+   A (from meeting): [their answer]
+   📋 Assessment: [✅/⚠️/❌] [your assessment and any corrections]
+
+**Suggested Answers for Open Questions:**
+1. Q: [question]
+   💡 Suggested Answer: [your answer based on product knowledge]
+
+Be concise but thorough. Prioritize accuracy over completeness.`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: questionsForAssessment.join("\n") },
+      ],
+      temperature: 0.3,
+      max_tokens: 3000,
+    });
+    
+    const answer = response.choices[0]?.message?.content || "Unable to generate KB-assisted answers.";
+    const dateSuffix = getMeetingDateSuffix(ctx);
+    
+    const header = `*Customer Questions Review — ${ctx.companyName}${dateSuffix}*\n\n`;
+    
+    return {
+      answer: header + answer,
+      intent: "extractive",
+      dataSource: "customer_questions",
+    };
+  } catch (err) {
+    console.error(`[SingleMeetingOrchestrator] LLM error in KB-assisted answers:`, err);
+    return {
+      answer: "I encountered an error while generating KB-assisted answers. Please try again.",
+      intent: "extractive",
+      dataSource: "not_found",
+    };
+  }
 }
 
 /**
