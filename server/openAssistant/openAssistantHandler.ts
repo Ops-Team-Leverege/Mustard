@@ -553,7 +553,8 @@ ${websiteContent ? `
 WEBSITE CONTENT CONTEXT:
 - The user has shared a URL and its content is provided above
 - Use both the product knowledge AND the website content to answer their question
-- If comparing: identify differences, gaps, or areas for improvement based on the user's request` : ''}
+- When comparing or updating content: clearly identify what is NEW (exists in product knowledge but missing from the website) vs what already EXISTS on the website
+- Use visual markers like [NEW], [UPDATED], or [EXISTS] to help the user quickly see what needs to be added or changed` : ''}
 
 PRICING RULES (CRITICAL - distinguish these two cases):
 1. "How is PitCrew priced?" / "What's the pricing model?" → USE the Airtable data (e.g., "per-store flat monthly fee, unlimited seats")
