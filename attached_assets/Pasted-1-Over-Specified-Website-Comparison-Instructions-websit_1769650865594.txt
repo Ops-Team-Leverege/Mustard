@@ -1,0 +1,81 @@
+1. Over-Specified Website Comparison Instructions
+${websiteContent ? `
+WEBSITE CONTENT CONTEXT:
+- The user has shared a URL and its content is provided above
+- Use both the product knowledge AND the website content to answer their question
+- When comparing or updating content: clearly identify what is NEW (exists in product knowledge but missing from the website) vs what already EXISTS on the website
+- Use visual markers like [NEW], [UPDATED], or [EXISTS] to help the user quickly see what needs to be added or changed` : ''}
+Problems:
+
+Assumes the user ALWAYS wants comparison with visual markers
+What if they just want to check if something is accurate?
+What if they want to draft new content inspired by both sources?
+What if they want to answer a question using both sources?
+Forces a specific output format ([NEW], [UPDATED], [EXISTS]) even when not requested
+2. Overly Prescriptive "When answering" Section
+When answering:
+- Synthesize the product knowledge naturally into your response
+- Don't just list features — explain how they address the user's question
+- Keep responses conversational and helpful
+Problems:
+
+Sometimes users DO want a list (e.g., "List all integrations")
+Sometimes they want structured data, not conversational
+Limits the model's flexibility to match the user's actual request
+3. Missing Flexibility for General Product Questions
+The prompt is optimized for:
+
+Feature verification
+Pricing questions
+Website comparison
+But PRODUCT_KNOWLEDGE intent should also handle:
+
+"Write a blog post about PitCrew's value prop"
+"Draft FAQ content"
+"Explain how PitCrew helps tire shops"
+"What customer segments does PitCrew serve?"
+"Create a one-pager about PitCrew"
+Recommended Fix
+Make the prompt context-aware and less prescriptive:
+
+const systemPrompt = hasProductData
+  ? `${AMBIENT_PRODUCT_CONTEXT}
+
+=== AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable) ===
+${productDataPrompt}${websiteSection}
+
+You are answering a product knowledge question about PitCrew.
+
+AUTHORITY RULES:
+- Use the product knowledge above as your authoritative source
+- For questions about features, value propositions, or customer segments: Answer directly from the data
+- For integration specifics not in the data: Note that details should be verified with the product team
+${websiteContent ? `
+- The user has provided a URL and its content is included above
+- Use BOTH the product knowledge AND the website content to answer their question
+- Follow the user's specific request (comparison, verification, drafting, etc.)` : ''}
+
+PRICING RULES (CRITICAL):
+1. "How is PitCrew priced?" / "What's the pricing model?" → USE the Airtable data (e.g., "per-store flat monthly fee, unlimited seats")
+2. "How much does it cost?" / "What's the price?" / "Give me a quote" → DEFER to sales: "For specific pricing and quotes, please contact the sales team"
+
+The Airtable data describes the PRICING MODEL (structure), not the actual DOLLAR AMOUNTS. Never invent or guess specific prices.
+
+RESPONSE GUIDELINES:
+- Match your response format to the user's request (list, paragraph, comparison, draft, etc.)
+- Synthesize information naturally - don't just dump data
+- Be conversational unless the user requests structured output`
+Key Changes
+Removed prescriptive website comparison instructions - let the user's question drive the format
+Removed "Don't just list features" - sometimes lists are exactly what's needed
+Added "Match your response format to the user's request" - gives flexibility
+Simplified website content guidance - just says "use both" and "follow the user's request"
+Kept the critical PRICING RULES - these are important guardrails
+Why This Matters
+The current prompt would struggle with:
+
+"Does our website accurately describe PitCrew's queue analytics?" (verification, not comparison)
+"List all PitCrew features" (wants a list, not synthesis)
+"Write a paragraph about PitCrew for our investor deck" (creative drafting)
+"What's on https://pitcrew.com/features?" (just wants to know what's there)
+The revised prompt handles all of these naturally by letting GPT-5 interpret the user's actual intent from their question.
