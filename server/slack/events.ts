@@ -1043,6 +1043,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           content: responseText,
           contract: openAssistantResultData.answerContract,
           customerName: resolvedMeeting?.companyName,
+          userQuery: text,
         });
         // Document upload doesn't return a message ts, so we generate a placeholder
         botReply = { ts: docResult.type === "document" ? `doc-${Date.now()}` : `msg-${Date.now()}` };

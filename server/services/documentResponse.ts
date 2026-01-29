@@ -25,6 +25,7 @@ interface DocumentResponseParams {
   contract: AnswerContract;
   customerName?: string;
   title?: string;
+  userQuery?: string;
 }
 
 interface DocumentResponseResult {
@@ -59,7 +60,7 @@ function isErrorOrClarificationContent(content: string): boolean {
 export async function sendResponseWithDocumentSupport(
   params: DocumentResponseParams
 ): Promise<DocumentResponseResult> {
-  const { channel, threadTs, content, contract, customerName, title } = params;
+  const { channel, threadTs, content, contract, customerName, title, userQuery } = params;
   
   // Primary check: Don't generate documents for CLARIFY/REFUSE contracts
   const isNonDocContract = NON_DOCUMENT_CONTRACTS.includes(contract);
@@ -111,7 +112,7 @@ export async function sendResponseWithDocumentSupport(
   try {
     console.log(`[DocumentResponse] Starting document generation for contract: ${contract}`);
     
-    const docTitle = title || generateTitleFromContract(contract, customerName);
+    const docTitle = title || generateTitleFromQuery(userQuery, contract, customerName);
     console.log(`[DocumentResponse] Document title: ${docTitle}`);
     
     const sections = contentToSections(content, docTitle);
@@ -133,7 +134,7 @@ export async function sendResponseWithDocumentSupport(
     console.log(`[DocumentResponse] Generated document buffer: ${docBuffer.length} bytes`);
     
     const fileName = generateFileName(contract, customerName);
-    const slackMessage = getDocumentMessage(contract);
+    const slackMessage = generateSlackMessage(userQuery, contract);
     console.log(`[DocumentResponse] Uploading to Slack: ${fileName}`);
     
     await uploadSlackFile({
@@ -174,7 +175,54 @@ export async function sendResponseWithDocumentSupport(
   }
 }
 
-function generateTitleFromContract(contract: AnswerContract, customerName?: string): string {
+/**
+ * Extract a concise topic from the user's query for use in titles.
+ * Removes filler words and extracts the core subject.
+ */
+function extractTopicFromQuery(query?: string): string | null {
+  if (!query || query.length < 5) return null;
+  
+  // Remove common question starters and filler phrases
+  let topic = query
+    .replace(/^(what|how|can you|please|could you|tell me|explain|give me|show me|i need|i want)\s+(is|are|about|the|a|an)?\s*/gi, '')
+    .replace(/\?+$/g, '')
+    .trim();
+  
+  // Capitalize first letter
+  if (topic.length > 0) {
+    topic = topic.charAt(0).toUpperCase() + topic.slice(1);
+  }
+  
+  // If topic is too long, truncate at a sensible word boundary
+  if (topic.length > 50) {
+    const words = topic.split(' ').slice(0, 6);
+    topic = words.join(' ');
+  }
+  
+  return topic.length > 3 ? topic : null;
+}
+
+/**
+ * Generate a document title based on the user's query, falling back to contract-based title.
+ */
+function generateTitleFromQuery(query?: string, contract?: AnswerContract, customerName?: string): string {
+  const topic = extractTopicFromQuery(query);
+  const customer = customerName || "General";
+  
+  // If we have a clear topic from the query, use it
+  if (topic) {
+    // For product-related queries, prefix with PitCrew
+    if (contract === AnswerContract.PRODUCT_EXPLANATION) {
+      return `PitCrew: ${topic}`;
+    }
+    return topic;
+  }
+  
+  // Fall back to contract-based titles
+  return generateTitleFromContract(contract, customerName);
+}
+
+function generateTitleFromContract(contract?: AnswerContract, customerName?: string): string {
   const customer = customerName || "General";
   
   switch (contract) {
@@ -202,6 +250,35 @@ function generateTitleFromContract(contract: AnswerContract, customerName?: stri
       // Use the customer name as title if available, otherwise generic
       return customer && customer !== "General" ? `${customer} Report` : `PitCrew Report`;
   }
+}
+
+/**
+ * Generate a Slack message based on the user's query, falling back to config messages.
+ */
+function generateSlackMessage(query?: string, contract?: AnswerContract): string {
+  const topic = extractTopicFromQuery(query);
+  
+  // If we have a clear topic, generate a query-specific message
+  if (topic) {
+    const topicLower = topic.toLowerCase();
+    
+    // Match common query patterns
+    if (topicLower.includes('pipeline') || topicLower.includes('feature')) {
+      return `Here's an overview of ${topicLower}.`;
+    }
+    if (topicLower.includes('value') || topicLower.includes('benefit')) {
+      return `Here's the value proposition breakdown.`;
+    }
+    if (topicLower.includes('comparison') || topicLower.includes('vs') || topicLower.includes('difference')) {
+      return `Here's the comparison you requested.`;
+    }
+    
+    // Generic but topic-specific message
+    return `Here's the information on ${topicLower}.`;
+  }
+  
+  // Fall back to config-based messages
+  return getDocumentMessage(contract || 'default');
 }
 
 export function isDocumentEligibleContract(contract: AnswerContract): boolean {
