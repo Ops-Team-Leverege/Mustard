@@ -754,9 +754,19 @@ async function handleExtractiveIntent(
       }
     }
     
-    // Offer to help with specific questions if there are any
+    // Offer KB-assisted answers if there are questions to assess
     if (openQuestions.length > 0 || answeredQuestions.length > 0) {
-      lines.push("\n_Ask me about any specific question for more details!_");
+      lines.push("\n---");
+      if (openQuestions.length > 0 && answeredQuestions.length > 0) {
+        lines.push("_Would you like me to:_");
+        lines.push("_• Answer the open questions using our product knowledge?_");
+        lines.push("_• Check the answered questions for correctness?_");
+        lines.push("\n_Just say \"help me answer those\" or \"check for correctness\" and I'll review them against our product database._");
+      } else if (openQuestions.length > 0) {
+        lines.push("_Would you like me to answer these open questions using our product knowledge? Just say \"help me answer those\" and I'll provide suggested responses._");
+      } else {
+        lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
+      }
     }
     
     return {
@@ -1031,9 +1041,19 @@ async function handleAggregativeIntent(
       }
     }
     
-    // Offer to help with specific questions if there are any
+    // Offer KB-assisted answers if there are questions to assess
     if (openQuestions.length > 0 || answeredQuestions.length > 0) {
-      lines.push("\n_Ask me about any specific question for more details!_");
+      lines.push("\n---");
+      if (openQuestions.length > 0 && answeredQuestions.length > 0) {
+        lines.push("_Would you like me to:_");
+        lines.push("_• Answer the open questions using our product knowledge?_");
+        lines.push("_• Check the answered questions for correctness?_");
+        lines.push("\n_Just say \"help me answer those\" or \"check for correctness\" and I'll review them against our product database._");
+      } else if (openQuestions.length > 0) {
+        lines.push("_Would you like me to answer these open questions using our product knowledge? Just say \"help me answer those\" and I'll provide suggested responses._");
+      } else {
+        lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
+      }
     }
     
     return {
