@@ -979,6 +979,11 @@ async function handleProductKnowledgeIntent(
   
   const hasProductData = snapshotResult.recordCount > 0;
   
+  // Build progress message for product knowledge query
+  const progressMessage = hasProductData 
+    ? `I'm reviewing our product database to answer your question. This may take a moment.`
+    : `I'll do my best to answer your product question, but I'm working with limited data right now.`;
+  
   let answer: string;
   
   // Build thread context for conversation continuity
@@ -1012,6 +1017,7 @@ async function handleProductKnowledgeIntent(
     dataSource: "product_ssot",
     delegatedToSingleMeeting: false,
     evidenceSources: hasProductData ? tablesWithData : undefined,
+    progressMessage,
   };
 }
 
@@ -1195,6 +1201,14 @@ If you're unsure whether something requires evidence, err on the side of asking 
   );
   console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
 
+  // Build progress message based on contract type
+  let progressMessage: string | undefined;
+  if (isDraftingContract) {
+    progressMessage = actualContract === AnswerContract.DRAFT_EMAIL 
+      ? `I'm drafting the email now. This will take a moment.`
+      : `I'm drafting the response now. This will take a moment.`;
+  }
+
   return {
     answer,
     intent: "general_assistance",
@@ -1204,6 +1218,7 @@ If you're unsure whether something requires evidence, err on the side of asking 
     ssotMode: "none" as SSOTMode,
     dataSource: "general_knowledge",
     delegatedToSingleMeeting: false,
+    progressMessage,
   };
 }
 

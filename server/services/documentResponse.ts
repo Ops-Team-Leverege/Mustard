@@ -182,9 +182,11 @@ export async function sendResponseWithDocumentSupport(
 function extractTopicFromQuery(query?: string): string | null {
   if (!query || query.length < 5) return null;
   
-  // Remove common question starters and filler phrases
+  // Remove common question starters, filler phrases, and leading punctuation (from "@bot, how...")
   let topic = query
+    .replace(/^[\s,;:\-]+/, '') // Remove leading whitespace and punctuation
     .replace(/^(what|how|can you|please|could you|tell me|explain|give me|show me|i need|i want)\s+(is|are|about|the|a|an)?\s*/gi, '')
+    .replace(/^[\s,;:\-]+/, '') // Clean up any punctuation left after removing words
     .replace(/\?+$/g, '')
     .trim();
   
