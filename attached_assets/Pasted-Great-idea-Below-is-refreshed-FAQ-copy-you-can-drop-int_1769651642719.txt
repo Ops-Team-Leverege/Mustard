@@ -1,0 +1,101 @@
+Great idea. Below is refreshed FAQ copy you can drop into the site. I’ve prioritized value-
+forward questions first, then covered deployment, privacy/security, integrations, and
+roadmap. For anything not clearly covered by the product SSOT, I’ve used safe phrasing
+and flagged where you should verify with product/legal.
+Customer outcomes and value
+● How does PitCrew help us complete more services without adding bays or
+headcount?
+PitCrew gives real-time visibility into service start/stop times, idle time, and bottlenecks. Live
+TV dashboards and configurable alerts keep work moving bay-to-bay so you increase
+throughput and capture more revenue during peak demand.
+● How does PitCrew help store managers improve performance?
+Managers get live TV dashboards to spot issues in real-time, daily and weekly reports to
+review trends with the team, and delay cause logging to address recurring bottlenecks.
+These feedback loops support coaching, accountability, and a healthy performance culture.
+● How does PitCrew improve staffing decisions and labor standards?
+PitCrew provides execution-level data on service duration and labor minutes to inform more
+accurate labor standards and smarter staffing. Historical trends help you project demand and
+set targets by store, bay, and day.
+● How does PitCrew improve the customer experience?
+By reducing delays, monitoring intake and queues, and providing more accurate timing,
+PitCrew lowers uncertainty and wait times so customers are greeted promptly and kept on
+track throughout their visit.
+● How does PitCrew support safety, security, and loss prevention?
+PitCrew helps proactively detect and document safety and security issues, reduces costly
+incidents, and simplifies investigations with objective event data and retention. (Automatic
+identification of specific safety violations is on the roadmap; see “What’s coming next?”
+below.)
+Data and insights
+● What data does PitCrew capture for each visit?
+PitCrew captures vehicle service start and end times, license plate, make/model/color/body
+type, labor minutes, and delay reasons. It also provides queue and foot traffic analytics for
+broader visibility across intake and waiting areas.
+● Can we stream PitCrew data into our data lake?
+Yes. A real-time event data feed provides PitCrew events programmatically so you can
+ingest them as they happen.
+Integrations and compatibility
+● Does PitCrew integrate with our POS?
+PitCrew provides POS integration to enrich PitCrew with service data and to auto-populate
+your POS with items such as VIN and license plate. For specific POS systems and
+implementation details, please check the product documentation or speak with our team.
+● Do you support SSO and role-based access?
+Yes. PitCrew supports SSO integration and granular access controls by role and
+organizational scope (store, district, region, corporate).
+● Can PitCrew use our existing cameras?
+Yes. PitCrew can use your existing cameras for a faster rollout (where compatible). We’ll
+confirm compatibility during scoping.
+● What if we don’t have cameras installed yet?
+If you don’t currently have cameras, we’ll work with you to determine an approach that fits
+your environment. Installation options and responsibilities vary by customer—please verify
+the details and division of work with our team.
+Alerts, dashboards, and devices
+● Do you provide real-time alerts?
+Yes. PitCrew supports SMS and email notifications and service idle alerts with configurable
+thresholds.
+● Do technicians and managers get live visibility?
+Yes. Live TV dashboards display real-time performance and optional gamification elements,
+and PitCrew is available on mobile and tablet for access while on the move.
+Configuration and operations
+● Can we set different targets or hours by store?
+Yes. You can configure service targets per bay and per day, and set store-specific operating
+hours so metrics, reports, and notifications align with local schedules.
+Security, privacy, and governance
+● How is PitCrew deployed and secured?
+PitCrew is delivered as a single-tenant deployment for maximum separation, control, and
+performance. Enterprise support and SLAs provide uptime and response commitments at
+scale, and SSO plus granular access controls reinforce security.
+● How do you protect customer and employee privacy?
+PitCrew includes privacy controls with automatic blurring of people captured in footage to
+preserve privacy. Configuration options are available to meet your policies.
+● How long do you retain data?
+PitCrew provides historical data retention for compliance, auditing, and coaching. Specific
+retention policies are set per customer—please refer to your agreement.
+● Who owns the data? Do you sell data to third parties?
+Data ownership and permitted uses are governed by your contract. Please consult your
+agreement or contact us for specifics. (If you want to keep the “you own your data / we don’t
+sell” message from the current site, run the exact wording through legal for approval.)
+Pricing
+● How is PitCrew priced?
+Please contact our sales team for the current pricing model and packaging. (If you plan to
+disclose the pricing model publicly, insert the approved, SSOT-backed pricing model text
+here.)
+What’s coming next? (Roadmap highlights)
+● Store leaderboards for cross-store comparison (Q4’25 roadmap)
+● AI-powered security system with proactive monitoring (Q4’25 roadmap)
+● Detect safety violations (future roadmap)
+● Service checkpoints, time-to-greet, and flag services with no invoice (future roadmap)
+● Video playback of services for training and investigations (future roadmap)
+● Identify if wheels are properly torqued (TBD feasibility)
+Optional additions (use if helpful on your page)
+● Which types of service businesses use PitCrew?
+PitCrew serves commercial, quick lube, and full service automotive operations, including tire
+service centers, oil change centers, and dealership service departments.
+Notes on compliance and accuracy
+● All items above marked as “roadmap” should include an availability disclaimer or
+timeline only if approved by product.
+● Avoid specific retention durations, camera installation promises, or legal/data
+ownership assertions without confirmation.
+● For integrations with specific vendors and any pricing language, route to
+product/sales for approval.
+If you share your brand voice guidelines (e.g., tone and length per FAQ), I can tighten these
+answers to match the exact style of the page and trim to fit the component layout.

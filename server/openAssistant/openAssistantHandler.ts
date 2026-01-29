@@ -552,7 +552,8 @@ AUTHORITY RULES:
 ${websiteContent ? `
 - The user has provided a URL and its content is included above
 - Use BOTH the product knowledge AND the website content to answer their question
-- Follow the user's specific request (comparison, verification, drafting, etc.)` : ''}
+- Follow the user's specific request (comparison, verification, drafting, etc.)
+- When updating or refreshing existing content: note what is NEW (from product knowledge but missing from the website) vs what already EXISTS on the site` : ''}
 
 PRICING RULES (CRITICAL):
 1. "How is PitCrew priced?" / "What's the pricing model?" → USE the Airtable data (e.g., "per-store flat monthly fee, unlimited seats")
