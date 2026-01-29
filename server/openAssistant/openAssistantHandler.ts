@@ -25,9 +25,11 @@ import {
   type IntentClassification, 
   type OpenAssistantContext, 
   type OpenAssistantResult,
+  type SlackStreamingContext,
   defaultClassification,
   deriveEvidenceSource 
 } from "./types";
+import { streamOpenAIResponse } from "./streamingHelper";
 import { findRelevantMeetings, searchAcrossMeetings } from "./meetingResolver";
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
@@ -299,12 +301,14 @@ CRITICAL RULES:
 }
 
 /**
- * Helper function to get GPT-5 product knowledge response
+ * Helper function to get product knowledge response
+ * Uses streaming when Slack context is provided for better perceived latency.
  */
-async function getGPT5ProductKnowledgeResponse(
+async function getProductKnowledgeResponse(
   userMessage: string,
   productDataPrompt: string,
-  hasProductData: boolean
+  hasProductData: boolean,
+  streamingContext?: SlackStreamingContext
 ): Promise<string> {
   const systemPrompt = hasProductData
     ? `${AMBIENT_PRODUCT_CONTEXT}
@@ -349,17 +353,18 @@ AUTHORITY RULES (without product data):
 
   try {
     const startTime = Date.now();
-    console.log(`[OpenAssistant] Calling gpt-4o for product knowledge response (prompt: ${systemPrompt.length} chars)...`);
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    });
-    const answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
+    console.log(`[OpenAssistant] Calling gpt-4o for product knowledge response (prompt: ${systemPrompt.length} chars, streaming: ${!!streamingContext})...`);
+    
+    // Use streaming when Slack context is available
+    const answer = await streamOpenAIResponse(
+      "gpt-4o",
+      systemPrompt,
+      userMessage,
+      streamingContext
+    );
+    
     console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-    return answer;
+    return answer || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
   } catch (openaiError) {
     console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE OpenAI error:`, openaiError);
     throw new Error(`OpenAI API error in product knowledge: ${openaiError instanceof Error ? openaiError.message : String(openaiError)}`);
@@ -861,13 +866,13 @@ async function handleProductKnowledgeIntent(
       answer = geminiResult;
       console.log(`[OpenAssistant] Gemini analysis successful (${answer.length} chars)`);
     } else {
-      // Gemini failed - fall back to GPT-5 without website content
-      console.log(`[OpenAssistant] Gemini unavailable - falling back to GPT-5`);
-      answer = await getGPT5ProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData);
+      // Gemini failed - fall back to gpt-4o without website content
+      console.log(`[OpenAssistant] Gemini unavailable - falling back to gpt-4o`);
+      answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming);
     }
   } else {
-    // No URL - use GPT-5 directly
-    answer = await getGPT5ProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData);
+    // No URL - use gpt-4o directly
+    answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming);
   }
 
   return {
@@ -993,12 +998,7 @@ async function handleGeneralAssistanceIntent(
   }
   
   const startTime = Date.now();
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "system",
-        content: `${AMBIENT_PRODUCT_CONTEXT}
+  const systemPrompt = `${AMBIENT_PRODUCT_CONTEXT}
 
 You are a helpful business assistant for the PitCrew team. Provide clear, professional help with the user's request.
 
@@ -1015,16 +1015,16 @@ You are a helpful business assistant for the PitCrew team. Provide clear, profes
 - Making claims that require Product SSOT or meeting evidence
 - Implying you have access to specific meeting data
 
-If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.`,
-      },
-      {
-        role: "user",
-        content: userMessage,
-      },
-    ],
-  });
-
-  const answer = response.choices[0]?.message?.content || "I'm not sure how to help with that. Could you rephrase your question?";
+If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.`;
+  
+  console.log(`[OpenAssistant] Calling gpt-4o for general assistance (streaming: ${!!context.slackStreaming})...`);
+  const answer = await streamOpenAIResponse(
+    "gpt-4o",
+    systemPrompt,
+    userMessage,
+    context.slackStreaming
+  );
+  console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
 
   return {
     answer,

@@ -62,6 +62,34 @@ type UploadFileResponse = {
   permalink?: string;
 };
 
+type UpdateMessageParams = {
+  channel: string;
+  ts: string;
+  text: string;
+};
+
+export async function updateSlackMessage(params: UpdateMessageParams): Promise<void> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    throw new Error("Missing SLACK_BOT_TOKEN");
+  }
+
+  const response = await fetch("https://slack.com/api/chat.update", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify(params),
+  });
+
+  const data = (await response.json()) as { ok: boolean; error?: string };
+
+  if (!data.ok) {
+    console.error(`[SlackAPI] Failed to update message: ${data.error}`);
+  }
+}
+
 export async function uploadSlackFile(params: UploadFileParams): Promise<UploadFileResponse> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {

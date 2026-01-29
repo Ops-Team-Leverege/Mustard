@@ -48,12 +48,19 @@ export type IntentClassification = {
   suggestedClarification?: string;
 };
 
+export type SlackStreamingContext = {
+  channel: string;
+  messageTs: string;
+  threadTs: string;
+};
+
 export type OpenAssistantContext = {
   userId?: string;
   threadId?: string;
   conversationContext?: string;
   resolvedMeeting?: SingleMeetingContext | null;
   controlPlaneResult?: ControlPlaneResult;
+  slackStreaming?: SlackStreamingContext;
 };
 
 export type OpenAssistantResult = {

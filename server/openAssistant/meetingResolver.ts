@@ -428,26 +428,32 @@ export async function searchAcrossMeetings(
   }
   
   // SLOW PATH: No topic - use standard handler (may involve LLM)
-  const allResults: Array<{
-    companyName: string;
-    meetingDate: string;
-    answer: string;
-  }> = [];
-
-  for (const meeting of meetings.slice(0, 5)) {
-    try {
-      const result = await handleSingleMeetingQuestion(meeting, userMessage, false);
-      if (result.dataSource !== "not_found") {
-        allResults.push({
-          companyName: meeting.companyName,
-          meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
-          answer: result.answer,
-        });
+  // OPTIMIZATION: Process meetings in parallel for faster response
+  const meetingsToSearch = meetings.slice(0, 5);
+  console.log(`[MeetingResolver] Processing ${meetingsToSearch.length} meetings in parallel...`);
+  const startTime = Date.now();
+  
+  const results = await Promise.all(
+    meetingsToSearch.map(async (meeting) => {
+      try {
+        const result = await handleSingleMeetingQuestion(meeting, userMessage, false);
+        if (result.dataSource !== "not_found") {
+          return {
+            companyName: meeting.companyName,
+            meetingDate: meeting.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date",
+            answer: result.answer,
+          };
+        }
+        return null;
+      } catch (err) {
+        console.error(`[MeetingResolver] Error searching meeting ${meeting.meetingId}:`, err);
+        return null;
       }
-    } catch (err) {
-      console.error(`[MeetingResolver] Error searching meeting ${meeting.meetingId}:`, err);
-    }
-  }
+    })
+  );
+  
+  const allResults = results.filter((r): r is NonNullable<typeof r> => r !== null);
+  console.log(`[MeetingResolver] Parallel search completed in ${Date.now() - startTime}ms (${allResults.length}/${meetingsToSearch.length} had results)`);
 
   if (allResults.length === 0) {
     return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information related to your question.`;

@@ -109,6 +109,14 @@ The control plane dynamically builds contract chains based on user messages, ens
 
 ## Recent Changes (January 2026)
 
+### Performance Improvements
+- **Streaming Responses**: Integrated OpenAI streaming for PRODUCT_KNOWLEDGE and GENERAL_RESPONSE paths. Slack messages now update progressively as the LLM generates content, reducing perceived latency.
+- **Model Optimization**: Switched GPT-5 → gpt-4o for product knowledge and general assistance paths (2-3x faster).
+- **Parallel Execution**: Multi-meeting search now uses `Promise.all` for concurrent processing.
+
 ### Bug Fixes
 - **SQL DISTINCT Fix**: Fixed PostgreSQL error 42P10 in `meetingResolver.ts` - queries using `SELECT DISTINCT` with `ORDER BY COALESCE(t.meeting_date, t.created_at)` now include the COALESCE expression as `sort_date` in the SELECT clause.
 - **Intent Classification Fix**: FAQ/website copy update requests now correctly route to `PRODUCT_KNOWLEDGE` instead of `MULTI_MEETING`. Added keywords: "frequently asked questions", "faq", "update copy", "value props" to product knowledge patterns. Removed overly generic "frequently" keyword from multi-meeting patterns.
+
+### Security Hardening
+- **Website Verification**: Domain allowlist for SSRF protection (leverege.com), HTTPS-only, 20+ word minimum content validation for website analysis.

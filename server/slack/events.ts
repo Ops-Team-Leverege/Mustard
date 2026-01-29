@@ -28,6 +28,7 @@ import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCom
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
+import type { SlackStreamingContext } from "../openAssistant/types";
 import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
 import { getProgressMessage, getProgressDelayMs } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
@@ -850,6 +851,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let controlPlaneResult: ControlPlaneResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
       let usedSingleMeetingMode = false;
+      let streamingContext: SlackStreamingContext | undefined;
       
       // Stage timing tracking
       let cpDuration = 0;
@@ -948,6 +950,30 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, etc.) → Open Assistant
         console.log(`[Slack] Open Assistant mode - intent=${controlPlaneResult.intent}, routing to appropriate handler`);
         
+        // Contracts that might generate documents - don't use streaming for these
+        const docGeneratingContracts = [
+          "VALUE_PROPOSITION", "MEETING_SUMMARY", "COMPARISON", 
+          "DRAFT_EMAIL", "PATTERN_ANALYSIS", "PRODUCT_EXPLANATION"
+        ];
+        const mightGenerateDoc = docGeneratingContracts.includes(controlPlaneResult.answerContract || "");
+        
+        // Create placeholder message for streaming (if not a test run and not generating a doc)
+        if (!testRun && !mightGenerateDoc) {
+          const placeholderMsg = await postSlackMessage({
+            channel,
+            text: "...",
+            thread_ts: threadTs,
+          });
+          streamingContext = {
+            channel,
+            messageTs: placeholderMsg.ts,
+            threadTs,
+          };
+          console.log(`[Slack] Streaming placeholder posted: ts=${placeholderMsg.ts}`);
+        } else if (mightGenerateDoc) {
+          console.log(`[Slack] Skipping streaming for doc-generating contract: ${controlPlaneResult.answerContract}`);
+        }
+        
         logger.startStage('open_assistant');
         openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
@@ -960,6 +986,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             meetingDate: resolvedMeeting.meetingDate,
           } : null,
           controlPlaneResult: controlPlaneResult,
+          slackStreaming: streamingContext,
         });
         oaDuration = logger.endStage('open_assistant');
         
@@ -991,15 +1018,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const totalTimeMs = Date.now() - pipelineStartTime;
       console.log(`[Slack] Pipeline completed in ${totalTimeMs}ms, progressMessages=${progressMessageCount}`);
 
-      // Post response to Slack (skip in test mode)
+      // Post response to Slack (skip in test mode or if streaming already handled it)
       // For Open Assistant responses, use document support to generate .docx for long content
       let botReply: { ts: string };
       const hasContract = !!openAssistantResultData?.answerContract;
       const willGenerateDoc = hasContract && !usedSingleMeetingMode;
+      const usedStreaming = !!streamingContext;
       console.log(`[Slack] === DOCUMENT DECISION ===`);
       console.log(`[Slack] testRun: ${testRun}`);
       console.log(`[Slack] contract: ${openAssistantResultData?.answerContract || 'NONE'}`);
       console.log(`[Slack] usedSingleMeetingMode: ${usedSingleMeetingMode}`);
+      console.log(`[Slack] usedStreaming: ${usedStreaming}`);
       console.log(`[Slack] hasOpenAssistantData: ${!!openAssistantResultData}`);
       console.log(`[Slack] hasContract: ${hasContract}`);
       console.log(`[Slack] willGenerateDoc: ${willGenerateDoc}`);
@@ -1017,6 +1046,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
         });
         // Document upload doesn't return a message ts, so we generate a placeholder
         botReply = { ts: docResult.type === "document" ? `doc-${Date.now()}` : `msg-${Date.now()}` };
+      } else if (usedStreaming) {
+        // Streaming already updated the message - use the streaming message ts
+        botReply = { ts: streamingContext!.messageTs };
+        console.log(`[Slack] Response already streamed to message: ${botReply.ts}`);
       } else {
         botReply = await postSlackMessage({
           channel,
