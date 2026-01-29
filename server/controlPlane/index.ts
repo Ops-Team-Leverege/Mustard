@@ -113,7 +113,7 @@ const TIME_RANGE_PATTERNS = [
 // Patterns that indicate customer scope is specified
 // Case-insensitive, supports multi-word company names
 const CUSTOMER_SCOPE_PATTERNS = [
-  /\b(all\s+customers?|every\s+customer|across\s+all|everyone)\b/i,
+  /\b(all\s+(the\s+)?customers?|every\s+customer|across\s+all|everyone)\b/i, // "all customers", "all the customers"
   /\bfor\s+[\w\s]+(?:inc|llc|corp|company|co\b)/i, // "for Acme Inc", "for Big Corp"
   /\bfor\s+\w+[\w\s]*\b/i, // "for Costco", "for Ivy Lane"
   /\b(specific|particular)\s+customer/i,
