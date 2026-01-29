@@ -609,7 +609,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // If ambiguous → ask for clarification (no intent classification runs)
     // If resolved → proceed to single-meeting mode
     //
-    let resolvedMeeting: { meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null } | null = null;
+    let resolvedMeeting: { meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null; wasAutoSelected?: boolean } | null = null;
     let mrDuration = 0; // Meeting resolution timing
     
     // Only attempt temporal resolution if:
@@ -631,14 +631,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
           companyId: resolution.companyId,
           companyName: resolution.companyName,
           meetingDate: resolution.meetingDate,
+          wasAutoSelected: resolution.wasAutoSelected,
         };
         logger.debug('Meeting resolution completed', {
           resolved: true,
           meetingId: resolution.meetingId,
           companyName: resolution.companyName,
+          wasAutoSelected: resolution.wasAutoSelected,
           duration_ms: mrDuration,
         });
-        console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
+        console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})${resolution.wasAutoSelected ? ' [auto-selected most recent]' : ''}`);
       } else if (resolution.needsClarification) {
         // Clarification needed - respond and stop processing
         console.log(`[Slack] Clarification needed: ${resolution.message}`);
@@ -803,7 +805,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         logger.startStage('single_meeting');
         const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer);
         smDuration = logger.endStage('single_meeting');
-        responseText = result.answer;
+        
+        // Add note about auto-selection if we picked the most recent meeting automatically
+        if (resolvedMeeting.wasAutoSelected && resolvedMeeting.meetingDate) {
+          const dateStr = resolvedMeeting.meetingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          responseText = `_Based on the most recent ${resolvedMeeting.companyName} meeting (${dateStr}):_\n\n${result.answer}`;
+        } else {
+          responseText = result.answer;
+        }
         capabilityName = `single_meeting_${result.intent}`;
         resolvedCompanyId = singleMeetingContext.companyId;
         resolvedMeetingId = singleMeetingContext.meetingId;

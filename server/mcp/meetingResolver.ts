@@ -25,7 +25,7 @@ const openai = new OpenAI({
 });
 
 export type MeetingResolutionResult =
-  | { resolved: true; meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null }
+  | { resolved: true; meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null; wasAutoSelected?: boolean }
   | { resolved: false; needsClarification: true; message: string; options?: Array<{ meetingId: string; date: Date; companyName: string }> }
   | { resolved: false; needsClarification: false; reason: string };
 
@@ -591,11 +591,42 @@ export async function resolveMeetingFromSlackMessage(
     };
   }
   
-  // No temporal language and no LLM detection - can't determine which meeting
+  // 5. Company mentioned but no explicit temporal language - auto-select most recent meeting
+  // This is the smart fallback: when user says "What action items from the ACE call?"
+  // they almost always mean the most recent one
+  console.log(`[MeetingResolver] Company mentioned without temporal language - auto-selecting most recent meeting for ${companyName}`);
+  
+  const meetings = await getMeetingsOnMostRecentDate(companyId);
+  
+  if (meetings.length === 0) {
+    return {
+      resolved: false,
+      needsClarification: true,
+      message: `I don't see any meetings with ${companyName} on record.`,
+    };
+  }
+  
+  if (meetings.length === 1) {
+    return {
+      resolved: true,
+      meetingId: meetings[0].id,
+      companyId,
+      companyName,
+      meetingDate: meetings[0].meetingDate,
+      wasAutoSelected: true, // Flag to indicate this was auto-selected
+    };
+  }
+  
+  // Multiple meetings on same date - need clarification
   return {
     resolved: false,
-    needsClarification: false,
-    reason: "company_mentioned_but_no_meeting_specified",
+    needsClarification: true,
+    message: `I see multiple ${companyName} meetings on ${formatDate(meetings[0].meetingDate)}:\n${meetings.map((m, i) => `• ${m.name || `Meeting ${i + 1}`}`).join("\n")}\nWhich one should I use?`,
+    options: meetings.map(m => ({
+      meetingId: m.id,
+      date: m.meetingDate,
+      companyName,
+    })),
   };
 }
 
