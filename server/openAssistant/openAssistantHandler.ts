@@ -483,6 +483,9 @@ async function handleMultiMeetingIntent(
  * 
  * Fetches REAL product data from Airtable tables (synced to database)
  * and injects it into the prompt for authoritative answers.
+ * 
+ * If a URL is detected in the message, also fetches that URL's content
+ * so GPT can compare/analyze it against the product knowledge.
  */
 async function handleProductKnowledgeIntent(
   userMessage: string,
@@ -493,6 +496,23 @@ async function handleProductKnowledgeIntent(
   console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
   
   const actualContract = contract || AnswerContract.PRODUCT_EXPLANATION;
+  
+  // Check for URLs in the message - if present, fetch their content
+  let websiteContent: string | null = null;
+  let websiteUrl: string | null = null;
+  const urlMatch = userMessage.match(/https?:\/\/[\w\-\.]+\.\w+[\w\/\-\.\?\=\&]*/i);
+  if (urlMatch) {
+    websiteUrl = urlMatch[0];
+    console.log(`[OpenAssistant] URL detected in message: ${websiteUrl}`);
+    try {
+      const { extractTextFromUrl } = await import("../textExtractor");
+      websiteContent = await extractTextFromUrl(websiteUrl);
+      console.log(`[OpenAssistant] Fetched website content: ${websiteContent.length} chars`);
+    } catch (urlError) {
+      console.warn(`[OpenAssistant] Failed to fetch URL content: ${urlError}`);
+      // Continue without website content - still use product knowledge
+    }
+  }
   
   // Fetch REAL product data from Airtable tables
   let productKnowledge;
