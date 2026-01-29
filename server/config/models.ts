@@ -47,6 +47,13 @@ export const LLM_MODELS = {
    * and executive-level summaries. Note: Only supports temperature=1.
    */
   HEAVY_ANALYSIS: "gpt-5",
+
+  /**
+   * Streaming-capable model for progressive response delivery.
+   * Same quality as STANDARD_REASONING but marked for streaming use cases.
+   * Use when responses should stream to Slack or UI progressively.
+   */
+  STREAMING_RESPONSE: "gpt-4o",
 } as const;
 
 export type LLMModelType = typeof LLM_MODELS[keyof typeof LLM_MODELS];
@@ -62,6 +69,8 @@ export function getModelDescription(model: LLMModelType): string {
       return "standard-reasoning (gpt-4o)";
     case LLM_MODELS.HEAVY_ANALYSIS:
       return "heavy-analysis (gpt-5)";
+    case LLM_MODELS.STREAMING_RESPONSE:
+      return "streaming-response (gpt-4o)";
     default:
       return model;
   }
@@ -72,33 +81,38 @@ export function getModelDescription(model: LLMModelType): string {
  * This provides explicit documentation for why each task uses a specific model.
  */
 export const MODEL_ASSIGNMENTS = {
-  // Control Plane / Intent Classification
+  // Control Plane / Intent Classification - Fast for quick routing decisions
   INTENT_CLASSIFICATION: LLM_MODELS.FAST_CLASSIFICATION,
   CONTRACT_SELECTION: LLM_MODELS.FAST_CLASSIFICATION,
   LLM_INTERPRETATION: LLM_MODELS.FAST_CLASSIFICATION,
   
-  // Progress & UX
+  // Progress & UX - Fast for immediate feedback
   PROGRESS_MESSAGES: LLM_MODELS.FAST_CLASSIFICATION,
   DOCUMENT_TITLE_GENERATION: LLM_MODELS.FAST_CLASSIFICATION,
   
-  // Semantic Search & RAG
-  ARTIFACT_SEARCH: LLM_MODELS.FAST_CLASSIFICATION,
-  MEETING_RESOLUTION: LLM_MODELS.FAST_CLASSIFICATION,
-  RAG_COMPOSITION: LLM_MODELS.FAST_CLASSIFICATION,
+  // Semantic Search & RAG - Standard for quality semantic matching
+  ARTIFACT_SEARCH: LLM_MODELS.STANDARD_REASONING,
+  MEETING_RESOLUTION: LLM_MODELS.STANDARD_REASONING,
+  RAG_COMPOSITION: LLM_MODELS.STANDARD_REASONING,
   
-  // Customer Questions & Extraction
+  // Customer Questions & Extraction - Standard for accurate extraction
   CUSTOMER_QUESTION_EXTRACTION: LLM_MODELS.STANDARD_REASONING,
   QUESTION_ANSWER_RESOLUTION: LLM_MODELS.STANDARD_REASONING,
   ACTION_ITEM_EXTRACTION: LLM_MODELS.STANDARD_REASONING,
   
-  // Response Generation
+  // Response Generation (non-streaming) - Standard for quality responses
   PRODUCT_KNOWLEDGE_RESPONSE: LLM_MODELS.STANDARD_REASONING,
   GENERAL_ASSISTANCE: LLM_MODELS.STANDARD_REASONING,
   EXTERNAL_RESEARCH: LLM_MODELS.STANDARD_REASONING,
   SINGLE_MEETING_RESPONSE: LLM_MODELS.STANDARD_REASONING,
   
-  // Heavy Analysis
+  // Streaming Response Generation - For progressive Slack updates
+  PRODUCT_KNOWLEDGE_STREAMING: LLM_MODELS.STREAMING_RESPONSE,
+  GENERAL_ASSISTANCE_STREAMING: LLM_MODELS.STREAMING_RESPONSE,
+  
+  // Heavy Analysis - GPT-5 for complex multi-step reasoning
   TRANSCRIPT_ANALYSIS: LLM_MODELS.HEAVY_ANALYSIS,
   EXECUTIVE_SUMMARY: LLM_MODELS.HEAVY_ANALYSIS,
   COMPLEX_SYNTHESIS: LLM_MODELS.HEAVY_ANALYSIS,
+  SEMANTIC_ANSWER_SYNTHESIS: LLM_MODELS.HEAVY_ANALYSIS,
 } as const;

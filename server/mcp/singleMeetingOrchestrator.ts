@@ -30,7 +30,7 @@
  * but should be migrated to Control Plane routing.
  */
 
-import { MODEL_ASSIGNMENTS, LLM_MODELS } from "../config/models";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 /**
  */
@@ -1276,7 +1276,7 @@ async function handleSummaryIntent(
     .join("\n\n");
   
   const response = await openai.chat.completions.create({
-    model: LLM_MODELS.HEAVY_ANALYSIS,
+    model: MODEL_ASSIGNMENTS.EXECUTIVE_SUMMARY,
     messages: [
       {
         role: "system",
