@@ -257,8 +257,10 @@ ${fetchResult.content}
 ${productDataPrompt}
 
 TASK:
-Compare the LIVE WEBSITE CONTENT above with the AUTHORITATIVE PRODUCT KNOWLEDGE.
+Think step by step. Compare the LIVE WEBSITE CONTENT above with the AUTHORITATIVE PRODUCT KNOWLEDGE.
 The website content was fetched by our server - this is the ACTUAL content currently on the live site.
+
+First, identify what content exists in each source. Then, systematically compare them to find gaps and discrepancies.
 
 OUTPUT FORMAT:
 
