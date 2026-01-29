@@ -49,7 +49,160 @@ function getGeminiClient() {
 }
 
 /**
- * Use Gemini to analyze website content against product knowledge
+ * Allowlist of domains we're allowed to fetch for website analysis.
+ * This is the most secure approach - only fetch from known, trusted domains.
+ */
+const ALLOWED_DOMAINS = [
+  'leverege.com',
+  'www.leverege.com',
+  // Add more trusted domains as needed
+];
+
+/**
+ * Validate URL for safety (SSRF protection)
+ * Uses strict domain allowlist to prevent SSRF attacks.
+ */
+function isUrlSafe(urlString: string): { safe: boolean; error?: string } {
+  try {
+    const url = new URL(urlString);
+    
+    // Must be HTTPS only (no HTTP in production)
+    if (url.protocol !== 'https:') {
+      return { safe: false, error: 'Only HTTPS URLs are supported for security' };
+    }
+    
+    // Strict domain allowlist - most secure approach
+    const hostname = url.hostname.toLowerCase();
+    const isAllowed = ALLOWED_DOMAINS.some(domain => 
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+    
+    if (!isAllowed) {
+      console.log(`[OpenAssistant] Domain not in allowlist: ${hostname}`);
+      return { 
+        safe: false, 
+        error: `Domain "${hostname}" is not in the allowed list. I can only fetch content from trusted domains (${ALLOWED_DOMAINS.join(', ')}). Please provide product knowledge from the database instead, or ask an admin to add this domain to the allowlist.` 
+      };
+    }
+    
+    // Additional sanity checks
+    if (url.username || url.password) {
+      return { safe: false, error: 'URLs with credentials are not allowed' };
+    }
+    
+    if (url.port && url.port !== '443') {
+      return { safe: false, error: 'Only standard HTTPS port (443) is allowed' };
+    }
+    
+    return { safe: true };
+  } catch {
+    return { safe: false, error: 'Invalid URL format' };
+  }
+}
+
+/**
+ * Server-side fetch of website content.
+ * Fetches the URL and extracts text content for analysis.
+ * Includes SSRF protection and content validation.
+ */
+async function fetchWebsiteContent(url: string): Promise<{ success: boolean; content?: string; error?: string; isProductOnly?: boolean }> {
+  // SSRF protection: validate URL before fetching
+  const urlCheck = isUrlSafe(url);
+  if (!urlCheck.safe) {
+    console.log(`[OpenAssistant] URL validation failed: ${urlCheck.error}`);
+    return { success: false, error: urlCheck.error, isProductOnly: true };
+  }
+  
+  try {
+    console.log(`[OpenAssistant] Fetching website content: ${url}`);
+    
+    // First try with manual redirect handling (allow one redirect within allowed domains)
+    let response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; PitCrewBot/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      redirect: 'manual', // Handle redirects manually for safety
+      signal: AbortSignal.timeout(15000), // 15 second timeout
+    });
+    
+    // Handle redirects safely - only follow if redirect stays on allowed domain
+    if (response.status >= 300 && response.status < 400) {
+      const redirectUrl = response.headers.get('location');
+      if (redirectUrl) {
+        const absoluteRedirect = new URL(redirectUrl, url).toString();
+        console.log(`[OpenAssistant] Redirect to: ${absoluteRedirect}`);
+        
+        // Validate redirect URL is also safe
+        const redirectCheck = isUrlSafe(absoluteRedirect);
+        if (!redirectCheck.safe) {
+          return { success: false, error: `Redirect to blocked domain: ${absoluteRedirect}`, isProductOnly: true };
+        }
+        
+        // Follow the safe redirect
+        response = await fetch(absoluteRedirect, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; PitCrewBot/1.0)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+          redirect: 'error', // No more redirects after first
+          signal: AbortSignal.timeout(10000),
+        });
+      }
+    }
+    
+    if (!response.ok) {
+      return { success: false, error: `HTTP ${response.status}: ${response.statusText}`, isProductOnly: true };
+    }
+    
+    const html = await response.text();
+    
+    // Extract text content from HTML (basic extraction)
+    // Remove script and style tags first
+    let textContent = html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<[^>]+>/g, '\n') // Replace tags with newlines
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\n\s*\n/g, '\n') // Collapse multiple newlines
+      .trim();
+    
+    // Validate content is meaningful (not empty/too short)
+    // Lower threshold to 20 words to handle short FAQ pages
+    const wordCount = textContent.split(/\s+/).filter(w => w.length > 0).length;
+    if (wordCount < 20) {
+      console.log(`[OpenAssistant] Content too sparse: ${wordCount} words (may be JS-rendered site)`);
+      return { 
+        success: false, 
+        error: `Website returned very little text content (${wordCount} words). This may be a JavaScript-rendered site that requires browser execution to display content.`,
+        isProductOnly: true
+      };
+    }
+    
+    // Truncate if too long (keep first 15000 chars)
+    if (textContent.length > 15000) {
+      textContent = textContent.substring(0, 15000) + '\n\n[Content truncated...]';
+    }
+    
+    console.log(`[OpenAssistant] Fetched website content: ${textContent.length} chars, ${wordCount} words`);
+    return { success: true, content: textContent, isProductOnly: false };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[OpenAssistant] Website fetch error:`, errorMessage);
+    return { success: false, error: errorMessage, isProductOnly: true };
+  }
+}
+
+/**
+ * Use Gemini to analyze website content against product knowledge.
+ * Two-step process:
+ * 1. Server-side fetch of website content (deterministic)
+ * 2. Gemini analysis comparing fetched content vs product knowledge
  */
 async function analyzeWebsiteWithGemini(
   websiteUrl: string,
@@ -61,33 +214,56 @@ async function analyzeWebsiteWithGemini(
     return null;
   }
 
+  // STEP 1: Server-side fetch of website content
+  console.log(`[OpenAssistant] Step 1: Server-side fetch of website content`);
+  const fetchResult = await fetchWebsiteContent(websiteUrl);
+  
+  if (!fetchResult.success || !fetchResult.content) {
+    console.log(`[OpenAssistant] Website fetch failed: ${fetchResult.error}`);
+    // Return a clear error message explaining the limitation
+    return `**Unable to Access Live Website**
+
+I attempted to fetch the content from ${websiteUrl} but encountered an error: ${fetchResult.error}
+
+**What I Can Do Instead:**
+
+Since I cannot access the live website, I can only provide information from the **Product Knowledge Database (Airtable)**. This represents what *should* be on the website according to your product documentation, but I cannot verify what's *actually* there.
+
+**Product Knowledge (from Airtable):**
+${productDataPrompt.substring(0, 2000)}${productDataPrompt.length > 2000 ? '\n\n[Additional product data available...]' : ''}
+
+**Recommended Next Steps:**
+1. Manually check the live website at ${websiteUrl}
+2. Compare what you see with the product knowledge above
+3. Or try again later if the website is temporarily unavailable`;
+  }
+
+  console.log(`[OpenAssistant] Step 1 complete: Fetched ${fetchResult.content.length} chars from live site`);
+  
+  // STEP 2: Use Gemini to analyze the fetched content vs product knowledge
+  console.log(`[OpenAssistant] Step 2: Gemini analysis of fetched content vs product knowledge`);
+  
   try {
-    console.log(`[OpenAssistant] Using Gemini to analyze website: ${websiteUrl}`);
-    
     const response = await gemini.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `You are helping analyze a website against authoritative product knowledge.
+      contents: `You are helping analyze website content against authoritative product knowledge.
 
 USER REQUEST: ${userMessage}
 
-WEBSITE TO ANALYZE: ${websiteUrl}
+=== LIVE WEBSITE CONTENT (fetched from ${websiteUrl}) ===
+${fetchResult.content}
 
-AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable):
+=== AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable) ===
 ${productDataPrompt}
 
 TASK:
-You MUST perform a two-step analysis:
+Compare the LIVE WEBSITE CONTENT above with the AUTHORITATIVE PRODUCT KNOWLEDGE.
+The website content was fetched by our server - this is the ACTUAL content currently on the live site.
 
-STEP 1 - FETCH THE LIVE WEBSITE:
-First, fetch and read the actual content from the provided URL. Extract and list what currently exists on the live site. This is critical - do NOT assume or guess what's on the website.
+OUTPUT FORMAT:
 
-STEP 2 - COMPARE WITH PRODUCT KNOWLEDGE:
-After fetching the live content, compare it against the authoritative product knowledge above.
-
-OUTPUT FORMAT (required for comparison/update requests):
-
-**Currently on the Live Website:**
-[List the actual items/content you found on the live site - be specific with exact text/questions]
+**Currently on the Live Website (${websiteUrl}):**
+[List the actual items/content from the fetched website - be specific with exact text/questions you see above]
 
 **In Product Knowledge (Airtable):**
 [List the relevant items from the product knowledge database]
@@ -101,10 +277,9 @@ OUTPUT FORMAT (required for comparison/update requests):
 [Based on the gap analysis, provide specific recommendations]
 
 CRITICAL RULES:
-- NEVER claim something is "on the website" without actually fetching and verifying it
-- Always clearly distinguish between "data from live website" vs "data from product knowledge"
-- If you cannot access the website, explicitly state this limitation
-- Quote exact text from the live site when possible`,
+- The "LIVE WEBSITE CONTENT" above IS the actual website content - use it directly
+- Quote exact text from the website content when identifying what's on the live site
+- Clearly distinguish between items that exist on the live site vs only in product knowledge`,
     });
 
     const content = response.text;
