@@ -125,6 +125,8 @@ The control plane dynamically builds contract chains based on user messages, ens
 ### Bug Fixes
 - **SQL DISTINCT Fix**: Fixed PostgreSQL error 42P10 in `meetingResolver.ts` - queries using `SELECT DISTINCT` with `ORDER BY COALESCE(t.meeting_date, t.created_at)` now include the COALESCE expression as `sort_date` in the SELECT clause.
 - **Intent Classification Fix**: FAQ/website copy update requests now correctly route to `PRODUCT_KNOWLEDGE` instead of `MULTI_MEETING`. Added keywords: "frequently asked questions", "faq", "update copy", "value props" to product knowledge patterns. Removed overly generic "frequently" keyword from multi-meeting patterns.
+- **CROSS_MEETING_QUESTIONS Synthesis**: Fixed control flow so CROSS_MEETING_QUESTIONS runs through synthesis step instead of early-returning as extraction-only. Questions are now properly consolidated and categorized by theme.
+- **Coverage Fallback**: Fixed coverage calculation to compute `uniqueCompanies` from meetings instead of hardcoding 1, ensuring accurate sample size reporting.
 
 ### Security Hardening
 - **Website Verification**: Domain allowlist for SSRF protection (leverege.com), HTTPS-only, 20+ word minimum content validation for website analysis.
