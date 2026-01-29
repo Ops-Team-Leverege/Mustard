@@ -109,6 +109,27 @@ export async function extractCompanyFromMessage(message: string): Promise<{ comp
     }
   }
   
+  // Third pass: match content inside parentheses (e.g., "ACE" from "Atlantic Coast Enterprise (ACE - Jiffy Lube)")
+  for (const company of companies) {
+    const fullName = company.name as string;
+    const parenMatch = fullName.match(/\(([^)]+)\)/);
+    if (parenMatch) {
+      const parenContent = parenMatch[1].toLowerCase();
+      // Split on common separators and check each part
+      const parts = parenContent.split(/[\s\-,]+/);
+      for (const part of parts) {
+        // Only match meaningful tokens (3+ chars, not common words)
+        if (part.length >= 3 && !['the', 'and', 'for'].includes(part)) {
+          // Use word boundary matching to avoid partial matches
+          const wordPattern = new RegExp(`\\b${part}\\b`, 'i');
+          if (wordPattern.test(message)) {
+            return { companyId: company.id as string, companyName: fullName };
+          }
+        }
+      }
+    }
+  }
+  
   return null;
 }
 
