@@ -372,6 +372,14 @@ COMMON PATTERNS:
 - "slide deck for [external company]" or "pitch deck" → EXTERNAL_RESEARCH with SALES_DOCS_PREP contract
 - "find their strategic priorities" or "public statements" → EXTERNAL_RESEARCH
 
+CRITICAL FOLLOW-UP PATTERN:
+When the conversation history shows a list of customer questions was just provided, and the user asks something like "help me answer those questions" or "can you answer those" or "draft responses":
+- This is asking for PRODUCT_KNOWLEDGE answers to the questions in the thread
+- Use PRODUCT_KNOWLEDGE intent with FAQ_ANSWER contract
+- The user wants you to use product knowledge to provide answers to the open/unanswered questions
+- NOT just re-list the same questions again
+- Reference the specific questions from thread context and provide answers
+
 EXAMPLES:
 
 User: "how does the cameras installation work?"
