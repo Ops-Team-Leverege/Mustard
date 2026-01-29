@@ -22,7 +22,7 @@ export type LogInteractionParams = {
   testRun?: boolean;
   capabilityName?: string;
   totalTimeMs?: number;
-  progressMessageSent?: boolean;
+  progressMessageCount?: number;
 };
 
 export async function logInteraction(params: LogInteractionParams): Promise<void> {
@@ -35,7 +35,7 @@ export async function logInteraction(params: LogInteractionParams): Promise<void
     const contextLayersWithTiming = {
       ...params.metadata.context_layers,
       total_time_ms: params.totalTimeMs,
-      progress_message_sent: params.progressMessageSent,
+      progress_message_count: params.progressMessageCount,
     };
     
     await storage.insertInteractionLog({

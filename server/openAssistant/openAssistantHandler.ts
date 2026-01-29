@@ -31,12 +31,137 @@ import {
 import { findRelevantMeetings, searchAcrossMeetings } from "./meetingResolver";
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
+import { GoogleGenAI } from "@google/genai";
 
 export type { EvidenceSource, IntentClassification, OpenAssistantContext, OpenAssistantResult };
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
+
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    console.log("[OpenAssistant] GEMINI_API_KEY not configured");
+    return null;
+  }
+  return new GoogleGenAI({ apiKey });
+}
+
+/**
+ * Use Gemini to analyze website content against product knowledge
+ */
+async function analyzeWebsiteWithGemini(
+  websiteUrl: string,
+  userMessage: string,
+  productDataPrompt: string
+): Promise<string | null> {
+  const gemini = getGeminiClient();
+  if (!gemini) {
+    return null;
+  }
+
+  try {
+    console.log(`[OpenAssistant] Using Gemini to analyze website: ${websiteUrl}`);
+    
+    const response = await gemini.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `You are helping analyze a website against authoritative product knowledge.
+
+USER REQUEST: ${userMessage}
+
+WEBSITE TO ANALYZE: ${websiteUrl}
+
+AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable):
+${productDataPrompt}
+
+TASK:
+1. Fetch and analyze the content from the provided URL
+2. Compare the website content against the authoritative product knowledge
+3. For update/refresh requests: clearly identify what is NEW (in product knowledge but missing from website) vs what EXISTS (already on the website)
+4. For verification requests: confirm accuracy of website content against product knowledge
+5. For drafting requests: create new content based on both sources
+
+RESPONSE GUIDELINES:
+- Match your response format to the user's request (comparison, verification, draft, etc.)
+- Be specific about what content exists vs what is new
+- Cite the product knowledge when making factual claims`,
+    });
+
+    const content = response.text;
+    if (!content) {
+      console.log(`[OpenAssistant] Empty response from Gemini`);
+      return null;
+    }
+
+    console.log(`[OpenAssistant] Gemini analysis complete: ${content.length} chars`);
+    return content;
+  } catch (error) {
+    console.error("[OpenAssistant] Gemini website analysis error:", error);
+    return null;
+  }
+}
+
+/**
+ * Helper function to get GPT-5 product knowledge response
+ */
+async function getGPT5ProductKnowledgeResponse(
+  userMessage: string,
+  productDataPrompt: string,
+  hasProductData: boolean
+): Promise<string> {
+  const systemPrompt = hasProductData
+    ? `${AMBIENT_PRODUCT_CONTEXT}
+
+=== AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable) ===
+${productDataPrompt}
+
+You are answering a product knowledge question about PitCrew.
+
+AUTHORITY RULES:
+- Use the product knowledge above as your authoritative source
+- For questions about features, value propositions, or customer segments: Answer directly from the data
+- For integration specifics not in the data: Note that details should be verified with the product team
+
+PRICING RULES (CRITICAL):
+1. "How is PitCrew priced?" / "What's the pricing model?" → USE the Airtable data (e.g., "per-store flat monthly fee, unlimited seats")
+2. "How much does it cost?" / "What's the price?" / "Give me a quote" → DEFER to sales: "For specific pricing and quotes, please contact the sales team"
+
+The Airtable data describes the PRICING MODEL (structure), not the actual DOLLAR AMOUNTS. Never invent or guess specific prices.
+
+RESPONSE GUIDELINES:
+- Match your response format to the user's request (list, paragraph, comparison, draft, etc.)
+- Synthesize information naturally - don't just dump data
+- Be conversational unless the user requests structured output`
+    : `${AMBIENT_PRODUCT_CONTEXT}
+
+You are answering a product knowledge question about PitCrew.
+
+NOTE: No product data is currently available in the database. Provide high-level framing only.
+
+AUTHORITY RULES (without product data):
+- Provide only general, high-level explanations about PitCrew's purpose and value
+- Add "I'd recommend checking our product documentation for specific details"
+- For pricing: Say "For current pricing information, please check with the sales team"
+- NEVER fabricate specific features, pricing, or integration claims`;
+
+  try {
+    console.log(`[OpenAssistant] Calling GPT-5 for product knowledge response...`);
+    const response = await openai.chat.completions.create({
+      model: "gpt-5",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+    });
+    const answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
+    console.log(`[OpenAssistant] GPT-5 response received (${answer.length} chars)`);
+    return answer;
+  } catch (openaiError) {
+    console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE OpenAI error:`, openaiError);
+    throw new Error(`OpenAI API error in product knowledge: ${openaiError instanceof Error ? openaiError.message : String(openaiError)}`);
+  }
+}
 
 /**
  * AMBIENT PRODUCT CONTEXT (Always On)
@@ -497,21 +622,12 @@ async function handleProductKnowledgeIntent(
   
   const actualContract = contract || AnswerContract.PRODUCT_EXPLANATION;
   
-  // Check for URLs in the message - if present, fetch their content
-  let websiteContent: string | null = null;
+  // Check for URLs in the message
   let websiteUrl: string | null = null;
   const urlMatch = userMessage.match(/https?:\/\/[\w\-\.]+\.\w+[\w\/\-\.\?\=\&]*/i);
   if (urlMatch) {
     websiteUrl = urlMatch[0];
     console.log(`[OpenAssistant] URL detected in message: ${websiteUrl}`);
-    try {
-      const { extractTextFromUrl } = await import("../textExtractor");
-      websiteContent = await extractTextFromUrl(websiteUrl);
-      console.log(`[OpenAssistant] Fetched website content: ${websiteContent.length} chars`);
-    } catch (urlError) {
-      console.warn(`[OpenAssistant] Failed to fetch URL content: ${urlError}`);
-      // Continue without website content - still use product knowledge
-    }
   }
   
   // Fetch REAL product data from Airtable tables
@@ -531,67 +647,24 @@ async function handleProductKnowledgeIntent(
   
   const hasProductData = productKnowledge.metadata.totalRecords > 0;
   
-  // Build website content section if URL was fetched
-  const websiteSection = websiteContent && websiteUrl
-    ? `\n\n=== WEBSITE CONTENT (fetched from ${websiteUrl}) ===
-${websiteContent.slice(0, 15000)}${websiteContent.length > 15000 ? '\n[... content truncated ...]' : ''}`
-    : '';
-
-  const systemPrompt = hasProductData
-    ? `${AMBIENT_PRODUCT_CONTEXT}
-
-=== AUTHORITATIVE PRODUCT KNOWLEDGE (from Airtable) ===
-${productDataPrompt}${websiteSection}
-
-You are answering a product knowledge question about PitCrew.
-
-AUTHORITY RULES:
-- Use the product knowledge above as your authoritative source
-- For questions about features, value propositions, or customer segments: Answer directly from the data
-- For integration specifics not in the data: Note that details should be verified with the product team
-${websiteContent ? `
-- The user has provided a URL and its content is included above
-- Use BOTH the product knowledge AND the website content to answer their question
-- Follow the user's specific request (comparison, verification, drafting, etc.)
-- When updating or refreshing existing content: note what is NEW (from product knowledge but missing from the website) vs what already EXISTS on the site` : ''}
-
-PRICING RULES (CRITICAL):
-1. "How is PitCrew priced?" / "What's the pricing model?" → USE the Airtable data (e.g., "per-store flat monthly fee, unlimited seats")
-2. "How much does it cost?" / "What's the price?" / "Give me a quote" → DEFER to sales: "For specific pricing and quotes, please contact the sales team"
-
-The Airtable data describes the PRICING MODEL (structure), not the actual DOLLAR AMOUNTS. Never invent or guess specific prices.
-
-RESPONSE GUIDELINES:
-- Match your response format to the user's request (list, paragraph, comparison, draft, etc.)
-- Synthesize information naturally - don't just dump data
-- Be conversational unless the user requests structured output`
-    : `${AMBIENT_PRODUCT_CONTEXT}
-
-You are answering a product knowledge question about PitCrew.
-
-NOTE: No product data is currently available in the database. Provide high-level framing only.
-
-AUTHORITY RULES (without product data):
-- Provide only general, high-level explanations about PitCrew's purpose and value
-- Add "I'd recommend checking our product documentation for specific details"
-- For pricing: Say "For current pricing information, please check with the sales team"
-- NEVER fabricate specific features, pricing, or integration claims`;
-
   let answer: string;
-  try {
-    console.log(`[OpenAssistant] Calling GPT-5 for product knowledge response...`);
-    const response = await openai.chat.completions.create({
-      model: "gpt-5",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-    });
-    answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
-    console.log(`[OpenAssistant] GPT-5 response received (${answer.length} chars)`);
-  } catch (openaiError) {
-    console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE OpenAI error:`, openaiError);
-    throw new Error(`OpenAI API error in product knowledge: ${openaiError instanceof Error ? openaiError.message : String(openaiError)}`);
+  
+  // If URL detected + product data available → use Gemini for web-based analysis
+  if (websiteUrl && hasProductData) {
+    console.log(`[OpenAssistant] URL detected with product data - trying Gemini for website analysis`);
+    const geminiResult = await analyzeWebsiteWithGemini(websiteUrl, userMessage, productDataPrompt);
+    
+    if (geminiResult) {
+      answer = geminiResult;
+      console.log(`[OpenAssistant] Gemini analysis successful (${answer.length} chars)`);
+    } else {
+      // Gemini failed - fall back to GPT-5 without website content
+      console.log(`[OpenAssistant] Gemini unavailable - falling back to GPT-5`);
+      answer = await getGPT5ProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData);
+    }
+  } else {
+    // No URL - use GPT-5 directly
+    answer = await getGPT5ProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData);
   }
 
   return {

@@ -186,13 +186,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] Test mode - skipping acknowledgment message");
     }
 
-    // 7.1 Start pipeline timing and progress message timer (recurring)
+    // 7.1 Start pipeline timing and progress message timer (recurring, max 4 messages)
     const pipelineStartTime = Date.now();
     let progressMessageCount = 0;
+    const MAX_PROGRESS_MESSAGES = 4;
     let progressInterval: ReturnType<typeof setInterval> | null = null;
     
     if (!testRun) {
       progressInterval = setInterval(async () => {
+        if (progressMessageCount >= MAX_PROGRESS_MESSAGES) {
+          return; // Stop sending after max reached
+        }
         try {
           const progressMsg = getProgressMessage();
           await postSlackMessage({
@@ -864,7 +868,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       
       // Calculate total pipeline time
       const totalTimeMs = Date.now() - pipelineStartTime;
-      console.log(`[Slack] Pipeline completed in ${totalTimeMs}ms, progressMessageSent=${progressMessageSent}`);
+      console.log(`[Slack] Pipeline completed in ${totalTimeMs}ms, progressMessages=${progressMessageCount}`);
 
       // Post response to Slack (skip in test mode)
       // For Open Assistant responses, use document support to generate .docx for long content
@@ -1020,7 +1024,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         metadata: resolvedMetadata,
         testRun,
         totalTimeMs,
-        progressMessageSent,
+        progressMessageCount,
       });
       
       // Log successful completion with stage breakdown
@@ -1037,8 +1041,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       });
       
       // Track progress message overhead
-      if (progressMessageSent) {
-        logger.debug('Progress message was sent', { 
+      if (progressMessageCount > 0) {
+        logger.debug('Progress messages were sent', { 
+          count: progressMessageCount,
           delayMs: getProgressDelayMs(),
           totalTimeMs,
         });
