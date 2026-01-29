@@ -361,12 +361,13 @@ const EXTERNAL_RESEARCH_PATTERNS = [
   /\bslide\s+deck\s+for\s+[\w\s]+\s+to\s+sell\b/i,
   /\bselling?\s+(to|their)\s+(leadership|team|executive)\b/i,
   // External company research patterns - must indicate researching a DIFFERENT company
-  // NOT just any URL (user's own website should use PRODUCT_KNOWLEDGE)
-  /\bresearch\s+(the\s+)?(company|website|site)\s+(at\s+)?https?:/i,
-  /\bresearch\s+https?:\/\/(?!.*leverege)/i,  // Research URL that's NOT leverege.com
+  // Key signals: "research [company]", "their company", "competitor", "what do they do"
+  // NOT triggered by: "our website", "update our FAQ", "our value props"
+  /\bresearch\s+(the\s+)?(company|website|site|business)\b/i,
   /\b(competitor|competitive)\s+(analysis|research|comparison)\b/i,
-  /\banalyze\s+(their|the)\s+(company|business|website)\b/i,
+  /\banalyze\s+(their|the)\s+(company|business|offerings?)\b/i,
   /\bwhat\s+(does|do)\s+[\w\s]+\s+(company\s+)?(do|offer|sell)\b/i,
+  /\b(their|the\s+company'?s?)\s+(website|site|business|offerings?)\b/i,
 ];
 
 const REFUSE_PATTERNS = [
