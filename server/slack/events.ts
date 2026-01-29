@@ -186,13 +186,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] Test mode - skipping acknowledgment message");
     }
 
-    // 7.1 Start pipeline timing and progress message timer
+    // 7.1 Start pipeline timing and progress message timer (recurring)
     const pipelineStartTime = Date.now();
-    let progressMessageSent = false;
-    let progressTimer: ReturnType<typeof setTimeout> | null = null;
+    let progressMessageCount = 0;
+    let progressInterval: ReturnType<typeof setInterval> | null = null;
     
     if (!testRun) {
-      progressTimer = setTimeout(async () => {
+      progressInterval = setInterval(async () => {
         try {
           const progressMsg = getProgressMessage();
           await postSlackMessage({
@@ -200,19 +200,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
             text: progressMsg,
             thread_ts: threadTs,
           });
-          progressMessageSent = true;
-          console.log("[Slack] Progress message sent after delay");
+          progressMessageCount++;
+          console.log(`[Slack] Progress message #${progressMessageCount} sent`);
         } catch (err) {
           console.error("[Slack] Failed to send progress message:", err);
         }
       }, getProgressDelayMs());
     }
     
-    // Helper to clear progress timer
+    // Helper to clear progress interval
     const clearProgressTimer = () => {
-      if (progressTimer) {
-        clearTimeout(progressTimer);
-        progressTimer = null;
+      if (progressInterval) {
+        clearInterval(progressInterval);
+        progressInterval = null;
       }
     };
 
