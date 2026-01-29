@@ -348,16 +348,17 @@ AUTHORITY RULES (without product data):
 - NEVER fabricate specific features, pricing, or integration claims`;
 
   try {
-    console.log(`[OpenAssistant] Calling GPT-5 for product knowledge response...`);
+    const startTime = Date.now();
+    console.log(`[OpenAssistant] Calling gpt-4o for product knowledge response (prompt: ${systemPrompt.length} chars)...`);
     const response = await openai.chat.completions.create({
-      model: "gpt-5",
+      model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
     });
     const answer = response.choices[0]?.message?.content || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
-    console.log(`[OpenAssistant] GPT-5 response received (${answer.length} chars)`);
+    console.log(`[OpenAssistant] gpt-4o response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
     return answer;
   } catch (openaiError) {
     console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE OpenAI error:`, openaiError);
@@ -991,8 +992,9 @@ async function handleGeneralAssistanceIntent(
     };
   }
   
+  const startTime = Date.now();
   const response = await openai.chat.completions.create({
-    model: "gpt-5",
+    model: "gpt-4o",
     messages: [
       {
         role: "system",
