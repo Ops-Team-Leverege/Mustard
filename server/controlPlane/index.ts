@@ -101,7 +101,8 @@ const AGGREGATE_CONTRACTS = [
 // Patterns that indicate time range is EXPLICITLY specified
 // Note: "recent/recently" is too vague - always ask for clarification
 const TIME_RANGE_PATTERNS = [
-  /\b(last|past)\s+(week|month|quarter|year|\d+\s*days?)\b/i,
+  /\b(last|past)\s+(week|month|quarter|year)\b/i, // "last month", "past quarter"
+  /\b(last|past)\s+(\d+|two|three|four|five|six|seven|eight|nine|ten|few|several|couple(\s+of)?)\s+(days?|weeks?|months?|quarters?|years?)\b/i, // "last 3 months", "past few weeks", "last couple of months"
   /\b(this|current)\s+(week|month|quarter|year)\b/i,
   /\b(since|from|after|before)\s+(january|february|march|april|may|june|july|august|september|october|november|december|\d{4})/i,
   /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b/i,
