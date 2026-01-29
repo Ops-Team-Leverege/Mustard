@@ -561,6 +561,22 @@ const MULTI_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "most asked": AnswerContract.CROSS_MEETING_QUESTIONS,
   "objections": AnswerContract.CROSS_MEETING_QUESTIONS,
   "concerns raised": AnswerContract.CROSS_MEETING_QUESTIONS,
+  // Additional aggregate analysis keywords
+  "concerns": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "customer concerns": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "bigger concerns": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "main concerns": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "issues": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "customer issues": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "problems": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "feedback": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "customer feedback": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "worries": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "hesitations": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "reservations": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "pain points": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "challenges": AnswerContract.CROSS_MEETING_QUESTIONS,
+  "customer challenges": AnswerContract.CROSS_MEETING_QUESTIONS,
 };
 
 const REFUSE_PATTERNS = [
