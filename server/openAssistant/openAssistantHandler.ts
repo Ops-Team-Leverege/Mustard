@@ -985,21 +985,48 @@ async function handleGeneralAssistanceIntent(
   // USE CONTROL PLANE CONTRACT when provided
   const actualContract = contract || AnswerContract.GENERAL_RESPONSE;
   
-  const evidenceCheck = wouldBenefitFromEvidence(userMessage);
-  if (evidenceCheck.needsEvidence) {
-    console.log(`[OpenAssistant] GENERAL_HELP guardrail triggered: ${evidenceCheck.reason}`);
-    return {
-      answer: `${evidenceCheck.reason}\n\nTo give you accurate information, could you:\n- For meeting questions: specify which customer or meeting you're asking about\n- For product questions: let me know what specific capability you want to verify\n\nThis helps me provide verified information rather than general guidance.`,
-      intent: "general_assistance",
-      intentClassification: classification,
-      controlPlaneIntent: Intent.CLARIFY,
-      answerContract: AnswerContract.CLARIFY,
-      dataSource: "clarification",
-      delegatedToSingleMeeting: false,
-    };
+  // For drafting emails, we allow thread context to inform the draft
+  const isDraftingContract = actualContract === AnswerContract.DRAFT_EMAIL || actualContract === AnswerContract.DRAFT_RESPONSE;
+  
+  // Skip evidence check for drafting - we'll use thread context instead
+  if (!isDraftingContract) {
+    const evidenceCheck = wouldBenefitFromEvidence(userMessage);
+    if (evidenceCheck.needsEvidence) {
+      console.log(`[OpenAssistant] GENERAL_HELP guardrail triggered: ${evidenceCheck.reason}`);
+      return {
+        answer: `${evidenceCheck.reason}\n\nTo give you accurate information, could you:\n- For meeting questions: specify which customer or meeting you're asking about\n- For product questions: let me know what specific capability you want to verify\n\nThis helps me provide verified information rather than general guidance.`,
+        intent: "general_assistance",
+        intentClassification: classification,
+        controlPlaneIntent: Intent.CLARIFY,
+        answerContract: AnswerContract.CLARIFY,
+        dataSource: "clarification",
+        delegatedToSingleMeeting: false,
+      };
+    }
   }
   
   const startTime = Date.now();
+  
+  // Build thread context string for drafting
+  let threadContextStr = "";
+  if (isDraftingContract && context.threadMessages && context.threadMessages.length > 1) {
+    const prevMessages = context.threadMessages.slice(0, -1); // Exclude current message
+    threadContextStr = "\n\n=== CONVERSATION CONTEXT ===\nUse this context from the thread to inform your draft:\n\n";
+    for (const msg of prevMessages) {
+      const role = msg.isBot ? "Assistant" : "User";
+      threadContextStr += `${role}: ${msg.text}\n\n`;
+    }
+    threadContextStr += "=== END CONTEXT ===\n\nIMPORTANT: Use the specific details from the conversation above (customer names, action items, topics discussed) in your draft. Do NOT use generic placeholders.";
+    console.log(`[OpenAssistant] Including ${prevMessages.length} thread messages for drafting context`);
+  }
+  
+  // Add meeting context if available
+  let meetingContextStr = "";
+  if (isDraftingContract && context.resolvedMeeting) {
+    const meeting = context.resolvedMeeting;
+    meetingContextStr = `\n\nMeeting Context: ${meeting.companyName}${meeting.meetingDate ? ` (${meeting.meetingDate.toLocaleDateString()})` : ''}`;
+  }
+  
   const systemPrompt = `${AMBIENT_PRODUCT_CONTEXT}
 
 You are a helpful business assistant for the PitCrew team. Provide clear, professional help with the user's request.
@@ -1017,7 +1044,7 @@ You are a helpful business assistant for the PitCrew team. Provide clear, profes
 - Making claims that require Product SSOT or meeting evidence
 - Implying you have access to specific meeting data
 
-If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.`;
+If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.${meetingContextStr}${threadContextStr}`;
   
   console.log(`[OpenAssistant] Calling gpt-4o for general assistance (streaming: ${!!context.slackStreaming})...`);
   const answer = await streamOpenAIResponse(

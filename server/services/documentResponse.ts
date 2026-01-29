@@ -206,8 +206,21 @@ function extractTopicFromQuery(query?: string): string | null {
  * Generate a document title based on the user's query, falling back to contract-based title.
  */
 function generateTitleFromQuery(query?: string, contract?: AnswerContract, customerName?: string): string {
-  const topic = extractTopicFromQuery(query);
   const customer = customerName || "General";
+  
+  // For certain contracts, always use contract-based title (not query-based)
+  const useContractTitleContracts = [
+    AnswerContract.DRAFT_EMAIL,
+    AnswerContract.DRAFT_RESPONSE,
+    AnswerContract.MEETING_SUMMARY,
+    AnswerContract.VALUE_PROPOSITION,
+  ];
+  
+  if (contract && useContractTitleContracts.includes(contract)) {
+    return generateTitleFromContract(contract, customerName);
+  }
+  
+  const topic = extractTopicFromQuery(query);
   
   // If we have a clear topic from the query, use it
   if (topic) {
@@ -256,6 +269,18 @@ function generateTitleFromContract(contract?: AnswerContract, customerName?: str
  * Generate a Slack message based on the user's query, falling back to config messages.
  */
 function generateSlackMessage(query?: string, contract?: AnswerContract): string {
+  // For certain contracts, always use config-based messages
+  const useConfigMessageContracts = [
+    AnswerContract.DRAFT_EMAIL,
+    AnswerContract.DRAFT_RESPONSE,
+    AnswerContract.MEETING_SUMMARY,
+    AnswerContract.VALUE_PROPOSITION,
+  ];
+  
+  if (contract && useConfigMessageContracts.includes(contract)) {
+    return getDocumentMessage(contract);
+  }
+  
   const topic = extractTopicFromQuery(query);
   
   // If we have a clear topic, generate a query-specific message

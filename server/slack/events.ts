@@ -992,6 +992,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           userId: userId || undefined,
           threadId: threadTs,
           conversationContext: threadContext ? `Company: ${resolvedMeeting?.companyName || 'unknown'}` : undefined,
+          threadMessages: threadContextForCP?.messages,
           resolvedMeeting: resolvedMeeting ? {
             meetingId: resolvedMeeting.meetingId,
             companyId: resolvedMeeting.companyId,

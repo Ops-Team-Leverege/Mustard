@@ -54,10 +54,16 @@ export type SlackStreamingContext = {
   threadTs: string;
 };
 
+export type ThreadMessage = {
+  text: string;
+  isBot: boolean;
+};
+
 export type OpenAssistantContext = {
   userId?: string;
   threadId?: string;
   conversationContext?: string;
+  threadMessages?: ThreadMessage[];
   resolvedMeeting?: SingleMeetingContext | null;
   controlPlaneResult?: ControlPlaneResult;
   slackStreaming?: SlackStreamingContext;
