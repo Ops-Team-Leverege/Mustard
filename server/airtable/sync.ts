@@ -24,6 +24,7 @@ import {
 import { fetchAllRecords, type AirtableRecord } from "./client";
 import { AIRTABLE_TABLES, type FeatureFields, type ValuePropositionFields, type ValueThemeFields, type FeatureThemeFields, type CustomerSegmentFields } from "./types";
 import { eq } from "drizzle-orm";
+import { rebuildProductSnapshot } from "./productData";
 
 export type SyncResult = {
   table: string;
@@ -288,6 +289,11 @@ export async function syncAllTables(): Promise<SyncAllResult> {
   const hasErrors = results.some(r => r.status === "error");
 
   console.log(`[Airtable Sync] Completed. Total records: ${totalRecords}, Errors: ${hasErrors}`);
+  
+  // Rebuild the product snapshot after sync
+  if (!hasErrors) {
+    await rebuildProductSnapshot();
+  }
 
   return {
     success: !hasErrors,

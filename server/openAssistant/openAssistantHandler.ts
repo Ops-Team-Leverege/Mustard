@@ -30,7 +30,7 @@ import {
 } from "./types";
 import { findRelevantMeetings, searchAcrossMeetings } from "./meetingResolver";
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
-import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
+import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
 import { GoogleGenAI } from "@google/genai";
 
 export type { EvidenceSource, IntentClassification, OpenAssistantContext, OpenAssistantResult };
@@ -630,22 +630,22 @@ async function handleProductKnowledgeIntent(
     console.log(`[OpenAssistant] URL detected in message: ${websiteUrl}`);
   }
   
-  // Fetch REAL product data from Airtable tables
-  let productKnowledge;
-  let productDataPrompt;
+  // Get product knowledge from snapshot (fast path) or compute on-demand
+  let snapshotResult;
+  let productDataPrompt: string;
+  let tablesWithData: string[];
   try {
-    console.log(`[OpenAssistant] Fetching product knowledge from database...`);
-    productKnowledge = await getComprehensiveProductKnowledge();
-    productDataPrompt = formatProductKnowledgeForPrompt(productKnowledge);
-    console.log(`[OpenAssistant] Product knowledge fetch successful`);
+    console.log(`[OpenAssistant] Fetching product knowledge...`);
+    snapshotResult = await getProductKnowledgePrompt();
+    productDataPrompt = snapshotResult.promptText;
+    tablesWithData = snapshotResult.tablesIncluded;
+    console.log(`[OpenAssistant] Product knowledge loaded (${snapshotResult.source}): ${snapshotResult.recordCount} records`);
   } catch (dbError) {
     console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE database error:`, dbError);
     throw new Error(`Product knowledge database error: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
   }
   
-  console.log(`[OpenAssistant] Product knowledge loaded: ${productKnowledge.metadata.totalRecords} records from ${productKnowledge.metadata.tablesWithData.join(", ")}`);
-  
-  const hasProductData = productKnowledge.metadata.totalRecords > 0;
+  const hasProductData = snapshotResult.recordCount > 0;
   
   let answer: string;
   
@@ -676,7 +676,7 @@ async function handleProductKnowledgeIntent(
     ssotMode: hasProductData ? "authoritative" : "descriptive",
     dataSource: "product_ssot",
     delegatedToSingleMeeting: false,
-    evidenceSources: hasProductData ? productKnowledge.metadata.tablesWithData : undefined,
+    evidenceSources: hasProductData ? tablesWithData : undefined,
   };
 }
 

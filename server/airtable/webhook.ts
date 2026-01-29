@@ -20,6 +20,7 @@ import type { Request, Response } from "express";
 import { invalidateAllDataCache } from "./dynamicData";
 import { invalidateSchemaCache } from "./schema";
 import { syncAllTablesDynamic } from "./dynamicSync";
+import { rebuildProductSnapshot } from "./productData";
 
 type WebhookPayload = {
   base?: { id: string };
@@ -48,6 +49,11 @@ export async function handleAirtableWebhook(req: Request, res: Response): Promis
     const syncResult = await syncAllTablesDynamic();
     
     console.log(`[Airtable Webhook] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
+    
+    // Rebuild product snapshot after successful sync
+    if (syncResult.success) {
+      await rebuildProductSnapshot();
+    }
 
     res.status(200).json({ 
       ...syncResult,
@@ -86,6 +92,11 @@ export async function handleAirtableRefresh(req: Request, res: Response): Promis
     const syncResult = await syncAllTablesDynamic();
     
     console.log(`[Airtable Refresh] Sync completed. Tables: ${syncResult.tablesDiscovered}, Records: ${syncResult.totalRecords}`);
+    
+    // Rebuild product snapshot after successful sync
+    if (syncResult.success) {
+      await rebuildProductSnapshot();
+    }
 
     const message = syncResult.success 
       ? `Discovered ${syncResult.tablesDiscovered} tables, synced ${syncResult.totalRecords} records.`

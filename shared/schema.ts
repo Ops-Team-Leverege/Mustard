@@ -581,6 +581,15 @@ export const pitcrewAirtableSyncLog = pgTable("pitcrew_airtable_sync_log", {
   errorMessage: text("error_message"),
 });
 
+// Unified product knowledge - rebuilt after each Airtable sync
+export const pitcrewProductSnapshot = pgTable("pitcrew_product_snapshot", {
+  id: varchar("id").primaryKey().default("singleton"),
+  promptText: text("prompt_text").notNull(),
+  recordCount: integer("record_count").notNull(),
+  tablesIncluded: text("tables_included").array().notNull(),
+  lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
+});
+
 // Types
 export type PitcrewAirtableFeature = typeof pitcrewAirtableFeatures.$inferSelect;
 export type InsertPitcrewAirtableFeature = typeof pitcrewAirtableFeatures.$inferInsert;

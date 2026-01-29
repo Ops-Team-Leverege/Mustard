@@ -21,13 +21,14 @@ import {
   pitcrewAirtableValueThemes,
   pitcrewAirtableFeatureThemes,
   pitcrewAirtableCustomerSegments,
+  pitcrewProductSnapshot,
   type PitcrewAirtableFeature,
   type PitcrewAirtableValueProposition,
   type PitcrewAirtableValueTheme,
   type PitcrewAirtableFeatureTheme,
   type PitcrewAirtableCustomerSegment,
 } from "@shared/schema";
-import { ilike, or } from "drizzle-orm";
+import { ilike, or, eq } from "drizzle-orm";
 
 export async function getFeatures(): Promise<PitcrewAirtableFeature[]> {
   return db.select().from(pitcrewAirtableFeatures);
@@ -314,4 +315,85 @@ ${roadmapFeatures.map(f => `- ${f.name} [${f.productStatus}]${f.description ? `:
   }
   
   return sections.join("\n\n");
+}
+
+/**
+ * Get the pre-computed product knowledge prompt from the snapshot.
+ * This is the fast path - single query instead of 5.
+ * Falls back to computing on-demand if snapshot doesn't exist.
+ */
+export type ProductSnapshotResult = {
+  promptText: string;
+  recordCount: number;
+  tablesIncluded: string[];
+  lastSyncedAt: Date | null;
+  source: "snapshot" | "computed";
+};
+
+export async function getProductKnowledgePrompt(): Promise<ProductSnapshotResult> {
+  // Try to get from snapshot first (fast path)
+  const [snapshot] = await db.select()
+    .from(pitcrewProductSnapshot)
+    .where(eq(pitcrewProductSnapshot.id, "singleton"))
+    .limit(1);
+  
+  if (snapshot) {
+    console.log(`[ProductData] Using snapshot: ${snapshot.recordCount} records, synced ${snapshot.lastSyncedAt?.toISOString()}`);
+    return {
+      promptText: snapshot.promptText,
+      recordCount: snapshot.recordCount,
+      tablesIncluded: snapshot.tablesIncluded,
+      lastSyncedAt: snapshot.lastSyncedAt,
+      source: "snapshot",
+    };
+  }
+  
+  // Fallback: compute on-demand (slow path)
+  console.log(`[ProductData] No snapshot found, computing on-demand...`);
+  const knowledge = await getComprehensiveProductKnowledge();
+  const promptText = formatProductKnowledgeForPrompt(knowledge);
+  
+  return {
+    promptText,
+    recordCount: knowledge.metadata.totalRecords,
+    tablesIncluded: knowledge.metadata.tablesWithData,
+    lastSyncedAt: null,
+    source: "computed",
+  };
+}
+
+/**
+ * Rebuild the unified product snapshot from all Airtable tables.
+ * Called after each successful sync to pre-compute the LLM prompt.
+ */
+export async function rebuildProductSnapshot(): Promise<void> {
+  console.log("[ProductData] Rebuilding product snapshot...");
+  
+  try {
+    const knowledge = await getComprehensiveProductKnowledge();
+    const promptText = formatProductKnowledgeForPrompt(knowledge);
+    
+    await db.insert(pitcrewProductSnapshot)
+      .values({
+        id: "singleton",
+        promptText,
+        recordCount: knowledge.metadata.totalRecords,
+        tablesIncluded: knowledge.metadata.tablesWithData,
+        lastSyncedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: pitcrewProductSnapshot.id,
+        set: {
+          promptText,
+          recordCount: knowledge.metadata.totalRecords,
+          tablesIncluded: knowledge.metadata.tablesWithData,
+          lastSyncedAt: new Date(),
+        },
+      });
+    
+    console.log(`[ProductData] Product snapshot rebuilt: ${knowledge.metadata.totalRecords} records, ${promptText.length} chars`);
+  } catch (error) {
+    console.error("[ProductData] Failed to rebuild product snapshot:", error);
+    throw error;
+  }
 }
