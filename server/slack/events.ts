@@ -383,6 +383,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     let storedProposedInterpretation: { intent: string; contract: string; summary: string } | null = null;
     let originalQuestion: string | null = null;
     let lastResponseType: string | null = null;
+    let priorAnswerText: string | null = null;
     
     // Only look up prior context if this is a reply in an existing thread
     if (isReply && shouldReuseThreadContext(text)) {
@@ -406,6 +407,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           
           // Track what the last response was about (for follow-up context)
           lastResponseType = (contextLayers?.lastResponseType as string) || null;
+          priorAnswerText = priorInteraction.answerText || null;
           
           console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}, lastResponseType=${lastResponseType}`);
         }
@@ -617,28 +619,31 @@ export async function slackEventsHandler(req: Request, res: Response) {
       if (wantsToAnswerQuestions) {
         console.log(`[Slack] Detected "answer those questions" follow-up - routing to product knowledge + draft response`);
         
-        // Fetch the actual customer questions from this meeting to include in the prompt
-        const customerQuestions = await storage.getCustomerQuestionsByTranscript(threadContext.meetingId);
-        const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
+        // Extract questions from prior response (already formatted in the thread)
+        // This avoids an extra database call since we have the formatted questions from the prior interaction
+        let questionList: string | null = null;
         
-        if (openQuestions.length === 0) {
-          // No open questions to answer
-          const noOpenQuestionsResponse = "All the questions from this meeting have already been answered. Would you like me to show the answers, or help with something else?";
+        if (priorAnswerText) {
+          // Extract the "Open Questions:" section from the prior response
+          const openQuestionsMatch = priorAnswerText.match(/\*Open Questions:\*\n([\s\S]*?)(?=\n\*|$)/);
+          if (openQuestionsMatch) {
+            questionList = openQuestionsMatch[1].trim();
+          }
+        }
+        
+        if (!questionList) {
+          // Fallback: no questions found in prior response
+          const noQuestionsResponse = "I don't see any open questions from the prior response. Would you like me to look up the customer questions from this meeting?";
           if (!testRun) {
             await postSlackMessage({
               channel,
-              text: noOpenQuestionsResponse,
+              text: noQuestionsResponse,
               thread_ts: threadTs,
             });
           }
           clearProgressTimer();
           return;
         }
-        
-        // Build a question list for the LLM
-        const questionList = openQuestions
-          .map((q, i) => `${i + 1}. "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}`)
-          .join("\n");
         
         // Route to Open Assistant with PRODUCT_KNOWLEDGE contract to draft responses
         const syntheticControlPlane = {
