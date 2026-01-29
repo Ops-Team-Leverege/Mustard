@@ -138,11 +138,15 @@ export function detectAmbiguity(question: string): { isAmbiguous: boolean; clari
   //   1. "What were the action items?" (artifact extractive)
   //   2. "Give me a summary to prepare" (semantic summary)
   const preparationPatterns = [
-    /\b(?:preparing|prepare|getting ready|prepping)\s+(?:for|to)\b/,
+    /\b(?:preparing|prepare|getting ready|prepping|prep)\s+(?:me\s+)?(?:for|to)\b/,
+    /\b(?:prepare|prep)\s+me\s+for\b/,
     /\bwhat should I\s+(?:[\w\s]+\s+)?(?:cover|know|remember|bring up|focus on)\b/,
     /\bwhat (?:do I need|should I need) to know\b/,
-    /\bbefore (?:the|our|this|my) (?:meeting|call)\b/,
-    /\bbrief me (?:for|before)\b/,
+    /\bbefore (?:the|our|this|my|a)\s+(?:\w+\s+)?(?:meeting|call)\b/,
+    /\bwhat should I know\s+(?:before|for)\b/,
+    /\bbrief me (?:for|on|before)\b/,
+    /\bhelp me (?:get ready|prepare)\s+for\b/,
+    /\bget me ready for\b/,
   ];
   
   const isPreparationQuestion = preparationPatterns.some(p => p.test(q));
