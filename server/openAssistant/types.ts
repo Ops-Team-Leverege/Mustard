@@ -83,6 +83,7 @@ export type OpenAssistantResult = {
   singleMeetingResult?: SingleMeetingResult;
   delegatedToSingleMeeting: boolean;
   evidenceSources?: string[];
+  progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for long operations)
 };
 
 /**

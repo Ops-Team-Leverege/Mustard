@@ -808,6 +808,9 @@ async function handleMultiMeetingIntent(
     },
   };
   
+  // Build progress message for multi-meeting search
+  const progressMessage = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}. I'll analyze them and compile the insights.`;
+  
   // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
@@ -842,6 +845,7 @@ async function handleMultiMeetingIntent(
     ssotMode: "none" as SSOTMode,
     dataSource: "meeting_artifacts",
     delegatedToSingleMeeting: false,
+    progressMessage,
   };
 }
 
@@ -944,6 +948,24 @@ async function handleExternalResearchIntent(
   
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
   
+  // Build progress message for user
+  const progressParts: string[] = [];
+  if (companyName) {
+    progressParts.push(`I'll search the web for information about ${companyName}.`);
+  } else {
+    progressParts.push(`I'll search the web for the information you need.`);
+  }
+  
+  if (actualContract === AnswerContract.SALES_DOCS_PREP) {
+    progressParts.push(`I'll gather their strategic priorities, recent news, and key data to help with your presentation.`);
+  } else if (actualContract === AnswerContract.VALUE_PROPOSITION) {
+    progressParts.push(`I'll combine external research with our product knowledge to build a tailored value proposition.`);
+  } else {
+    progressParts.push(`I'll gather relevant information and include my sources.`);
+  }
+  
+  const progressMessage = progressParts.join(' ');
+  
   // Perform the research
   const researchResult = await performExternalResearch(
     userMessage,
@@ -977,6 +999,7 @@ async function handleExternalResearchIntent(
     dataSource: "external_research",
     delegatedToSingleMeeting: false,
     evidenceSources: researchResult.citations.map(c => c.source),
+    progressMessage,
   };
 }
 
