@@ -1,0 +1,60 @@
+Revised Assessment & Priorities
+✅ Corrections Acknowledged
+MemStorage - You're right, it's not dead code. It's essential for local development and PostgreSQL fallback. My mistake.
+
+Model Configuration - I see you've already centralized this in 
+models.ts
+ with MODEL_ASSIGNMENTS. That's exactly the right approach and addresses the scattered model patterns issue.
+
+Designed Layer Flow - Good point about controlPlane → openAssistant → mcp being intentional architecture. Full DI might indeed be over-engineering for this scale.
+
+Complex Conditionals - Agreed that LLM-first routing inherently requires complex logic. Extracting into smaller, well-named functions is the right approach rather than oversimplifying.
+
+Refined Priority Order (Based on Your Suggestions)
+Phase 1: Quick Wins (Low Risk, High Impact)
+Extract Constants ✅
+
+Create 
+constants.ts
+Move all magic numbers (timeouts, limits, thresholds)
+Include the new patterns you added to 
+index.ts
+Standardize Error Handling ✅
+
+Create error types (AppError, ValidationError, ExternalServiceError)
+Consistent error response format
+Replace mix of throw/console.error patterns
+Phase 2: Structural Improvements (Medium Risk)
+Split storage.ts by Domain ✅
+
+TranscriptRepository
+CategoryRepository
+UserRepository
+CompanyRepository
+Keep interface-based approach for both Postgres and MemStorage
+Extract Complex Functions
+
+Break down nested conditionals in intent classification
+Create well-named helper functions
+Maintain the LLM-first logic but improve readability
+Phase 3: Quality Assurance (Higher Risk)
+Add Critical Path Tests ✅
+Intent classification edge cases
+Contract execution flows
+Error handling scenarios
+Mock external LLM calls
+Additional Suggestions Based on Your Context
+Interface Clarity - Instead of full DI, create clearer interfaces between layers to reduce coupling while maintaining the designed flow.
+
+Configuration Validation - Since you're extracting constants, add startup validation to ensure all required config is present.
+
+Incremental Refactoring - Given the system's complexity, tackle one domain at a time (e.g., start with transcript-related storage methods).
+
+Questions for Implementation
+Constants Organization - Should we group by domain (e.g., LLM_CONSTANTS, STORAGE_CONSTANTS) or by type (e.g., TIMEOUTS, LIMITS)?
+
+Error Handling Strategy - Do you prefer throwing typed errors that get caught by middleware, or returning Result<T, Error> patterns?
+
+Storage Split Approach - Should repositories share a common base class, or keep them independent with shared interfaces?
+
+Your priority order makes perfect sense - starting with low-risk, high-impact changes and building confidence before tackling the larger structural changes. Ready to review whatever approach you decide to implement!
