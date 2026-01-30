@@ -524,6 +524,38 @@ export function mapOrchestratorIntentToContract(
  * This is the key step that transforms raw transcript excerpts into
  * actionable insights with patterns, frequencies, and groupings.
  */
+/**
+ * Extract the focus topic from the user's question.
+ * This identifies what they're specifically asking about (concerns, questions, objections, etc.)
+ */
+function extractFocusTopic(userMessage: string): string {
+  const lower = userMessage.toLowerCase();
+  
+  // Common analysis topics - extract the key noun they're asking about
+  const topicPatterns: Array<{ pattern: RegExp; topic: string }> = [
+    { pattern: /\b(bigger|main|top|common|major|key)\s+(concerns?)\b/i, topic: "concerns" },
+    { pattern: /\bconcerns?\b/i, topic: "concerns" },
+    { pattern: /\b(objections?|pushback|resistance)\b/i, topic: "objections" },
+    { pattern: /\b(questions?|asking|asked)\b/i, topic: "questions" },
+    { pattern: /\b(pain\s*points?|frustrations?|challenges?|problems?|issues?)\b/i, topic: "pain points" },
+    { pattern: /\b(hesitations?|doubts?|worries?|reservations?)\b/i, topic: "hesitations" },
+    { pattern: /\b(feedback|opinions?|thoughts?)\b/i, topic: "feedback" },
+    { pattern: /\b(requests?|feature\s*requests?|asks?)\b/i, topic: "requests" },
+    { pattern: /\b(complaints?|negative)\b/i, topic: "complaints" },
+    { pattern: /\b(praise|positive|liked|loves?)\b/i, topic: "positive feedback" },
+    { pattern: /\b(priorities?|important|matters?)\b/i, topic: "priorities" },
+    { pattern: /\b(needs?|requirements?|must\s*haves?)\b/i, topic: "needs" },
+  ];
+  
+  for (const { pattern, topic } of topicPatterns) {
+    if (pattern.test(userMessage)) {
+      return topic;
+    }
+  }
+  
+  return "themes"; // fallback
+}
+
 async function synthesizeAnalysis(
   contract: AnswerContract,
   userMessage: string,
@@ -534,7 +566,10 @@ async function synthesizeAnalysis(
   const uniqueCompanies = Array.from(new Set(meetings.map(m => m.companyName)));
   const companyList = uniqueCompanies.slice(0, 5).join(", ") + (uniqueCompanies.length > 5 ? ` and ${uniqueCompanies.length - 5} more` : "");
   
-  const synthesisPrompt = getSynthesisPrompt(contract, coverage, companyList);
+  const focusTopic = extractFocusTopic(userMessage);
+  console.log(`[ContractExecutor] Extracted focus topic: "${focusTopic}" from question`);
+  
+  const synthesisPrompt = getSynthesisPrompt(contract, coverage, companyList, focusTopic);
   
   try {
     const response = await openai.chat.completions.create({
@@ -566,54 +601,49 @@ async function synthesizeAnalysis(
  * Get contract-specific synthesis prompts.
  * These prompts instruct the LLM how to transform raw excerpts into insights.
  * Includes coverage qualification to ensure appropriate confidence levels.
+ * 
+ * @param focusTopic - The extracted topic from the user's question (e.g., "concerns", "questions")
  */
-function getSynthesisPrompt(contract: AnswerContract, coverage: CoverageContext, companyList: string): string {
+function getSynthesisPrompt(contract: AnswerContract, coverage: CoverageContext, companyList: string, focusTopic: string): string {
   const baseContext = `You are analyzing customer call data from ${coverage.totalMeetings} meetings across ${coverage.uniqueCompanies} companies (${companyList}).`;
   const coverageQualification = getCoverageQualification(coverage);
+  const topicUpper = focusTopic.toUpperCase();
   
   switch (contract) {
     case AnswerContract.PATTERN_ANALYSIS:
       return `${baseContext}
 ${coverageQualification}
 
-CRITICAL: You must analyze the data TO ANSWER THE USER'S SPECIFIC QUESTION. Do not provide generic patterns - focus on what they asked about.
-
-For example:
-- If they ask about "concerns" → find customer CONCERNS, worries, hesitations, objections
-- If they ask about "questions" → find customer QUESTIONS they asked
-- If they ask about "objections" → find sales OBJECTIONS and pushback
-- If they ask about "pain points" → find customer PAIN POINTS and frustrations
+FOCUS: The user is asking about "${topicUpper}". Your job is to find and synthesize ${topicUpper} from the meeting data.
 
 OUTPUT FORMAT:
-**[Topic from User's Question] Across ${coverage.totalMeetings} Calls:**
+**Customer ${focusTopic.charAt(0).toUpperCase() + focusTopic.slice(1)} Across ${coverage.totalMeetings} Calls:**
 
-1. **[Specific Finding]** (mentioned in X/${coverage.totalMeetings} calls)
+1. **[${focusTopic.charAt(0).toUpperCase() + focusTopic.slice(1)} #1]** (mentioned in X/${coverage.totalMeetings} calls)
    - Brief description
    - Representative quote if available
 
-2. **[Specific Finding]** (mentioned in X/${coverage.totalMeetings} calls)
+2. **[${focusTopic.charAt(0).toUpperCase() + focusTopic.slice(1)} #2]** (mentioned in X/${coverage.totalMeetings} calls)
    - Brief description
    - Representative quote
 
 RULES:
-- FOCUS on exactly what the user asked about - do not drift to general themes
-- Group similar items together
+- ONLY extract ${topicUpper} - do not include general themes or unrelated topics
+- Group similar ${focusTopic} together
 - Count frequency (estimate if unclear)
 - Prioritize by frequency (most common first)
 - Include 1-2 representative quotes per item
-- Limit to 5-7 most significant findings
-- If the data doesn't contain what the user asked about, say so explicitly`;
+- Limit to 5-7 most significant ${focusTopic}
+- If no ${focusTopic} are found in the data, say so explicitly`;
 
     case AnswerContract.TREND_SUMMARY:
       return `${baseContext}
 ${coverageQualification}
 
-CRITICAL: Focus your analysis on what the user specifically asked about. Do not provide generic trends.
-
-Your task is to identify TRENDS and CHANGES OVER TIME related to the user's question.
+FOCUS: The user is asking about "${topicUpper}". Identify trends and changes over time related to ${topicUpper}.
 
 OUTPUT FORMAT:
-**[Topic from User's Question] - Trends Across ${coverage.totalMeetings} Calls:**
+**${focusTopic.charAt(0).toUpperCase() + focusTopic.slice(1)} Trends Across ${coverage.totalMeetings} Calls:**
 
 1. **[Trend Name]**
    - How this has evolved over time
@@ -624,12 +654,11 @@ OUTPUT FORMAT:
    - Notable shifts
 
 RULES:
-- FOCUS on trends related to what the user asked about
-- Look for topics that appear more/less frequently over time
+- FOCUS on trends related to ${topicUpper}
+- Look for ${focusTopic} that appear more/less frequently over time
 - Note any shifts in customer sentiment or priorities
-- Identify emerging concerns vs declining ones
 - If meeting dates are visible in the data, reference them
-- If temporal data is insufficient or dates are unclear, explicitly state: "Temporal trends cannot be determined from this data - consider organizing by theme instead"
+- If temporal data is insufficient or dates are unclear, explicitly state: "Temporal trends cannot be determined from this data"
 - Do not fabricate timeline information`;
 
     case AnswerContract.CROSS_MEETING_QUESTIONS:
@@ -661,7 +690,7 @@ RULES:
       return `${baseContext}
 ${coverageQualification}
 
-Analyze the provided meeting excerpts and synthesize the key insights relevant to the user's question.
+FOCUS: The user is asking about "${topicUpper}". Analyze the meeting data to find ${topicUpper}.
 Be specific, cite evidence, and organize your response clearly.`;
   }
 }
