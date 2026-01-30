@@ -20,6 +20,7 @@ import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeet
 import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../controlPlane/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
+import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
 
 import { 
   type EvidenceSource, 
@@ -272,7 +273,7 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       redirect: 'manual', // Handle redirects manually for safety
-      signal: AbortSignal.timeout(15000), // 15 second timeout
+      signal: AbortSignal.timeout(TIMEOUTS.WEBSITE_FETCH_MS),
     });
     
     // Handle redirects safely - only follow if redirect stays on allowed domain
@@ -333,9 +334,9 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
       };
     }
     
-    // Truncate if too long (keep first 15000 chars)
-    if (textContent.length > 15000) {
-      textContent = textContent.substring(0, 15000) + '\n\n[Content truncated...]';
+    // Truncate if too long
+    if (textContent.length > CONTENT_LIMITS.WEBSITE_CONTENT_MAX_CHARS) {
+      textContent = textContent.substring(0, CONTENT_LIMITS.WEBSITE_CONTENT_MAX_CHARS) + '\n\n[Content truncated...]';
     }
     
     console.log(`[OpenAssistant] Fetched website content: ${textContent.length} chars, ${wordCount} words`);

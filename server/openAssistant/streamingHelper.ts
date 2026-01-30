@@ -67,10 +67,12 @@ export async function streamOpenAIResponse(
     stream: true,
   });
   
+  const { STREAMING } = await import("../config/constants");
+  
   let accumulatedContent = "";
   let lastUpdateTime = Date.now();
-  const UPDATE_INTERVAL_MS = 1000; // Update Slack every 1 second
-  const MIN_CONTENT_FOR_UPDATE = 50; // Minimum chars before first update
+  const UPDATE_INTERVAL_MS = STREAMING.UPDATE_INTERVAL_MS;
+  const MIN_CONTENT_FOR_UPDATE = STREAMING.MIN_CONTENT_FOR_UPDATE;
   
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content || "";

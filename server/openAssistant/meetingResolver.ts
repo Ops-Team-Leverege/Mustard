@@ -90,7 +90,8 @@ export async function findRelevantMeetings(
 
   // Limit per company to prevent unbounded loads for large customers
   // Downstream processing (e.g., searchAcrossMeetings) may further reduce this
-  const MAX_MEETINGS_PER_COMPANY = 25;
+  const { MEETING_LIMITS } = await import("../config/constants");
+  const MAX_MEETINGS_PER_COMPANY = MEETING_LIMITS.MAX_MEETINGS_PER_COMPANY;
   
   const meetings: SingleMeetingContext[] = [];
   for (const company of companyMatches) {
@@ -131,8 +132,9 @@ export async function findRelevantMeetings(
  */
 async function fetchAllRecentTranscripts(): Promise<SingleMeetingContext[]> {
   const { storage } = await import("../storage");
+  const { MEETING_LIMITS } = await import("../config/constants");
   
-  const MAX_TOTAL_TRANSCRIPTS = 100; // Reasonable limit for cross-meeting analysis
+  const MAX_TOTAL_TRANSCRIPTS = MEETING_LIMITS.MAX_TOTAL_TRANSCRIPTS;
   
   const rows = await storage.rawQuery(`
     SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, 

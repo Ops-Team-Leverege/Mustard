@@ -12,6 +12,7 @@
 
 import crypto from "crypto";
 import type { Request } from "express";
+import { TIMEOUTS } from "../config/constants";
 
 export function verifySlackSignature(req: Request): boolean {
   const signingSecret = process.env.SLACK_SIGNING_SECRET;
@@ -28,7 +29,7 @@ export function verifySlackSignature(req: Request): boolean {
 
   // Prevent replay attacks (5 minutes)
   const ts = Number(timestamp);
-  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > 60 * 5) {
+  if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > TIMEOUTS.SLACK_SIGNATURE_TOLERANCE_SECONDS) {
     return false;
   }
 
