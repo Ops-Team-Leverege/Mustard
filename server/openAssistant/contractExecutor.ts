@@ -576,36 +576,44 @@ function getSynthesisPrompt(contract: AnswerContract, coverage: CoverageContext,
       return `${baseContext}
 ${coverageQualification}
 
-Your task is to identify PATTERNS and RECURRING THEMES across all the meeting excerpts.
+CRITICAL: You must analyze the data TO ANSWER THE USER'S SPECIFIC QUESTION. Do not provide generic patterns - focus on what they asked about.
+
+For example:
+- If they ask about "concerns" → find customer CONCERNS, worries, hesitations, objections
+- If they ask about "questions" → find customer QUESTIONS they asked
+- If they ask about "objections" → find sales OBJECTIONS and pushback
+- If they ask about "pain points" → find customer PAIN POINTS and frustrations
 
 OUTPUT FORMAT:
-**Key Patterns Across ${coverage.totalMeetings} Calls:**
+**[Topic from User's Question] Across ${coverage.totalMeetings} Calls:**
 
-1. **[Pattern Name]** (mentioned in X/${coverage.totalMeetings} calls)
-   - Brief description of the pattern
+1. **[Specific Finding]** (mentioned in X/${coverage.totalMeetings} calls)
+   - Brief description
    - Representative quote if available
 
-2. **[Pattern Name]** (mentioned in X/${coverage.totalMeetings} calls)
+2. **[Specific Finding]** (mentioned in X/${coverage.totalMeetings} calls)
    - Brief description
    - Representative quote
 
 RULES:
-- Group similar concerns/questions together into patterns
-- Count how many meetings mention each pattern (estimate if exact count unclear)
-- Prioritize patterns by frequency (most common first)
-- Include 1-2 representative quotes per pattern
-- Be specific about what customers are asking or concerned about
-- Limit to 5-7 most significant patterns
-- If data is insufficient to identify clear patterns, say so explicitly`;
+- FOCUS on exactly what the user asked about - do not drift to general themes
+- Group similar items together
+- Count frequency (estimate if unclear)
+- Prioritize by frequency (most common first)
+- Include 1-2 representative quotes per item
+- Limit to 5-7 most significant findings
+- If the data doesn't contain what the user asked about, say so explicitly`;
 
     case AnswerContract.TREND_SUMMARY:
       return `${baseContext}
 ${coverageQualification}
 
-Your task is to identify TRENDS and CHANGES OVER TIME in customer discussions.
+CRITICAL: Focus your analysis on what the user specifically asked about. Do not provide generic trends.
+
+Your task is to identify TRENDS and CHANGES OVER TIME related to the user's question.
 
 OUTPUT FORMAT:
-**Trends Across ${coverage.totalMeetings} Calls:**
+**[Topic from User's Question] - Trends Across ${coverage.totalMeetings} Calls:**
 
 1. **[Trend Name]**
    - How this has evolved over time
@@ -616,6 +624,7 @@ OUTPUT FORMAT:
    - Notable shifts
 
 RULES:
+- FOCUS on trends related to what the user asked about
 - Look for topics that appear more/less frequently over time
 - Note any shifts in customer sentiment or priorities
 - Identify emerging concerns vs declining ones
