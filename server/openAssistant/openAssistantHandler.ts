@@ -1098,6 +1098,10 @@ async function handleExternalResearchIntent(
   
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
   
+  // Detect if user wants to write content matching existing product style
+  const needsStyleMatching = detectStyleMatchingRequest(userMessage);
+  console.log(`[OpenAssistant] Style matching needed: ${needsStyleMatching}`);
+  
   // Generate personalized progress message
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
   
@@ -1120,6 +1124,32 @@ async function handleExternalResearchIntent(
     };
   }
   
+  // If user wants style-matched output, chain product knowledge for style examples
+  if (needsStyleMatching) {
+    console.log(`[OpenAssistant] Chaining product knowledge for style matching...`);
+    try {
+      const styledOutput = await chainProductStyleWriting(userMessage, researchResult.answer, context);
+      const sourcesSection = researchResult.citations.length > 0 
+        ? formatCitationsForDisplay(researchResult.citations)
+        : "";
+      
+      return {
+        answer: styledOutput + sourcesSection,
+        intent: "external_research",
+        intentClassification: classification,
+        controlPlaneIntent: Intent.EXTERNAL_RESEARCH,
+        answerContract: actualContract,
+        dataSource: "product_ssot",
+        delegatedToSingleMeeting: false,
+        evidenceSources: researchResult.citations.map(c => c.source),
+        progressMessage,
+      };
+    } catch (styleError) {
+      console.error(`[OpenAssistant] Style chaining failed, returning raw research:`, styleError);
+      // Fall through to return raw research
+    }
+  }
+  
   // Include sources in the response
   const sourcesSection = researchResult.citations.length > 0 
     ? formatCitationsForDisplay(researchResult.citations)
@@ -1136,6 +1166,80 @@ async function handleExternalResearchIntent(
     evidenceSources: researchResult.citations.map(c => c.source),
     progressMessage,
   };
+}
+
+/**
+ * Detect if the user request involves writing content that should match
+ * existing product content style (features, descriptions, etc.)
+ */
+function detectStyleMatchingRequest(message: string): boolean {
+  const lower = message.toLowerCase();
+  const stylePatterns = [
+    /similar\s+to\s+(?:our\s+)?(?:other\s+)?(?:features?|descriptions?)/i,
+    /like\s+(?:our\s+)?(?:other\s+)?(?:features?|descriptions?)/i,
+    /match(?:ing)?\s+(?:the\s+)?style/i,
+    /(?:same|consistent)\s+(?:style|format|tone)/i,
+    /(?:write|create|draft)\s+(?:a\s+)?(?:feature\s+)?description/i,
+    /making\s+it\s+similar/i,
+    /write\s+(?:the|a)\s+description\s+for\s+(?:the\s+)?feature/i,
+  ];
+  
+  return stylePatterns.some(pattern => pattern.test(lower));
+}
+
+/**
+ * Chain product knowledge to generate styled output that matches existing
+ * feature descriptions in tone and format.
+ */
+async function chainProductStyleWriting(
+  originalRequest: string,
+  researchContent: string,
+  context: OpenAssistantContext
+): Promise<string> {
+  const { getProductKnowledgePrompt } = await import("../airtable/productData");
+  
+  // Fetch existing feature descriptions as style examples
+  const snapshotResult = await getProductKnowledgePrompt();
+  
+  // Extract just the features section for style reference
+  const featuresMatch = snapshotResult.promptText.match(/=== Features[\s\S]*?(?===|$)/);
+  const featureExamples = featuresMatch ? featuresMatch[0].slice(0, 2000) : "";
+  
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+  
+  const response = await openai.chat.completions.create({
+    model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
+    messages: [
+      {
+        role: "system",
+        content: `You are writing a feature description for PitCrew. You MUST match the exact style and tone of our existing feature descriptions.
+
+=== STYLE EXAMPLES (match this format exactly) ===
+${featureExamples}
+
+=== STYLE RULES ===
+1. Keep it concise - typically 1-2 sentences
+2. Start with an action verb (Detects, Identifies, Shows, Enables, etc.)
+3. Describe WHAT it does and WHY it matters
+4. Be specific about the capability
+5. No marketing fluff or buzzwords
+6. Professional but accessible tone
+
+=== RESEARCH CONTEXT ===
+${researchContent}
+
+Use the research to inform your understanding, then write a concise feature description that matches our existing style.`,
+      },
+      {
+        role: "user",
+        content: originalRequest,
+      },
+    ],
+    temperature: 0.3,
+    max_tokens: 500,
+  });
+  
+  return response.choices[0]?.message?.content || researchContent;
 }
 
 /**

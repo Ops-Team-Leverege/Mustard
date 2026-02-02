@@ -107,6 +107,18 @@ The control plane dynamically builds contract chains based on user messages, ens
 **Behavior**: Waits for sync, auto-discovers new tables, and auto-adds new columns.
 **Trigger**: Zapier automation on Airtable record changes.
 
+## Recent Changes (February 2026)
+
+### Product Style Matching for EXTERNAL_RESEARCH
+- **Style Chaining Implementation**: When EXTERNAL_RESEARCH requests include "write description similar to other features" or style-matching phrases, the system now chains product knowledge to provide existing feature descriptions as style examples.
+- **Detection Patterns**: Added `detectStyleMatchingRequest()` to identify when users want output matching existing product style.
+- **Feature Description Examples**: The `chainProductStyleWriting()` function fetches existing feature descriptions from the product knowledge base and instructs the LLM to match their concise, action-verb-first style.
+- **Architectural Fix**: Previously, comments claimed "EXTERNAL_RESEARCH automatically chains product knowledge" but this was not implemented. Now properly chains product knowledge when style matching is detected.
+
+### Configuration Centralization
+- **Constants File**: Created `server/config/constants.ts` with domain-grouped constants (MEETING_LIMITS, STREAMING, TIMEOUTS, CONTENT_LIMITS, LLM_TOKENS, SEMANTIC_SEARCH) for easier tuning.
+- **Updated Files**: meetingResolver.ts, streamingHelper.ts, getLastMeeting.ts, openAssistantHandler.ts, verify.ts now use centralized constants.
+
 ## Recent Changes (January 2026)
 
 ### UX Improvements
