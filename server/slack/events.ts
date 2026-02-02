@@ -78,57 +78,12 @@ function shouldReuseThreadContext(messageText: string): boolean {
   return !overridePatterns.some(pattern => pattern.test(messageText));
 }
 
-// Robust in-memory dedupe with TTL and size limits
-// Uses both event_id and client_msg_id for deduplication
-// Entries expire after 5 minutes to prevent memory bloat
-const seenEventIds = new Map<string, number>(); // eventId -> timestamp
-const MAX_DEDUPE_SIZE = 1000;
-const DEDUPE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+import { isDuplicate, maybeCleanup } from '../services/eventDeduplicator';
 
-function cleanupDedupeCache() {
-  const now = Date.now();
-  let deletedCount = 0;
-  const keysToDelete: string[] = [];
-  
-  seenEventIds.forEach((timestamp, key) => {
-    if (now - timestamp > DEDUPE_TTL_MS) {
-      keysToDelete.push(key);
-    }
-  });
-  
-  keysToDelete.forEach(key => {
-    seenEventIds.delete(key);
-    deletedCount++;
-  });
-  
-  if (deletedCount > 0) {
-    console.log(`[Dedupe] Cleaned up ${deletedCount} expired entries`);
-  }
-}
-
-function isDuplicateEvent(eventId: string, clientMsgId: string | undefined): boolean {
-  // Cleanup old entries periodically
-  if (seenEventIds.size > MAX_DEDUPE_SIZE / 2) {
-    cleanupDedupeCache();
-  }
-  
-  // Check both event_id and client_msg_id
-  const keys = [eventId];
-  if (clientMsgId) keys.push(`msg:${clientMsgId}`);
-  
-  for (const key of keys) {
-    if (key && seenEventIds.has(key)) {
-      console.log(`[Dedupe] Duplicate detected: ${key}`);
-      return true;
-    }
-  }
-  
-  // Mark as seen
-  const now = Date.now();
-  if (eventId) seenEventIds.set(eventId, now);
-  if (clientMsgId) seenEventIds.set(`msg:${clientMsgId}`, now);
-  
-  return false;
+// Helper to check for duplicate events (async wrapper)
+async function isDuplicateEvent(eventId: string, clientMsgId: string | undefined): Promise<boolean> {
+  maybeCleanup();
+  return isDuplicate(eventId, clientMsgId);
 }
 
 
@@ -233,7 +188,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const eventId = String(payload.event_id || "");
     const clientMsgId = event?.client_msg_id as string | undefined;
     
-    if (isDuplicateEvent(eventId, clientMsgId)) {
+    if (await isDuplicateEvent(eventId, clientMsgId)) {
       console.log(`[Slack] Duplicate event detected - skipping (eventId=${eventId}, clientMsgId=${clientMsgId})`);
       return;
     }

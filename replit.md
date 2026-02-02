@@ -1,7 +1,7 @@
 # PitCrew Customer Transcript Analyzer
 
 ## Overview
-The PitCrew Customer Transcript Analyzer is a SaaS application that utilizes AI to extract, categorize, and organize product insights and customer Q&A from Business Development call transcripts. Its main goal is to provide actionable intelligence to sales and product teams, improving product development and refining sales strategies. Key capabilities include a dark-mode-first UI, real-time categorization, and advanced AI models for semantic understanding and extraction, ultimately enhancing decision-making and market responsiveness.
+The PitCrew Customer Transcript Analyzer is a SaaS application that leverages AI to extract, categorize, and organize product insights and customer Q&A from Business Development call transcripts. Its primary goal is to provide actionable intelligence to sales and product teams, thereby enhancing product development and refining sales strategies. Key capabilities include a dark-mode-first UI, real-time categorization, and advanced AI models for semantic understanding and extraction, ultimately improving decision-making and market responsiveness.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -12,52 +12,16 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 
 ### Core Design Principles
-The system is a Single-Page Application (SPA) built with React, Vite, and Wouter, designed for asynchronous AI transcript processing. It features end-to-end type safety using Zod and shared schemas, supporting a multi-product environment with data separation via a `product` column.
+The system is a Single-Page Application (SPA) built with React, Vite, and Wouter, designed for asynchronous AI transcript processing. It features end-to-end type safety using Zod and shared schemas, supporting a multi-product environment with data separation via a `product` column. The UI features a dark-mode-first interface using Shadcn/ui (New York style), Radix UI, and Tailwind CSS.
 
-### Frontend
-The frontend uses React, TypeScript, Shadcn/ui (New York style), Radix UI, and Tailwind CSS, featuring a dark-mode-first interface. State management is handled by TanStack Query for server state and React hooks for local state, with a design system defined by custom CSS variables and the Inter font.
+### Technical Implementations
+The frontend uses React, TypeScript, and Tailwind CSS, with state management handled by TanStack Query for server state and React hooks for local state. The backend is built with Express.js and TypeScript, exposing a RESTful JSON API. Data is persisted using PostgreSQL and Drizzle ORM, with Zod for schema validation. Authentication uses Replit Auth (OpenID Connect), restricted to specific email domains. The database schema supports `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, `meeting_action_items`, and `users`.
 
-### Backend
-The backend is built with Express.js and TypeScript, exposing a RESTful JSON API. Data is persisted using PostgreSQL and Drizzle ORM, with Zod for schema validation. OpenAI API (GPT-5, GPT-4o, GPT-4o-mini) is integrated for AI tasks, employing structured prompt engineering and batching. Authentication uses Replit Auth (OpenID Connect), restricted to specific email domains. The database schema supports `transcripts`, `categories`, `product_insights`, `qa_pairs`, `customer_questions`, `meeting_action_items`, and `users`.
-
-### Key Features
-The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`. It also includes a Document Output Feature for generating .docx files for long-form content and specific contract types, with configurable trigger conditions and customizable Slack messages.
+### Feature Specifications
+The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`. It also includes a Document Output Feature for generating .docx files and a markdown formatting system that supports multiple output targets (Slack, standard, plaintext).
 
 ### Control Plane Architecture (LLM-First Intent Routing)
-
-**CRITICAL: The system uses LLM-FIRST classification, NOT keyword matching.**
-
-The Control Plane classifies intent using an LLM (gpt-4o-mini) that understands semantic meaning. This ensures requests like "research Costco and create a slide deck" correctly route to EXTERNAL_RESEARCH, not based on keyword matching but on understanding the full request.
-
-**Architecture Principles:**
-- **LLM classifies ALL intents** - The LLM prompt includes examples for each intent type
-- **NO keyword-based intent detection** - Keywords are ONLY used for contract selection AFTER intent is classified
-- **Semantic understanding** - "search all calls about Ivy Lane" → MULTI_MEETING (not single-meeting)
-
-**Early Fast Paths (Pre-Control Plane):**
-- Briefing/prep ambiguity detection (handled before intent classification)
-- Binary existence questions (short-circuit for quick responses)
-
-**Routing Flow:**
-1. **Control Plane LLM classifies intent** - Uses gpt-4o-mini with full message context
-2. **CLARIFY intent** → Ask user for clarification
-3. **SINGLE_MEETING + resolved meeting** → SingleMeetingOrchestrator for artifact access
-4. **SINGLE_MEETING without meeting** → Ask which meeting
-5. **EXTERNAL_RESEARCH** → Gemini web research + product knowledge chaining
-6. **MULTI_MEETING, PRODUCT_KNOWLEDGE, etc.** → Open Assistant with appropriate handlers
-
-**Intent Types:** SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, EXTERNAL_RESEARCH, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, CLARIFY
-
-**Contract Chains:**
-Contracts are task-level operations that can be chained. Both EXTERNAL_RESEARCH and PRODUCT_KNOWLEDGE are available as:
-- **Standalone intents** - When that's the primary task
-- **Chainable contracts** - When other intents need to incorporate that data
-
-Example chains:
-- `EXTERNAL_RESEARCH` intent → `[EXTERNAL_RESEARCH, PRODUCT_KNOWLEDGE, SALES_DECK_PREP]`
-- `SINGLE_MEETING` intent → `[CUSTOMER_QUESTIONS, PRODUCT_KNOWLEDGE, DRAFT_RESPONSE]`
-
-The control plane dynamically builds contract chains based on user messages, ensuring ordered execution (Extraction → Analysis → Drafting) and enforcing restriction rules. Safety constraints are enforced at multiple levels with evidence-based enforcement.
+The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt-4o-mini) classifies all intents based on semantic understanding rather than keyword matching. This involves a routing flow where the Control Plane LLM classifies intent, leading to actions such as clarification, single or multi-meeting orchestration, external research, product knowledge retrieval, document search, or general assistance. Intent types include `SINGLE_MEETING`, `MULTI_MEETING`, `PRODUCT_KNOWLEDGE`, `EXTERNAL_RESEARCH`, `DOCUMENT_SEARCH`, `GENERAL_HELP`, `REFUSE`, and `CLARIFY`. Contract chains are dynamically built based on user messages, ensuring ordered execution and enforcing safety constraints.
 
 ## External Dependencies
 
@@ -77,8 +41,6 @@ The control plane dynamically builds contract chains based on user messages, ens
 
 ### Build & Development Tools
 - Vite
-- esbuild
-- tsx
 
 ### State & Data Fetching
 - TanStack Query
@@ -107,66 +69,21 @@ The control plane dynamically builds contract chains based on user messages, ens
 **Behavior**: Waits for sync, auto-discovers new tables, and auto-adds new columns.
 **Trigger**: Zapier automation on Airtable record changes.
 
-## Recent Changes (February 2026)
-
-### Product Style Matching for EXTERNAL_RESEARCH
-- **Style Chaining Implementation**: When EXTERNAL_RESEARCH requests include "write description similar to other features" or style-matching phrases, the system now chains product knowledge to provide existing feature descriptions as style examples.
-- **Detection Patterns**: Added `detectStyleMatchingRequest()` to identify when users want output matching existing product style.
-- **Feature Description Examples**: The `chainProductStyleWriting()` function fetches existing feature descriptions from the product knowledge base and instructs the LLM to match their concise, action-verb-first style.
-- **Architectural Fix**: Previously, comments claimed "EXTERNAL_RESEARCH automatically chains product knowledge" but this was not implemented. Now properly chains product knowledge when style matching is detected.
-- **Regex Bug Fix**: Fixed regex that was looking for `=== Features` but actual section header was `=== Current Product Features`. Now matches both `Current Product Features` and `Roadmap Features` sections.
-- **Improved Prompt**: Added explicit BAD/GOOD examples, reduced max_tokens from 500 to 150, lowered temperature to 0.2, and instructed to output ONLY the description without preamble.
-
-### EXTERNAL_RESEARCH Scope Expansion
-- **Topic/Concept Research**: EXTERNAL_RESEARCH now correctly handles research about topics, concepts, and industry practices - not just company research. Examples: "research oil change shop safety nets", "understand more about tire shop workflows".
-- **Expanded Keywords**: Added topic-focused keywords like "do research to understand", "understand more about", "industry practices", "best practices for", "how do they", "why do they".
-- **Expanded Patterns**: Added patterns for concept research like "understand more about X and why", "industry practices/standards", "research... then write".
-- **LLM Prompt Updates**: Updated intent classification prompts in both `intent.ts` and `llmInterpretation.ts` with expanded EXTERNAL_RESEARCH description and examples including topic research and "research + write" patterns.
-
-### Slack Message Deduplication Fix
-- **Problem**: Messages were being sent twice due to Slack webhook retries when the server didn't respond quickly enough, or server restarts clearing the in-memory deduplication cache.
-- **Solution 1**: Added `x-slack-retry-num` header detection - if Slack is retrying due to `http_timeout`, return 200 immediately without processing.
-- **Solution 2**: Enhanced deduplication to use both `event_id` AND `client_msg_id` for more reliable duplicate detection.
-- **Solution 3**: Added TTL-based cache cleanup (5 minute expiry) to prevent memory bloat while maintaining deduplication.
-- **Solution 4**: Added size limits (1000 entries max) with automatic cleanup.
-
-### Thread Context for Intent Classification
-- **Follow-Up Detection**: Added `detectFollowUpMessage()` function to recognize refinement messages like "make it shorter", "better but too long", "try again".
-- **Thread Context Passed to Keyword Classifier**: `classifyByKeyword()` now receives `threadContext` parameter so it can detect follow-up patterns.
-- **Intent Inference from Bot Response**: When a follow-up is detected, the system infers the correct intent from the previous bot response (e.g., feature description → EXTERNAL_RESEARCH).
-- **New Type Fields**: Added `isFollowUp` and `previousBotResponseSnippet` to `IntentDecisionMetadata`, and `follow_up_detection` to `IntentDetectionMethod`.
-
-### Configuration Centralization
-- **Constants File**: Created `server/config/constants.ts` with domain-grouped constants (MEETING_LIMITS, STREAMING, TIMEOUTS, CONTENT_LIMITS, LLM_TOKENS, SEMANTIC_SEARCH) for easier tuning.
-- **Updated Files**: meetingResolver.ts, streamingHelper.ts, getLastMeeting.ts, openAssistantHandler.ts, verify.ts now use centralized constants.
+## Recent Architectural Improvements
 
 ### Markdown Formatting System
-- **Flexible Formatter**: Created `server/utils/markdownFormatter.ts` with extensible format system supporting multiple output targets (Slack, standard, plaintext).
-- **Runtime Extension**: Use `registerFormat(name, rules)` to add new formats or `extendFormat(name, rules)` to extend existing ones without modifying core code.
+- **Flexible Formatter**: `server/utils/markdownFormatter.ts` with extensible format system supporting multiple output targets.
+- **Runtime Extension**: Use `registerFormat(name, rules)` to add new formats or `extendFormat(name, rules)` to extend existing ones.
 - **Pre-configured Formats**: 'slack' (converts `**bold**` → `*bold*`), 'standard' (no changes), 'plaintext' (strips formatting).
-- **Document Generator**: Created `parseInlineMarkdown()` helper function to handle `**bold**` patterns consistently. Applied to bullet items, numbered items, and regular text paragraphs.
-- **Slack Integration**: Uses `formatMarkdown(text, 'slack')` in both `postSlackMessage()` and `updateSlackMessage()`.
 
-## Recent Changes (January 2026)
+### Follow-Up Detection Service
+- **Extracted to Service**: `server/services/followUpDetector.ts` - standalone, testable service for detecting follow-up/refinement messages.
+- **Configurable Patterns**: Pattern rules and intent inference rules can be extended at runtime via `registerFollowUpPatterns()` and `registerIntentInferenceRules()`.
+- **Separation of Concerns**: Intent classifier delegates to the service, reducing complexity in `intent.ts`.
 
-### UX Improvements
-- **Aggregate Query Clarification**: When users ask broad analytical questions (e.g., "What are the bigger concerns?"), the bot now asks for time range (last month, quarter, all time) and customer scope (all customers or specific) before proceeding. This ensures more focused, actionable analysis.
-- **Expanded Aggregate Keywords**: Added keywords for CROSS_MEETING_QUESTIONS: concerns, issues, problems, feedback, worries, hesitations, reservations, pain points, challenges.
-- **Personalized Progress Messages**: Long-running operations now show personalized, conversational progress messages generated by gpt-4o-mini. Messages reference the user's specific question (e.g., "Let me dig into our camera integration specs for you - pulling that info now.") instead of generic bot messages.
-- **Smart Message Deduplication**: Progress messages only show if no timer-based generic messages have been sent, preventing confusing message order.
-- **Document Title Fix**: Fixed topic extraction to handle leading punctuation from queries like "@bot, how does..." - titles now correctly format as "PitCrew: How does X" instead of "PitCrew: , how does X".
-- **Thread Context**: All handlers (product knowledge, general assistance, external research) now maintain conversation continuity via `buildThreadContextSection()`.
-
-### Performance Improvements
-- **Streaming Responses**: Integrated OpenAI streaming for PRODUCT_KNOWLEDGE and GENERAL_RESPONSE paths. Slack messages now update progressively as the LLM generates content, reducing perceived latency.
-- **Model Optimization**: Switched GPT-5 → gpt-4o for product knowledge and general assistance paths (2-3x faster).
-- **Parallel Execution**: Multi-meeting search now uses `Promise.all` for concurrent processing.
-
-### Bug Fixes
-- **SQL DISTINCT Fix**: Fixed PostgreSQL error 42P10 in `meetingResolver.ts` - queries using `SELECT DISTINCT` with `ORDER BY COALESCE(t.meeting_date, t.created_at)` now include the COALESCE expression as `sort_date` in the SELECT clause.
-- **Intent Classification Fix**: FAQ/website copy update requests now correctly route to `PRODUCT_KNOWLEDGE` instead of `MULTI_MEETING`. Added keywords: "frequently asked questions", "faq", "update copy", "value props" to product knowledge patterns. Removed overly generic "frequently" keyword from multi-meeting patterns.
-- **CROSS_MEETING_QUESTIONS Synthesis**: Fixed control flow so CROSS_MEETING_QUESTIONS runs through synthesis step instead of early-returning as extraction-only. Questions are now properly consolidated and categorized by theme.
-- **Coverage Fallback**: Fixed coverage calculation to compute `uniqueCompanies` from meetings instead of hardcoding 1, ensuring accurate sample size reporting.
-
-### Security Hardening
-- **Website Verification**: Domain allowlist for SSRF protection (leverege.com), HTTPS-only, 20+ word minimum content validation for website analysis.
+### Database-Backed Deduplication
+- **Scalable Architecture**: `server/services/eventDeduplicator.ts` using PostgreSQL for cross-instance deduplication.
+- **Atomic INSERT**: Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING id` for race-condition-safe duplicate detection.
+- **Empty ID Guard**: Filters out empty/undefined event IDs to prevent false positives.
+- **Schema Addition**: `slack_event_dedupe` table with index on `processed_at` for efficient cleanup.
+- **Automatic Cleanup**: Runs on startup and every 100 requests via `maybeCleanup()`.

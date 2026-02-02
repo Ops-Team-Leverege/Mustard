@@ -590,6 +590,12 @@ export const pitcrewProductSnapshot = pgTable("pitcrew_product_snapshot", {
   lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
 });
 
+// Slack event deduplication - database-backed for multi-instance scalability
+export const slackEventDedupe = pgTable("slack_event_dedupe", {
+  id: varchar("id", { length: 128 }).primaryKey(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
 // Types
 export type PitcrewAirtableFeature = typeof pitcrewAirtableFeatures.$inferSelect;
 export type InsertPitcrewAirtableFeature = typeof pitcrewAirtableFeatures.$inferInsert;

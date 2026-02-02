@@ -517,89 +517,39 @@ function detectMultiIntent(text: string): { needsSplit: boolean; splitOptions?: 
 // FOLLOW-UP MESSAGE DETECTION
 // ============================================================================
 
+import { detectFollowUp } from '../services/followUpDetector';
+
 /**
  * Detect if the current message is a follow-up/refinement of a previous request.
- * Follow-up messages are short, context-dependent messages that refine what was
- * just produced (e.g., "make it shorter", "better but too long", "try again").
- * 
- * When detected, we return null to force the message through the interpretation
- * path which has full thread context, OR we infer the intent from the previous
- * bot response's capability.
+ * Uses the configurable followUpDetector service for pattern matching.
  */
 function detectFollowUpMessage(
   question: string,
   threadContext?: ThreadContext
 ): IntentClassificationResult | null {
-  // No thread context = can't detect follow-up
-  if (!threadContext?.messages || threadContext.messages.length < 2) {
-    return null;
-  }
+  const result = detectFollowUp(question, threadContext);
+  if (!result) return null;
+
+  // Map the service result to an IntentClassificationResult
+  const intentMap: Record<string, Intent> = {
+    "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
+    "SINGLE_MEETING": Intent.SINGLE_MEETING,
+    "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
+    "GENERAL_HELP": Intent.GENERAL_HELP,
+  };
+
+  const intent = intentMap[result.inferredIntentKey] || Intent.GENERAL_HELP;
   
-  const lower = question.toLowerCase().trim();
-  
-  // Follow-up patterns - short messages that imply refinement
-  const followUpPatterns = [
-    /^(make\s+it|can\s+you\s+make\s+it)\s+(shorter|longer|more\s+concise|simpler|clearer)/i,
-    /^(too\s+)?(long|short|verbose|wordy|brief)/i,
-    /^(better|good|nice),?\s+but\s+(too|a\s+bit|still)/i,
-    /^try\s+(again|once\s+more)/i,
-    /^(more|less)\s+(concise|detailed|verbose|brief)/i,
-    /^(shorten|expand|simplify|clarify)\s+(it|this|that)/i,
-    /^(that'?s?|this\s+is)\s+(too|not)/i,
-    /^not\s+quite/i,
-    /^(tweak|adjust|refine|revise)\s+(it|this|that)/i,
-    /^can\s+you\s+(redo|rewrite|revise)/i,
-  ];
-  
-  // Check if current message matches follow-up patterns
-  const isFollowUp = followUpPatterns.some(p => p.test(lower));
-  
-  if (!isFollowUp) {
-    return null;
-  }
-  
-  // Look at the last bot message to infer intent
-  const lastBotMessage = threadContext.messages
-    .slice()
-    .reverse()
-    .find(m => m.isBot);
-  
-  if (!lastBotMessage) {
-    return null;
-  }
-  
-  // Check for capability markers in the bot's previous response
-  // These help us understand what type of task was being performed
-  const botText = lastBotMessage.text.toLowerCase();
-  
-  // Infer intent from previous bot response content
-  let inferredIntent: Intent = Intent.GENERAL_HELP;
-  let inferredReason = "Follow-up to previous response";
-  
-  if (botText.includes("feature description") || botText.includes("description:") || 
-      botText.includes("**net safety") || botText.includes("research")) {
-    inferredIntent = Intent.EXTERNAL_RESEARCH;
-    inferredReason = "Follow-up to external research / feature description task";
-  } else if (botText.includes("meeting") || botText.includes("they said") || 
-             botText.includes("action items") || botText.includes("next steps")) {
-    inferredIntent = Intent.SINGLE_MEETING;
-    inferredReason = "Follow-up to meeting-related task";
-  } else if (botText.includes("pitcrew") && (botText.includes("pricing") || 
-             botText.includes("feature") || botText.includes("integration"))) {
-    inferredIntent = Intent.PRODUCT_KNOWLEDGE;
-    inferredReason = "Follow-up to product knowledge task";
-  }
-  
-  console.log(`[IntentClassifier] Follow-up detected: "${question}" → ${inferredIntent} (${inferredReason})`);
+  console.log(`[IntentClassifier] Follow-up detected: "${question}" → ${intent} (${result.reason})`);
   
   return {
-    intent: inferredIntent,
+    intent,
     intentDetectionMethod: "follow_up_detection",
-    confidence: 0.85,
-    reason: inferredReason,
+    confidence: result.confidence,
+    reason: result.reason,
     decisionMetadata: {
       isFollowUp: true,
-      previousBotResponseSnippet: botText.slice(0, 100),
+      previousBotResponseSnippet: result.previousBotSnippet,
     },
   };
 }
