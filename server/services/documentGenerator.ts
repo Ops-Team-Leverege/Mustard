@@ -134,6 +134,42 @@ export function generateFileName(type: string, customer?: string): string {
     .replace('{date}', date);
 }
 
+/**
+ * Parse inline markdown (bold) and return TextRun array.
+ * Handles **word** patterns within text.
+ */
+function parseInlineMarkdown(text: string): TextRun[] {
+  const children: TextRun[] = [];
+  const boldRegex = /\*\*(.+?)\*\*/g;
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = boldRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      children.push(new TextRun({
+        text: text.substring(lastIndex, match.index),
+      }));
+    }
+    children.push(new TextRun({
+      text: match[1],
+      bold: true,
+    }));
+    lastIndex = match.index + match[0].length;
+  }
+  
+  if (lastIndex < text.length) {
+    children.push(new TextRun({
+      text: text.substring(lastIndex),
+    }));
+  }
+  
+  if (children.length === 0) {
+    children.push(new TextRun({ text }));
+  }
+  
+  return children;
+}
+
 function parseMarkdownContent(content: string): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   const lines = content.split('\n');
@@ -155,24 +191,18 @@ function parseMarkdownContent(content: string): Paragraph[] {
         spacing: { before: 400, after: 200 },
       }));
     } else if (trimmed.startsWith('- ') || trimmed.startsWith('• ')) {
+      // Parse inline markdown in bullet items
       paragraphs.push(new Paragraph({
-        children: [
-          new TextRun({
-            text: trimmed.substring(2),
-          }),
-        ],
+        children: parseInlineMarkdown(trimmed.substring(2)),
         bullet: { level: 0 },
         spacing: { before: 100, after: 100 },
       }));
     } else if (/^\d+\.\s/.test(trimmed)) {
       const match = trimmed.match(/^\d+\.\s(.+)/);
       if (match) {
+        // Parse inline markdown in numbered items
         paragraphs.push(new Paragraph({
-          children: [
-            new TextRun({
-              text: match[1],
-            }),
-          ],
+          children: parseInlineMarkdown(match[1]),
           bullet: { level: 0 },
           spacing: { before: 100, after: 100 },
         }));
@@ -188,38 +218,9 @@ function parseMarkdownContent(content: string): Paragraph[] {
         spacing: { before: 200, after: 100 },
       }));
     } else {
-      const children: TextRun[] = [];
-      let remaining = trimmed;
-      
-      const boldRegex = /\*\*(.+?)\*\*/g;
-      let lastIndex = 0;
-      let match;
-      
-      while ((match = boldRegex.exec(remaining)) !== null) {
-        if (match.index > lastIndex) {
-          children.push(new TextRun({
-            text: remaining.substring(lastIndex, match.index),
-          }));
-        }
-        children.push(new TextRun({
-          text: match[1],
-          bold: true,
-        }));
-        lastIndex = match.index + match[0].length;
-      }
-      
-      if (lastIndex < remaining.length) {
-        children.push(new TextRun({
-          text: remaining.substring(lastIndex),
-        }));
-      }
-      
-      if (children.length === 0) {
-        children.push(new TextRun({ text: remaining }));
-      }
-      
+      // Parse inline markdown for regular text
       paragraphs.push(new Paragraph({
-        children,
+        children: parseInlineMarkdown(trimmed),
         spacing: { before: 100, after: 100 },
       }));
     }

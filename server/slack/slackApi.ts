@@ -24,11 +24,28 @@ type PostMessageResponse = {
   ts: string; // Message timestamp (unique ID)
 };
 
+/**
+ * Convert standard markdown to Slack's mrkdwn format.
+ * - **word** → *word* (Slack uses single asterisks for bold)
+ * - Preserves single asterisks for italic
+ */
+function convertToSlackMarkdown(text: string): string {
+  // Convert **word** to *word* for Slack bold formatting
+  // Be careful not to affect single asterisks (used for italic in both formats)
+  return text.replace(/\*\*(.+?)\*\*/g, '*$1*');
+}
+
 export async function postSlackMessage(params: PostMessageParams): Promise<PostMessageResponse> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     throw new Error("Missing SLACK_BOT_TOKEN");
   }
+
+  // Convert markdown to Slack's mrkdwn format
+  const slackParams = {
+    ...params,
+    text: convertToSlackMarkdown(params.text),
+  };
 
   const response = await fetch("https://slack.com/api/chat.postMessage", {
     method: "POST",
@@ -36,7 +53,7 @@ export async function postSlackMessage(params: PostMessageParams): Promise<PostM
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json; charset=utf-8",
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(slackParams),
   });
 
   const data = (await response.json()) as { ok: boolean; error?: string; ts?: string };
@@ -74,13 +91,19 @@ export async function updateSlackMessage(params: UpdateMessageParams): Promise<v
     throw new Error("Missing SLACK_BOT_TOKEN");
   }
 
+  // Convert markdown to Slack's mrkdwn format
+  const slackParams = {
+    ...params,
+    text: convertToSlackMarkdown(params.text),
+  };
+
   const response = await fetch("https://slack.com/api/chat.update", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json; charset=utf-8",
     },
-    body: JSON.stringify(params),
+    body: JSON.stringify(slackParams),
   });
 
   const data = (await response.json()) as { ok: boolean; error?: string };
