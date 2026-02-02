@@ -115,7 +115,26 @@ The `server/mcp/` folder contains ONLY MCP (Model Context Protocol) plumbing and
 - `types.ts`: MCP type definitions
 - `tools/`: MCP tool definitions
 
-**Note**: Application-level orchestration logic lives in `server/openAssistant/` (Execution Layer), Slack-specific resolvers in `server/slack/`, and shared meeting utilities in `server/meeting/`. Do not add business logic or orchestration to the MCP folder.
+**Note**: Application-level orchestration logic lives in `server/openAssistant/` (Execution Layer), Slack-specific handlers in `server/slack/handlers/`, Slack context utilities in `server/slack/context/`, and shared meeting utilities in `server/meeting/`. Do not add business logic or orchestration to the MCP folder.
+
+### Slack Module Organization
+The `server/slack/` folder is organized into specialized subfolders:
+
+**handlers/** - Specialized question/response handlers:
+- `ambiguityHandler.ts`: Handles aggregate query clarification
+- `binaryQuestionHandler.ts`: Handles yes/no binary questions
+- `clarificationHandler.ts`: Handles next-steps and proposed interpretation follow-ups
+- `answerQuestionsHandler.ts`: Handles "answer those questions" follow-up requests
+
+**context/** - Thread and meeting context resolution:
+- `meetingResolver.ts`: Slack-specific meeting resolution with thread context awareness
+- `threadResolver.ts`: Thread context retrieval and caching
+- `progressManager.ts`: Progress message timing and display
+
+**Root files** - Core event handling and Slack API:
+- `events.ts`: Main event orchestration (~966 lines, reduced from 1376)
+- `slackApi.ts`: Slack API wrapper functions
+- `logInteraction.ts`: Interaction logging utilities
 
 ### Standardized Error Handling
 - **Error Handler Utilities**: `server/utils/errorHandler.ts` provides centralized error handling for API routes.
