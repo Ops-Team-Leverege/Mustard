@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { Category } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "./config/models";
+import { TRANSCRIPT_ANALYZER_SYSTEM_PROMPT, buildTranscriptAnalysisPrompt } from "./config/prompts";
 
 const openai = new OpenAI({ 
   apiKey: process.env.OPENAI_API_KEY,
@@ -101,97 +102,15 @@ async function analyzeTranscriptChunk(
   
   const chunkInfo = totalChunks > 1 ? ` (Part ${chunkNumber} of ${totalChunks})` : '';
   
-  const isNotes = contentType === "notes";
-  const contentLabel = isNotes ? "meeting notes" : "BD (Business Development) call transcript";
-  
-  const prompt = `You are analyzing ${contentLabel} to extract product insights and Q&A pairs${chunkInfo}.
-
-${isNotes ? 'MEETING NOTES:' : 'TRANSCRIPT:'}
-${transcript}
-
-CONTEXT:
-- Company: ${companyName}
-- Leverege Team Members: ${leverageTeam.join(', ')}
-- Customer Names: ${customerNames.join(', ')}
-
-AVAILABLE CATEGORIES:
-${categoryList}
-
-${isNotes ? `
-NOTE: These are meeting notes from an onsite visit, not a full transcript. The notes may be brief, informal, or fragmented. Extract insights and questions based on the captured information, understanding that details may be condensed or paraphrased by the note-taker.
-` : ''}
-
-TASK 1 - Extract Product Insights (LEARNINGS ONLY):
-Focus on meaningful learnings, NOT simple confirmations or explanations. Extract insights ONLY if they meet one of these criteria:
-
-A) Customer comments on EXISTING features that reveal VALUE/USEFULNESS:
-   - How useful/important a feature is to them
-   - Their specific use case that shows why they need it
-   - Pain points the feature would solve
-
-B) Customer asks about or expresses interest in NEW features we DON'T currently have:
-   - Requests for capabilities we don't offer
-   - Questions about features we're missing
-   - Suggestions for improvements
-
-DO NOT include:
-- Simple confirmations of how a feature works
-${isNotes ? '- General observations without specific product relevance' : '- BD team explaining features (unless customer responds with value/need)'}
-- Administrative or scheduling topics
-
-For each insight:
-- feature: The specific feature or capability name
-- context: Why this feature is important/valuable to the customer (their use case/need)
-- quote: ${isNotes ? 'Key observation or customer statement from notes - lightly paraphrased for clarity' : 'Customer quote - lightly paraphrased for readability while preserving exact intent and meaning'}
-- categoryId: Match to one of the category IDs above, or null if no good match (will be marked as NEW)
-
-TASK 2 - Extract Q&A Pairs:
-${isNotes ? 'Identify any product-specific questions that were asked and answered during the meeting.' : 'Identify product-specific questions asked during the call.'} For each:
-- question: The question that was asked (product-related only, not scheduling/admin) - lightly paraphrased for clarity
-- answer: The answer that was provided - lightly paraphrased for clarity
-- asker: The name of the person who asked (from customer names list)
-- categoryId: Match to one of the category IDs above, or null if no good match (will be marked as NEW)
-
-TASK 3 - Detect Point of Sale (POS) System:
-If the customer mentions their POS system by name (e.g., Square, Toast, Clover, Lightspeed, NCR, etc.), extract:
-- name: The POS system name (normalized, e.g., "Square" not "square pos system")
-- websiteLink: If mentioned or if you know it, provide the official website (optional)
-- description: Brief description of what was mentioned about it (optional)
-
-If no POS system is mentioned, set "posSystem" to null.
-
-OUTPUT FORMAT:
-Respond with valid JSON in this exact structure:
-{
-  "insights": [
-    {
-      "feature": "feature name",
-      "context": "why valuable to customer",
-      "quote": "paraphrased customer quote (readable, intent preserved)",
-      "categoryId": "category-id-or-null"
-    }
-  ],
-  "qaPairs": [
-    {
-      "question": "paraphrased question (clear and readable)",
-      "answer": "paraphrased answer (clear and readable)",
-      "asker": "person name",
-      "categoryId": "category-id-or-null"
-    }
-  ],
-  "posSystem": {
-    "name": "POS system name",
-    "websiteLink": "https://example.com (optional)",
-    "description": "brief description (optional)"
-  }
-}
-
-IMPORTANT:
-- Be SELECTIVE - only include real learnings, not confirmations
-- Paraphrase quotes lightly for readability without changing meaning
-- Focus on VALUE and NEW capabilities
-- categoryId must be one of the IDs listed above or null
-- Only include product-specific Q&A, not logistics/scheduling`;
+  const prompt = buildTranscriptAnalysisPrompt({
+    transcript,
+    companyName,
+    leverageTeam,
+    customerNames,
+    categoryList,
+    contentType,
+    chunkInfo,
+  });
 
   try {
     const response = await openai.chat.completions.create({
@@ -200,11 +119,11 @@ IMPORTANT:
       messages: [
         {
           role: "system",
-          content: "You are an expert at analyzing business development call transcripts to extract product insights and customer questions. Always respond with valid JSON."
+          content: TRANSCRIPT_ANALYZER_SYSTEM_PROMPT,
         },
         {
           role: "user",
-          content: prompt
+          content: prompt,
         }
       ],
       response_format: { type: "json_object" }

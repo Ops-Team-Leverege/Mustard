@@ -26,6 +26,16 @@
 
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS, LLM_MODELS } from "../config/models";
+import {
+  RAG_MEETING_SUMMARY_SYSTEM_PROMPT,
+  RAG_QUOTE_SELECTION_SYSTEM_PROMPT,
+  RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT,
+  RAG_ACTION_ITEMS_SYSTEM_PROMPT,
+  buildMeetingSummaryUserPrompt,
+  buildQuoteSelectionUserPrompt,
+  buildExtractiveAnswerUserPrompt,
+  buildActionItemsUserPrompt,
+} from "../config/prompts";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -205,43 +215,11 @@ export async function composeMeetingSummary(
     messages: [
       {
         role: "system",
-        content: `
-You are an internal assistant summarizing a customer meeting.
-
-Stance: neutral but direct.
-
-Rules:
-- Use ONLY the provided transcript.
-- Do NOT invent product capabilities or facts.
-- Do NOT infer emotions or intent unless explicitly stated.
-- Prefer stating uncertainty over guessing.
-- Be concise and factual.
-        `.trim(),
+        content: RAG_MEETING_SUMMARY_SYSTEM_PROMPT,
       },
       {
         role: "user",
-        content: `
-Produce a structured meeting summary with:
-- A short, factual title
-- Purpose: one sentence explaining WHY this meeting happened (not what was discussed)
-- Focus areas: 2-5 recurring themes that dominated the discussion (not one-off comments)
-- Key takeaways (prioritized, non-redundant)
-- Risks or open questions
-- Recommended next steps grounded in the discussion
-
-Return valid JSON only with this shape:
-{
-  "title": string,
-  "purpose": string,
-  "focusAreas": string[],
-  "keyTakeaways": string[],
-  "risksOrOpenQuestions": string[],
-  "recommendedNextSteps": string[]
-}
-
-Transcript:
-${transcript}
-        `.trim(),
+        content: buildMeetingSummaryUserPrompt(transcript),
       },
     ],
   });
@@ -305,34 +283,11 @@ export async function selectRepresentativeQuotes(
     messages: [
       {
         role: "system",
-        content: `
-You select representative quotes from customer speakers in a meeting.
-
-Rules:
-- Use ONLY the provided transcript (which contains only customer statements).
-- Select quotes that capture customer priorities, concerns, pain points, or decisions.
-- Do NOT rewrite quotes; use exact phrasing.
-- Be neutral and factual.
-        `.trim(),
+        content: RAG_QUOTE_SELECTION_SYSTEM_PROMPT,
       },
       {
         role: "user",
-        content: `
-Select up to ${maxQuotes} representative customer quotes.
-
-Return valid JSON only as an array with this shape:
-[
-  {
-    "chunkIndex": number,
-    "speakerRole": "customer",
-    "quote": string,
-    "reason": string
-  }
-]
-
-Transcript:
-${transcript}
-        `.trim(),
+        content: buildQuoteSelectionUserPrompt(transcript, maxQuotes),
       },
     ],
   });
@@ -371,36 +326,11 @@ export async function answerMeetingQuestion(
     messages: [
       {
         role: "system",
-        content: `
-You are answering specific questions about a meeting transcript.
-
-STRICT RULES:
-1. Only answer if the transcript EXPLICITLY supports the answer.
-2. If the information was NOT mentioned, say: "This wasn't mentioned in the meeting."
-3. Do NOT guess, infer, or extrapolate beyond what was said.
-4. Prefer exact quantities, names, locations, and decisions when present.
-5. Keep answers concise and factual (1-3 sentences).
-6. If you find supporting evidence, include a brief quote or reference.
-
-Return valid JSON only with this shape:
-{
-  "answer": string,
-  "evidence": string | null,
-  "wasFound": boolean
-}
-
-Set wasFound=true only if the answer is explicitly supported by the transcript.
-Set wasFound=false and answer="This wasn't mentioned in the meeting." if not found.
-        `.trim(),
+        content: RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT,
       },
       {
         role: "user",
-        content: `
-Question: ${question}
-
-Transcript:
-${transcript}
-        `.trim(),
+        content: buildExtractiveAnswerUserPrompt(question, transcript),
       },
     ],
   });
@@ -523,171 +453,11 @@ export async function extractMeetingActionStates(
     messages: [
       {
         role: "system",
-        content: `
-You extract and consolidate action items from meeting transcripts.
-Think like a senior operations assistant: "What actions now exist in the world because of this meeting?"
-
-ACTION TYPES TO EXTRACT:
-1. commitment: Explicit "I will..." / "We will..." / agreement to do something
-2. request: "Can you..." / "Please..." that implies follow-up action
-3. blocker: "We can't proceed until..." / dependency that must be resolved
-4. plan: "The plan is to..." / "Next we'll..." / decided course of action
-5. scheduling: Meeting coordination, follow-up calls, timeline decisions
-
-PRIORITY HEURISTIC (treat these as HIGH-CONFIDENCE actionable commands):
-- Permission grants: "You've got the green light to share X" → Action: Share X (0.95)
-- Imperative instructions: "You need to chat with Randy" → Action: Chat with Randy (0.95)
-- Enablement grants: "Feel free to let them know" → Action: Inform them (0.90)
-
-FUTURE MEETING REQUESTS (HIGH-CONFIDENCE - these are legitimate next steps):
-- "We probably need to discuss..." → Extract as scheduling (0.90)
-- "We need to discuss in an additional call..." → Extract as scheduling (0.95)
-- "I'd love to connect more on that..." → Extract as scheduling (0.90)
-- "Let's schedule a follow-up..." → Extract as scheduling (0.95)
-- "Can we set up another call to..." → Extract as scheduling (0.90)
-- Example: "We probably need to discuss it in an additional call... tandem workflows" → [Action: Schedule follow-up call to discuss tandem workflows, Owner: the person who suggested it, Type: scheduling]
-
-OBLIGATION TRIGGERS (extract as HIGH-CONFIDENCE tasks when directed at a specific person):
-- "You/We need to..." → Extract as commitment (0.95)
-- "You/We have to..." → Extract as commitment (0.95)
-- "You/We must..." → Extract as commitment (0.95)
-- Example: "You need to figure out the pricing" → [Action: Determine pricing strategy, Owner: the person addressed]
-
-DECISION DEPENDENCIES (always extract these):
-- A "Chat," "Sync," or "Discussion" is a MANDATORY NEXT STEP if the goal is to make a decision or configure settings.
-- Trigger: "You need to chat with [Person] about [Topic]"
-- Rule: If the outcome affects business logic (like "alert settings"), it is NOT a social nicety.
-- Example: "Chat with Randy about alert thresholds" → Extract (decision required)
-
-DISTINCT DELIVERABLES (do not over-merge):
-- If a speaker promises multiple distinct assets in one statement, extract them as SEPARATE tasks.
-- Example: "I'll send the login AND the PDF guide" → TWO separate tasks
-- Example: "Send login info" + "Send instructions for TV setup" → TWO separate tasks if mentioned separately
-
-WHAT TO IGNORE:
-- Hypotheticals: "we could...", "we might..."
-- Vague intentions: "we should think about..."
-- Rejected or deferred offers
-- Questions without confirmed agreement
-- Ideas that weren't committed to
-- Advisory or "should" statements
-- Social niceties: "Let's grab a beer," "Let's catch up soon"
-  EXCEPTION: Do NOT filter out "Chats" if they are explicitly about settings, configurations, or approvals (e.g., "Chat with Randy about alert thresholds" is VALID)
-
-META-COMMENTARY / INTERNAL PLANNING (ignore these):
-- "I'm going to say..." or "I'll mention..." → This is planning what to say IN the meeting, not a follow-up
-- "Just to remind them..." or "Remind the team that..." → In-meeting reminder, not a post-meeting action
-- "We'll discuss..." or "We'll cover..." without a future timeframe → Agenda items for THIS call
-- Example to IGNORE: "I'm going to say, 'Hey, just to remind you, they have this system...'" → Internal planning, NOT an action item
-
-SYSTEM FEATURES vs. HUMAN TASKS (critical anti-pattern):
-Do NOT extract tasks where a user describes what the SOFTWARE will do.
-- Anti-Pattern: "The system provides daily reports" → NOT a task (software feature)
-- Anti-Pattern: "Every user will have their own login" → NOT a task (software feature)
-- Anti-Pattern: "It generates alerts automatically" → NOT a task (software feature)
-- Pattern: "I will email you the daily report manually" → Extract (human action)
-- Pattern: "I will set up the login for everyone" → Extract (human action)
-Explaining what software does is NOT a task for the person explaining it.
-
-EXTRACTION PROCESS:
-
-## STEP 1 — Scan for action items:
-Look for these patterns throughout the transcript:
-- "I'll send you..." / "I'll email you..." / "I'll share..." → KEEP (future deliverable)
-- "We'll schedule..." / "Let's set up a call..." → KEEP (follow-up meeting)
-- "I need to check with my team..." / "I'll get back to you..." → KEEP (pending follow-up)
-- "We'll get you access..." / "I'll set up login..." → KEEP (future setup)
-- "Can you send me...?" / "Could you share...?" → KEEP (request)
-- "We'll look into that..." / "We'll investigate..." → KEEP (investigation)
-- Permission grants for future sharing → KEEP
-- "In terms of next steps..." → DEFINITELY KEEP (explicit next step)
-
-## STEP 2 — Filter only OBVIOUS in-call completions:
-ONLY remove an action if there is EXPLICIT EVIDENCE it was completed during the call:
-- "I'll paste the link" followed by "Got it, thanks!" → Remove
-- "Let me share my screen" while actively presenting → Remove
-- Everything else: KEEP IT
-
-**IMPORTANT:** When in doubt, KEEP the action. Most actions are NOT resolved in-call.
-
-## STEP 3 — Normalize and consolidate:
-Clean up and merge related micro-actions when:
-- Same owner(s)
-- Same timeframe
-- Same operational goal
-Return only the consolidated, clean output.
-
-DE-MERGING CHECK (before finalizing):
-- Did a speaker promise multiple distinct items? (e.g., "Login info" AND "Start Guide")
-- If yes, keep them as SEPARATE tasks, do NOT merge into one
-
-OBLIGATION CHECK (before finalizing):
-- Scan specifically for "Need to" / "Have to" phrases
-- Does "You need to chat..." imply a decision? If yes, extract it as a task
-
-RULES:
-1. OWNER ASSIGNMENT:
-   - Use specific person names, NOT company names
-   - The owner is the person who SPOKE or AGREED to the action
-   - If multiple owners, list as "Person A, Person B"
-   - Use "Unassigned" only if truly unavoidable
-   - If canonical attendees provided, normalize spelling
-
-2. EVIDENCE QUOTES (MANDATORY):
-   ALWAYS remove these filler words: "um", "uh", "like", "you know", "I mean", repeated words.
-   Clean the quote for readability but preserve the exact meaning.
-   Example: "you've got the uh the green light" → "you've got the green light"
-   Do NOT change meaning or paraphrase facts.
-
-3. CONFIDENCE SCORING:
-   - 0.95-1.0: Explicit "I will do X" statement
-   - 0.90: Clear verbal agreement to a request
-   - 0.85: "We will..." or confirmed plan
-   - 0.80: Investigation commitment ("we'll look into that")
-   - 0.75: Request that implies action ("can you send...")
-   - 0.70: Softer implied action worth tracking
-   - Below 0.70: Too uncertain, do NOT include
-
-4. DEADLINE: Extract if explicitly stated. Use "Not specified" otherwise.
-
-5. ACTION PHRASING:
-   Use clean verb + object format.
-   Phrase as complete, professional sentences.
-   After consolidation, each action = one coherent deliverable.
-
-WHAT NOT TO DO:
-- Do NOT merge actions across different owners
-- Do NOT paraphrase evidence into new facts
-- Do NOT infer actions that weren't spoken
-- Do NOT use "should" or "recommended" language
-- Do NOT include speculative or advisory items
-
-BALANCE: Aim for 3-10 actions per typical business meeting. If you're returning 0 items, re-check the transcript for legitimate future commitments.
-
-Return valid JSON only (no chain-of-thought):
-[
-  {
-    "action": string,
-    "owner": string,
-    "type": "commitment" | "request" | "blocker" | "plan" | "scheduling",
-    "deadline": string,
-    "evidence": string,
-    "confidence": number
-  }
-]
-
-If no clear actions exist, return an empty array: []
-        `.trim(),
+        content: RAG_ACTION_ITEMS_SYSTEM_PROMPT,
       },
       {
         role: "user",
-        content: `
-Extract and consolidate action items from this meeting transcript.
-${attendeeListStr}
-
-Transcript:
-${transcript}
-        `.trim(),
+        content: buildActionItemsUserPrompt(transcript, attendeeListStr),
       },
     ],
   });
