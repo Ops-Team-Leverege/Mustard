@@ -116,3 +116,12 @@ The `server/mcp/` folder contains ONLY MCP (Model Context Protocol) plumbing and
 - `tools/`: MCP tool definitions
 
 **Note**: Application-level orchestration logic lives in `server/openAssistant/` (Execution Layer), Slack-specific resolvers in `server/slack/`, and shared meeting utilities in `server/meeting/`. Do not add business logic or orchestration to the MCP folder.
+
+### Standardized Error Handling
+- **Error Handler Utilities**: `server/utils/errorHandler.ts` provides centralized error handling for API routes.
+- **Custom Error Classes**: `ValidationError` (400), `NotFoundError` (404), `AuthenticationError` (401), `AuthorizationError` (403), `ExternalServiceError` (502), `RateLimitError` (429).
+- **Unified Response Format**: All routes return `{ error: message }` with appropriate HTTP status codes.
+- **ZodError Support**: Automatically extracts readable messages from Zod validation errors.
+- **Logging**: Server errors (500+) are logged with context; client errors (4xx) are not logged.
+- **Usage Pattern**: `throw new NotFoundError("Resource")` in route handlers, caught by `handleRouteError(res, error, "CONTEXT")`.
+- **Test Coverage**: 19 unit tests in `server/__tests__/errorHandler.test.ts` cover all utilities.

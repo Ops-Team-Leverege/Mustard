@@ -36,6 +36,7 @@ import {
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { randomUUID } from "crypto";
+import { handleRouteError, NotFoundError, ValidationError } from "./utils/errorHandler";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -511,8 +512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(user);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      handleRouteError(res, error, "GET /api/auth/user");
     }
   });
 
@@ -522,8 +522,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Return list of available products
       res.json({ products: PRODUCTS });
     } catch (error) {
-      console.error("Error fetching products:", error);
-      res.status(500).json({ message: "Failed to fetch products" });
+      handleRouteError(res, error, "GET /api/products");
     }
   });
 
@@ -533,20 +532,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate product
       if (!PRODUCTS.includes(product)) {
-        return res.status(400).json({ message: "Invalid product" });
+        throw new ValidationError("Invalid product");
       }
 
       const { userId } = await getUserAndProduct(req);
       const updatedUser = await storage.updateUserProduct(userId, product);
 
       if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
+        throw new NotFoundError("User");
       }
 
       res.json(updatedUser);
     } catch (error) {
-      console.error("Error updating user product:", error);
-      res.status(500).json({ message: "Failed to update product" });
+      handleRouteError(res, error, "PUT /api/user/product");
     }
   });
 
@@ -656,13 +654,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
       });
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-      } else if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Unknown error occurred" });
-      }
+      handleRouteError(res, error, "POST /api/transcripts");
     }
   });
 
@@ -672,11 +664,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const transcripts = await storage.getTranscripts(product);
       res.json(transcripts);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/transcripts");
     }
   });
 
@@ -693,11 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         res.json(transcripts);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/companies/:companyId/transcripts");
       }
     },
   );
@@ -730,15 +714,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transcript: transcript !== undefined ? transcript || null : undefined,
       });
       if (!updatedTranscript) {
-        return res.status(404).json({ error: "Transcript not found" });
+        throw new NotFoundError("Transcript");
       }
       res.json(updatedTranscript);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/transcripts/:id");
     }
   });
 
@@ -748,17 +728,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteTranscript(id);
 
       if (!success) {
-        return res.status(404).json({ error: "Transcript not found" });
+        throw new NotFoundError("Transcript");
       }
 
       res.json({ success: true });
     } catch (error) {
-      console.error("Error deleting transcript:", error);
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/transcripts/:id");
     }
   });
 
@@ -823,7 +798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const transcript = await storage.getTranscript(product, id);
 
         if (!transcript) {
-          return res.status(404).json({ error: "Transcript not found" });
+          throw new NotFoundError("Transcript");
         }
 
         const [insights, qaPairs, company] = await Promise.all([
@@ -841,11 +816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           company,
         });
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/transcripts/:id/details");
       }
     },
   );
@@ -880,11 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(enrichedInsights);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/insights");
     }
   });
 
@@ -899,32 +866,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Validate categoryId if provided
         if (categoryId !== null && typeof categoryId !== "string") {
-          res.status(400).json({ error: "Invalid categoryId" });
-          return;
+          throw new ValidationError("Invalid categoryId");
         }
 
         if (categoryId) {
           const category = await storage.getCategory(product, categoryId);
           if (!category) {
-            res.status(400).json({ error: "Category not found" });
-            return;
+            throw new NotFoundError("Category");
           }
         }
 
         const success = await storage.assignCategoryToInsight(id, categoryId);
 
         if (!success) {
-          res.status(404).json({ error: "Insight not found" });
-          return;
+          throw new NotFoundError("Insight");
         }
 
         res.json({ success: true });
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "PATCH /api/insights/:id/category");
       }
     },
   );
@@ -936,10 +896,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { feature, context, quote, company } = req.body;
 
       if (!feature || !context || !quote || !company) {
-        res
-          .status(400)
-          .json({ error: "Feature, context, quote, and company are required" });
-        return;
+        throw new ValidationError("Feature, context, quote, and company are required");
       }
 
       // Find or create company to get companyId
@@ -965,17 +922,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!insight) {
-        res.status(404).json({ error: "Insight not found" });
-        return;
+        throw new NotFoundError("Insight");
       }
 
       res.json(insight);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/insights/:id");
     }
   });
 
@@ -985,17 +937,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteProductInsight(id);
 
       if (!success) {
-        res.status(404).json({ error: "Insight not found" });
-        return;
+        throw new NotFoundError("Insight");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/insights/:id");
     }
   });
 
@@ -1005,10 +952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { feature, context, quote, company, categoryId } = req.body;
 
       if (!feature || !context || !quote || !company) {
-        res
-          .status(400)
-          .json({ error: "Feature, context, quote, and company are required" });
-        return;
+        throw new ValidationError("Feature, context, quote, and company are required");
       }
 
       // Find or create company
@@ -1066,11 +1010,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(qaPairs);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/qa-pairs");
     }
   });
 
@@ -1085,32 +1025,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Validate categoryId if provided
         if (categoryId !== null && typeof categoryId !== "string") {
-          res.status(400).json({ error: "Invalid categoryId" });
-          return;
+          throw new ValidationError("Invalid categoryId");
         }
 
         if (categoryId) {
           const category = await storage.getCategory(product, categoryId);
           if (!category) {
-            res.status(400).json({ error: "Category not found" });
-            return;
+            throw new NotFoundError("Category");
           }
         }
 
         const success = await storage.assignCategoryToQAPair(id, categoryId);
 
         if (!success) {
-          res.status(404).json({ error: "Q&A pair not found" });
-          return;
+          throw new NotFoundError("Q&A pair");
         }
 
         res.json({ success: true });
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "PATCH /api/qa-pairs/:id/category");
       }
     },
   );
@@ -1122,10 +1055,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { question, answer, asker, company, contactId } = req.body;
 
       if (!question || !answer || !asker || !company) {
-        res
-          .status(400)
-          .json({ error: "Question, answer, asker, and company are required" });
-        return;
+        throw new ValidationError("Question, answer, asker, and company are required");
       }
 
       // Find or create company to get companyId
@@ -1152,17 +1082,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!qaPair) {
-        res.status(404).json({ error: "Q&A pair not found" });
-        return;
+        throw new NotFoundError("Q&A pair");
       }
 
       res.json(qaPair);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/qa-pairs/:id");
     }
   });
 
@@ -1172,17 +1097,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteQAPair(id);
 
       if (!success) {
-        res.status(404).json({ error: "Q&A pair not found" });
-        return;
+        throw new NotFoundError("Q&A pair");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/qa-pairs/:id");
     }
   });
 
@@ -1194,17 +1114,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const qaPair = await storage.toggleQAPairStar(id, isStarred);
 
       if (!qaPair) {
-        res.status(404).json({ error: "Q&A pair not found" });
-        return;
+        throw new NotFoundError("Q&A pair");
       }
 
       res.json(qaPair);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/qa-pairs/:id/star");
     }
   });
 
@@ -1215,10 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.body;
 
       if (!question || !answer || !asker || !company) {
-        res
-          .status(400)
-          .json({ error: "Question, answer, asker, and company are required" });
-        return;
+        throw new ValidationError("Question, answer, asker, and company are required");
       }
 
       // Find or create company
@@ -1264,7 +1176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     async (req: any, res) => {
       try {
         if (!req.file) {
-          return res.status(400).json({ error: "No file uploaded" });
+          throw new ValidationError("No file uploaded");
         }
 
         const text = await extractTextFromFile(
@@ -1278,13 +1190,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           size: req.file.size,
         });
       } catch (error) {
-        console.error("Error extracting text from file:", error);
-        res.status(500).json({
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to extract text from file",
-        });
+        handleRouteError(res, error, "POST /api/extract-text-from-file");
       }
     },
   );
@@ -1298,7 +1204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const { url } = req.body;
 
         if (!url) {
-          return res.status(400).json({ error: "URL is required" });
+          throw new ValidationError("URL is required");
         }
 
         const text = await extractTextFromUrl(url);
@@ -1308,13 +1214,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           url,
         });
       } catch (error) {
-        console.error("Error extracting text from URL:", error);
-        res.status(500).json({
-          error:
-            error instanceof Error
-              ? error.message
-              : "Failed to extract text from URL",
-        });
+        handleRouteError(res, error, "POST /api/extract-text-from-url");
       }
     },
   );
@@ -1356,11 +1256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(categoriesWithCount);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/categories");
     }
   });
 
@@ -1405,11 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json(categoryStats);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/categories/company-stats");
       }
     },
   );
@@ -1424,13 +1316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(category);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-      } else if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Unknown error occurred" });
-      }
+      handleRouteError(res, error, "POST /api/categories");
     }
   });
 
@@ -1440,24 +1326,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, description } = req.body;
 
       if (!name || typeof name !== "string") {
-        res.status(400).json({ error: "Name is required" });
-        return;
+        throw new ValidationError("Name is required");
       }
 
       const category = await storage.updateCategory(id, name, description);
 
       if (!category) {
-        res.status(404).json({ error: "Category not found" });
-        return;
+        throw new NotFoundError("Category");
       }
 
       res.json(category);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/categories/:id");
     }
   });
 
@@ -1467,17 +1347,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteCategory(id);
 
       if (!success) {
-        res.status(404).json({ error: "Category not found" });
-        return;
+        throw new NotFoundError("Category");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/categories/:id");
     }
   });
 
@@ -1491,17 +1366,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const overview = await storage.getCategoryOverview(product, id);
 
         if (!overview) {
-          res.status(404).json({ error: "Category not found" });
-          return;
+          throw new NotFoundError("Category");
         }
 
         res.json(overview);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/categories/:id/overview");
       }
     },
   );
@@ -1513,11 +1383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const features = await storage.getFeatures(product);
       res.json(features);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/features");
     }
   });
 
@@ -1528,17 +1394,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const feature = await storage.getFeature(product, id);
 
       if (!feature) {
-        res.status(404).json({ error: "Feature not found" });
-        return;
+        throw new NotFoundError("Feature");
       }
 
       res.json(feature);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/features/:id");
     }
   });
 
@@ -1556,13 +1417,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(feature);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-      } else if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Unknown error occurred" });
-      }
+      handleRouteError(res, error, "POST /api/features");
     }
   });
 
@@ -1580,8 +1435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.body;
 
       if (!name || typeof name !== "string") {
-        res.status(400).json({ error: "Name is required" });
-        return;
+        throw new ValidationError("Name is required");
       }
 
       const releaseDateValue = releaseDate ? new Date(releaseDate) : undefined;
@@ -1598,17 +1452,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!feature) {
-        res.status(404).json({ error: "Feature not found" });
-        return;
+        throw new NotFoundError("Feature");
       }
 
       res.json(feature);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/features/:id");
     }
   });
 
@@ -1618,17 +1467,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteFeature(id);
 
       if (!success) {
-        res.status(404).json({ error: "Feature not found" });
-        return;
+        throw new NotFoundError("Feature");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/features/:id");
     }
   });
 
@@ -1639,11 +1483,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companies = await storage.getCompanies(product);
       res.json(companies);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/companies");
     }
   });
 
@@ -1662,11 +1502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ stageStats });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/dashboard/stats");
     }
   });
 
@@ -1690,11 +1526,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json(recentTranscripts);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/dashboard/recent-transcripts");
       }
     },
   );
@@ -1706,17 +1538,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const company = await storage.getCompanyBySlug(product, slug);
 
       if (!company) {
-        res.status(404).json({ error: "Company not found" });
-        return;
+        throw new NotFoundError("Company");
       }
 
       res.json(company);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/companies/:slug");
     }
   });
 
@@ -1730,17 +1557,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const overview = await storage.getCompanyOverview(product, slug);
 
         if (!overview) {
-          res.status(404).json({ error: "Company not found" });
-          return;
+          throw new NotFoundError("Company");
         }
 
         res.json(overview);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/companies/:slug/overview");
       }
     },
   );
@@ -1755,13 +1577,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(company);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-      } else if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Unknown error occurred" });
-      }
+      handleRouteError(res, error, "POST /api/companies");
     }
   });
 
@@ -1779,8 +1595,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } = req.body;
 
       if (!name || typeof name !== "string") {
-        res.status(400).json({ error: "Name is required" });
-        return;
+        throw new ValidationError("Name is required");
       }
 
       const pilotStartDateValue = pilotStartDate
@@ -1799,19 +1614,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!company) {
-        res.status(404).json({ error: "Company not found" });
-        return;
+        throw new NotFoundError("Company");
       }
 
       await storage.updateCompanyNameInRelatedRecords(id, name);
 
       res.json(company);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/companies/:id");
     }
   });
 
@@ -1821,17 +1631,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteCompany(id);
 
       if (!success) {
-        res.status(404).json({ error: "Company not found" });
-        return;
+        throw new NotFoundError("Company");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/companies/:id");
     }
   });
 
@@ -1846,11 +1651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const contacts = await storage.getContactsByCompany(product, companyId);
         res.json(contacts);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "GET /api/contacts/company/:companyId");
       }
     },
   );
@@ -1861,13 +1662,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const contact = await storage.createContact(data);
       res.json(contact);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: error.errors });
-      } else if (error instanceof Error) {
-        res.status(500).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: "Unknown error occurred" });
-      }
+      handleRouteError(res, error, "POST /api/contacts");
     }
   });
 
@@ -1877,8 +1672,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, nameInTranscript, jobTitle } = req.body;
 
       if (!name) {
-        res.status(400).json({ error: "Name is required" });
-        return;
+        throw new ValidationError("Name is required");
       }
 
       const contact = await storage.updateContact(
@@ -1889,17 +1683,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!contact) {
-        res.status(404).json({ error: "Contact not found" });
-        return;
+        throw new NotFoundError("Contact");
       }
 
       res.json(contact);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/contacts/:id");
     }
   });
 
@@ -1909,17 +1698,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deleteContact(id);
 
       if (!success) {
-        res.status(404).json({ error: "Contact not found" });
-        return;
+        throw new NotFoundError("Contact");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/contacts/:id");
     }
   });
 
@@ -1933,18 +1717,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         const company = await storage.getCompany(product, companyId);
         if (!company) {
-          res.status(404).json({ error: "Company not found" });
-          return;
+          throw new NotFoundError("Company");
         }
 
         const result = await storage.mergeDuplicateContacts(product, companyId);
         res.json(result);
       } catch (error) {
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "POST /api/companies/:companyId/merge-duplicate-contacts");
       }
     },
   );
@@ -1956,11 +1735,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const systems = await storage.getPOSSystems(product);
       res.json(systems);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/pos-systems");
     }
   });
 
@@ -1971,17 +1746,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const system = await storage.getPOSSystem(product, id);
 
       if (!system) {
-        res.status(404).json({ error: "POS system not found" });
-        return;
+        throw new NotFoundError("POS system");
       }
 
       res.json(system);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "GET /api/pos-systems/:id");
     }
   });
 
@@ -1995,15 +1765,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       res.json(system);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        res.status(400).json({ error: fromZodError(error).message });
-        return;
-      }
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "POST /api/pos-systems");
     }
   });
 
@@ -2013,8 +1775,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { name, websiteLink, description, companyIds } = req.body;
 
       if (!name) {
-        res.status(400).json({ error: "Name is required" });
-        return;
+        throw new ValidationError("Name is required");
       }
 
       const system = await storage.updatePOSSystem(
@@ -2026,17 +1787,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       if (!system) {
-        res.status(404).json({ error: "POS system not found" });
-        return;
+        throw new NotFoundError("POS system");
       }
 
       res.json(system);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "PATCH /api/pos-systems/:id");
     }
   });
 
@@ -2046,17 +1802,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const success = await storage.deletePOSSystem(id);
 
       if (!success) {
-        res.status(404).json({ error: "POS system not found" });
-        return;
+        throw new NotFoundError("POS system");
       }
 
       res.json({ success: true });
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "DELETE /api/pos-systems/:id");
     }
   });
 
@@ -2065,7 +1816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { capability, input } = req.body;
 
       if (!capability) {
-        return res.status(400).json({ error: "capability is required" });
+        throw new ValidationError("capability is required");
       }
 
       const result = await mcp.run(capability, input ?? {});
