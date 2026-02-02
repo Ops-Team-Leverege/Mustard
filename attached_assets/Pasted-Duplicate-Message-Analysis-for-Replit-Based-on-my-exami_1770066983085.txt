@@ -1,0 +1,76 @@
+Duplicate Message Analysis for Replit
+Based on my examination of the codebase and the screenshot showing duplicate responses, here's what I found:
+
+🔍 Issue Identification
+Symptom: The bot is sending identical responses twice in the same thread, as shown in the screenshot where the same presentation name suggestions appear duplicated.
+
+🕵️ Root Cause Analysis
+1. Recent Changes That May Be Related
+Commit 821800a: "Improve handling of Slack messages to prevent duplicate responses"
+Added double deduplication: Both eventId/clientMsgId AND messageTs checks
+Added subtype filtering: Ignoring message subtypes
+2. Potential Issues in Current Code
+A. Double Deduplication Logic (lines 192-201 in events.ts)
+
+// First check
+if (await isDuplicateEvent(eventId, clientMsgId)) {
+  console.log(`[Slack] Duplicate event detected - skipping`);
+  return;
+}
+
+// Second check - THIS MIGHT BE THE ISSUE
+if (await isDuplicateEvent(`ts:${messageTs}`, undefined)) {
+  console.log(`[Slack] Duplicate message timestamp detected - skipping`);
+  return;
+}
+Potential Problem: The second deduplication check using ts:${messageTs} might be interfering with legitimate message processing or creating race conditions.
+
+B. Response Posting Logic (lines 755-780) The response logic has multiple paths:
+
+Test mode: botReply = { ts: test-${Date.now()} }
+Document generation: sendResponseWithDocumentSupport()
+Streaming: Uses existing message timestamp
+Regular: postSlackMessage()
+C. Streaming vs Regular Message Conflict There might be a case where both streaming AND regular message posting occur.
+
+🎯 Most Likely Causes
+1. Race Condition in Deduplication
+The timestamp-based deduplication (ts:${messageTs}) might be causing issues:
+
+Multiple webhook deliveries from Slack with same timestamp
+Database race condition in isDuplicateEvent()
+Memory fallback conflicts
+2. Streaming Logic Issue
+The streaming placeholder message might not be properly preventing regular message posting:
+
+usedStreaming flag might not be set correctly
+Streaming context might be undefined when it shouldn't be
+Final streaming update + regular message both firing
+3. Document Generation Fallback
+The document service has fallback logic that posts a message if document generation fails - this might be posting in addition to the main response.
+
+🔧 Debugging Recommendations for Replit
+1. Add More Detailed Logging
+// In events.ts around line 755
+console.log(`[DEBUG] Response decision: testRun=${testRun}, hasContract=${hasContract}, usedSingleMeeting=${usedSingleMeetingMode}, usedStreaming=${usedStreaming}`);
+console.log(`[DEBUG] streamingContext exists: ${!!streamingContext}`);
+console.log(`[DEBUG] About to choose response path...`);
+2. Check Deduplication Database
+Look at the slack_event_dedupe table to see if events are being properly deduplicated:
+
+SELECT * FROM slack_event_dedupe 
+WHERE processed_at > NOW() - INTERVAL '1 hour' 
+ORDER BY processed_at DESC;
+3. Monitor Slack Webhook Deliveries
+Check if Slack is sending duplicate webhooks by logging all incoming events:
+
+console.log(`[WEBHOOK] Received: eventId=${eventId}, clientMsgId=${clientMsgId}, ts=${messageTs}, retryNum=${req.headers['x-slack-retry-num']}`);
+🎯 Quick Test to Isolate the Issue
+Temporarily disable the timestamp deduplication to see if that fixes it:
+
+// Comment out this block temporarily:
+// if (await isDuplicateEvent(`ts:${messageTs}`, undefined)) {
+//   console.log(`[Slack] Duplicate message timestamp detected - skipping (ts=${messageTs})`);
+//   return;
+// }
+If duplicates stop, the issue is in the timestamp deduplication logic.
