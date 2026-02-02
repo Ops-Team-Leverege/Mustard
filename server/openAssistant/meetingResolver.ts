@@ -442,7 +442,7 @@ export async function searchAcrossMeetings(
   meetings: SingleMeetingContext[],
   topic?: string
 ): Promise<string> {
-  const { handleSingleMeetingQuestion } = await import("../mcp/singleMeetingOrchestrator");
+  const { handleSingleMeetingQuestion } = await import("./singleMeetingOrchestrator");
   
   console.log(`[MeetingResolver] Searching across ${meetings.length} meetings${topic ? ` for topic: "${topic}"` : ''}`);
   

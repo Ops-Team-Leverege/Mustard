@@ -16,7 +16,7 @@
 
 import { OpenAI } from "openai";
 import { performExternalResearch, formatCitationsForDisplay, type ResearchResult } from "./externalResearch";
-import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
+import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "./singleMeetingOrchestrator";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";

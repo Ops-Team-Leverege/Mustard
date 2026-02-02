@@ -26,7 +26,13 @@ The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt
 **Key Components:**
 - **Intent Router** (`server/decisionLayer/intent.ts`): Classifies user intent using semantic understanding
 - **Orchestrator** (`server/decisionLayer/index.ts`): Manages flow and selects answer contracts
-- **Execution Layer** (`server/openAssistant/contractExecutor.ts`): Executes contracts deterministically
+- **Execution Layer** (`server/openAssistant/`): Executes contracts deterministically
+  - `contractExecutor.ts`: Multi-meeting contract chain execution
+  - `singleMeetingOrchestrator.ts`: Single-meeting question handling
+  - `meetingResolver.ts`: Meeting lookup and scope resolution
+- **Shared Meeting Module** (`server/meeting/`): Centralized types and utilities for meeting scope
+  - `types.ts`: SingleMeetingContext, MeetingResolutionResult, MeetingThreadContext
+  - `utils.ts`: TEMPORAL_PATTERNS, formatMeetingDate, wantsAllCustomers, extractTopic
 
 **Routing Flow:**
 1. Intent Router classifies intent → SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, EXTERNAL_RESEARCH, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, or CLARIFY
