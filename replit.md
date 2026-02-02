@@ -23,10 +23,20 @@ The application includes a transcript detail view, meeting date support, and das
 **Meeting-Aware Product Knowledge**: When PRODUCT_KNOWLEDGE intent is triggered within a meeting thread, the system enriches responses with meeting context by fetching customer questions from that meeting via `buildMeetingContextForProductKnowledge()`. This allows product knowledge responses to address specific customer concerns raised in the meeting.
 
 ### Decision Layer Architecture (LLM-First Intent Routing)
-The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt-4o-mini) classifies all intents based on semantic understanding rather than keyword matching.
+The system uses **true LLM-FIRST classification** for intent routing. The LLM (gpt-4o-mini) handles semantic understanding while minimal fast-paths handle only absolute certainties.
+
+**Classification Strategy:**
+1. **Minimal fast-paths** (no LLM cost):
+   - Simple greetings: "hello", "thanks", etc.
+   - REFUSE patterns: Weather, jokes, personal info (out of scope)
+   - MULTI_INTENT patterns: Multi-step requests needing clarification
+   - Entity detection: Known company/contact names → meeting intent
+2. **LLM semantic classification** (everything else):
+   - Uses `INTENT_CLASSIFICATION_PROMPT` in `server/config/prompts/decisionLayer.ts`
+   - Handles all nuanced classification: meetings, product knowledge, external research, etc.
 
 **Key Components:**
-- **Intent Router** (`server/decisionLayer/intent.ts`): Classifies user intent using semantic understanding
+- **Intent Router** (`server/decisionLayer/intent.ts`): Classifies user intent using LLM semantic understanding
 - **Orchestrator** (`server/decisionLayer/index.ts`): Manages flow and selects answer contracts
 - **Execution Layer** (`server/openAssistant/`): Executes contracts deterministically
   - `contractExecutor.ts`: Multi-meeting contract chain execution
@@ -41,6 +51,8 @@ The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt
 2. Orchestrator computes context layers and selects answer contract
 3. **Scope Detection (MULTI_MEETING)**: LLM determines if "all customers" scope is implied (e.g., "our meetings", "we've had", "3 most recent"). This scope is passed downstream via `DecisionLayerResult.scope` to avoid regex re-detection.
 4. Execution Layer executes contract chain with evidence enforcement
+
+**Why LLM-First?** Complex regex patterns and keyword lists create conflicts (e.g., "What does PitCrew do?" matching both PRODUCT_KNOWLEDGE and EXTERNAL_RESEARCH). The LLM handles these semantic distinctions naturally.
 
 **Scope Propagation**: The Decision Layer's LLM-determined scope (`allCustomers`, `hasTimeRange`) is passed through `ScopeOverride` to `findRelevantMeetings()`. This eliminates the need for brittle regex patterns to detect scope in the meeting resolver. The LLM handles semantic understanding of phrases like "meetings we've had" → all customers.
 

@@ -104,310 +104,30 @@ export type IntentClassificationResult = {
 };
 
 // ============================================================================
-// KEYWORD PATTERNS - Simple string matching (low cost, high precision)
+// KEYWORD PATTERNS - Minimal fast-paths for absolute certainties only
+// Most classification is handled by LLM for semantic understanding
 // ============================================================================
 
-const SINGLE_MEETING_KEYWORDS = [
-  "yesterday",
-  "today",
-  "last meeting",
-  "this meeting",
-  "the meeting",
-  "the call",
-  "last call",
-  "this call",
-  "from the meeting",
-  "in the meeting",
-  "discussed in",
-  "action items",
-  "next steps",
-  "commitments",
-  "attendees",
-  "who was on",
-  "who attended",
-  "customer questions",
-  "what did they ask",
-  "what questions",
-  "meeting with",
-  "call with",
-  "demo with",
-  "on monday",
-  "on tuesday",
-  "on wednesday",
-  "on thursday",
-  "on friday",
-  "last week",
-  "this week",
-  "summarize the meeting",
-  "summary of the meeting",
-  "meeting summary",
-  "walkthrough",
-];
-
-const MULTI_MEETING_KEYWORDS = [
-  "across meetings",
-  "across all meetings",
-  "all meetings",
-  "all calls",
-  "all recent calls",
-  "recent calls",
-  "all recent meetings",
-  "recent meetings",
-  "trend",
-  "over time",
-  "historically",
-  "patterns",
-  "how many times",
-  "common questions",
-  "recurring",
-  "aggregate",
-  "summary of all",
-  "compare meetings",
-  "find all",
-  "search for",
-  "search all",
-  "search across",
-  "which meetings",
-  "which calls",
-  "every meeting",
-  "every call",
-  "any meetings",
-  "any calls",
-  "meetings that mention",
-  "calls that mention",
-  "who asked about",
-  "everyone who",
-];
-
-const PRODUCT_KNOWLEDGE_KEYWORDS = [
-  // FAQ and content updates (prioritize over meeting patterns)
-  "frequently asked questions",
-  "faq",
-  "faqs",
-  "update the faq",
-  "update our faq",
-  "update copy",
-  "updating copy",
-  "website copy",
-  "value props",
-  "value propositions",
-  // Direct product questions
-  "what is pitcrew",
-  "what does pitcrew do",
-  "what's pitcrew",
-  "pitcrew features",
-  "product features",
-  "capabilities",
-  "what can pitcrew",
-  "does pitcrew support",
-  "does pitcrew integrate",
-  "does pitcrew connect",
-  "does pitcrew work with",
-  "can pitcrew",
-  // Pricing variations
-  "pitcrew pricing",
-  "pitcrew priced",
-  "pitcrew cost",
-  "how is pitcrew priced",
-  "how much is pitcrew",
-  "how much does pitcrew",
-  "price of pitcrew",
-  "pricing for pitcrew",
-  // Tier keywords
-  "pro tier",
-  "advanced tier",
-  "enterprise tier",
-  // Value/features
-  "value proposition",
-  "how does pitcrew",
-  "pitcrew integrations",
-  "pitcrew work",
-  "pitcrew help",
-  "about pitcrew",
-  "pitcrew's",
-  "tell me about pitcrew",
-  "explain pitcrew",
-  // Product feature names
-  "live tv dashboard",
-  "bladeassure",
-  "queue analytics",
-  "tire tracking",
-  "bay tracking",
-  "vehicle tracking",
-  "camera integration",
-  "vision ai",
-  // Content creation
-  "update our pricing",
-  "pricing faq",
-  "safety features",
-  "deployment options",
-  // Integration questions
-  "pos system",
-  "pos integration",
-  "integrate with pos",
-  "dms integration",
-  "dealer management",
-  // "Our" refers to PitCrew - internal product questions
-  "our roadmap",
-  "our product roadmap",
-  "our q1 roadmap",
-  "our q2 roadmap",
-  "our q3 roadmap",
-  "our q4 roadmap",
-  "on the roadmap",
-  "product roadmap",
-  "feature roadmap",
-];
-
-const DOCUMENT_SEARCH_KEYWORDS = [
-  "in the documents",
-  "documentation",
-  "spec",
-  "specification",
-  "wiki",
-  "knowledge base",
-  "reference doc",
-  "find the contract",
-  "contract we signed",
-  "proposal",
-  "agreement",
-];
-
-const EXTERNAL_RESEARCH_KEYWORDS = [
-  // Company research
-  "do research on",
-  "research on",
-  "research that customer",
-  "recent earnings",
-  "earnings call",
-  "public statements",
-  "their priorities",
-  "their strategic",
-  "competitor research",
-  "company research",
-  "find out their",
-  "find out about",
-  "look up",
-  // Presentation creation
-  "slide deck for",
-  "sales deck for",
-  "pitch deck for",
-  "presentation for",
-  // Topic/concept research (not just companies)
-  "do research to understand",
-  "research to understand",
-  "understand more about",
-  "learn more about",
-  "industry trends",
-  "industry practices",
-  "industry standards",
-  "best practices for",
-  "market research",
-  "how do they",
-  "why do they",
-  "what is the purpose of",
-  "what are the benefits of",
-];
-
-const GENERAL_HELP_KEYWORDS = [
-  "what can you do",
-  "commands",
-  "usage",
+// Simple greetings that don't need LLM
+const SIMPLE_GREETINGS = [
   "hello",
+  "hi",
   "hi there",
+  "hey",
   "hey there",
-  "thanks",
-  "thank you",
   "good morning",
   "good afternoon",
-  "draft an email",
-  "draft email",
-  "write an email",
-  "write email",
-  "draft a message",
-  "draft message",
-  "help me write",
-  "help me draft",
+  "good evening",
+  "thanks",
+  "thank you",
+  "thanks!",
+  "thank you!",
 ];
 
 // ============================================================================
-// REGEX PATTERNS - More precise matching for common sentence structures
+// REGEX PATTERNS - Only for absolute certainties (REFUSE, MULTI_INTENT)
+// All other classification is handled by LLM for semantic understanding
 // ============================================================================
-
-const SINGLE_MEETING_PATTERNS = [
-  /\bwhat\s+did\s+[\w\s]+\s+say\b/i,
-  /\bwhat\s+did\s+[\w\s]+\s+mention\b/i,
-  /\bwhat\s+did\s+[\w\s]+\s+ask\b/i,
-  /\bwhat\s+did\s+[\w\s]+\s+suggest\b/i,
-  /\bwhat\s+did\s+[\w\s]+\s+agree\b/i,
-  /\bwhat\s+concerns?\s+did\b/i,
-  /\bwhat\s+feedback\s+did\b/i,
-  /\bwhat\s+questions?\s+did\b/i,
-  /\bdid\s+they\s+(say|mention|ask|suggest|agree)\b/i,
-  /\bdid\s+[\w]+\s+(say|mention|ask|suggest|agree)\b/i,
-  /\bin\s+the\s+[\w\s]+\s+(meeting|call|demo)\b/i,
-  /\bfrom\s+the\s+[\w\s]+\s+(meeting|call|demo)\b/i,
-  /\bthe\s+[\w\s]+\s+(meeting|call|demo)\s+with\b/i,
-  /\bsummarize\s+(the|this|our|my)\s+(meeting|call|demo)\b/i,
-  /\bwhat\s+were\s+the\s+(next\s+steps|action\s+items|takeaways)\b/i,
-  /\bwho\s+was\s+(on|in|at)\s+(the|this)\s+(call|meeting)\b/i,
-  /\bhelp\s+me\s+answer\s+(the|their)\s+questions?\b/i,
-  /\banswer\s+(the|their)\s+questions?\s+from\b/i,
-];
-
-const MULTI_MEETING_PATTERNS = [
-  /\bacross\s+(all\s+)?meetings\b/i,
-  /\bfind\s+all\s+(the\s+)?(questions?|mentions?|times?)\b/i,
-  /\bwhich\s+meetings?\s+(mention|discuss|have|include)\b/i,
-  /\beveryone\s+who\s+(asked|mentioned|said)\b/i,
-  /\bwhat\s+meetings?\s+(mention|discuss|have|include)\b/i,
-  /\bcompare\s+what\s+[\w\s]+\s+said\b/i,
-  /\bcompare\s+[\w\s]+\s+and\s+[\w\s]+\s+meetings?\b/i,
-  /\bsearch\s+all\s+(recent\s+)?(calls?|meetings?)\b/i,
-  /\b(all|recent)\s+(calls?|meetings?)\b.*\b(mention|about|discuss)\b/i,
-];
-
-const PRODUCT_KNOWLEDGE_PATTERNS = [
-  /\bhow\s+does\s+pitcrew\s+work\b/i,
-  /\bwhat\s+is\s+pitcrew('s)?\b/i,
-  /\bdoes\s+(it|pitcrew)\s+(support|integrate|work\s+with|connect)\b/i,
-  /\bcan\s+pitcrew\s+(do|handle|support|integrate)\b/i,
-  /\bpitcrew('s)?\s+(pricing|cost|features?|capabilities?)\b/i,
-  /\b(pro|advanced|enterprise)\s+tier\b/i,
-  /\bupdat(e|ing)\s+(our|the|my)\s+(pricing|faq|copy|website)\b/i,
-  /\bwrite\s+(a\s+section|copy)\s+about\s+pitcrew\b/i,
-  /\b(help\s+me\s+)?write\s+about\s+(pitcrew|our\s+product)\b/i,
-];
-
-const EXTERNAL_RESEARCH_PATTERNS = [
-  // Company-specific research
-  /\bdo\s+research\s+on\s+(that\s+)?(customer|company|prospect)\b/i,
-  /\bresearch\s+(on\s+)?[\w\s]+\s+(to\s+find|including|and)\b/i,
-  /\b(recent\s+)?earnings\s+(calls?|reports?)\b/i,
-  /\bpublic\s+statements?\b/i,
-  /\b(their|company'?s?)\s+(priorities|strategy|strategic)\b/i,
-  /\bcreating\s+a\s+(slide|sales|pitch)\s+deck\s+for\b/i,
-  /\bslide\s+deck\s+for\s+[\w\s]+\s+to\s+sell\b/i,
-  /\bselling?\s+(to|their)\s+(leadership|team|executive)\b/i,
-  /\bresearch\s+(the\s+)?(company|website|site|business)\b/i,
-  /\b(competitor|competitive)\s+(analysis|research|comparison)\b/i,
-  /\banalyze\s+(their|the)\s+(company|business|offerings?)\b/i,
-  // Exclude "pitcrew" - that's our product, not external research
-  /\bwhat\s+(does|do)\s+(?!pitcrew\b)[\w\s]+\s+(company\s+)?(do|offer|sell)\b/i,
-  /\b(their|the\s+company'?s?)\s+(website|site|business|offerings?)\b/i,
-  // Topic/concept research (not just companies)
-  /\bdo\s+research\s+to\s+understand\b/i,
-  /\bresearch\s+to\s+understand\s+more\b/i,
-  /\bunderstand\s+more\s+about\s+[\w\s]+\s+(and|why|how)\b/i,
-  /\bwhy\s+(do|are)\s+[\w\s]+\s+(use|used|important|needed)\b/i,
-  /\bhow\s+(do|does|are)\s+[\w\s]+\s+(shops?|stores?|businesses?)\s+(use|handle|manage)\b/i,
-  /\bwhat\s+(is|are)\s+(the\s+)?(purpose|benefit|reason)\s+of\b/i,
-  /\bindustry\s+(practices?|standards?|trends?|norms?)\b/i,
-  /\b(best|common)\s+practices?\s+(for|in|at)\b/i,
-  // Research + Write pattern (critical for feature descriptions)
-  /\bresearch[\w\s]+then\s+write\b/i,
-  /\bdo\s+research[\w\s]+write\s+(a|the)\s+(description|feature)\b/i,
-];
 
 const REFUSE_PATTERNS = [
   /\bweather\s+(in|like|forecast)\b/i,
@@ -607,152 +327,17 @@ async function classifyByKeyword(
     };
   }
 
-  // HARDENING: Single-Intent Invariant Enforcement with Decision-Time Reasoning
-  // Count how many distinct intent categories match to detect ambiguity
-  // Also track which patterns matched for observability
-  const matchingIntents: Intent[] = [];
-  const matchedSignals: string[] = [];
-  const rejectedIntents: Array<{ intent: Intent; reason: string }> = [];
-  
-  // Check MULTI_MEETING patterns
-  const multiMeetingPatternMatch = matchesPatterns(question, MULTI_MEETING_PATTERNS);
-  const multiMeetingKeywordMatch = matchesKeywords(lower, MULTI_MEETING_KEYWORDS);
-  if (multiMeetingPatternMatch || multiMeetingKeywordMatch) {
-    matchingIntents.push(Intent.MULTI_MEETING);
-    matchedSignals.push(multiMeetingPatternMatch ? "multi_meeting_pattern" : "multi_meeting_keyword");
-  }
-  
-  // Check SINGLE_MEETING patterns
-  const singleMeetingPatternMatch = matchesPatterns(question, SINGLE_MEETING_PATTERNS);
-  const singleMeetingKeywordMatch = matchesKeywords(lower, SINGLE_MEETING_KEYWORDS);
-  if (singleMeetingPatternMatch || singleMeetingKeywordMatch) {
-    matchingIntents.push(Intent.SINGLE_MEETING);
-    matchedSignals.push(singleMeetingPatternMatch ? "single_meeting_pattern" : "single_meeting_keyword");
-  }
-  
-  // Check PRODUCT_KNOWLEDGE patterns
-  const productPatternMatch = matchesPatterns(question, PRODUCT_KNOWLEDGE_PATTERNS);
-  const productKeywordMatch = matchesKeywords(lower, PRODUCT_KNOWLEDGE_KEYWORDS);
-  if (productPatternMatch || productKeywordMatch) {
-    matchingIntents.push(Intent.PRODUCT_KNOWLEDGE);
-    matchedSignals.push(productPatternMatch ? "product_pattern" : "product_keyword");
-  }
-  
-  // Check EXTERNAL_RESEARCH patterns (URL detection, website analysis)
-  const externalResearchPatternMatch = matchesPatterns(question, EXTERNAL_RESEARCH_PATTERNS);
-  const externalResearchKeywordMatch = matchesKeywords(lower, EXTERNAL_RESEARCH_KEYWORDS);
-  if (externalResearchPatternMatch || externalResearchKeywordMatch) {
-    matchingIntents.push(Intent.EXTERNAL_RESEARCH);
-    matchedSignals.push(externalResearchPatternMatch ? "external_research_pattern" : "external_research_keyword");
-  }
-  
-  // Check GENERAL_HELP keywords (includes "what can you do", greetings, drafting)
-  const generalHelpKeywordMatch = matchesKeywords(lower, GENERAL_HELP_KEYWORDS);
-  if (generalHelpKeywordMatch) {
-    matchingIntents.push(Intent.GENERAL_HELP);
-    matchedSignals.push("general_help_keyword");
-  }
-  
-  // HARDENING: If multiple mutually exclusive intents match → CLARIFY (single-intent invariant)
-  // MULTI_MEETING and SINGLE_MEETING are mutually exclusive
-  // PRODUCT_KNOWLEDGE with MEETING intents is ambiguous
-  // EXCEPTION: EXTERNAL_RESEARCH + PRODUCT_KNOWLEDGE → EXTERNAL_RESEARCH wins (chains product knowledge automatically)
-  // EXCEPTION: GENERAL_HELP + PRODUCT_KNOWLEDGE → GENERAL_HELP wins (GENERAL_HELP keywords are more specific phrases)
-  if (matchingIntents.length > 1) {
-    // Special case: GENERAL_HELP + PRODUCT_KNOWLEDGE → GENERAL_HELP wins
-    // This handles "what can you do" which matches both (specific phrase vs generic "capabilities")
-    // GENERAL_HELP keywords are full phrases like "what can you do", more specific than "capabilities"
-    if (matchingIntents.length === 2 && 
-        matchingIntents.includes(Intent.GENERAL_HELP) && 
-        matchingIntents.includes(Intent.PRODUCT_KNOWLEDGE)) {
-      console.log(`[IntentClassifier] GENERAL_HELP + PRODUCT_KNOWLEDGE → GENERAL_HELP wins (more specific phrase match)`);
-      return {
-        intent: Intent.GENERAL_HELP,
-        intentDetectionMethod: "keyword",
-        confidence: 0.9,
-        reason: "GENERAL_HELP keyword is more specific (full phrase match takes priority)",
-        decisionMetadata: {
-          matchedSignals,
-          rejectedIntents: [{ intent: Intent.PRODUCT_KNOWLEDGE, reason: "less specific keyword match" }],
-        },
-      };
-    }
-    
-    // Special case: EXTERNAL_RESEARCH + PRODUCT_KNOWLEDGE → EXTERNAL_RESEARCH wins
-    // This is because EXTERNAL_RESEARCH automatically chains product knowledge for comparison
-    if (matchingIntents.length === 2 && 
-        matchingIntents.includes(Intent.EXTERNAL_RESEARCH) && 
-        matchingIntents.includes(Intent.PRODUCT_KNOWLEDGE)) {
-      console.log(`[IntentClassifier] EXTERNAL_RESEARCH + PRODUCT_KNOWLEDGE → EXTERNAL_RESEARCH wins (auto-chains product knowledge)`);
-      return {
-        intent: Intent.EXTERNAL_RESEARCH,
-        intentDetectionMethod: "pattern",
-        confidence: 0.9,
-        reason: "EXTERNAL_RESEARCH with URL/website analysis (will chain product knowledge for comparison)",
-        decisionMetadata: {
-          matchedSignals,
-          rejectedIntents: [{ intent: Intent.PRODUCT_KNOWLEDGE, reason: "subsumed by EXTERNAL_RESEARCH chain" }],
-        },
-      };
-    }
-    
-    console.log(`[IntentClassifier] HARDENING: Single-intent invariant violation detected. Matched: ${matchingIntents.join(", ")}, Signals: ${matchedSignals.join(", ")}`);
+  // ============================================================================
+  // FAST-PATH: Simple greetings (no LLM needed)
+  // ============================================================================
+  const trimmedLower = lower.trim();
+  if (SIMPLE_GREETINGS.includes(trimmedLower) || SIMPLE_GREETINGS.some(g => trimmedLower === g)) {
+    console.log(`[IntentClassifier] Fast-path: Simple greeting detected`);
     return {
-      intent: Intent.CLARIFY,
-      intentDetectionMethod: "pattern",
-      confidence: 0,
-      reason: `Multiple intents matched (${matchingIntents.join(", ")}) - clarification needed`,
-      decisionMetadata: {
-        singleIntentViolation: true,
-        matchedSignals,
-        rejectedIntents: matchingIntents.map(i => ({ intent: i, reason: "ambiguous: multiple intents matched" })),
-      },
-    };
-  }
-  
-  // If exactly one intent matched, log rejected intents for observability
-  if (matchingIntents.length === 1) {
-    const selectedIntent = matchingIntents[0];
-    
-    // Track which intents were NOT matched (rejected)
-    if (selectedIntent !== Intent.MULTI_MEETING && !multiMeetingPatternMatch && !multiMeetingKeywordMatch) {
-      rejectedIntents.push({ intent: Intent.MULTI_MEETING, reason: "no multi-meeting patterns/keywords matched" });
-    }
-    if (selectedIntent !== Intent.SINGLE_MEETING && !singleMeetingPatternMatch && !singleMeetingKeywordMatch) {
-      rejectedIntents.push({ intent: Intent.SINGLE_MEETING, reason: "no single-meeting patterns/keywords matched" });
-    }
-    if (selectedIntent !== Intent.PRODUCT_KNOWLEDGE && !productPatternMatch && !productKeywordMatch) {
-      rejectedIntents.push({ intent: Intent.PRODUCT_KNOWLEDGE, reason: "no product-knowledge patterns/keywords matched" });
-    }
-    if (selectedIntent !== Intent.EXTERNAL_RESEARCH && !externalResearchPatternMatch && !externalResearchKeywordMatch) {
-      rejectedIntents.push({ intent: Intent.EXTERNAL_RESEARCH, reason: "no external-research patterns/keywords matched" });
-    }
-    if (selectedIntent !== Intent.GENERAL_HELP && !generalHelpKeywordMatch) {
-      rejectedIntents.push({ intent: Intent.GENERAL_HELP, reason: "no general-help keywords matched" });
-    }
-    
-    console.log(`[IntentClassifier] Decision: ${selectedIntent} (signals: ${matchedSignals.join(", ")})`);
-    return {
-      intent: selectedIntent,
-      intentDetectionMethod: "pattern",
-      confidence: 0.9,
-      reason: `Matched ${selectedIntent} pattern`,
-      decisionMetadata: {
-        matchedSignals,
-        rejectedIntents,
-      },
-    };
-  }
-
-  // NOTE: GENERAL_HELP is now checked in the main matching block above with priority rules
-  // This ensures "what can you do" → GENERAL_HELP instead of PRODUCT_KNOWLEDGE
-
-  if (matchesKeywords(lower, DOCUMENT_SEARCH_KEYWORDS)) {
-    return {
-      intent: Intent.DOCUMENT_SEARCH,
+      intent: Intent.GENERAL_HELP,
       intentDetectionMethod: "keyword",
-      confidence: 0.9,
-      reason: "Matched document search keyword pattern",
+      confidence: 1.0,
+      reason: "Simple greeting - no LLM needed",
     };
   }
 
