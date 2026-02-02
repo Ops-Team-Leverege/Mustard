@@ -37,7 +37,10 @@ The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt
 **Routing Flow:**
 1. Intent Router classifies intent → SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, EXTERNAL_RESEARCH, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, or CLARIFY
 2. Orchestrator computes context layers and selects answer contract
-3. Execution Layer executes contract chain with evidence enforcement
+3. **Scope Detection (MULTI_MEETING)**: LLM determines if "all customers" scope is implied (e.g., "our meetings", "we've had", "3 most recent"). This scope is passed downstream via `DecisionLayerResult.scope` to avoid regex re-detection.
+4. Execution Layer executes contract chain with evidence enforcement
+
+**Scope Propagation**: The Decision Layer's LLM-determined scope (`allCustomers`, `hasTimeRange`) is passed through `ScopeOverride` to `findRelevantMeetings()`. This eliminates the need for brittle regex patterns to detect scope in the meeting resolver. The LLM handles semantic understanding of phrases like "meetings we've had" → all customers.
 
 Contract chains are dynamically built based on user messages, ensuring ordered execution and enforcing safety constraints.
 

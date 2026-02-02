@@ -25,19 +25,36 @@ export type ChunkSearchResult = {
 };
 
 /**
+ * LLM-determined scope passed from Decision Layer.
+ * Used to avoid regex re-detection of "all customers" scope.
+ */
+export type ScopeOverride = {
+  allCustomers?: boolean; // LLM detected "all customers" scope
+  hasTimeRange?: boolean;
+  timeRangeExplanation?: string;
+  customerScopeExplanation?: string;
+};
+
+/**
  * Find relevant meetings based on company/person names in the query.
  * Uses fuzzy matching on company names and contact names.
  * Special case: "all customers" returns all available transcripts.
+ * 
+ * @param scopeOverride - LLM-determined scope from Decision Layer (preferred over regex)
  */
 export async function findRelevantMeetings(
   userMessage: string,
-  classification: IntentClassification
+  classification: IntentClassification,
+  scopeOverride?: ScopeOverride
 ): Promise<MeetingSearchResult> {
   const { storage } = await import("../storage");
   
-  // Check for "all customers" scope - return all available transcripts
-  if (wantsAllCustomers(userMessage)) {
-    console.log(`[MeetingResolver] "All customers" detected - fetching all available transcripts`);
+  // Check for "all customers" scope - prefer LLM-determined scope over regex
+  const isAllCustomers = scopeOverride?.allCustomers ?? wantsAllCustomers(userMessage);
+  
+  if (isAllCustomers) {
+    const source = scopeOverride?.allCustomers ? "LLM scope detection" : "regex pattern";
+    console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching all available transcripts`);
     const allMeetings = await fetchAllRecentTranscripts();
     const topic = extractTopic(userMessage);
     return {

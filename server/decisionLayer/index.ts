@@ -92,6 +92,13 @@ export type DecisionLayerResult = {
   contractSelectionMethod: string;
   clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
+  // LLM-determined scope (passed downstream to avoid regex re-detection)
+  scope?: {
+    allCustomers: boolean; // True if LLM detected "all customers" scope
+    hasTimeRange: boolean; // True if LLM detected time range
+    timeRangeExplanation?: string; // e.g., "3 most recent meetings"
+    customerScopeExplanation?: string; // e.g., "we've had implies all customers"
+  };
 };
 
 // Backward compatibility alias
@@ -198,27 +205,43 @@ export async function runDecisionLayer(
   
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
 
-  // Check if this is an aggregate contract that needs scope clarification
-  if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
-    // Use LLM to check if question has sufficient specificity (semantic understanding)
+  // For MULTI_MEETING intent, always run specificity check to get LLM-determined scope
+  // This scope is passed downstream to avoid regex re-detection in meeting resolver
+  let scopeInfo: DecisionLayerResult["scope"];
+  
+  if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question);
-    const clarifyMessage = generateAggregateClarifyMessage(specificity.hasTimeRange, specificity.hasCustomerScope);
     
-    if (clarifyMessage) {
-      console.log(`[DecisionLayer] Aggregate contract detected, requesting scope clarification`);
-      return {
-        intent: Intent.CLARIFY,
-        intentDetectionMethod: "aggregate_scope_check",
-        contextLayers: layersMeta.layers,
-        answerContract: contractResult.contract,
-        contractSelectionMethod: contractResult.contractSelectionMethod,
-        clarifyMessage,
-        proposedInterpretation: {
-          intent: intentResult.intent.toString(),
-          contract: contractResult.contract.toString(),
-          summary: "Aggregate analysis - awaiting scope",
-        },
-      };
+    scopeInfo = {
+      allCustomers: specificity.hasCustomerScope,
+      hasTimeRange: specificity.hasTimeRange,
+      timeRangeExplanation: specificity.timeRangeExplanation,
+      customerScopeExplanation: specificity.customerScopeExplanation,
+    };
+    
+    console.log(`[DecisionLayer] LLM scope detection: allCustomers=${scopeInfo.allCustomers} (${scopeInfo.customerScopeExplanation}), hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation})`);
+    
+    // For aggregate contracts, check if we need clarification
+    if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
+      const clarifyMessage = generateAggregateClarifyMessage(specificity.hasTimeRange, specificity.hasCustomerScope);
+      
+      if (clarifyMessage) {
+        console.log(`[DecisionLayer] Aggregate contract detected, requesting scope clarification`);
+        return {
+          intent: Intent.CLARIFY,
+          intentDetectionMethod: "aggregate_scope_check",
+          contextLayers: layersMeta.layers,
+          answerContract: contractResult.contract,
+          contractSelectionMethod: contractResult.contractSelectionMethod,
+          clarifyMessage,
+          proposedInterpretation: {
+            intent: intentResult.intent.toString(),
+            contract: contractResult.contract.toString(),
+            summary: "Aggregate analysis - awaiting scope",
+          },
+          scope: scopeInfo,
+        };
+      }
     }
   }
 
@@ -230,6 +253,7 @@ export async function runDecisionLayer(
     contractSelectionMethod: contractResult.contractSelectionMethod,
     clarifyMessage: intentResult.clarifyMessage,
     proposedInterpretation: intentResult.proposedInterpretation,
+    scope: scopeInfo,
   };
 }
 

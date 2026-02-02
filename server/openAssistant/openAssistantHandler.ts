@@ -33,7 +33,7 @@ import {
   deriveEvidenceSource 
 } from "./types";
 import { streamOpenAIResponse } from "./streamingHelper";
-import { findRelevantMeetings, searchAcrossMeetings } from "./meetingResolver";
+import { findRelevantMeetings, searchAcrossMeetings, type ScopeOverride } from "./meetingResolver";
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
 import { GoogleGenAI } from "@google/genai";
@@ -801,7 +801,9 @@ async function handleMeetingDataIntent(
 
   console.log(`[OpenAssistant] No meeting resolved, searching for relevant meetings`);
   
-  const meetingSearch = await findRelevantMeetings(userMessage, classification);
+  // Pass LLM-determined scope from Decision Layer (if available)
+  const scopeOverride: ScopeOverride | undefined = context.decisionLayerResult?.scope;
+  const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride);
   
   if (meetingSearch.meetings.length === 0) {
     console.log(`[OpenAssistant] Scope resolution failed: SINGLE_MEETING intent, searched for: "${meetingSearch.searchedFor || 'nothing specific'}", candidates found: 0`);
@@ -922,7 +924,9 @@ async function handleMultiMeetingIntent(
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}`);
   
-  const meetingSearch = await findRelevantMeetings(userMessage, classification);
+  // Pass LLM-determined scope from Decision Layer (if available)
+  const scopeOverride: ScopeOverride | undefined = context.decisionLayerResult?.scope;
+  const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride);
   
   if (meetingSearch.meetings.length === 0) {
     console.log(`[OpenAssistant] Scope resolution failed: MULTI_MEETING intent, searched for: "${meetingSearch.searchedFor || 'all meetings'}", candidates found: 0`);
