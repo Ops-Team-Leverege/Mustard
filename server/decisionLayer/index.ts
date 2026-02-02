@@ -40,6 +40,9 @@ import {
   type ContractSelectionMethod,
 } from "./answerContracts";
 
+import OpenAI from "openai";
+import { AGGREGATE_SPECIFICITY_CHECK_PROMPT } from "../config/prompts";
+
 export {
   Intent,
   classifyIntent,
@@ -101,45 +104,49 @@ const AGGREGATE_CONTRACTS = [
   AnswerContract.TREND_SUMMARY,
 ];
 
-// Patterns that indicate time range is EXPLICITLY specified
-// Note: "recent/recently" alone is too vague - always ask for clarification
-const TIME_RANGE_PATTERNS = [
-  /\b(last|past)\s+(week|month|quarter|year)\b/i, // "last month", "past quarter"
-  /\b(last|past)\s+(\d+|two|three|four|five|six|seven|eight|nine|ten|few|several|couple(\s+of)?)\s+(days?|weeks?|months?|quarters?|years?)\b/i, // "last 3 months", "past few weeks", "last couple of months"
-  /\b(\d+|two|three|four|five|six|seven|eight|nine|ten)\s+most\s+recent\b/i, // "3 most recent", "the 3 most recent meetings"
-  /\bmost\s+recent\s+(\d+|two|three|four|five|six|seven|eight|nine|ten)\b/i, // "most recent 3 meetings"
-  /\b(last|latest|most\s+recent)\s+(\d+|two|three|four|five|six|seven|eight|nine|ten)\s+(meetings?|calls?|transcripts?)\b/i, // "last 3 meetings", "latest 5 calls"
-  /\b(this|current)\s+(week|month|quarter|year)\b/i,
-  /\b(since|from|after|before)\s+(january|february|march|april|may|june|july|august|september|october|november|december|\d{4})/i,
-  /\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}\b/i,
-  /\b(q[1-4])\s*['"]?\d{2,4}\b/i, // Q1 2024, Q1'24
-  /\b20[0-9]{2}\b/i, // Year like 2024, 2025
-  /\b(all\s+time|ever|historically)\b/i,
-];
-
-// Patterns that indicate customer scope is specified
-// Case-insensitive, supports multi-word company names
-const CUSTOMER_SCOPE_PATTERNS = [
-  /\b(all\s+(the\s+)?customers?|every\s+customer|across\s+all|everyone)\b/i, // "all customers", "all the customers"
-  /\b(we'?ve\s+had|our\s+meetings?|our\s+calls?)\b/i, // "we've had", "our meetings" - implies all customers
-  /\bfor\s+[\w\s]+(?:inc|llc|corp|company|co\b)/i, // "for Acme Inc", "for Big Corp"
-  /\bfor\s+\w+[\w\s]*\b/i, // "for Costco", "for Ivy Lane"
-  /\b(specific|particular)\s+customer/i,
-  /\b(with|from)\s+\w+[\w\s]*\s+(calls?|meetings?)\b/i, // "with Costco calls"
-];
-
-function hasTimeRange(question: string): boolean {
-  return TIME_RANGE_PATTERNS.some(p => p.test(question));
+// LLM-based specificity check result
+interface SpecificityCheckResult {
+  hasTimeRange: boolean;
+  hasCustomerScope: boolean;
+  timeRangeExplanation: string;
+  customerScopeExplanation: string;
 }
 
-function hasCustomerScope(question: string): boolean {
-  return CUSTOMER_SCOPE_PATTERNS.some(p => p.test(question));
+/**
+ * Use LLM to check if the question has sufficient specificity for aggregate queries.
+ * This replaces brittle regex patterns with semantic understanding.
+ */
+async function checkAggregateSpecificity(question: string): Promise<SpecificityCheckResult> {
+  try {
+    const openai = new OpenAI();
+    
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: AGGREGATE_SPECIFICITY_CHECK_PROMPT },
+        { role: "user", content: question },
+      ],
+      temperature: 0,
+      max_tokens: 200,
+      response_format: { type: "json_object" },
+    });
+    
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      console.log("[DecisionLayer] No content from specificity check, defaulting to needs clarification");
+      return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "" };
+    }
+    
+    const result = JSON.parse(content) as SpecificityCheckResult;
+    console.log(`[DecisionLayer] Specificity check: hasTimeRange=${result.hasTimeRange} (${result.timeRangeExplanation}), hasCustomerScope=${result.hasCustomerScope} (${result.customerScopeExplanation})`);
+    return result;
+  } catch (error) {
+    console.error("[DecisionLayer] Specificity check failed, defaulting to needs clarification:", error);
+    return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "" };
+  }
 }
 
-function generateAggregateClarifyMessage(question: string, contract: AnswerContract): string {
-  const hasTime = hasTimeRange(question);
-  const hasScope = hasCustomerScope(question);
-  
+function generateAggregateClarifyMessage(hasTime: boolean, hasScope: boolean): string {
   if (!hasTime && !hasScope) {
     return `Great question! To give you the best analysis, could you clarify:
 
@@ -193,7 +200,9 @@ export async function runDecisionLayer(
 
   // Check if this is an aggregate contract that needs scope clarification
   if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
-    const clarifyMessage = generateAggregateClarifyMessage(question, contractResult.contract);
+    // Use LLM to check if question has sufficient specificity (semantic understanding)
+    const specificity = await checkAggregateSpecificity(question);
+    const clarifyMessage = generateAggregateClarifyMessage(specificity.hasTimeRange, specificity.hasCustomerScope);
     
     if (clarifyMessage) {
       console.log(`[DecisionLayer] Aggregate contract detected, requesting scope clarification`);

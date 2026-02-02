@@ -232,3 +232,33 @@ export const FALLBACK_CLARIFY_MESSAGE = `I want to help but I'm not sure what yo
 • Help with a task (what kind?)
 
 Give me a hint and I'll get you sorted!`;
+
+/**
+ * Aggregate query specificity check prompt.
+ * Used to determine if a multi-meeting/aggregate question has sufficient specificity
+ * to proceed without clarification.
+ */
+export const AGGREGATE_SPECIFICITY_CHECK_PROMPT = `You are checking if a user's question about multiple meetings has enough specificity to answer.
+
+For aggregate/multi-meeting questions, we need to know:
+1. TIME RANGE: When should we look? (e.g., "last month", "past quarter", "all time", "3 most recent", "since January")
+2. CUSTOMER SCOPE: Which customers? (e.g., "all customers", "Costco", "our meetings", "we've had")
+
+Analyze the question and determine what information is present.
+
+RULES:
+- "X most recent meetings" or "last X meetings" = TIME RANGE is specified (they want the N most recent)
+- "we've had" or "our meetings" or "our calls" = SCOPE is specified (implies all customers/all our data)
+- "all customers" or "across all" or "everyone" = SCOPE is specified
+- Specific company names = SCOPE is specified
+- "last month/quarter/year" or "since [date]" = TIME RANGE is specified
+- "recent" alone without a number is NOT specific enough for time range
+- If the question clearly implies "look at everything" that's fine - no clarification needed
+
+Return JSON:
+{
+  "hasTimeRange": boolean,
+  "hasCustomerScope": boolean,
+  "timeRangeExplanation": "brief explanation",
+  "customerScopeExplanation": "brief explanation"
+}`;
