@@ -26,9 +26,18 @@ export interface ThreadResolutionResult {
  * - Explicitly names a new entity
  */
 export function shouldReuseThreadContext(messageText: string): boolean {
+  // Short clarification answers (< 5 words) should always reuse context
+  // These are typically answers like "last month", "all customers", "yes", "1", etc.
+  const wordCount = messageText.trim().split(/\s+/).length;
+  if (wordCount < 5) {
+    return true;
+  }
+  
+  // Only check override patterns for longer messages that might be new questions
   const overridePatterns = [
     /\b(different|another|other)\s+(meeting|call|customer|company)\b/i,
-    /\blast\s+(quarter|month|year)\b/i,
+    // Only trigger on "what about last quarter" or "show me last month" - not bare "last month"
+    /\b(what|show|tell|give|from|in)\s+(about\s+)?last\s+(quarter|month|year)\b/i,
     /\bwith\s+[A-Z][a-z]+\s+(about|regarding)\b/i, // "with CompanyName about..."
     /\bfor\s+[A-Z][a-z]+\b/i, // "for CompanyName"
     /\b(switch|change)\s+to\b/i,
