@@ -407,47 +407,58 @@ export function getContractHeader(contract: AnswerContract): string {
 }
 
 /**
- * Extract user-specified output format preferences from the message.
+ * Extract user-specified output format preferences from the message using LLM.
  * These override our default output formats when users want specific formats.
  * 
- * Examples:
- * - "no more than 3-4 sentences" → "Limit to 3-4 sentences maximum."
- * - "in one paragraph" → "Format as a single paragraph."
- * - "brief summary" → "Keep response brief and concise."
- * - "bullet points only" → "Use bullet points only."
+ * Uses semantic understanding to detect format constraints like:
+ * - Length limits ("no more than 3-4 sentences", "keep it brief")
+ * - Structure preferences ("bullet points only", "in paragraph form")
+ * - Style preferences ("casual tone", "formal")
  */
-export function extractUserFormatPreference(userMessage: string): string | null {
-  const messageLower = userMessage.toLowerCase();
-  
-  // Sentence/length limits
-  const sentenceMatch = messageLower.match(/(?:no more than|at most|max(?:imum)?|limit to|in|under)\s*(\d+(?:-\d+)?)\s*(?:sentence|word|line|bullet|point)/);
-  if (sentenceMatch) {
-    return `USER FORMAT OVERRIDE: Limit your response to ${sentenceMatch[1]} ${sentenceMatch[0].includes('word') ? 'words' : sentenceMatch[0].includes('bullet') || sentenceMatch[0].includes('point') ? 'bullet points' : 'sentences'} maximum. This is a strict requirement from the user.`;
+export async function extractUserFormatPreference(userMessage: string): Promise<string | null> {
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You analyze user messages to detect output format preferences.
+
+If the user specifies HOW they want the response formatted (length, structure, style), extract that as a clear instruction.
+
+Examples:
+- "summarize in 3 sentences" → "Limit response to exactly 3 sentences."
+- "give me a brief overview" → "Keep response brief and concise, no more than 2-3 sentences."
+- "no more than 3-4 sentences" → "Limit response to 3-4 sentences maximum."
+- "bullet points only" → "Use bullet points only, no prose."
+- "in one paragraph" → "Format as a single paragraph, no lists."
+- "keep it short" → "Keep response very short, 1-2 sentences."
+- "detailed breakdown" → null (this is about content depth, not format)
+- "what happened in the meeting" → null (no format preference)
+
+Return ONLY the format instruction as a single line, or "none" if no format preference detected.
+Do not include explanations.`
+        },
+        {
+          role: "user",
+          content: userMessage
+        }
+      ],
+      temperature: 0,
+      max_tokens: 100,
+    });
+    
+    const result = response.choices[0]?.message?.content?.trim();
+    
+    if (!result || result.toLowerCase() === "none" || result.toLowerCase() === "null") {
+      return null;
+    }
+    
+    return `USER FORMAT OVERRIDE: ${result} This is a strict requirement from the user - prioritize this over default formatting.`;
+  } catch (error) {
+    console.error(`[extractUserFormatPreference] LLM extraction failed:`, error);
+    return null;
   }
-  
-  // "brief", "concise", "short" indicators
-  if (/\b(?:brief(?:ly)?|concise(?:ly)?|short|quick|tl;?dr)\b/.test(messageLower)) {
-    return `USER FORMAT OVERRIDE: Keep your response brief and concise. The user wants a short summary, not a detailed analysis.`;
-  }
-  
-  // Paragraph constraints
-  const paragraphMatch = messageLower.match(/(?:in |just |only |one |single )?(?:\d+ )?paragraph/);
-  if (paragraphMatch) {
-    const numMatch = paragraphMatch[0].match(/\d+/);
-    const count = numMatch ? numMatch[0] : '1';
-    return `USER FORMAT OVERRIDE: Format your response as ${count === '1' ? 'a single paragraph' : `${count} paragraphs maximum`}. Do not use bullet points or numbered lists.`;
-  }
-  
-  // Explicit format requests
-  if (/bullet(?:s| points?)? only/.test(messageLower)) {
-    return `USER FORMAT OVERRIDE: Use only bullet points, no prose or paragraphs.`;
-  }
-  
-  if (/no (?:bullet|list|format)/.test(messageLower)) {
-    return `USER FORMAT OVERRIDE: Use prose only, no bullet points or numbered lists.`;
-  }
-  
-  return null;
 }
 
 /**
@@ -614,7 +625,7 @@ async function synthesizeAnalysis(
   console.log(`[ContractExecutor] Extracted focus topic: "${focusTopic}" from question`);
   
   // Check for user format override (e.g., "no more than 3-4 sentences")
-  const userFormatOverride = extractUserFormatPreference(userMessage);
+  const userFormatOverride = await extractUserFormatPreference(userMessage);
   if (userFormatOverride) {
     console.log(`[ContractExecutor] User format override detected: "${userFormatOverride}"`);
   }
