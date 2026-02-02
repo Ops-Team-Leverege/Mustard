@@ -66,6 +66,9 @@ export function getMeetingDateSuffix(ctx: SingleMeetingContext): string {
 export const ALL_CUSTOMERS_PATTERNS = [
   /\b(all\s+customers?|every\s+customer|across\s+all|everyone|all\s+calls?|all\s+meetings?)\b/i,
   /\b(across\s+customers?|across\s+companies|across\s+the\s+board)\b/i,
+  /\b(our\s+meetings?|our\s+calls?|we'?ve\s+had)\b/i,
+  /\b(\d+|three|two|four|five|six|seven|eight|nine|ten)\s+(most\s+)?recent\s+(meetings?|calls?)\b/i,
+  /\b(most\s+)?recent\s+(meetings?|calls?)\b/i,
 ];
 
 /**
