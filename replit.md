@@ -121,6 +121,12 @@ The control plane dynamically builds contract chains based on user messages, ens
 - **Expanded Patterns**: Added patterns for concept research like "understand more about X and why", "industry practices/standards", "research... then write".
 - **LLM Prompt Updates**: Updated intent classification prompts in both `intent.ts` and `llmInterpretation.ts` with expanded EXTERNAL_RESEARCH description and examples including topic research and "research + write" patterns.
 
+### Thread Context for Intent Classification
+- **Follow-Up Detection**: Added `detectFollowUpMessage()` function to recognize refinement messages like "make it shorter", "better but too long", "try again".
+- **Thread Context Passed to Keyword Classifier**: `classifyByKeyword()` now receives `threadContext` parameter so it can detect follow-up patterns.
+- **Intent Inference from Bot Response**: When a follow-up is detected, the system infers the correct intent from the previous bot response (e.g., feature description → EXTERNAL_RESEARCH).
+- **New Type Fields**: Added `isFollowUp` and `previousBotResponseSnippet` to `IntentDecisionMetadata`, and `follow_up_detection` to `IntentDetectionMethod`.
+
 ### Configuration Centralization
 - **Constants File**: Created `server/config/constants.ts` with domain-grouped constants (MEETING_LIMITS, STREAMING, TIMEOUTS, CONTENT_LIMITS, LLM_TOKENS, SEMANTIC_SEARCH) for easier tuning.
 - **Updated Files**: meetingResolver.ts, streamingHelper.ts, getLastMeeting.ts, openAssistantHandler.ts, verify.ts now use centralized constants.

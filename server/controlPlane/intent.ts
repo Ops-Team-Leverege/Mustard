@@ -46,7 +46,7 @@ export enum Intent {
   CLARIFY = "CLARIFY",
 }
 
-export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "llm_validated" | "default";
+export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "llm_validated" | "default" | "follow_up_detection";
 
 /**
  * Structured decision metadata for observability.
@@ -74,6 +74,8 @@ export type IntentDecisionMetadata = {
   };
   originalIntent?: Intent;             // Original intent before LLM override
   originalReason?: string;             // Original reason before LLM override
+  isFollowUp?: boolean;                // True if this is a follow-up/refinement message
+  previousBotResponseSnippet?: string; // Snippet of previous bot response for context
 };
 
 /**
@@ -512,11 +514,113 @@ function detectMultiIntent(text: string): { needsSplit: boolean; splitOptions?: 
 }
 
 // ============================================================================
+// FOLLOW-UP MESSAGE DETECTION
+// ============================================================================
+
+/**
+ * Detect if the current message is a follow-up/refinement of a previous request.
+ * Follow-up messages are short, context-dependent messages that refine what was
+ * just produced (e.g., "make it shorter", "better but too long", "try again").
+ * 
+ * When detected, we return null to force the message through the interpretation
+ * path which has full thread context, OR we infer the intent from the previous
+ * bot response's capability.
+ */
+function detectFollowUpMessage(
+  question: string,
+  threadContext?: ThreadContext
+): IntentClassificationResult | null {
+  // No thread context = can't detect follow-up
+  if (!threadContext?.messages || threadContext.messages.length < 2) {
+    return null;
+  }
+  
+  const lower = question.toLowerCase().trim();
+  
+  // Follow-up patterns - short messages that imply refinement
+  const followUpPatterns = [
+    /^(make\s+it|can\s+you\s+make\s+it)\s+(shorter|longer|more\s+concise|simpler|clearer)/i,
+    /^(too\s+)?(long|short|verbose|wordy|brief)/i,
+    /^(better|good|nice),?\s+but\s+(too|a\s+bit|still)/i,
+    /^try\s+(again|once\s+more)/i,
+    /^(more|less)\s+(concise|detailed|verbose|brief)/i,
+    /^(shorten|expand|simplify|clarify)\s+(it|this|that)/i,
+    /^(that'?s?|this\s+is)\s+(too|not)/i,
+    /^not\s+quite/i,
+    /^(tweak|adjust|refine|revise)\s+(it|this|that)/i,
+    /^can\s+you\s+(redo|rewrite|revise)/i,
+  ];
+  
+  // Check if current message matches follow-up patterns
+  const isFollowUp = followUpPatterns.some(p => p.test(lower));
+  
+  if (!isFollowUp) {
+    return null;
+  }
+  
+  // Look at the last bot message to infer intent
+  const lastBotMessage = threadContext.messages
+    .slice()
+    .reverse()
+    .find(m => m.isBot);
+  
+  if (!lastBotMessage) {
+    return null;
+  }
+  
+  // Check for capability markers in the bot's previous response
+  // These help us understand what type of task was being performed
+  const botText = lastBotMessage.text.toLowerCase();
+  
+  // Infer intent from previous bot response content
+  let inferredIntent: Intent = Intent.GENERAL_HELP;
+  let inferredReason = "Follow-up to previous response";
+  
+  if (botText.includes("feature description") || botText.includes("description:") || 
+      botText.includes("**net safety") || botText.includes("research")) {
+    inferredIntent = Intent.EXTERNAL_RESEARCH;
+    inferredReason = "Follow-up to external research / feature description task";
+  } else if (botText.includes("meeting") || botText.includes("they said") || 
+             botText.includes("action items") || botText.includes("next steps")) {
+    inferredIntent = Intent.SINGLE_MEETING;
+    inferredReason = "Follow-up to meeting-related task";
+  } else if (botText.includes("pitcrew") && (botText.includes("pricing") || 
+             botText.includes("feature") || botText.includes("integration"))) {
+    inferredIntent = Intent.PRODUCT_KNOWLEDGE;
+    inferredReason = "Follow-up to product knowledge task";
+  }
+  
+  console.log(`[IntentClassifier] Follow-up detected: "${question}" → ${inferredIntent} (${inferredReason})`);
+  
+  return {
+    intent: inferredIntent,
+    intentDetectionMethod: "follow_up_detection",
+    confidence: 0.85,
+    reason: inferredReason,
+    decisionMetadata: {
+      isFollowUp: true,
+      previousBotResponseSnippet: botText.slice(0, 100),
+    },
+  };
+}
+
+// ============================================================================
 // CLASSIFICATION LOGIC
 // ============================================================================
 
-async function classifyByKeyword(question: string): Promise<IntentClassificationResult | null> {
+async function classifyByKeyword(
+  question: string,
+  threadContext?: ThreadContext
+): Promise<IntentClassificationResult | null> {
   const lower = question.toLowerCase();
+
+  // EARLY CHECK: Detect follow-up/refinement messages that need thread context
+  // These are short messages that refine a previous request
+  const followUpResult = detectFollowUpMessage(question, threadContext);
+  if (followUpResult) {
+    console.log(`[IntentClassifier] Follow-up message detected: "${followUpResult.reason}"`);
+    return followUpResult;
+  }
 
   // HARDENING: Check for REFUSE first (highest priority)
   if (matchesPatterns(question, REFUSE_PATTERNS)) {
@@ -843,7 +947,7 @@ export async function classifyIntent(
   question: string,
   threadContext?: ThreadContext
 ): Promise<IntentClassificationResult> {
-  const keywordResult = await classifyByKeyword(question);
+  const keywordResult = await classifyByKeyword(question, threadContext);
   
   if (keywordResult) {
     // Check if this is already a CLARIFY due to ambiguity
