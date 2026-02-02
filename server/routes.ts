@@ -36,7 +36,7 @@ import {
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { randomUUID } from "crypto";
-import { handleRouteError, NotFoundError, ValidationError } from "./utils/errorHandler";
+import { handleRouteError, NotFoundError, ValidationError, AuthenticationError } from "./utils/errorHandler";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -60,7 +60,7 @@ async function getUserAndProduct(
   const user = await storage.getUser(userId);
 
   if (!user) {
-    throw new Error("User not found");
+    throw new AuthenticationError("User session invalid or user not found");
   }
 
   // User's current product defaults to PitCrew if not set
@@ -778,12 +778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({ success: true, message: "Transcript processing restarted" });
       } catch (error) {
-        console.error("Error retrying transcript:", error);
-        res
-          .status(500)
-          .json({
-            error: error instanceof Error ? error.message : "Unknown error",
-          });
+        handleRouteError(res, error, "POST /api/transcripts/:id/retry");
       }
     },
   );
@@ -981,11 +976,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(insight);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "POST /api/insights");
     }
   });
 
@@ -1160,11 +1151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json(qaPair);
     } catch (error) {
-      res
-        .status(500)
-        .json({
-          error: error instanceof Error ? error.message : "Unknown error",
-        });
+      handleRouteError(res, error, "POST /api/qa-pairs");
     }
   });
 
@@ -1837,7 +1824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const expectedKey = process.env.EXTERNAL_API_KEY;
     
     if (!expectedKey) {
-      return res.status(500).json({ error: "External API not configured" });
+      return res.status(503).json({ error: "External API not configured" });
     }
     
     if (!apiKey || apiKey !== expectedKey) {
@@ -1904,10 +1891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         transcripts,
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      handleRouteError(res, error, "GET /api/external/transcripts", { includeSuccessField: true });
     }
   });
 
@@ -1918,13 +1902,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const product = (req.query.product as Product) || "pitcrew";
       
       if (!PRODUCTS.includes(product)) {
-        return res.status(400).json({ error: `Invalid product. Must be one of: ${PRODUCTS.join(", ")}` });
+        throw new ValidationError(`Invalid product. Must be one of: ${PRODUCTS.join(", ")}`);
       }
       
       const transcript = await storage.getTranscript(product, id);
       
       if (!transcript) {
-        return res.status(404).json({ success: false, error: "Transcript not found" });
+        throw new NotFoundError("Transcript");
       }
       
       // Fetch all related data
@@ -1953,10 +1937,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
       });
     } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
+      handleRouteError(res, error, "GET /api/external/transcripts/:id", { includeSuccessField: true });
     }
   });
   
@@ -1986,8 +1967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const features = await getProductFeaturesFormatted();
       res.json({ success: true, count: features.length, features });
     } catch (error) {
-      console.error("[Airtable] Error fetching features:", error);
-      res.status(500).json({ success: false, error: "Failed to fetch features" });
+      handleRouteError(res, error, "GET /api/airtable/features", { includeSuccessField: true });
     }
   });
 
@@ -1997,8 +1977,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const valuePropositions = await getProductValuePropositionsFormatted();
       res.json({ success: true, count: valuePropositions.length, valuePropositions });
     } catch (error) {
-      console.error("[Airtable] Error fetching value propositions:", error);
-      res.status(500).json({ success: false, error: "Failed to fetch value propositions" });
+      handleRouteError(res, error, "GET /api/airtable/value-propositions", { includeSuccessField: true });
     }
   });
 
@@ -2007,8 +1986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const query = req.query.q as string;
       if (!query) {
-        res.status(400).json({ success: false, error: "Missing query parameter 'q'" });
-        return;
+        throw new ValidationError("Missing query parameter 'q'");
       }
       const results = await searchProductKnowledge(query);
       res.json({ 
@@ -2019,8 +1997,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...results 
       });
     } catch (error) {
-      console.error("[Airtable] Error searching product knowledge:", error);
-      res.status(500).json({ success: false, error: "Search failed" });
+      handleRouteError(res, error, "GET /api/airtable/search", { includeSuccessField: true });
     }
   });
 
@@ -2032,8 +2009,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tables = await listTables();
       res.json({ success: true, count: tables.length, tables });
     } catch (error) {
-      console.error("[Airtable] Error listing tables:", error);
-      res.status(500).json({ success: false, error: "Failed to list tables" });
+      handleRouteError(res, error, "GET /api/airtable/tables", { includeSuccessField: true });
     }
   });
 
@@ -2043,8 +2019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const schema = await discoverSchema();
       res.json({ success: true, ...schema });
     } catch (error) {
-      console.error("[Airtable] Error fetching schema:", error);
-      res.status(500).json({ success: false, error: "Failed to fetch schema" });
+      handleRouteError(res, error, "GET /api/airtable/schema", { includeSuccessField: true });
     }
   });
 
@@ -2055,9 +2030,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const records = await getRecordsByTableName(tableName);
       res.json({ success: true, table: tableName, count: records.length, records });
     } catch (error) {
-      console.error(`[Airtable] Error fetching records from ${req.params.tableName}:`, error);
-      const message = error instanceof Error ? error.message : "Failed to fetch records";
-      res.status(500).json({ success: false, error: message });
+      handleRouteError(res, error, "GET /api/airtable/tables/:tableName/records", { includeSuccessField: true });
     }
   });
 
@@ -2066,8 +2039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const query = req.query.q as string;
       if (!query) {
-        res.status(400).json({ success: false, error: "Missing query parameter 'q'" });
-        return;
+        throw new ValidationError("Missing query parameter 'q'");
       }
       const results = await searchAllTables(query);
       const totalMatches = results.reduce((sum, r) => sum + r.matches.length, 0);
@@ -2079,8 +2051,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         results,
       });
     } catch (error) {
-      console.error("[Airtable] Error searching all tables:", error);
-      res.status(500).json({ success: false, error: "Search failed" });
+      handleRouteError(res, error, "GET /api/airtable/search-all", { includeSuccessField: true });
     }
   });
   

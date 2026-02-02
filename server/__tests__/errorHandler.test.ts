@@ -172,4 +172,27 @@ describe("handleRouteError", () => {
     expect(consoleSpy).not.toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
+
+  it("includes success field when option is set", () => {
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    
+    handleRouteError(mockRes as any, new ValidationError("Bad data"), "test", { includeSuccessField: true });
+    
+    expect(mockRes.status).toHaveBeenCalledWith(400);
+    expect(mockRes.json).toHaveBeenCalledWith({ success: false, error: "Bad data" });
+  });
+
+  it("does not include success field by default", () => {
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn(),
+    };
+    
+    handleRouteError(mockRes as any, new NotFoundError("Resource"), "test");
+    
+    expect(mockRes.json).toHaveBeenCalledWith({ error: "Resource not found" });
+  });
 });

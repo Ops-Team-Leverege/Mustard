@@ -84,10 +84,16 @@ export function getErrorStatusCode(error: unknown): number {
   return 500;
 }
 
+export interface HandleRouteErrorOptions {
+  /** Include { success: false } in error response for backwards compatibility with external APIs */
+  includeSuccessField?: boolean;
+}
+
 export function handleRouteError(
   res: Response,
   error: unknown,
   context?: string,
+  options?: HandleRouteErrorOptions,
 ): void {
   const statusCode = getErrorStatusCode(error);
   const message = getErrorMessage(error);
@@ -96,7 +102,11 @@ export function handleRouteError(
     console.error(`[${context}] Error:`, error);
   }
   
-  res.status(statusCode).json({ error: message });
+  if (options?.includeSuccessField) {
+    res.status(statusCode).json({ success: false, error: message });
+  } else {
+    res.status(statusCode).json({ error: message });
+  }
 }
 
 export function logError(context: string, error: unknown): void {
