@@ -12,3 +12,4 @@ export {
   type ClarificationContext, 
   type ClarificationResult 
 } from './clarificationHandler';
+export { handleAnswerQuestions, type AnswerQuestionsContext, type AnswerQuestionsResult } from './answerQuestionsHandler';

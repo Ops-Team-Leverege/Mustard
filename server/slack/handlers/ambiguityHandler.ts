@@ -8,7 +8,7 @@
 
 import { postSlackMessage } from "../slackApi";
 import { detectAmbiguity } from "../../openAssistant/singleMeetingOrchestrator";
-import { extractCompanyFromMessage } from "../meetingResolver";
+import { extractCompanyFromMessage } from "../context/meetingResolver";
 import { logInteraction } from "../logInteraction";
 import { buildInteractionMetadata } from "../interactionMetadata";
 

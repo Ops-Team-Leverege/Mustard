@@ -20,15 +20,15 @@
  * see server/openAssistant/meetingResolver.ts
  */
 
-import { storage } from "../storage";
+import { storage } from "../../storage";
 import { OpenAI } from "openai";
-import { MODEL_ASSIGNMENTS } from "../config/models";
+import { MODEL_ASSIGNMENTS } from "../../config/models";
 import { 
   type MeetingResolutionResult as SharedMeetingResolutionResult,
   type MeetingThreadContext,
   TEMPORAL_PATTERNS,
   hasTemporalMeetingReference as hasTemporalMeetingReferenceShared
-} from "../meeting";
+} from "../../meeting";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,

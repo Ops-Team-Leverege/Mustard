@@ -24,7 +24,7 @@ import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";
-import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "./meetingResolver";
+import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "./context/meetingResolver";
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
@@ -37,6 +37,7 @@ import { RequestLogger } from "../utils/slackLogger";
 import { handleAmbiguity } from "./handlers/ambiguityHandler";
 import { handleBinaryQuestion } from "./handlers/binaryQuestionHandler";
 import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation } from "./handlers/clarificationHandler";
+import { handleAnswerQuestions } from "./handlers/answerQuestionsHandler";
 import { createProgressManager } from "./context/progressManager";
 import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
 
@@ -322,106 +323,21 @@ export async function slackEventsHandler(req: Request, res: Response) {
     }
     
     // 8.7 "ANSWER THOSE QUESTIONS" FOLLOW-UP HANDLING
-    //
-    // When the user asks to "answer" the questions after receiving customer questions,
-    // route to PRODUCT_KNOWLEDGE + DRAFT_RESPONSE to provide helpful answers.
-    //
-    if (lastResponseType === "customer_questions" && threadContext?.meetingId && threadContext?.companyId) {
-      const lowerText = text.toLowerCase().trim();
-      
-      // Detect "answer those questions" type patterns - MUST reference questions explicitly
-      // Patterns: "answer those questions", "help with these questions", "respond to the questions"
-      // Also: "can you answer them?" (short form referring to questions)
-      const wantsToAnswerQuestions = /\b(answer|help\s*with|respond\s*to|draft|address)\b.{0,20}\b(those|these|the)\b.{0,10}\b(questions?)\b/i.test(lowerText) ||
-                                     /\b(answer|help\s*with|respond\s*to)\s+(them|those|these)\b/i.test(lowerText);
-      
-      if (wantsToAnswerQuestions) {
-        console.log(`[Slack] Detected "answer those questions" follow-up - routing to product knowledge + draft response`);
-        
-        // Query database for customer questions from the meeting (single source of truth)
-        let questionList: string | null = null;
-        
-        try {
-          const customerQuestions = await storage.getCustomerQuestionsByTranscript(threadContext.meetingId);
-          const unansweredQuestions = customerQuestions.filter(q => !q.answerEvidence);
-          
-          if (unansweredQuestions.length > 0) {
-            questionList = unansweredQuestions
-              .map(q => `• ${q.questionText}${q.askedByName ? ` (asked by ${q.askedByName})` : ''}`)
-              .join('\n');
-          }
-        } catch (error) {
-          console.error('[Slack] Error fetching customer questions:', error);
-        }
-        
-        if (!questionList) {
-          // No unanswered questions found
-          const noQuestionsResponse = "I don't see any unanswered customer questions from this meeting. All questions may have been addressed, or there might not be any recorded questions.";
-          if (!testRun) {
-            await postSlackMessage({
-              channel,
-              text: noQuestionsResponse,
-              thread_ts: threadTs,
-            });
-          }
-          clearProgressTimer();
-          return;
-        }
-        
-        // Construct a detailed question for the LLM with the actual questions
-        const enhancedQuestion = `Using PitCrew product knowledge, help draft responses to these customer questions from the meeting with ${companyNameFromContext || 'this company'}:\n\n${questionList}`;
-        
-        // Use actual Decision Layer for proper intent classification and contract selection
-        const decisionLayerResult = await runDecisionLayer(enhancedQuestion);
-        
-        const openAssistantResult = await handleOpenAssistant(enhancedQuestion, {
-          userId: userId || undefined,
-          threadId: threadTs,
-          resolvedMeeting: {
-            meetingId: threadContext.meetingId,
-            companyId: threadContext.companyId,
-            companyName: companyNameFromContext || 'Unknown',
-            meetingDate: null,
-          },
-          decisionLayerResult,
-        });
-        
-        if (!testRun) {
-          await postSlackMessage({
-            channel,
-            text: openAssistantResult.answer,
-            thread_ts: threadTs,
-          });
-        }
-        
-        logInteraction({
-          slackChannelId: channel,
-          slackThreadId: threadTs,
-          slackMessageTs: messageTs,
-          userId: userId || null,
-          companyId: threadContext.companyId,
-          meetingId: threadContext.meetingId,
-          questionText: text,
-          answerText: openAssistantResult.answer,
-          metadata: buildInteractionMetadata(
-            { companyId: threadContext.companyId, companyName: companyNameFromContext || undefined, meetingId: threadContext.meetingId },
-            {
-              entryPoint: "slack",
-              legacyIntent: "content",
-              answerShape: "summary",
-              dataSource: "product_ssot",
-              llmPurposes: ["general_assistance"],
-              companySource: "thread",
-              meetingSource: "thread",
-              testRun,
-            }
-          ),
-          testRun,
-        });
-        
-        clearProgressTimer();
-        return; // Done - fast path completed
-      }
+    // Extracted to handlers/answerQuestionsHandler.ts
+    const answerQuestionsResult = await handleAnswerQuestions({
+      channel,
+      threadTs,
+      messageTs,
+      text,
+      userId: userId || null,
+      testRun,
+      threadContext: threadContext || null,
+      lastResponseType,
+      companyNameFromContext,
+      clearProgressTimer,
+    });
+    if (answerQuestionsResult.handled) {
+      return; // Done - fast path completed
     }
 
     // 9. STEP 0: Meeting Resolution (runs before intent classification)

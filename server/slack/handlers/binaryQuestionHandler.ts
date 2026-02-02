@@ -8,7 +8,7 @@
 
 import { postSlackMessage } from "../slackApi";
 import { isBinaryQuestion } from "../../openAssistant/singleMeetingOrchestrator";
-import { extractCompanyFromMessage } from "../meetingResolver";
+import { extractCompanyFromMessage } from "../context/meetingResolver";
 import { logInteraction } from "../logInteraction";
 import { buildInteractionMetadata, type DataSource } from "../interactionMetadata";
 import { storage } from "../../storage";
