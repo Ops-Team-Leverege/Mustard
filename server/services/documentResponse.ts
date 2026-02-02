@@ -263,10 +263,13 @@ function extractTopicFromQuery(query?: string): string | null {
 async function generateTitleFromQuery(query?: string, contract?: AnswerContract, customerName?: string): Promise<string> {
   const customer = customerName || "General";
   
-  // For most contracts, use contract-based title (more professional than query extraction)
-  // Only PRODUCT_EXPLANATION benefits from query-specific titles
+  // Contracts that benefit from dynamic, query-specific titles
+  // Multi-meeting analysis should reflect what user asked about
   const useQueryTitleContracts = [
     AnswerContract.PRODUCT_EXPLANATION,
+    AnswerContract.PATTERN_ANALYSIS,
+    AnswerContract.TREND_SUMMARY,
+    AnswerContract.CROSS_MEETING_QUESTIONS,
   ];
   
   // If contract doesn't benefit from query-based titles, use contract-based
