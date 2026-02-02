@@ -1,21 +1,21 @@
 /**
- * MCP Capability Router
+ * MCP Tool Router
  * 
  * Purpose:
- * Routes user questions to the appropriate MCP capability using LLM-based
+ * Routes user questions to the appropriate MCP tool using LLM-based
  * intent classification. Handles thread context inheritance for follow-up
  * questions in Slack threads.
  * 
  * Key Functions:
- * - processQuestion: Main entry point for routing questions to capabilities
- * - seedArgsFromThreadContext: Merges thread context into capability args
+ * - processQuestion: Main entry point for routing questions to tools
+ * - seedArgsFromThreadContext: Merges thread context into tool args
  * 
  * Layer: MCP (orchestration)
  */
 
 import type { MCPContext, CapabilityResult, ResolvedEntities } from "./types";
 import { decideCapability } from "./llm";
-import { capabilities } from "./capabilities";
+import { tools } from "./tools";
 
 export type MCPResult = {
   capabilityName: string;
@@ -74,11 +74,11 @@ export function createMCP(ctx: MCPContext) {
   }
 
   async function run(name: string, input: unknown): Promise<MCPResult> {
-    const capability = capabilities.find(c => c.name === name);
-    if (!capability) throw new Error(`Unknown capability: ${name}`);
+    const tool = tools.find(t => t.name === name);
+    if (!tool) throw new Error(`Unknown tool: ${name}`);
 
-    const parsedInput = capability.inputSchema.parse(input);
-    const rawResult = await capability.handler(ctx, parsedInput);
+    const parsedInput = tool.inputSchema.parse(input);
+    const rawResult = await tool.handler(ctx, parsedInput);
     
     // Initialize resolved entities from input args
     const resolvedEntities: ResolvedEntities = {};
@@ -88,12 +88,12 @@ export function createMCP(ctx: MCPContext) {
       if (args.meetingId) resolvedEntities.meetingId = String(args.meetingId);
     }
     
-    // Check if capability returned structured result with resolvedEntities
-    // Capabilities can return { result, resolvedEntities } to provide IDs they resolved internally
+    // Check if tool returned structured result with resolvedEntities
+    // Tools can return { result, resolvedEntities } to provide IDs they resolved internally
     let finalResult: unknown;
     if (isCapabilityResult(rawResult)) {
       finalResult = rawResult.result;
-      // Merge capability's resolved entities (capability takes precedence)
+      // Merge tool's resolved entities (tool takes precedence)
       if (rawResult.resolvedEntities) {
         if (rawResult.resolvedEntities.companyId) {
           resolvedEntities.companyId = rawResult.resolvedEntities.companyId;
@@ -114,10 +114,10 @@ export function createMCP(ctx: MCPContext) {
   }
 
   async function runFromText(text: string): Promise<MCPResult> {
-    const descriptors = capabilities.map(c => ({
-      name: c.name,
-      description: c.description,
-      parameters: c.inputSchema,
+    const descriptors = tools.map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.inputSchema,
     }));
 
     const { name, args } = await decideCapability({
@@ -125,11 +125,11 @@ export function createMCP(ctx: MCPContext) {
       capabilities: descriptors,
     });
 
-    console.log(`[MCP] Router selected capability: ${name}, args: ${JSON.stringify(args)}`);
+    console.log(`[MCP] Router selected tool: ${name}, args: ${JSON.stringify(args)}`);
 
-    // Handle fallback when no capability was selected
+    // Handle fallback when no tool was selected
     if (name === "__fallback__") {
-      console.log(`[MCP] Fallback response (no capability matched)`);
+      console.log(`[MCP] Fallback response (no tool matched)`);
       return {
         capabilityName: "__fallback__",
         result: args.response,
