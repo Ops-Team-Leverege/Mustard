@@ -155,6 +155,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       return;
     }
     
+    // Ignore message subtypes (edits, deletes, etc.) - only process original messages
+    const subtype = event?.subtype;
+    if (subtype) {
+      console.log(`[Slack] Ignoring message subtype: ${subtype}`);
+      return;
+    }
+    
     // Only process app_mentions, DMs, or test runs
     if (!isAppMention && !isDirectMessage && !testRun) {
       console.log(`[Slack] Ignoring event: type=${eventType}, channel_type=${channelType}`);
@@ -169,21 +176,30 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] Processing app_mention");
     }
 
+    // Extract message details early for deduplication
+    const channel = String(event.channel);
+    const messageTs = String(event.ts); // This specific message's timestamp
+    // For thread replies, use thread_ts (parent message); otherwise use ts (this message starts a thread)
+    const threadTs = String(event.thread_ts || event.ts);
+    
     // 6. Dedupe events using robust deduplication
-    // Uses both event_id and client_msg_id for more reliable duplicate detection
+    // Uses event_id, client_msg_id, AND message timestamp for reliable duplicate detection
     const eventId = String(payload.event_id || "");
     const clientMsgId = event?.client_msg_id as string | undefined;
+    
+    // Log event details for debugging duplicate issues
+    console.log(`[Slack] Event details: eventId=${eventId}, clientMsgId=${clientMsgId}, messageTs=${messageTs}, threadTs=${threadTs}, channel=${channel}`);
     
     if (await isDuplicateEvent(eventId, clientMsgId)) {
       console.log(`[Slack] Duplicate event detected - skipping (eventId=${eventId}, clientMsgId=${clientMsgId})`);
       return;
     }
-
-    // Extract message details
-    const channel = String(event.channel);
-    // For thread replies, use thread_ts (parent message); otherwise use ts (this message starts a thread)
-    const threadTs = String(event.thread_ts || event.ts);
-    const messageTs = String(event.ts); // This specific message's timestamp
+    
+    // Also dedupe by message timestamp to catch Slack sending multiple events for same message
+    if (await isDuplicateEvent(`ts:${messageTs}`, undefined)) {
+      console.log(`[Slack] Duplicate message timestamp detected - skipping (ts=${messageTs})`);
+      return;
+    }
     // For DMs, don't strip @mention (users don't need to mention bot in DMs)
     // For app_mention, strip the @mention from the beginning
     const rawText = String(event.text || "");
