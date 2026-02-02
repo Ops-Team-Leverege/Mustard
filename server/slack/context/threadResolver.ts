@@ -1,0 +1,107 @@
+/**
+ * Thread Resolver
+ * 
+ * Resolves thread context from prior interactions.
+ * Enables natural follow-ups without conversation memory or hallucination risk.
+ */
+
+import { storage } from "../../storage";
+import type { ThreadContext } from "../../mcp/context";
+
+export interface ThreadResolutionResult {
+  threadContext?: ThreadContext;
+  awaitingClarification: string | null;
+  companyNameFromContext: string | null;
+  storedProposedInterpretation: { intent: string; contract: string; summary: string } | null;
+  originalQuestion: string | null;
+  lastResponseType: string | null;
+}
+
+/**
+ * Determines whether to reuse thread context from a prior interaction.
+ * 
+ * Returns FALSE (resolve fresh) if the user explicitly overrides context:
+ * - References a different customer/company
+ * - Mentions "different meeting", "another call", "last quarter", etc.
+ * - Explicitly names a new entity
+ */
+export function shouldReuseThreadContext(messageText: string): boolean {
+  const overridePatterns = [
+    /\b(different|another|other)\s+(meeting|call|customer|company)\b/i,
+    /\blast\s+(quarter|month|year)\b/i,
+    /\bwith\s+[A-Z][a-z]+\s+(about|regarding)\b/i, // "with CompanyName about..."
+    /\bfor\s+[A-Z][a-z]+\b/i, // "for CompanyName"
+    /\b(switch|change)\s+to\b/i,
+  ];
+  
+  return !overridePatterns.some(pattern => pattern.test(messageText));
+}
+
+/**
+ * Resolve thread context from prior interactions.
+ * Only looks up context if this is a reply and context should be reused.
+ */
+export async function resolveThreadContext(
+  threadTs: string,
+  text: string,
+  isReply: boolean
+): Promise<ThreadResolutionResult> {
+  const emptyResult: ThreadResolutionResult = {
+    threadContext: undefined,
+    awaitingClarification: null,
+    companyNameFromContext: null,
+    storedProposedInterpretation: null,
+    originalQuestion: null,
+    lastResponseType: null,
+  };
+  
+  if (!isReply) {
+    return emptyResult;
+  }
+  
+  if (!shouldReuseThreadContext(text)) {
+    console.log("[Slack] User explicitly overriding context - resolving fresh");
+    return emptyResult;
+  }
+  
+  try {
+    const priorInteraction = await storage.getLastInteractionByThread(threadTs);
+    if (!priorInteraction) {
+      return emptyResult;
+    }
+    
+    // Use new schema fields directly, with fallback to resolution JSON
+    const resolution = priorInteraction.resolution as Record<string, unknown> | null;
+    const threadContext: ThreadContext = {
+      meetingId: priorInteraction.meetingId || (resolution?.meeting_id as string | null) || null,
+      companyId: priorInteraction.companyId || (resolution?.company_id as string | null) || null,
+    };
+    
+    // Check awaiting clarification from resolution metadata
+    const contextLayers = priorInteraction.contextLayers as Record<string, unknown> | null;
+    const awaitingClarification = (contextLayers?.awaitingClarification as string) || null;
+    const companyNameFromContext = (resolution?.company_name as string) || null;
+    
+    // Check for stored proposed interpretation (for "yes" or numbered responses)
+    const storedProposedInterpretation = (contextLayers?.proposedInterpretation as { intent: string; contract: string; summary: string }) || null;
+    const originalQuestion = priorInteraction.questionText || null;
+    
+    // Track what the last response was about (for follow-up context)
+    const lastResponseType = (contextLayers?.lastResponseType as string) || null;
+    
+    console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}, lastResponseType=${lastResponseType}`);
+    
+    return {
+      threadContext,
+      awaitingClarification,
+      companyNameFromContext,
+      storedProposedInterpretation,
+      originalQuestion,
+      lastResponseType,
+    };
+  } catch (err) {
+    // Non-fatal - just proceed without context
+    console.error("[Slack] Failed to lookup prior interaction:", err);
+    return emptyResult;
+  }
+}

@@ -23,7 +23,7 @@ import { generateAckWithMention, generateAck } from "./acknowledgments";
 import { createMCP, type MCPResult } from "../mcp/createMCP";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
-import { handleSingleMeetingQuestion, type SingleMeetingContext, detectAmbiguity, isBinaryQuestion } from "../openAssistant/singleMeetingOrchestrator";
+import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "./meetingResolver";
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
@@ -32,6 +32,13 @@ import type { SlackStreamingContext } from "../openAssistant/types";
 import { runDecisionLayer, type DecisionLayerResult } from "../decisionLayer";
 import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
+
+// Extracted handler modules
+import { handleAmbiguity } from "./handlers/ambiguityHandler";
+import { handleBinaryQuestion } from "./handlers/binaryQuestionHandler";
+import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation } from "./handlers/clarificationHandler";
+import { createProgressManager } from "./context/progressManager";
+import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
 
 export interface PipelineTiming {
   intent_classification_ms?: number;
@@ -54,28 +61,6 @@ function cleanMention(text: string): string {
  */
 function isTestRun(req: Request): boolean {
   return req.headers['x-pitcrew-test-run'] === 'true';
-}
-
-/**
- * Determines whether to reuse thread context from a prior interaction.
- * 
- * Returns FALSE (resolve fresh) if the user explicitly overrides context:
- * - References a different customer/company
- * - Mentions "different meeting", "another call", "last quarter", etc.
- * - Explicitly names a new entity
- * 
- * This is a conservative check - when in doubt, reuse context.
- */
-function shouldReuseThreadContext(messageText: string): boolean {
-  const overridePatterns = [
-    /\b(different|another|other)\s+(meeting|call|customer|company)\b/i,
-    /\blast\s+(quarter|month|year)\b/i,
-    /\bwith\s+[A-Z][a-z]+\s+(about|regarding)\b/i, // "with CompanyName about..."
-    /\bfor\s+[A-Z][a-z]+\b/i, // "for CompanyName"
-    /\b(switch|change)\s+to\b/i,
-  ];
-  
-  return !overridePatterns.some(pattern => pattern.test(messageText));
 }
 
 import { isDuplicate, maybeCleanup } from '../services/eventDeduplicator';
@@ -267,383 +252,73 @@ export async function slackEventsHandler(req: Request, res: Response) {
     };
 
     // 7.5 EARLY AMBIGUITY DETECTION (preparation/briefing questions)
-    // 
-    // Check for ambiguous preparation questions BEFORE any routing.
-    // "I'm preparing for our meeting with X - what should I cover?"
-    // These questions are inherently ambiguous and need clarification.
-    //
-    const ambiguityCheck = detectAmbiguity(text);
-    if (ambiguityCheck.isAmbiguous && ambiguityCheck.clarificationPrompt) {
-      console.log(`[Slack] Early ambiguity detected - asking for clarification`);
-      
-      // IMPORTANT: Extract company from original question so thread context works for follow-up
-      const companyContext = await extractCompanyFromMessage(text);
-      console.log(`[Slack] Extracted company from preparation question: ${companyContext?.companyName || 'none'}`);
-      
-      if (!testRun) {
-        await postSlackMessage({
-          channel,
-          text: ambiguityCheck.clarificationPrompt,
-          thread_ts: threadTs,
-        });
-      }
-      
-      // Log interaction for clarification - include company so thread context works
-      logInteraction({
-        slackChannelId: channel,
-        slackThreadId: threadTs,
-        slackMessageTs: messageTs,
-        userId: userId || null,
-        companyId: companyContext?.companyId || null,
-        meetingId: null,
-        questionText: text,
-        answerText: ambiguityCheck.clarificationPrompt,
-        metadata: buildInteractionMetadata(
-          { companyId: companyContext?.companyId, companyName: companyContext?.companyName },
-          {
-            entryPoint: "slack",
-            legacyIntent: "prep",
-            answerShape: "none",
-            dataSource: "not_found",
-            llmPurposes: [],
-            companySource: companyContext ? "extracted" : "none",
-            meetingSource: "none",
-            ambiguity: {
-              detected: true,
-              clarificationAsked: true,
-              type: "next_steps_or_summary",
-            },
-            clarificationState: {
-              awaiting: true,
-              resolvedWith: null,
-            },
-            awaitingClarification: "next_steps_or_summary",
-            testRun,
-          }
-        ),
-        testRun,
-      });
-      
+    // Extracted to handlers/ambiguityHandler.ts
+    const ambiguityResult = await handleAmbiguity({
+      channel,
+      threadTs,
+      messageTs,
+      text,
+      userId: userId || null,
+      testRun,
+    });
+    if (ambiguityResult.handled) {
       clearProgressTimer();
       return; // Stop processing - clarification required
     }
 
     // 7.6 EARLY BINARY QUESTION HANDLING (existence checks)
-    //
-    // "Is there a meeting with Walmart?" should get "Yes, on [date]. Want details?"
-    // NOT a full summary. Handle this before routing to avoid LLM overhead.
-    //
-    if (isBinaryQuestion(text)) {
-      // Check if it's an existence question about a company meeting
-      const existenceMatch = text.match(/\b(?:is|are|was|were|do|does|did)\s+(?:there|we|they)\s+(?:a|any)\s+(?:meeting|call|transcript)s?\s+(?:with|for|about)\s+(.+?)(?:\?|$)/i);
-      
-      if (existenceMatch) {
-        const searchTerm = existenceMatch[1].trim().replace(/[?.,!]$/, '');
-        console.log(`[Slack] Binary existence question detected for: "${searchTerm}"`);
-        
-        // Try to find the company
-        const companyContext = await extractCompanyFromMessage(text);
-        
-        if (companyContext) {
-          // Fast DB query to check for meetings
-          const meetingRows = await storage.rawQuery(`
-            SELECT t.id, t.meeting_date, c.name as company_name
-            FROM transcripts t
-            JOIN companies c ON t.company_id = c.id
-            WHERE t.company_id = $1
-            ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
-            LIMIT 1
-          `, [companyContext.companyId]);
-          
-          let responseText: string;
-          let meetingId: string | null = null;
-          
-          if (meetingRows && meetingRows.length > 0) {
-            const meeting = meetingRows[0];
-            meetingId = meeting.id as string;
-            const meetingDate = meeting.meeting_date 
-              ? new Date(meeting.meeting_date as string).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-              : "recently";
-            responseText = `Yes, there's a meeting with ${companyContext.companyName} from ${meetingDate}.\n\nWould you like the key takeaways or next steps?`;
-          } else {
-            responseText = `No, I don't see any meetings with ${companyContext.companyName} in the system.`;
-          }
-          
-          if (!testRun) {
-            await postSlackMessage({
-              channel,
-              text: responseText,
-              thread_ts: threadTs,
-            });
-          }
-          
-          // Log interaction with structured metadata
-          logInteraction({
-            slackChannelId: channel,
-            slackThreadId: threadTs,
-            slackMessageTs: messageTs,
-            userId: userId || null,
-            companyId: companyContext.companyId,
-            meetingId,
-            questionText: text,
-            answerText: responseText,
-            metadata: buildInteractionMetadata(
-              { companyId: companyContext.companyId, companyName: companyContext.companyName, meetingId },
-              {
-                entryPoint: "slack",
-                legacyIntent: "binary",
-                answerShape: "yes_no",
-                dataSource: "meeting_artifacts",
-                artifactType: null,
-                llmPurposes: [],
-                companySource: "extracted",
-                meetingSource: meetingId ? "last_meeting" : "none",
-                isBinaryQuestion: true,
-                clarificationState: meetingId ? {
-                  awaiting: true,
-                  resolvedWith: null,
-                } : undefined,
-                awaitingClarification: meetingId ? "takeaways_or_next_steps" : undefined,
-                testRun,
-              }
-            ),
-            testRun,
-          });
-          
-          clearProgressTimer();
-          return; // Done - fast path completed
-        }
-      }
+    // Extracted to handlers/binaryQuestionHandler.ts
+    const binaryResult = await handleBinaryQuestion({
+      channel,
+      threadTs,
+      messageTs,
+      text,
+      userId: userId || null,
+      testRun,
+    });
+    if (binaryResult.handled) {
+      clearProgressTimer();
+      return; // Done - fast path completed
     }
 
     // 8. Thread context resolution (deterministic follow-up support)
-    // 
-    // IMPORTANT ARCHITECTURAL BOUNDARY:
-    // Thread follow-ups reuse resolved entity context only.
-    // LLMs never see prior answers or interaction history.
-    // This enables natural follow-ups without conversation memory or hallucination risk.
-    //
-    let threadContext: ThreadContext | undefined;
-    let awaitingClarification: string | null = null;
-    let companyNameFromContext: string | null = null;
-    let storedProposedInterpretation: { intent: string; contract: string; summary: string } | null = null;
-    let originalQuestion: string | null = null;
-    let lastResponseType: string | null = null;
-    
-    // Only look up prior context if this is a reply in an existing thread
-    if (isReply && shouldReuseThreadContext(text)) {
-      try {
-        const priorInteraction = await storage.getLastInteractionByThread(threadTs);
-        if (priorInteraction) {
-          // Use new schema fields directly, with fallback to resolution JSON
-          const resolution = priorInteraction.resolution as Record<string, unknown> | null;
-          threadContext = {
-            meetingId: priorInteraction.meetingId || (resolution?.meeting_id as string | null) || null,
-            companyId: priorInteraction.companyId || (resolution?.company_id as string | null) || null,
-          };
-          // Check awaiting clarification from resolution metadata
-          const contextLayers = priorInteraction.contextLayers as Record<string, unknown> | null;
-          awaitingClarification = (contextLayers?.awaitingClarification as string) || null;
-          companyNameFromContext = (resolution?.company_name as string) || null;
-          
-          // Check for stored proposed interpretation (for "yes" or numbered responses)
-          storedProposedInterpretation = (contextLayers?.proposedInterpretation as typeof storedProposedInterpretation) || null;
-          originalQuestion = priorInteraction.questionText || null;
-          
-          // Track what the last response was about (for follow-up context)
-          lastResponseType = (contextLayers?.lastResponseType as string) || null;
-          
-          console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}, lastResponseType=${lastResponseType}`);
-        }
-      } catch (err) {
-        // Non-fatal - just proceed without context
-        console.error("[Slack] Failed to lookup prior interaction:", err);
-      }
-    } else if (isReply) {
-      console.log("[Slack] User explicitly overriding context - resolving fresh");
-    }
+    // Extracted to context/threadResolver.ts
+    const threadResolution = await resolveThreadContext(threadTs, text, isReply);
+    const threadContext = threadResolution.threadContext;
+    const awaitingClarification = threadResolution.awaitingClarification;
+    const companyNameFromContext = threadResolution.companyNameFromContext;
+    const storedProposedInterpretation = threadResolution.storedProposedInterpretation;
+    const originalQuestion = threadResolution.originalQuestion;
+    const lastResponseType = threadResolution.lastResponseType;
     
     // 8.5 CLARIFICATION RESPONSE HANDLING (fast path)
-    //
-    // If the prior interaction was a clarification request, check if this is the response.
-    // Route directly to meeting artifacts without LLM calls.
-    //
-    if (awaitingClarification === "next_steps_or_summary" && threadContext?.companyId) {
-      const lowerText = text.toLowerCase().trim();
-      const isNextStepsResponse = /\b(next\s*steps?|action\s*items?|follow[- ]?ups?|commitments?)\b/i.test(lowerText);
-      const isSummaryResponse = /\b(summary|summarize|overview|brief)\b/i.test(lowerText);
-      
-      if (isNextStepsResponse || isSummaryResponse) {
-        console.log(`[Slack] Clarification response detected: ${isNextStepsResponse ? 'next_steps' : 'summary'}`);
-        
-        // Get the last meeting for this company (fast DB query, no LLM)
-        const lastMeetingRows = await storage.rawQuery(`
-          SELECT t.id, t.meeting_date, c.name as company_name
-          FROM transcripts t
-          JOIN companies c ON t.company_id = c.id
-          WHERE t.company_id = $1
-          ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
-          LIMIT 1
-        `, [threadContext.companyId]);
-        
-        if (lastMeetingRows && lastMeetingRows.length > 0) {
-          const meeting = lastMeetingRows[0];
-          const meetingId = meeting.id as string;
-          const companyName = (meeting.company_name as string) || companyNameFromContext || "Unknown";
-          const meetingDate = meeting.meeting_date ? new Date(meeting.meeting_date as string) : null;
-          
-          const singleMeetingContext: SingleMeetingContext = {
-            meetingId,
-            companyId: threadContext.companyId,
-            companyName,
-            meetingDate,
-          };
-          
-          // Route directly to single-meeting orchestrator with explicit intent
-          const result = await handleSingleMeetingQuestion(
-            singleMeetingContext,
-            isNextStepsResponse ? "What are the next steps?" : "Give me a brief summary",
-            false
-          );
-          
-          if (!testRun) {
-            await postSlackMessage({
-              channel,
-              text: result.answer,
-              thread_ts: threadTs,
-            });
-          }
-          
-          // Log interaction with structured metadata
-          const responseType = isNextStepsResponse ? 'next_steps' : 'summary';
-          logInteraction({
-            slackChannelId: channel,
-            slackThreadId: threadTs,
-            slackMessageTs: messageTs,
-            userId: userId || null,
-            companyId: threadContext.companyId,
-            meetingId,
-            questionText: text,
-            answerText: result.answer,
-            metadata: buildInteractionMetadata(
-              { companyId: threadContext.companyId, meetingId },
-              {
-                entryPoint: "slack",
-                legacyIntent: isNextStepsResponse ? "next_steps" : "summary",
-                answerShape: isNextStepsResponse ? "list" : "summary",
-                dataSource: mapLegacyDataSource(result.dataSource),
-                artifactType: isNextStepsResponse ? "action_items" : null,
-                llmPurposes: isNextStepsResponse ? [] : ["summary"],
-                companySource: "thread",
-                meetingSource: "last_meeting",
-                clarificationState: {
-                  awaiting: false,
-                  resolvedWith: responseType as ClarificationResolution,
-                },
-                testRun,
-              }
-            ),
-            testRun,
-          });
-          
-          clearProgressTimer();
-          return; // Done - fast path completed
-        }
-      }
+    // Extracted to handlers/clarificationHandler.ts
+    const clarificationCtx = {
+      channel,
+      threadTs,
+      messageTs,
+      text,
+      userId: userId || null,
+      testRun,
+      threadContext,
+      awaitingClarification,
+      companyNameFromContext,
+      storedProposedInterpretation,
+      originalQuestion,
+    };
+    
+    const nextStepsResult = await handleNextStepsOrSummaryResponse(clarificationCtx);
+    if (nextStepsResult.handled) {
+      clearProgressTimer();
+      return; // Done - fast path completed
     }
     
     // 8.6 PROPOSED INTERPRETATION FOLLOW-UP (for "yes", "1", etc. responses)
-    //
-    // When the user replies to a clarification with confirmation, execute the stored interpretation.
-    //
-    if (storedProposedInterpretation && originalQuestion) {
-      const lowerText = text.toLowerCase().trim();
-      
-      // Detect confirmation patterns: "yes", "1", "first one", "that", "go ahead", etc.
-      const isConfirmation = /^(yes|yeah|yep|yup|ok|okay|sure|1|first|that|go\s*ahead|do\s*it|please)$/i.test(lowerText) ||
-                            /^(sounds?\s*good|let'?s?\s*do\s*(it|that)|proceed)$/i.test(lowerText);
-      
-      if (isConfirmation) {
-        console.log(`[Slack] Clarification confirmed - using proposed interpretation: intent=${storedProposedInterpretation.intent}, contract=${storedProposedInterpretation.contract}`);
-        
-        // Map intent string to Intent enum
-        const intentMap: Record<string, string> = {
-          "SINGLE_MEETING": "SINGLE_MEETING",
-          "MULTI_MEETING": "MULTI_MEETING", 
-          "PRODUCT_KNOWLEDGE": "PRODUCT_KNOWLEDGE",
-          "EXTERNAL_RESEARCH": "EXTERNAL_RESEARCH",
-          "DOCUMENT_SEARCH": "DOCUMENT_SEARCH",
-          "GENERAL_HELP": "GENERAL_HELP",
-        };
-        
-        const mappedIntent = intentMap[storedProposedInterpretation.intent] || "GENERAL_HELP";
-        
-        // Create synthetic Decision Layer result with the stored interpretation
-        const syntheticDecisionLayer = {
-          intent: mappedIntent as any,
-          answerContract: storedProposedInterpretation.contract as any,
-          intentDetectionMethod: "clarification_followup",
-          contractSelectionMethod: "clarification_followup",
-          contextLayers: {
-            product_identity: true,
-            product_ssot: false,
-            single_meeting: mappedIntent === "SINGLE_MEETING",
-            multi_meeting: mappedIntent === "MULTI_MEETING",
-            document_context: mappedIntent === "DOCUMENT_SEARCH",
-          },
-        };
-        
-        // Route to Open Assistant with the original question and confirmed interpretation
-        const openAssistantResult = await handleOpenAssistant(originalQuestion, {
-          userId: userId || undefined,
-          threadId: threadTs,
-          resolvedMeeting: threadContext?.meetingId ? {
-            meetingId: threadContext.meetingId,
-            companyId: threadContext.companyId || '',
-            companyName: companyNameFromContext || 'Unknown',
-            meetingDate: null,
-          } : null,
-          decisionLayerResult: syntheticDecisionLayer,
-        });
-        
-        if (!testRun) {
-          await postSlackMessage({
-            channel,
-            text: openAssistantResult.answer,
-            thread_ts: threadTs,
-          });
-        }
-        
-        // Log interaction
-        logInteraction({
-          slackChannelId: channel,
-          slackThreadId: threadTs,
-          slackMessageTs: messageTs,
-          userId: userId || null,
-          companyId: threadContext?.companyId || null,
-          meetingId: threadContext?.meetingId || null,
-          questionText: originalQuestion,
-          answerText: openAssistantResult.answer,
-          metadata: buildInteractionMetadata(
-            { companyId: threadContext?.companyId || undefined, meetingId: threadContext?.meetingId },
-            {
-              entryPoint: "slack",
-              legacyIntent: storedProposedInterpretation.intent.toLowerCase(),
-              answerShape: "summary",
-              dataSource: openAssistantResult.dataSource as any,
-              clarificationState: {
-                awaiting: false,
-                resolvedWith: "confirmed" as any,
-              },
-              testRun,
-            }
-          ),
-          testRun,
-        });
-        
-        clearProgressTimer();
-        return; // Done - clarification follow-up completed
-      }
+    // Extracted to handlers/clarificationHandler.ts
+    const confirmationResult = await handleProposedInterpretationConfirmation(clarificationCtx);
+    if (confirmationResult.handled) {
+      clearProgressTimer();
+      return; // Done - clarification follow-up completed
     }
     
     // 8.7 "ANSWER THOSE QUESTIONS" FOLLOW-UP HANDLING
