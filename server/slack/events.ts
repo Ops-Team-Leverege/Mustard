@@ -607,7 +607,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         };
         
         logger.startStage('single_meeting');
-        const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer);
+        // Pass Decision Layer contract to enforce single authority for intent classification
+        const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer, decisionLayerResult.answerContract);
         smDuration = logger.endStage('single_meeting');
         
         // Add note about auto-selection if we picked the most recent meeting automatically

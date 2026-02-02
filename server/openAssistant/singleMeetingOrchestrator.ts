@@ -191,74 +191,6 @@ function extractBinarySubject(question: string): string | null {
 }
 
 /**
- * @deprecated This function is deprecated. Intent classification should be done by the Intent Router.
- * Use the optional `contract` parameter in `handleSingleMeetingQuestion` instead.
- * 
- * This function is retained for backward compatibility with direct Slack calls that haven't
- * migrated to Decision Layer routing yet.
- */
-function classifyQuestionType(question: string): InternalHandlerType {
-  const q = question.toLowerCase().trim();
-  
-  // SUMMARY: Only explicit summary requests
-  // These patterns indicate the user wants a general narrative, not specific facts
-  const summaryPatterns = [
-    /\bsummar(?:y|ize|ise)\b/,           // "summarize", "summary"
-    /\bgive me (?:a |an )?overview\b/,   // "give me an overview"
-    /\bmeeting overview\b/,              // "meeting overview"
-    /\bbrief me\b/,                      // "brief me"
-    /\bcatch me up\b/,                   // "catch me up"
-    /\bkey takeaways\b/,                 // "key takeaways"
-    /\bmeeting recap\b/,                 // "meeting recap"
-    /\bgive me (?:a |the )?rundown\b/,   // "give me a rundown"
-    /\bhighlights of the meeting\b/,     // "highlights of the meeting"
-  ];
-  
-  // Check for explicit summary request
-  if (summaryPatterns.some(p => p.test(q))) {
-    return "summary";
-  }
-  
-  // "What happened" is only summary if it's standalone (no topic qualifier)
-  // "What happened in the meeting?" = summary
-  // "What happened with the pricing discussion?" = extractive
-  if (/\bwhat happened\b/.test(q) && !/\bwhat happened (?:with|about|regarding|to|when)\b/.test(q)) {
-    return "summary";
-  }
-  
-  // AGGREGATIVE: Questions seeking a list of items (not a single fact)
-  const aggregativePatterns = [
-    /\bwhat issues\b/,
-    /\bwhat concerns\b/,
-    /\bwhat questions\b/,
-    /\bwhat problems\b/,
-    /\bwhat came up\b/,
-    /\bwhat topics\b/,
-    /\bwhat did .* raise\b/,
-    /\bwhat did .* ask\b/,
-    /\bopen questions\b/,
-    /\bopen items\b/,
-    /\ball (?:the )?questions\b/,
-    /\blist (?:the |all )?questions\b/,
-    /\blist (?:the |all )?concerns\b/,
-    /\blist (?:the |all )?issues\b/,
-    /\bconcerns (?:that )?(?:were )?raised\b/,
-    /\bissues (?:that )?(?:were )?raised\b/,
-    /\bquestions (?:that )?(?:were )?asked\b/,
-    /\bany (?:open )?questions\b/,
-    /\bany concerns\b/,
-    /\bany issues\b/,
-  ];
-  
-  if (aggregativePatterns.some(p => p.test(q))) {
-    return "aggregative";
-  }
-  
-  // Default to extractive (specific fact questions)
-  return "extractive";
-}
-
-/**
  * Detect if user is asking about meeting attendees.
  * 
  * Deterministic matcher using word combinations:
@@ -1618,17 +1550,14 @@ export async function handleSingleMeetingQuestion(
     // If handleBinaryQuestion returns null, fall through to normal processing
   }
   
-  // Derive handler type from Decision Layer contract if provided, otherwise use deprecated internal classification
-  let handlerType: InternalHandlerType;
-  if (contract) {
-    handlerType = deriveHandlerFromContract(contract);
-    console.log(`[SingleMeetingOrchestrator] Using Decision Layer contract: ${contract} → handler: ${handlerType}`);
-  } else {
-    // @deprecated Legacy internal classification for backward compatibility with direct Slack calls
-    // This path should only execute when invoked without Decision Layer context
-    handlerType = classifyQuestionType(question);
-    console.log(`[SingleMeetingOrchestrator] Using deprecated internal classification (no contract provided)`);
+  // Derive handler type from Decision Layer contract (required - Decision Layer is sole authority)
+  if (!contract) {
+    console.error(`[SingleMeetingOrchestrator] ERROR: No contract provided. Decision Layer must provide a contract for all requests.`);
+    // Fallback to EXTRACTIVE_FACT as safe default
+    contract = AnswerContract.EXTRACTIVE_FACT;
   }
+  const handlerType: InternalHandlerType = deriveHandlerFromContract(contract);
+  console.log(`[SingleMeetingOrchestrator] Using Decision Layer contract: ${contract} → handler: ${handlerType}`);
   
   const isSemantic = isSemanticQuestion(question);
   console.log(`[SingleMeetingOrchestrator] VERSION=2026-01-27-v2 | handlerType: ${handlerType} | isSemantic: ${isSemantic} | isBinary: ${isBinary} | hasContract: ${!!contract}`);

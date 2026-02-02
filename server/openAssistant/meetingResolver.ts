@@ -12,6 +12,7 @@ import {
   wantsAllCustomers
 } from "../meeting";
 import type { IntentClassification } from "./types";
+import { AnswerContract } from "../decisionLayer/answerContracts";
 
 // Re-export from shared module for backward compatibility
 export type MeetingSearchResult = SharedMeetingSearchResult;
@@ -511,7 +512,8 @@ export async function searchAcrossMeetings(
   const results = await Promise.all(
     meetingsToSearch.map(async (meeting) => {
       try {
-        const result = await handleSingleMeetingQuestion(meeting, userMessage, false);
+        // Use EXTRACTIVE_FACT for cross-meeting search (enforces Decision Layer authority)
+        const result = await handleSingleMeetingQuestion(meeting, userMessage, false, AnswerContract.EXTRACTIVE_FACT);
         if (result.dataSource !== "not_found") {
           return {
             companyName: meeting.companyName,

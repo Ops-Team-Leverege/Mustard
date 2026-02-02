@@ -13,6 +13,7 @@ import { logInteraction, mapLegacyDataSource } from "../logInteraction";
 import { buildInteractionMetadata, type LegacyIntent, type ClarificationResolution } from "../interactionMetadata";
 import { storage } from "../../storage";
 import type { ThreadContext } from "../../mcp/context";
+import { AnswerContract } from "../../decisionLayer/answerContracts";
 
 export interface ClarificationContext {
   channel: string;
@@ -80,11 +81,12 @@ export async function handleNextStepsOrSummaryResponse(
     meetingDate,
   };
   
-  // Route directly to single-meeting orchestrator with explicit intent
+  // Route directly to single-meeting orchestrator with explicit contract (enforces Decision Layer authority)
   const result = await handleSingleMeetingQuestion(
     singleMeetingContext,
     isNextStepsResponse ? "What are the next steps?" : "Give me a brief summary",
-    false
+    false,
+    isNextStepsResponse ? AnswerContract.NEXT_STEPS : AnswerContract.MEETING_SUMMARY
   );
   
   if (!ctx.testRun) {

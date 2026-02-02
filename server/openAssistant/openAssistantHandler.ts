@@ -21,7 +21,7 @@ import { Intent, type IntentClassificationResult } from "../decisionLayer/intent
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
-import { isCapabilityQuestion, CAPABILITIES_PROMPT } from "../config/prompts/system";
+import { isCapabilityQuestion, CAPABILITIES_PROMPT, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
 
 import { 
   type EvidenceSource, 
@@ -531,51 +531,6 @@ AUTHORITY RULES (without product data):
     throw new Error(`OpenAI API error in product knowledge: ${openaiError instanceof Error ? openaiError.message : String(openaiError)}`);
   }
 }
-
-/**
- * AMBIENT PRODUCT CONTEXT (Always On)
- * 
- * Provides product identity and framing while explicitly restricting factual authority.
- */
-const AMBIENT_PRODUCT_CONTEXT = `IMPORTANT: You are an AI assistant for PitCrew employees.
-There is only ONE PitCrew — the product developed by Leverege.
-
-=== PitCrew Identity (Established Fact) ===
-- PitCrew is a B2B SaaS product developed by Leverege
-- It is used by automotive service businesses (e.g., tire shops, oil change centers, car washes, dealership service departments)
-- When users mention "PitCrew," they ALWAYS mean this product
-- Never ask for clarification about which PitCrew
-
-=== Framing Context (Non-Authoritative) ===
-Use the following only for high-level explanation and framing:
-- PitCrew focuses on helping teams understand operations in automotive service environments
-- It applies AI and computer vision concepts to analyze activity in service bays
-- It is commonly described in terms of visibility, operational insight, and performance improvement
-
-Do NOT treat the above as authoritative facts or guarantees.
-
-=== Authority Rules (HARDENING - CRITICAL) ===
-1. Ambient context is NOT evidence - never cite or reference it as a source of truth
-2. Ambient context must NEVER justify factual claims about features, pricing, or capabilities
-3. Product SSOT is the ONLY source for authoritative product information
-
-=== Forbidden Phrasing Without Product SSOT ===
-When Product SSOT data is NOT explicitly provided, you MUST NOT use phrasing like:
-- "PitCrew supports..." / "PitCrew integrates with..."
-- "PitCrew typically..." / "PitCrew can..."
-- "According to our approach..." / "Our product..."
-- Any statement implying specific feature capabilities or guarantees
-
-Instead, use hedged language like:
-- "You'd want to verify with the product team whether..."
-- "For specific integration details, please check the product documentation..."
-- "I don't have authoritative product data to confirm..."
-
-=== When SSOT IS Provided ===
-Only make authoritative claims when:
-1. Product SSOT data is explicitly included in the context
-2. The active contract permits authoritative claims (ssotMode="authoritative")
-3. The claim is directly supported by the SSOT data provided`;
 
 /**
  * HARDENING: Patterns that indicate the user would benefit from factual evidence.
@@ -1359,12 +1314,12 @@ async function handleGeneralAssistanceIntent(
   if (pitcrewContextPatterns.test(userMessage) || (threadContextSection && pitcrewContextPatterns.test(threadContextSection))) {
     try {
       const pkResult = await getProductKnowledgePrompt();
-      if (pkResult.hasData && pkResult.prompt) {
+      if (pkResult.recordCount > 0 && pkResult.promptText) {
         // Use a condensed version for GENERAL_HELP (terminology and branding focus)
         productKnowledgeSection = `\n\n=== PITCREW PRODUCT CONTEXT (for terminology and branding alignment) ===
-${pkResult.prompt.substring(0, 2000)}...
+${pkResult.promptText.substring(0, 2000)}...
 Use this context to align suggestions with PitCrew's terminology and value proposition.`;
-        console.log(`[OpenAssistant] GENERAL_HELP enriched with product knowledge (${pkResult.prompt.length} chars)`);
+        console.log(`[OpenAssistant] GENERAL_HELP enriched with product knowledge (${pkResult.promptText.length} chars)`);
       }
     } catch (err) {
       console.log(`[OpenAssistant] Could not fetch product knowledge for GENERAL_HELP: ${err}`);
