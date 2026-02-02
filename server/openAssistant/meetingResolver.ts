@@ -57,6 +57,7 @@ export async function findRelevantMeetings(
     const source = scopeOverride?.allCustomers ? "LLM scope detection" : "regex pattern";
     const meetingLimit = scopeOverride?.meetingLimit ?? null;
     console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching ${meetingLimit ?? 'all'} transcripts`);
+    console.log(`[MeetingResolver] Scope override received:`, JSON.stringify(scopeOverride));
     const allMeetings = await fetchAllRecentTranscripts(meetingLimit);
     const topic = extractTopic(userMessage);
     return {
