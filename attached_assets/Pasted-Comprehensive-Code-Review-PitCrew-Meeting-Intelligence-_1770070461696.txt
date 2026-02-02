@@ -1,0 +1,180 @@
+Comprehensive Code Review: PitCrew Meeting Intelligence System
+Executive Summary
+This is a sophisticated TypeScript/Node.js application with a well-architected decision layer and intent-driven routing system. However, there are significant inconsistencies in implementation patterns, architectural conflicts between layers, and several areas where the system deviates from its own design principles.
+
+🔴 Critical Architectural Conflicts
+1. Intent Classification Authority Violations
+Issue: Multiple systems claim to be the "single source of truth" for intent classification, creating conflicts.
+
+Evidence:
+
+intent.ts
+ claims to be the "SOLE authority for intent classification"
+singleMeetingOrchestrator.ts
+ has its own classifyQuestionType() function marked as @deprecated but still actively used
+events.ts
+ has routing logic that bypasses the Decision Layer in some cases
+Impact: Inconsistent routing behavior, difficult debugging, and potential for different code paths to make conflicting decisions.
+
+Recommendation: Enforce the Decision Layer as the single authority. Remove all deprecated classification functions and ensure all routing goes through the Decision Layer.
+
+2. Contract vs Handler Type Confusion
+Issue: The system mixes two different abstraction levels - Decision Layer "contracts" and internal "handler types" - creating confusion about which system is authoritative.
+
+Evidence:
+
+// In singleMeetingOrchestrator.ts
+type InternalHandlerType = "extractive" | "aggregative" | "summary" | "drafting";
+
+// But also uses Decision Layer contracts
+if (contract === AnswerContract.CUSTOMER_QUESTIONS) {
+Impact: Developers must understand two different classification systems, leading to bugs when they diverge.
+
+Recommendation: Eliminate internal handler types entirely. Map Decision Layer contracts directly to implementation functions.
+
+3. Inconsistent Error Handling Patterns
+Issue: The codebase uses multiple error handling patterns inconsistently.
+
+Evidence:
+
+Some functions throw custom error classes (ValidationError, NotFoundError)
+Others throw generic Error objects
+Some use console.error directly
+Others use the centralized error handler
+Inconsistent error message formats
+Impact: Difficult debugging, inconsistent user experience, and potential security issues from information leakage.
+
+🟡 Architectural Inconsistencies
+4. Model Assignment Confusion
+Issue: The model registry in 
+models.ts
+ defines clear tiers but implementation doesn't consistently follow them.
+
+Evidence:
+
+// models.ts defines clear tiers:
+FAST_CLASSIFICATION: "gpt-4o-mini",    // 100-300ms
+STANDARD_REASONING: "gpt-4o",          // 500-1500ms  
+HEAVY_ANALYSIS: "gpt-5",               // 1500-3000ms
+
+// But MODEL_ASSIGNMENTS object references non-existent properties
+MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION // Not defined in LLM_MODELS
+MODEL_ASSIGNMENTS.CONTRACT_SELECTION    // Not defined in LLM_MODELS
+Impact: Runtime errors when trying to access undefined model assignments.
+
+Recommendation: Create a complete MODEL_ASSIGNMENTS object that maps all use cases to the defined model tiers.
+
+5. Prompt Management Inconsistencies
+Issue: Prompts are centralized in server/config/prompts/ but many files still contain inline prompts.
+
+Evidence:
+
+index.ts
+ claims "All LLM prompts are maintained in this single location"
+But 
+openAssistantHandler.ts
+ has inline prompts like AMBIENT_PRODUCT_CONTEXT
+composer.ts
+ has hardcoded prompt strings
+Impact: Difficult to maintain consistency, version prompts, or A/B test different approaches.
+
+6. Database Schema vs Code Misalignment
+Issue: Comments in code don't match actual database schema usage.
+
+Evidence:
+
+// Schema defines both legacy and new fields:
+companyName: text("company_name").notNull(), // Legacy field, kept for backward compatibility
+companyId: varchar("company_id"), // New normalized field
+
+// But code inconsistently uses both without clear migration strategy
+Impact: Data inconsistency, difficult migrations, and confusion about which fields are authoritative.
+
+🟠 Implementation Pattern Conflicts
+7. Streaming vs Non-Streaming Inconsistencies
+Issue: The system has complex streaming logic but inconsistent implementation.
+
+Evidence:
+
+streamOpenAIResponse function exists but many LLM calls don't use it
+Streaming constants defined but not consistently applied
+Some functions check for streamingContext but others ignore it
+Impact: Inconsistent user experience, some operations appear slow while others stream.
+
+8. Caching Strategy Conflicts
+Issue: Multiple caching strategies that don't coordinate.
+
+Evidence:
+
+In-memory caches in multiple files (cachedCompanyNames, memoryFallback)
+Database-backed deduplication
+Airtable schema caching
+No cache invalidation coordination between systems
+Impact: Stale data, memory leaks, and cache coherence issues.
+
+9. Validation Inconsistencies
+Issue: Request validation is inconsistent across endpoints.
+
+Evidence:
+
+Some routes use Zod validation middleware
+Others do manual validation
+Some skip validation entirely
+Error responses have different formats ({ error } vs { success: false, error })
+🔵 Unused Code and Technical Debt
+10. Deprecated Code Still in Use
+Issue: Multiple @deprecated functions are still actively called.
+
+Evidence:
+
+// Marked as deprecated but still used:
+export function classifyQuestionType(question: string): InternalHandlerType {
+  // @deprecated This function is deprecated...
+}
+
+// Still called in production code:
+handlerType = classifyQuestionType(question);
+Impact: Technical debt, confusion about which code paths are active, and potential bugs.
+
+11. Dead Configuration
+Issue: Configuration files contain unused or conflicting settings.
+
+Evidence:
+
+constants.ts
+ defines limits that aren't enforced
+Multiple timeout values that aren't consistently applied
+Feature flags that aren't used
+12. Test Coverage Gaps
+Issue: Tests exist but don't cover the actual integration points where bugs are likely.
+
+Evidence:
+
+Tests mock the Decision Layer but don't test the integration between layers
+No tests for the streaming functionality
+No tests for error handling edge cases
+🟢 Prompt Engineering Issues
+13. Prompt Quality Problems
+Issue: Several prompts violate prompt engineering best practices.
+
+Evidence:
+
+// Overly complex prompt with multiple instructions:
+export const CUSTOMER_QUESTIONS_EXTRACTION_PROMPT = `You are a strict extraction engine...
+// 11 different rules in one prompt
+// Mixing extraction rules with output format rules
+Impact: Inconsistent LLM behavior, higher token costs, and difficult debugging.
+
+Recommendation:
+
+Split complex prompts into focused, single-purpose prompts
+Use few-shot examples instead of long rule lists
+Separate system prompts from user prompts clearly
+14. Inconsistent Prompt Patterns
+Issue: Different prompt styles across the codebase.
+
+Evidence:
+
+Some prompts use imperative style ("Extract questions...")
+Others use role-playing ("You are an assistant...")
+Inconsistent use of examples and constraints
