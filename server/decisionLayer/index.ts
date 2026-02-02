@@ -1,15 +1,15 @@
 /**
- * Control Plane
+ * Decision Layer (Intent Router + Orchestrator)
  * 
  * Purpose:
  * Central export for the Intent → Context Layers → Answer Contract architecture.
  * 
  * Flow:
- * 1. Classify Intent (keyword fast-path + LLM fallback)
+ * 1. Intent Router: Classify Intent (keyword fast-path + LLM fallback)
  * 2. Compute Context Layers (intent-gated)
- * 3. Select Answer Contract (after layers determined)
+ * 3. Orchestrator: Select Answer Contract (after layers determined)
  * 
- * Layer: Control Plane (orchestration)
+ * Layer: Decision Layer (routing + orchestration)
  */
 
 import {
@@ -81,7 +81,7 @@ export type ThreadContext = {
   }>;
 };
 
-export type ControlPlaneResult = {
+export type DecisionLayerResult = {
   intent: Intent;
   intentDetectionMethod: string;
   contextLayers: ContextLayers;
@@ -90,6 +90,9 @@ export type ControlPlaneResult = {
   clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
 };
+
+// Backward compatibility alias
+export type ControlPlaneResult = DecisionLayerResult;
 
 // Aggregate contracts that require scope clarification
 const AGGREGATE_CONTRACTS = [
@@ -164,17 +167,17 @@ For example: "...across all customers" or "...for Costco"`;
   return "";
 }
 
-export async function runControlPlane(
+export async function runDecisionLayer(
   question: string,
   threadContext?: ThreadContext
-): Promise<ControlPlaneResult> {
+): Promise<DecisionLayerResult> {
   const intentResult = await classifyIntent(question, threadContext);
   
-  console.log(`[ControlPlane] Intent: ${intentResult.intent} (${intentResult.intentDetectionMethod})`);
+  console.log(`[DecisionLayer] Intent: ${intentResult.intent} (${intentResult.intentDetectionMethod})`);
   
   const layersMeta = computeContextLayers(intentResult.intent);
   
-  console.log(`[ControlPlane] Context Layers: ${JSON.stringify(layersMeta.layers)}`);
+  console.log(`[DecisionLayer] Context Layers: ${JSON.stringify(layersMeta.layers)}`);
   
   const contractResult = await selectAnswerContract(
     question,
@@ -182,14 +185,14 @@ export async function runControlPlane(
     layersMeta.layers
   );
   
-  console.log(`[ControlPlane] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
+  console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
 
   // Check if this is an aggregate contract that needs scope clarification
   if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
     const clarifyMessage = generateAggregateClarifyMessage(question, contractResult.contract);
     
     if (clarifyMessage) {
-      console.log(`[ControlPlane] Aggregate contract detected, requesting scope clarification`);
+      console.log(`[DecisionLayer] Aggregate contract detected, requesting scope clarification`);
       return {
         intent: Intent.CLARIFY,
         intentDetectionMethod: "aggregate_scope_check",
@@ -216,3 +219,6 @@ export async function runControlPlane(
     proposedInterpretation: intentResult.proposedInterpretation,
   };
 }
+
+// Backward compatibility alias
+export const runControlPlane = runDecisionLayer;

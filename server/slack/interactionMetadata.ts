@@ -17,9 +17,9 @@
  * NOT for user-visible responses.
  */
 
-import type { ContextLayers } from "../controlPlane/contextLayers";
-import type { Intent } from "../controlPlane/intent";
-import type { AnswerContract, SSOTMode } from "../controlPlane/answerContracts";
+import type { ContextLayers } from "../decisionLayer/contextLayers";
+import type { Intent } from "../decisionLayer/intent";
+import type { AnswerContract, SSOTMode } from "../decisionLayer/answerContracts";
 
 export type EntryPoint = "slack" | "api" | "test";
 
@@ -152,7 +152,7 @@ export interface InteractionMetadata {
   test_run?: boolean;
 }
 
-export interface ControlPlaneMetadata {
+export interface DecisionLayerMetadata {
   intent: Intent;
   intentDetectionMethod: "keyword" | "pattern" | "entity" | "llm" | "default";
   contextLayers: ContextLayers;
@@ -162,9 +162,12 @@ export interface ControlPlaneMetadata {
   contractChain?: ContractChainEntry[];
 }
 
+// Backward compatibility alias
+export type ControlPlaneMetadata = DecisionLayerMetadata;
+
 /**
  * Build structured metadata for interaction logging.
- * Updated for new control plane architecture.
+ * Updated for Decision Layer architecture.
  */
 export function buildInteractionMetadata(
   base: {
@@ -174,6 +177,8 @@ export function buildInteractionMetadata(
   },
   execution: {
     entryPoint: EntryPoint;
+    decisionLayer?: DecisionLayerMetadata;
+    /** @deprecated Use decisionLayer instead */
     controlPlane?: ControlPlaneMetadata;
     legacyIntent?: LegacyIntent;
     answerShape: AnswerShape;

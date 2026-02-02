@@ -16,7 +16,7 @@ import {
   countWords,
   contentToSections 
 } from "./documentGenerator";
-import { AnswerContract } from "../controlPlane/answerContracts";
+import { AnswerContract } from "../decisionLayer/answerContracts";
 import OpenAI from 'openai';
 import { MODEL_ASSIGNMENTS } from '../config/models';
 

@@ -10,7 +10,7 @@
  * - Synthesis contracts: Gather data, then use LLM to analyze patterns/trends
  */
 
-import { AnswerContract, type SSOTMode, getContractConstraints, type ContractChain } from "../controlPlane/answerContracts";
+import { AnswerContract, type SSOTMode, getContractConstraints, type ContractChain } from "../decisionLayer/answerContracts";
 import type { SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
 import { storage } from "../storage";
 import { searchAcrossMeetings } from "./meetingResolver";

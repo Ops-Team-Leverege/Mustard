@@ -9,16 +9,16 @@
  * - types.ts: Shared type definitions
  * 
  * Key Principles:
- * - Control Plane is the SOLE authority for intent classification
- * - This handler routes based on Control Plane decisions, never reclassifies
- * - Execution Plane is deterministic and follows contracts verbatim
+ * - Decision Layer is the SOLE authority for intent classification
+ * - This handler routes based on Decision Layer decisions, never reclassifies
+ * - Execution Layer is deterministic and follows contracts verbatim
  */
 
 import { OpenAI } from "openai";
 import { performExternalResearch, formatCitationsForDisplay, type ResearchResult } from "./externalResearch";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
-import { Intent, type IntentClassificationResult } from "../controlPlane/intent";
-import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../controlPlane/answerContracts";
+import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
+import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
 
@@ -606,7 +606,7 @@ function wouldBenefitFromEvidence(message: string): { needsEvidence: boolean; re
  * Main entry point for Open Assistant.
  * 
  * Called from Slack events handler after initial processing.
- * Routes to appropriate handler based on Control Plane intent.
+ * Routes to appropriate handler based on Decision Layer intent.
  */
 export async function handleOpenAssistant(
   userMessage: string,
@@ -614,15 +614,15 @@ export async function handleOpenAssistant(
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Processing: "${userMessage}"`);
   
-  if (context.controlPlaneResult) {
-    const cpResult = context.controlPlaneResult;
-    console.log(`[OpenAssistant] Using full Control Plane result: intent=${cpResult.intent}, contract=${cpResult.answerContract}, method=${cpResult.intentDetectionMethod}`);
+  if (context.decisionLayerResult) {
+    const cpResult = context.decisionLayerResult;
+    console.log(`[OpenAssistant] Using full Decision Layer result: intent=${cpResult.intent}, contract=${cpResult.answerContract}, method=${cpResult.intentDetectionMethod}`);
     
     if (cpResult.intent === Intent.REFUSE) {
       return {
         answer: "I'm sorry, but that question is outside of what I can help with. I'm designed to assist with PitCrew-related topics, customer meetings, and product information.",
         intent: "general_assistance",
-        intentClassification: defaultClassification("Refused by control plane"),
+        intentClassification: defaultClassification("Refused by Decision Layer"),
         controlPlaneIntent: cpResult.intent,
         answerContract: cpResult.answerContract,
         dataSource: "clarification",
@@ -663,7 +663,7 @@ export async function handleOpenAssistant(
         return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
       }
       
-      // Use the smart clarification message from Control Plane (or fallback to friendly message)
+      // Use the smart clarification message from Decision Layer (or fallback to friendly message)
       const clarifyMessage = cpResult.clarifyMessage || `I want to help but I'm not sure what you're looking for. Are you asking about:
 
 • A customer meeting (which company?)
@@ -675,7 +675,7 @@ Give me a hint and I'll get you sorted!`;
       return {
         answer: clarifyMessage,
         intent: "general_assistance",
-        intentClassification: defaultClassification("Clarification required by control plane"),
+        intentClassification: defaultClassification("Clarification required by Decision Layer"),
         controlPlaneIntent: cpResult.intent,
         answerContract: cpResult.answerContract,
         dataSource: "clarification",
@@ -687,7 +687,7 @@ Give me a hint and I'll get you sorted!`;
     const classification: IntentClassification = {
       intent: evidenceSource,
       confidence: "high",
-      rationale: `Derived from Control Plane: ${cpResult.intent} -> ${cpResult.answerContract}`,
+      rationale: `Derived from Decision Layer: ${cpResult.intent} -> ${cpResult.answerContract}`,
       meetingRelevance: {
         referencesSpecificInteraction: cpResult.intent === Intent.SINGLE_MEETING,
         asksWhatWasSaidOrAgreed: false,
@@ -700,7 +700,7 @@ Give me a hint and I'll get you sorted!`;
       },
     };
     
-    console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Control Plane: ${cpResult.intent} -> ${cpResult.answerContract})`);
+    console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Decision Layer: ${cpResult.intent} -> ${cpResult.answerContract})`);
     
     if (cpResult.intent === Intent.SINGLE_MEETING) {
       return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
@@ -721,9 +721,9 @@ Give me a hint and I'll get you sorted!`;
     return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
   }
   
-  // CONTROL PLANE REQUIRED: No fallback to separate classifier
-  console.log(`[OpenAssistant] WARNING: No Control Plane intent provided, defaulting to CLARIFY`);
-  const fallbackClassification = defaultClassification("No Control Plane intent provided - clarification needed");
+  // DECISION LAYER REQUIRED: No fallback to separate classifier
+  console.log(`[OpenAssistant] WARNING: No Decision Layer intent provided, defaulting to CLARIFY`);
+  const fallbackClassification = defaultClassification("No Decision Layer intent provided - clarification needed");
   
   return {
     answer: "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?",
@@ -754,18 +754,18 @@ async function handleMeetingDataIntent(
       companyName: context.resolvedMeeting.companyName,
     };
     
-    // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
-    // Only fall back to internal selection when CP contract not provided (legacy paths)
+    // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
+    // Only fall back to internal selection when DL contract not provided (legacy paths)
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
     
     if (contract) {
-      // Control Plane provided the contract - use it directly
+      // Decision Layer provided the contract - use it directly
       primaryContract = contract;
       contractChain = [contract];
-      console.log(`[OpenAssistant] Using CP-provided contract: ${contract}`);
+      console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
     } else {
-      // Legacy path (no CP context) - use internal selection
+      // Legacy path (no DL context) - use internal selection
       const chain = selectSingleMeetingContractChain(userMessage, scope);
       primaryContract = chain.primaryContract;
       contractChain = chain.contracts;
@@ -827,14 +827,14 @@ async function handleMeetingDataIntent(
       companyName: meeting.companyName,
     };
     
-    // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
+    // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
     
     if (contract) {
       primaryContract = contract;
       contractChain = [contract];
-      console.log(`[OpenAssistant] Using CP-provided contract: ${contract}`);
+      console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
     } else {
       const chain = selectSingleMeetingContractChain(userMessage, scope);
       primaryContract = chain.primaryContract;
@@ -950,17 +950,17 @@ async function handleMultiMeetingIntent(
     },
   };
   
-  // USE CONTROL PLANE CONTRACT when provided (Control Plane is sole authority)
+  // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
   
   if (contract) {
-    // Control Plane provided the contract - use it directly
+    // Decision Layer provided the contract - use it directly
     primaryContract = contract;
     contractChain = [contract];
-    console.log(`[OpenAssistant] Using CP-provided contract: ${contract}`);
+    console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
   } else {
-    // Legacy path (no CP context) - use internal selection
+    // Legacy path (no DL context) - use internal selection
     const chain = selectMultiMeetingContractChain(userMessage, scope);
     primaryContract = chain.primaryContract;
     contractChain = chain.contracts;
@@ -1379,7 +1379,7 @@ If you're unsure whether something requires evidence, err on the side of asking 
  * Determine if the Open Assistant path should be used.
  * 
  * IMPORTANT: This function no longer performs intent classification.
- * The Control Plane (server/controlPlane/intent.ts) is the SOLE authority.
+ * The Intent Router (server/decisionLayer/intent.ts) is the SOLE authority.
  */
 export function shouldUseOpenAssistant(
   resolvedMeeting: SingleMeetingContext | null

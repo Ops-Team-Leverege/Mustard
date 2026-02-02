@@ -18,16 +18,16 @@
  * - Extended Search (Blocked): qa_pairs, searchQuestions, searchCompanyFeedback, etc.
  * 
  * IMPORTANT: Intent Classification Authority
- * The Control Plane (server/controlPlane/intent.ts) is the SOLE authority for intent classification.
- * This orchestrator receives contracts from the Control Plane and executes them verbatim.
+ * The Intent Router (server/decisionLayer/intent.ts) is the SOLE authority for intent classification.
+ * This orchestrator receives contracts from the Decision Layer and executes them verbatim.
  * 
- * Internal routing (extractive/aggregative/summary) is derived from Control Plane contracts:
+ * Internal routing (extractive/aggregative/summary) is derived from Decision Layer contracts:
  * - EXTRACTIVE_FACT, ATTENDEES, CUSTOMER_QUESTIONS, NEXT_STEPS → extractive handler
  * - AGGREGATIVE_LIST → aggregative handler
  * - MEETING_SUMMARY → summary handler
  * 
  * Legacy internal classification is retained for backward compatibility with direct Slack calls
- * but should be migrated to Control Plane routing.
+ * but should be migrated to Decision Layer routing.
  */
 
 import { MODEL_ASSIGNMENTS } from "../config/models";
@@ -39,7 +39,7 @@ import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
-import { AnswerContract } from "../controlPlane/answerContracts";
+import { AnswerContract } from "../decisionLayer/answerContracts";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
 
 const openai = new OpenAI({
@@ -59,12 +59,12 @@ type OrchestratorActionItem = {
 };
 
 /**
- * Internal handler type (derived from Control Plane contracts)
+ * Internal handler type (derived from Decision Layer contracts)
  * 
- * NOTE: This is NOT intent classification. The Control Plane has already classified intent
+ * NOTE: This is NOT intent classification. The Intent Router has already classified intent
  * and selected a contract. This type represents which internal handler to use.
  * 
- * @deprecated Direct use is discouraged. Prefer receiving contracts from Control Plane.
+ * @deprecated Direct use is discouraged. Prefer receiving contracts from Decision Layer.
  */
 type InternalHandlerType = "extractive" | "aggregative" | "summary" | "drafting";
 
@@ -229,11 +229,11 @@ function extractBinarySubject(question: string): string | null {
 }
 
 /**
- * @deprecated This function is deprecated. Intent classification should be done by the Control Plane.
+ * @deprecated This function is deprecated. Intent classification should be done by the Intent Router.
  * Use the optional `contract` parameter in `handleSingleMeetingQuestion` instead.
  * 
  * This function is retained for backward compatibility with direct Slack calls that haven't
- * migrated to Control Plane routing yet.
+ * migrated to Decision Layer routing yet.
  */
 function classifyQuestionType(question: string): InternalHandlerType {
   const q = question.toLowerCase().trim();
@@ -1566,9 +1566,9 @@ Be concise but thorough. Prioritize accuracy over completeness.`;
 }
 
 /**
- * Derive internal handler type from Control Plane contract.
+ * Derive internal handler type from Decision Layer contract.
  * 
- * When a contract is provided by the Control Plane, we skip the deprecated
+ * When a contract is provided by the Decision Layer, we skip the deprecated
  * internal classification and directly route to the appropriate handler.
  */
 function deriveHandlerFromContract(contract: AnswerContract): InternalHandlerType {
@@ -1593,7 +1593,7 @@ function deriveHandlerFromContract(contract: AnswerContract): InternalHandlerTyp
 /**
  * Main orchestrator entry point.
  * 
- * Routes to appropriate handler based on Control Plane contract or internal classification.
+ * Routes to appropriate handler based on Decision Layer contract or internal classification.
  * 
  * Processing Flow:
  * 1. Check for offer responses (if pending)
@@ -1605,7 +1605,7 @@ function deriveHandlerFromContract(contract: AnswerContract): InternalHandlerTyp
  * @param ctx - Single meeting context (meetingId, companyName, meetingDate)
  * @param question - User's question text
  * @param hasPendingOffer - Whether the previous interaction offered a summary (from interaction_logs)
- * @param contract - Optional Control Plane contract. When provided, skips deprecated internal classification.
+ * @param contract - Optional Decision Layer contract. When provided, skips deprecated internal classification.
  */
 export async function handleSingleMeetingQuestion(
   ctx: SingleMeetingContext,
@@ -1656,14 +1656,14 @@ export async function handleSingleMeetingQuestion(
     // If handleBinaryQuestion returns null, fall through to normal processing
   }
   
-  // Derive handler type from Control Plane contract if provided, otherwise use deprecated internal classification
+  // Derive handler type from Decision Layer contract if provided, otherwise use deprecated internal classification
   let handlerType: InternalHandlerType;
   if (contract) {
     handlerType = deriveHandlerFromContract(contract);
-    console.log(`[SingleMeetingOrchestrator] Using Control Plane contract: ${contract} → handler: ${handlerType}`);
+    console.log(`[SingleMeetingOrchestrator] Using Decision Layer contract: ${contract} → handler: ${handlerType}`);
   } else {
     // @deprecated Legacy internal classification for backward compatibility with direct Slack calls
-    // This path should only execute when invoked without Control Plane context
+    // This path should only execute when invoked without Decision Layer context
     handlerType = classifyQuestionType(question);
     console.log(`[SingleMeetingOrchestrator] Using deprecated internal classification (no contract provided)`);
   }

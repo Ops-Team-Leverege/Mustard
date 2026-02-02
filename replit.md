@@ -20,8 +20,20 @@ The frontend uses React, TypeScript, and Tailwind CSS, with state management han
 ### Feature Specifications
 The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`. It also includes a Document Output Feature for generating .docx files and a markdown formatting system that supports multiple output targets (Slack, standard, plaintext).
 
-### Control Plane Architecture (LLM-First Intent Routing)
-The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt-4o-mini) classifies all intents based on semantic understanding rather than keyword matching. This involves a routing flow where the Control Plane LLM classifies intent, leading to actions such as clarification, single or multi-meeting orchestration, external research, product knowledge retrieval, document search, or general assistance. Intent types include `SINGLE_MEETING`, `MULTI_MEETING`, `PRODUCT_KNOWLEDGE`, `EXTERNAL_RESEARCH`, `DOCUMENT_SEARCH`, `GENERAL_HELP`, `REFUSE`, and `CLARIFY`. Contract chains are dynamically built based on user messages, ensuring ordered execution and enforcing safety constraints.
+### Decision Layer Architecture (LLM-First Intent Routing)
+The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt-4o-mini) classifies all intents based on semantic understanding rather than keyword matching.
+
+**Key Components:**
+- **Intent Router** (`server/decisionLayer/intent.ts`): Classifies user intent using semantic understanding
+- **Orchestrator** (`server/decisionLayer/index.ts`): Manages flow and selects answer contracts
+- **Execution Layer** (`server/openAssistant/contractExecutor.ts`): Executes contracts deterministically
+
+**Routing Flow:**
+1. Intent Router classifies intent → SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, EXTERNAL_RESEARCH, DOCUMENT_SEARCH, GENERAL_HELP, REFUSE, or CLARIFY
+2. Orchestrator computes context layers and selects answer contract
+3. Execution Layer executes contract chain with evidence enforcement
+
+Contract chains are dynamically built based on user messages, ensuring ordered execution and enforcing safety constraints.
 
 ## External Dependencies
 

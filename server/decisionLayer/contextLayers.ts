@@ -9,7 +9,7 @@
  * - product_identity is ALWAYS ON (establishes PitCrew context)
  * - All other layers are intent-gated (no implicit inclusion)
  * 
- * Layer: Control Plane (Context Layer Computation)
+ * Layer: Decision Layer (Context Layer Computation)
  */
 
 import { Intent } from "./intent";

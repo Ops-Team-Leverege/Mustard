@@ -15,7 +15,7 @@
  * 4. REFUSE detection for out-of-scope requests
  * 5. LLM fallback for ambiguous queries
  * 
- * Layer: Control Plane (Intent Classification)
+ * Layer: Decision Layer (Intent Router)
  */
 
 import { OpenAI } from "openai";
@@ -974,7 +974,7 @@ export async function classifyIntent(
  * The LLM may NOT:
  * - Execute
  * - Decide
- * - Override Control Plane rules
+ * - Override Decision Layer rules
  */
 async function classifyWithInterpretation(
   question: string,

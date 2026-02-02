@@ -29,7 +29,7 @@ import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type Answ
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 import type { SlackStreamingContext } from "../openAssistant/types";
-import { runControlPlane, type ControlPlaneResult } from "../controlPlane";
+import { runDecisionLayer, type DecisionLayerResult } from "../decisionLayer";
 import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
 
@@ -578,8 +578,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         
         const mappedIntent = intentMap[storedProposedInterpretation.intent] || "GENERAL_HELP";
         
-        // Create synthetic control plane result with the stored interpretation
-        const syntheticControlPlane = {
+        // Create synthetic Decision Layer result with the stored interpretation
+        const syntheticDecisionLayer = {
           intent: mappedIntent as any,
           answerContract: storedProposedInterpretation.contract as any,
           intentDetectionMethod: "clarification_followup",
@@ -603,7 +603,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: companyNameFromContext || 'Unknown',
             meetingDate: null,
           } : null,
-          controlPlaneResult: syntheticControlPlane,
+          decisionLayerResult: syntheticDecisionLayer,
         });
         
         if (!testRun) {
@@ -696,8 +696,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // Construct a detailed question for the LLM with the actual questions
         const enhancedQuestion = `Using PitCrew product knowledge, help draft responses to these customer questions from the meeting with ${companyNameFromContext || 'this company'}:\n\n${questionList}`;
         
-        // Use actual Control Plane for proper intent classification and contract selection
-        const controlPlaneResult = await runControlPlane(enhancedQuestion);
+        // Use actual Decision Layer for proper intent classification and contract selection
+        const decisionLayerResult = await runDecisionLayer(enhancedQuestion);
         
         const openAssistantResult = await handleOpenAssistant(enhancedQuestion, {
           userId: userId || undefined,
@@ -708,7 +708,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: companyNameFromContext || 'Unknown',
             meetingDate: null,
           },
-          controlPlaneResult,
+          decisionLayerResult,
         });
         
         if (!testRun) {
@@ -864,7 +864,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // 10. Process request
     // 
     // LLM-FIRST ARCHITECTURE:
-    // Always run Control Plane first to classify intent from the FULL message.
+    // Always run Decision Layer first to classify intent from the FULL message.
     // This ensures semantic understanding (e.g., "search all calls about Ivy Lane" 
     // is correctly classified as MULTI_MEETING, not single-meeting).
     // 
@@ -892,8 +892,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let isClarificationRequest: boolean | undefined;
       let isBinaryQuestion: boolean | undefined;
       
-      // Control Plane and Open Assistant results (for metadata logging)
-      let controlPlaneResult: ControlPlaneResult | null = null;
+      // Decision Layer and Open Assistant results (for metadata logging)
+      let decisionLayerResult: DecisionLayerResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
       let usedSingleMeetingMode = false;
       let streamingContext: SlackStreamingContext | undefined;
@@ -903,9 +903,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let smDuration = 0;
       let oaDuration = 0;
 
-      // STEP 1: ALWAYS run Control Plane first to classify intent from full message
-      console.log(`[Slack] LLM-first architecture - running Control Plane for intent classification`);
-      logger.startStage('control_plane');
+      // STEP 1: ALWAYS run Decision Layer first to classify intent from full message
+      console.log(`[Slack] LLM-first architecture - running Decision Layer for intent classification`);
+      logger.startStage('decision_layer');
       
       // Fetch thread history for context-aware intent classification
       let threadContextForCP: { messages: Array<{ text: string; isBot: boolean }> } | undefined;
@@ -919,23 +919,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
         }
       }
       
-      controlPlaneResult = await runControlPlane(text, threadContextForCP);
-      cpDuration = logger.endStage('control_plane');
-      logger.info('Control Plane completed', {
-        intent: controlPlaneResult.intent,
-        contract: controlPlaneResult.answerContract,
-        method: controlPlaneResult.intentDetectionMethod,
+      decisionLayerResult = await runDecisionLayer(text, threadContextForCP);
+      cpDuration = logger.endStage('decision_layer');
+      logger.info('Decision Layer completed', {
+        intent: decisionLayerResult.intent,
+        contract: decisionLayerResult.answerContract,
+        method: decisionLayerResult.intentDetectionMethod,
         resolvedMeetingId: resolvedMeeting?.meetingId,
         duration_ms: cpDuration,
       });
-      console.log(`[Slack] Control plane: intent=${controlPlaneResult.intent}, contract=${controlPlaneResult.answerContract}, method=${controlPlaneResult.intentDetectionMethod}, layers=${JSON.stringify(controlPlaneResult.contextLayers)}`);
+      console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
       
       // EARLY PROGRESS MESSAGE: Send personalized progress right after intent classification
       // This happens BEFORE expensive operations, so users see relevant context quickly
       // Only for intents that involve expensive operations (not CLARIFY, REFUSE, etc.)
       const expensiveIntents = ['SINGLE_MEETING', 'MULTI_MEETING', 'PRODUCT_KNOWLEDGE', 'EXTERNAL_RESEARCH', 'GENERAL_HELP'];
-      if (!testRun && expensiveIntents.includes(controlPlaneResult.intent || '')) {
-        // Map control plane intent to progress intent type
+      if (!testRun && expensiveIntents.includes(decisionLayerResult.intent || '')) {
+        // Map Decision Layer intent to progress intent type
         const intentToProgressType: Record<string, ProgressIntentType> = {
           'SINGLE_MEETING': 'single_meeting',
           'MULTI_MEETING': 'multi_meeting',
@@ -943,7 +943,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           'EXTERNAL_RESEARCH': 'research',
           'GENERAL_HELP': 'general',
         };
-        const progressType = intentToProgressType[controlPlaneResult.intent || ''] || 'general';
+        const progressType = intentToProgressType[decisionLayerResult.intent || ''] || 'general';
         
         // Generate and send personalized progress immediately (don't await in blocking way)
         // This runs quickly (<500ms) and makes the experience feel more human
@@ -967,8 +967,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
       
       // STEP 2: Handle CLARIFY intent - ask user for clarification
-      if (controlPlaneResult.intent === "CLARIFY") {
-        const clarifyMessage = controlPlaneResult.clarifyMessage 
+      if (decisionLayerResult.intent === "CLARIFY") {
+        const clarifyMessage = decisionLayerResult.clarifyMessage 
           || "I'm not sure what you're asking. Could you please clarify?";
         responseText = clarifyMessage;
         capabilityName = "clarify";
@@ -978,7 +978,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.log(`[Slack] Clarification requested: ${clarifyMessage}`);
       }
       // STEP 3: Handle SINGLE_MEETING without resolved meeting - ask for clarification
-      else if (controlPlaneResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {
+      else if (decisionLayerResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {
         responseText = "Which meeting are you asking about? Please mention the company name or a specific meeting date.";
         capabilityName = "clarify_meeting";
         intentClassification = "single_meeting_clarify";
@@ -987,7 +987,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification`);
       }
       // STEP 4: Route based on classified intent
-      else if (controlPlaneResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
+      else if (decisionLayerResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
         // SINGLE_MEETING intent with resolved meeting → use SingleMeetingOrchestrator
         usedSingleMeetingMode = true;
         console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
@@ -1042,14 +1042,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
       } else {
         // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, etc.) → Open Assistant
-        console.log(`[Slack] Open Assistant mode - intent=${controlPlaneResult.intent}, routing to appropriate handler`);
+        console.log(`[Slack] Open Assistant mode - intent=${decisionLayerResult.intent}, routing to appropriate handler`);
         
         // Contracts that might generate documents - don't use streaming for these
         const docGeneratingContracts = [
           "VALUE_PROPOSITION", "MEETING_SUMMARY", "COMPARISON", 
           "DRAFT_EMAIL", "PATTERN_ANALYSIS", "PRODUCT_EXPLANATION"
         ];
-        const mightGenerateDoc = docGeneratingContracts.includes(controlPlaneResult.answerContract || "");
+        const mightGenerateDoc = docGeneratingContracts.includes(decisionLayerResult.answerContract || "");
         
         // Create placeholder message for streaming (if not a test run and not generating a doc)
         if (!testRun && !mightGenerateDoc) {
@@ -1065,7 +1065,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           };
           console.log(`[Slack] Streaming placeholder posted: ts=${placeholderMsg.ts}`);
         } else if (mightGenerateDoc) {
-          console.log(`[Slack] Skipping streaming for doc-generating contract: ${controlPlaneResult.answerContract}`);
+          console.log(`[Slack] Skipping streaming for doc-generating contract: ${decisionLayerResult.answerContract}`);
         }
         
         logger.startStage('open_assistant');
@@ -1080,7 +1080,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             companyName: resolvedMeeting.companyName,
             meetingDate: resolvedMeeting.meetingDate,
           } : null,
-          controlPlaneResult: controlPlaneResult,
+          decisionLayerResult: decisionLayerResult,
           slackStreaming: streamingContext,
         });
         oaDuration = logger.endStage('open_assistant');
@@ -1219,18 +1219,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
             }
           );
         } else {
-          // Open Assistant path - use actual Control Plane results
+          // Open Assistant path - use actual Decision Layer results
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
           
-          // Use Control Plane result directly (full pipeline with intent, contract, layers)
+          // Use Decision Layer result directly (full pipeline with intent, contract, layers)
           // OpenAssistant may override contract if it does additional processing
-          const actualIntent = controlPlaneResult?.intent || openAssistantResultData?.controlPlaneIntent || "GENERAL_HELP";
-          const actualContract = controlPlaneResult?.answerContract || openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
+          const actualIntent = decisionLayerResult?.intent || openAssistantResultData?.controlPlaneIntent || "GENERAL_HELP";
+          const actualContract = decisionLayerResult?.answerContract || openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
           const actualContractChain = openAssistantResultData?.answerContractChain;
           const actualSsotMode = openAssistantResultData?.ssotMode || "none";
           
-          // Use context layers from Control Plane result directly
-          const contextLayers = (controlPlaneResult?.contextLayers || {
+          // Use context layers from Decision Layer result directly
+          const contextLayers = (decisionLayerResult?.contextLayers || {
             product_identity: true, // Always on
             product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
             single_meeting: actualIntent === "SINGLE_MEETING",
@@ -1239,8 +1239,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
           }) as any;
           
           // Store proposedInterpretation for CLARIFY follow-ups
-          if (actualIntent === "CLARIFY" && controlPlaneResult?.proposedInterpretation) {
-            contextLayers.proposedInterpretation = controlPlaneResult.proposedInterpretation;
+          if (actualIntent === "CLARIFY" && decisionLayerResult?.proposedInterpretation) {
+            contextLayers.proposedInterpretation = decisionLayerResult.proposedInterpretation;
             contextLayers.awaitingClarification = "proposed_interpretation";
           }
           
@@ -1250,7 +1250,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               entryPoint: "slack",
               controlPlane: {
                 intent: actualIntent as any,
-                intentDetectionMethod: (controlPlaneResult?.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "keyword",
+                intentDetectionMethod: (decisionLayerResult?.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "keyword",
                 contextLayers,
                 answerContract: actualContract as any,
                 contractChain: actualContractChain?.map((c: any) => ({ 
@@ -1258,7 +1258,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                   ssot_mode: actualSsotMode as any, 
                   selection_method: "default" as const 
                 })),
-                contractSelectionMethod: (controlPlaneResult?.contractSelectionMethod as "keyword" | "llm" | "default") || "default",
+                contractSelectionMethod: (decisionLayerResult?.contractSelectionMethod as "keyword" | "llm" | "default") || "default",
                 ssotMode: actualSsotMode as any,
               },
               answerShape: "summary",
@@ -1297,13 +1297,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       
       // Log successful completion with stage breakdown
       logger.info('Request completed successfully', {
-        intent: controlPlaneResult?.intent,
-        contract: controlPlaneResult?.answerContract,
+        intent: decisionLayerResult?.intent,
+        contract: decisionLayerResult?.answerContract,
         responseLength: responseText?.length,
         totalTimeMs,
         stages: {
           meeting_resolution: mrDuration,
-          control_plane: cpDuration,
+          decision_layer: cpDuration,
           handler: smDuration || oaDuration,
         },
       });

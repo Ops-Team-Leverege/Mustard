@@ -32,7 +32,7 @@
  * - Each contract performs one task with fixed output shape
  * - Each contract has explicit authority rules
  * - Later contracts may depend on outputs of earlier contracts
- * - The chain is PLANNED by control plane, not discovered mid-flight
+ * - The chain is PLANNED by Decision Layer, not discovered mid-flight
  * 
  * What it is NOT:
  * - One contract per question
@@ -76,11 +76,11 @@
  * - None: Extractive from meeting evidence only
  * 
  * Selection Strategy:
- * - Control Plane = planner (decides the chain)
- * - LLM = executor (executes after chain is fixed)
+ * - Orchestrator = planner (decides the chain)
+ * - Execution Layer = executor (executes after chain is fixed)
  * - The LLM never decides contracts (preserves determinism, auditability, safety)
  * 
- * Layer: Control Plane (Answer Contract Selection)
+ * Layer: Decision Layer (Orchestrator - Contract Selection)
  */
 
 import { OpenAI } from "openai";

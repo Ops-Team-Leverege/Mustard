@@ -9,8 +9,8 @@
  * - contractExecutor.ts: Contract chain execution and evidence enforcement
  * - types.ts: Shared type definitions
  * 
- * NOTE: Intent classification is handled EXCLUSIVELY by the Control Plane (server/controlPlane/intent.ts).
- * This module no longer exports any intent classification logic - the Control Plane is the single source of truth.
+ * NOTE: Intent classification is handled EXCLUSIVELY by the Intent Router (server/decisionLayer/intent.ts).
+ * This module no longer exports any intent classification logic - the Decision Layer is the single source of truth.
  */
 
 export { performExternalResearch, formatCitationsForDisplay, type ResearchResult, type Citation } from "./externalResearch";
