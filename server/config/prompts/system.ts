@@ -30,9 +30,7 @@ KEY VALUE DELIVERED:
 - Better unit economics through accurate labor standards and demand visibility
 - Improved customer experience with accurate wait times and reduced uncertainty
 - Manager enablement with real-time visibility and coaching insights
-- Safety and loss prevention with proactive incident detection
-
-PitCrew does NOT serve: car washes, car dealerships, or non-automotive businesses.`;
+- Safety and loss prevention with proactive incident detection`;
 
 /**
  * Base sales assistant persona used across multiple handlers.
