@@ -37,6 +37,7 @@ import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { randomUUID } from "crypto";
 import { handleRouteError, NotFoundError, ValidationError, AuthenticationError } from "./utils/errorHandler";
+import { validate, commonSchemas, updateSchemas } from "./middleware/validation";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -686,31 +687,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.patch("/api/transcripts/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/transcripts/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.transcript }), async (req, res) => {
     try {
       const { id } = req.params;
-      const {
-        name,
-        createdAt,
-        mainMeetingTakeaways,
-        nextSteps,
-        supportingMaterials,
-        transcript,
-      } = req.body;
+      const { name, createdAt, mainMeetingTakeaways, nextSteps, supportingMaterials, transcript } = req.body;
       const updatedTranscript = await storage.updateTranscript(id, {
         name: name !== undefined ? name || null : undefined,
         createdAt: createdAt !== undefined ? new Date(createdAt) : undefined,
-        mainMeetingTakeaways:
-          mainMeetingTakeaways !== undefined
-            ? mainMeetingTakeaways || null
-            : undefined,
+        mainMeetingTakeaways: mainMeetingTakeaways !== undefined ? mainMeetingTakeaways || null : undefined,
         nextSteps: nextSteps !== undefined ? nextSteps || null : undefined,
-        supportingMaterials:
-          supportingMaterials !== undefined
-            ? Array.isArray(supportingMaterials)
-              ? supportingMaterials
-              : []
-            : undefined,
+        supportingMaterials: supportingMaterials !== undefined ? supportingMaterials : undefined,
         transcript: transcript !== undefined ? transcript || null : undefined,
       });
       if (!updatedTranscript) {
@@ -884,17 +870,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.patch("/api/insights/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/insights/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.insight }), async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { feature, context, quote, company } = req.body;
 
-      if (!feature || !context || !quote || !company) {
-        throw new ValidationError("Feature, context, quote, and company are required");
-      }
-
-      // Find or create company to get companyId
       const slug = generateSlug(company);
       let companyRecord = await storage.getCompanyBySlug(product, slug);
 
@@ -1039,17 +1020,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   );
 
-  app.patch("/api/qa-pairs/:id", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/qa-pairs/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.qaPair }), async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
       const { id } = req.params;
       const { question, answer, asker, company, contactId } = req.body;
 
-      if (!question || !answer || !asker || !company) {
-        throw new ValidationError("Question, answer, asker, and company are required");
-      }
-
-      // Find or create company to get companyId
       const slug = generateSlug(company);
       let companyRecord = await storage.getCompanyBySlug(product, slug);
 
@@ -1097,7 +1073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/qa-pairs/:id/star", isAuthenticated, async (req, res) => {
+  app.patch("/api/qa-pairs/:id/star", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.qaPairStar }), async (req, res) => {
     try {
       const { id } = req.params;
       const { isStarred } = req.body;
@@ -1307,14 +1283,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/categories/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/categories/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.category }), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, description } = req.body;
-
-      if (!name || typeof name !== "string") {
-        throw new ValidationError("Name is required");
-      }
 
       const category = await storage.updateCategory(id, name, description);
 
@@ -1408,22 +1380,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/features/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/features/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.feature }), async (req, res) => {
     try {
       const { id } = req.params;
-      const {
-        name,
-        description,
-        value,
-        videoLink,
-        helpGuideLink,
-        categoryId,
-        releaseDate,
-      } = req.body;
-
-      if (!name || typeof name !== "string") {
-        throw new ValidationError("Name is required");
-      }
+      const { name, description, value, videoLink, helpGuideLink, categoryId, releaseDate } = req.body;
 
       const releaseDateValue = releaseDate ? new Date(releaseDate) : undefined;
 
@@ -1568,26 +1528,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/companies/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/companies/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.company }), async (req, res) => {
     try {
       const { id } = req.params;
-      const {
-        name,
-        notes,
-        companyDescription,
-        numberOfStores,
-        stage,
-        pilotStartDate,
-        serviceTags,
-      } = req.body;
+      const { name, notes, companyDescription, numberOfStores, stage, pilotStartDate, serviceTags } = req.body;
 
-      if (!name || typeof name !== "string") {
-        throw new ValidationError("Name is required");
-      }
-
-      const pilotStartDateValue = pilotStartDate
-        ? new Date(pilotStartDate)
-        : null;
+      const pilotStartDateValue = pilotStartDate ? new Date(pilotStartDate) : null;
 
       const company = await storage.updateCompany(
         id,
@@ -1653,21 +1599,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/contacts/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/contacts/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.contact }), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, nameInTranscript, jobTitle } = req.body;
 
-      if (!name) {
-        throw new ValidationError("Name is required");
-      }
-
-      const contact = await storage.updateContact(
-        id,
-        name,
-        nameInTranscript,
-        jobTitle,
-      );
+      const contact = await storage.updateContact(id, name, nameInTranscript, jobTitle);
 
       if (!contact) {
         throw new NotFoundError("Contact");
@@ -1756,22 +1693,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/pos-systems/:id", isAuthenticated, async (req, res) => {
+  app.patch("/api/pos-systems/:id", isAuthenticated, validate({ params: commonSchemas.id, body: updateSchemas.posSystem }), async (req, res) => {
     try {
       const { id } = req.params;
       const { name, websiteLink, description, companyIds } = req.body;
 
-      if (!name) {
-        throw new ValidationError("Name is required");
-      }
-
-      const system = await storage.updatePOSSystem(
-        id,
-        name,
-        websiteLink,
-        description,
-        companyIds,
-      );
+      const system = await storage.updatePOSSystem(id, name, websiteLink, description, companyIds);
 
       if (!system) {
         throw new NotFoundError("POS system");
