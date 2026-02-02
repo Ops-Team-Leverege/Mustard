@@ -20,6 +20,8 @@ The frontend uses React, TypeScript, and Tailwind CSS, with state management han
 ### Feature Specifications
 The application includes a transcript detail view, meeting date support, and dashboard analytics. It offers smart duplicate prevention for contacts, comprehensive transcript management (list, search, edit, delete), company stage management, service tagging, and automatic POS system detection. The system preserves speaker identity in transcripts and differentiates between interpreted `qa_pairs` and verbatim `customer_questions`. It also includes a Document Output Feature for generating .docx files and a markdown formatting system that supports multiple output targets (Slack, standard, plaintext).
 
+**Meeting-Aware Product Knowledge**: When PRODUCT_KNOWLEDGE intent is triggered within a meeting thread, the system enriches responses with meeting context by fetching customer questions from that meeting via `buildMeetingContextForProductKnowledge()`. This allows product knowledge responses to address specific customer concerns raised in the meeting.
+
 ### Decision Layer Architecture (LLM-First Intent Routing)
 The system uses LLM-FIRST classification for intent routing, meaning an LLM (gpt-4o-mini) classifies all intents based on semantic understanding rather than keyword matching.
 
