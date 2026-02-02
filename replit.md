@@ -121,6 +121,13 @@ The control plane dynamically builds contract chains based on user messages, ens
 - **Expanded Patterns**: Added patterns for concept research like "understand more about X and why", "industry practices/standards", "research... then write".
 - **LLM Prompt Updates**: Updated intent classification prompts in both `intent.ts` and `llmInterpretation.ts` with expanded EXTERNAL_RESEARCH description and examples including topic research and "research + write" patterns.
 
+### Slack Message Deduplication Fix
+- **Problem**: Messages were being sent twice due to Slack webhook retries when the server didn't respond quickly enough, or server restarts clearing the in-memory deduplication cache.
+- **Solution 1**: Added `x-slack-retry-num` header detection - if Slack is retrying due to `http_timeout`, return 200 immediately without processing.
+- **Solution 2**: Enhanced deduplication to use both `event_id` AND `client_msg_id` for more reliable duplicate detection.
+- **Solution 3**: Added TTL-based cache cleanup (5 minute expiry) to prevent memory bloat while maintaining deduplication.
+- **Solution 4**: Added size limits (1000 entries max) with automatic cleanup.
+
 ### Thread Context for Intent Classification
 - **Follow-Up Detection**: Added `detectFollowUpMessage()` function to recognize refinement messages like "make it shorter", "better but too long", "try again".
 - **Thread Context Passed to Keyword Classifier**: `classifyByKeyword()` now receives `threadContext` parameter so it can detect follow-up patterns.

@@ -78,11 +78,75 @@ function shouldReuseThreadContext(messageText: string): boolean {
   return !overridePatterns.some(pattern => pattern.test(messageText));
 }
 
-// Simple in-memory dedupe
-const seenEventIds = new Set<string>();
+// Robust in-memory dedupe with TTL and size limits
+// Uses both event_id and client_msg_id for deduplication
+// Entries expire after 5 minutes to prevent memory bloat
+const seenEventIds = new Map<string, number>(); // eventId -> timestamp
+const MAX_DEDUPE_SIZE = 1000;
+const DEDUPE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function cleanupDedupeCache() {
+  const now = Date.now();
+  let deletedCount = 0;
+  const keysToDelete: string[] = [];
+  
+  seenEventIds.forEach((timestamp, key) => {
+    if (now - timestamp > DEDUPE_TTL_MS) {
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(key => {
+    seenEventIds.delete(key);
+    deletedCount++;
+  });
+  
+  if (deletedCount > 0) {
+    console.log(`[Dedupe] Cleaned up ${deletedCount} expired entries`);
+  }
+}
+
+function isDuplicateEvent(eventId: string, clientMsgId: string | undefined): boolean {
+  // Cleanup old entries periodically
+  if (seenEventIds.size > MAX_DEDUPE_SIZE / 2) {
+    cleanupDedupeCache();
+  }
+  
+  // Check both event_id and client_msg_id
+  const keys = [eventId];
+  if (clientMsgId) keys.push(`msg:${clientMsgId}`);
+  
+  for (const key of keys) {
+    if (key && seenEventIds.has(key)) {
+      console.log(`[Dedupe] Duplicate detected: ${key}`);
+      return true;
+    }
+  }
+  
+  // Mark as seen
+  const now = Date.now();
+  if (eventId) seenEventIds.set(eventId, now);
+  if (clientMsgId) seenEventIds.set(`msg:${clientMsgId}`, now);
+  
+  return false;
+}
 
 
 export async function slackEventsHandler(req: Request, res: Response) {
+  // Check for Slack retry headers
+  const retryNum = req.headers['x-slack-retry-num'];
+  const retryReason = req.headers['x-slack-retry-reason'];
+  
+  if (retryNum) {
+    console.log(`[Slack] Retry #${retryNum} received (reason: ${retryReason})`);
+    // If this is a retry due to http_timeout, we already processed it
+    // Return 200 immediately to stop further retries
+    if (retryReason === 'http_timeout') {
+      console.log(`[Slack] Ignoring http_timeout retry - already processed`);
+      return res.status(200).send();
+    }
+  }
+  
   console.log("[Slack] Received event request");
   try {
     // Handle body in multiple formats:
@@ -164,10 +228,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] Processing app_mention");
     }
 
-    // 6. Dedupe events
+    // 6. Dedupe events using robust deduplication
+    // Uses both event_id and client_msg_id for more reliable duplicate detection
     const eventId = String(payload.event_id || "");
-    if (eventId && seenEventIds.has(eventId)) return;
-    if (eventId) seenEventIds.add(eventId);
+    const clientMsgId = event?.client_msg_id as string | undefined;
+    
+    if (isDuplicateEvent(eventId, clientMsgId)) {
+      console.log(`[Slack] Duplicate event detected - skipping (eventId=${eventId}, clientMsgId=${clientMsgId})`);
+      return;
+    }
 
     // Extract message details
     const channel = String(event.channel);
