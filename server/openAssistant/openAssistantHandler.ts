@@ -1202,8 +1202,11 @@ async function chainProductStyleWriting(
   const snapshotResult = await getProductKnowledgePrompt();
   
   // Extract just the features section for style reference
-  const featuresMatch = snapshotResult.promptText.match(/=== Features[\s\S]*?(?===|$)/);
+  // Matches both "=== Current Product Features" and "=== Roadmap Features"
+  const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[\s\S]*?(?===|$)/);
   const featureExamples = featuresMatch ? featuresMatch[0].slice(0, 2000) : "";
+  
+  console.log(`[OpenAssistant] Style matching - feature examples length: ${featureExamples.length} chars`);
   
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
@@ -1217,26 +1220,30 @@ async function chainProductStyleWriting(
 === STYLE EXAMPLES (match this format exactly) ===
 ${featureExamples}
 
-=== STYLE RULES ===
-1. Keep it concise - typically 1-2 sentences
-2. Start with an action verb (Detects, Identifies, Shows, Enables, etc.)
-3. Describe WHAT it does and WHY it matters
+=== STYLE RULES (CRITICAL - FOLLOW EXACTLY) ===
+1. MAXIMUM 1-2 sentences - typically 15-30 words total
+2. Start with an action verb (Detects, Identifies, Shows, Enables, Monitors, Alerts, etc.)
+3. Describe WHAT it does and WHY it matters in ONE concise statement
 4. Be specific about the capability
-5. No marketing fluff or buzzwords
-6. Professional but accessible tone
+5. NO marketing fluff, NO buzzwords, NO effusive language
+6. Professional but accessible tone - match the examples above EXACTLY
 
-=== RESEARCH CONTEXT ===
+BAD: "Enhance safety in your oil change shop with our cutting-edge capability that monitors the presence of protective nets underneath service bays, ensuring they are always in place. If a net is detected to be missing, an immediate alert is sent to your team, helping prevent potential safety hazards."
+
+GOOD: "Detects missing safety nets underneath service bays and alerts staff immediately, preventing fall hazards in oil change facilities."
+
+=== RESEARCH CONTEXT (for your understanding only) ===
 ${researchContent}
 
-Use the research to inform your understanding, then write a concise feature description that matches our existing style.`,
+OUTPUT ONLY the feature description. No preamble, no "Here's the description", no extra explanation. Just the 1-2 sentence description.`,
       },
       {
         role: "user",
-        content: originalRequest,
+        content: `Write the feature description for: ${originalRequest.split("feature").pop()?.split(".")[0]?.trim() || "this feature"}`,
       },
     ],
-    temperature: 0.3,
-    max_tokens: 500,
+    temperature: 0.2,
+    max_tokens: 150,
   });
   
   return response.choices[0]?.message?.content || researchContent;

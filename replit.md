@@ -114,6 +114,8 @@ The control plane dynamically builds contract chains based on user messages, ens
 - **Detection Patterns**: Added `detectStyleMatchingRequest()` to identify when users want output matching existing product style.
 - **Feature Description Examples**: The `chainProductStyleWriting()` function fetches existing feature descriptions from the product knowledge base and instructs the LLM to match their concise, action-verb-first style.
 - **Architectural Fix**: Previously, comments claimed "EXTERNAL_RESEARCH automatically chains product knowledge" but this was not implemented. Now properly chains product knowledge when style matching is detected.
+- **Regex Bug Fix**: Fixed regex that was looking for `=== Features` but actual section header was `=== Current Product Features`. Now matches both `Current Product Features` and `Roadmap Features` sections.
+- **Improved Prompt**: Added explicit BAD/GOOD examples, reduced max_tokens from 500 to 150, lowered temperature to 0.2, and instructed to output ONLY the description without preamble.
 
 ### EXTERNAL_RESEARCH Scope Expansion
 - **Topic/Concept Research**: EXTERNAL_RESEARCH now correctly handles research about topics, concepts, and industry practices - not just company research. Examples: "research oil change shop safety nets", "understand more about tire shop workflows".
