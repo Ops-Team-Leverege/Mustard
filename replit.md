@@ -115,6 +115,12 @@ The control plane dynamically builds contract chains based on user messages, ens
 - **Feature Description Examples**: The `chainProductStyleWriting()` function fetches existing feature descriptions from the product knowledge base and instructs the LLM to match their concise, action-verb-first style.
 - **Architectural Fix**: Previously, comments claimed "EXTERNAL_RESEARCH automatically chains product knowledge" but this was not implemented. Now properly chains product knowledge when style matching is detected.
 
+### EXTERNAL_RESEARCH Scope Expansion
+- **Topic/Concept Research**: EXTERNAL_RESEARCH now correctly handles research about topics, concepts, and industry practices - not just company research. Examples: "research oil change shop safety nets", "understand more about tire shop workflows".
+- **Expanded Keywords**: Added topic-focused keywords like "do research to understand", "understand more about", "industry practices", "best practices for", "how do they", "why do they".
+- **Expanded Patterns**: Added patterns for concept research like "understand more about X and why", "industry practices/standards", "research... then write".
+- **LLM Prompt Updates**: Updated intent classification prompts in both `intent.ts` and `llmInterpretation.ts` with expanded EXTERNAL_RESEARCH description and examples including topic research and "research + write" patterns.
+
 ### Configuration Centralization
 - **Constants File**: Created `server/config/constants.ts` with domain-grouped constants (MEETING_LIMITS, STREAMING, TIMEOUTS, CONTENT_LIMITS, LLM_TOKENS, SEMANTIC_SEARCH) for easier tuning.
 - **Updated Files**: meetingResolver.ts, streamingHelper.ts, getLastMeeting.ts, openAssistantHandler.ts, verify.ts now use centralized constants.

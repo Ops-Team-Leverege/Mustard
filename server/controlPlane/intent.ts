@@ -261,6 +261,7 @@ const DOCUMENT_SEARCH_KEYWORDS = [
 ];
 
 const EXTERNAL_RESEARCH_KEYWORDS = [
+  // Company research
   "do research on",
   "research on",
   "research that customer",
@@ -269,17 +270,30 @@ const EXTERNAL_RESEARCH_KEYWORDS = [
   "public statements",
   "their priorities",
   "their strategic",
-  "industry trends",
-  "market research",
   "competitor research",
   "company research",
   "find out their",
   "find out about",
   "look up",
+  // Presentation creation
   "slide deck for",
   "sales deck for",
   "pitch deck for",
   "presentation for",
+  // Topic/concept research (not just companies)
+  "do research to understand",
+  "research to understand",
+  "understand more about",
+  "learn more about",
+  "industry trends",
+  "industry practices",
+  "industry standards",
+  "best practices for",
+  "market research",
+  "how do they",
+  "why do they",
+  "what is the purpose of",
+  "what are the benefits of",
 ];
 
 const GENERAL_HELP_KEYWORDS = [
@@ -353,6 +367,7 @@ const PRODUCT_KNOWLEDGE_PATTERNS = [
 ];
 
 const EXTERNAL_RESEARCH_PATTERNS = [
+  // Company-specific research
   /\bdo\s+research\s+on\s+(that\s+)?(customer|company|prospect)\b/i,
   /\bresearch\s+(on\s+)?[\w\s]+\s+(to\s+find|including|and)\b/i,
   /\b(recent\s+)?earnings\s+(calls?|reports?)\b/i,
@@ -361,14 +376,23 @@ const EXTERNAL_RESEARCH_PATTERNS = [
   /\bcreating\s+a\s+(slide|sales|pitch)\s+deck\s+for\b/i,
   /\bslide\s+deck\s+for\s+[\w\s]+\s+to\s+sell\b/i,
   /\bselling?\s+(to|their)\s+(leadership|team|executive)\b/i,
-  // External company research patterns - must indicate researching a DIFFERENT company
-  // Key signals: "research [company]", "their company", "competitor", "what do they do"
-  // NOT triggered by: "our website", "update our FAQ", "our value props"
   /\bresearch\s+(the\s+)?(company|website|site|business)\b/i,
   /\b(competitor|competitive)\s+(analysis|research|comparison)\b/i,
   /\banalyze\s+(their|the)\s+(company|business|offerings?)\b/i,
   /\bwhat\s+(does|do)\s+[\w\s]+\s+(company\s+)?(do|offer|sell)\b/i,
   /\b(their|the\s+company'?s?)\s+(website|site|business|offerings?)\b/i,
+  // Topic/concept research (not just companies)
+  /\bdo\s+research\s+to\s+understand\b/i,
+  /\bresearch\s+to\s+understand\s+more\b/i,
+  /\bunderstand\s+more\s+about\s+[\w\s]+\s+(and|why|how)\b/i,
+  /\bwhy\s+(do|are)\s+[\w\s]+\s+(use|used|important|needed)\b/i,
+  /\bhow\s+(do|does|are)\s+[\w\s]+\s+(shops?|stores?|businesses?)\s+(use|handle|manage)\b/i,
+  /\bwhat\s+(is|are)\s+(the\s+)?(purpose|benefit|reason)\s+of\b/i,
+  /\bindustry\s+(practices?|standards?|trends?|norms?)\b/i,
+  /\b(best|common)\s+practices?\s+(for|in|at)\b/i,
+  // Research + Write pattern (critical for feature descriptions)
+  /\bresearch[\w\s]+then\s+write\b/i,
+  /\bdo\s+research[\w\s]+write\s+(a|the)\s+(description|feature)\b/i,
 ];
 
 const REFUSE_PATTERNS = [
@@ -686,7 +710,7 @@ Classify into exactly ONE intent:
 - MULTI_MEETING: Questions across multiple meetings (trends, aggregates, comparisons)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - DOCUMENT_SEARCH: Questions about documentation, contracts, specs
-- EXTERNAL_RESEARCH: Requests involving external companies where you need PUBLIC information (earnings calls, news, priorities, market position). The PRIMARY focus is researching something external.
+- EXTERNAL_RESEARCH: Requests requiring PUBLIC/WEB information - either about external companies (earnings calls, news, priorities) OR about topics/concepts/industry practices that need web research (e.g., "research oil change shop safety practices", "understand more about tire shop workflows"). The PRIMARY focus is researching something EXTERNAL to our meeting data and product knowledge.
 - GENERAL_HELP: Greetings, meta questions, general assistance requests
 - REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
 - CLARIFY: Request is genuinely ambiguous about what the user wants
@@ -699,9 +723,10 @@ CRITICAL RULES:
 5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
 6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
 7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
-8. Focus on the PRIMARY ask - what information source is needed? Past meetings? External research? Product docs?
-9. PRODUCT_KNOWLEDGE is always available as a follow-up. If request combines EXTERNAL_RESEARCH + "connect to PitCrew offerings" → classify as EXTERNAL_RESEARCH (product info will be added automatically)
-10. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
+8. "Research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
+9. Focus on the PRIMARY ask - what information source is needed? Past meetings? External research? Product docs?
+10. PRODUCT_KNOWLEDGE is always available as a follow-up. If request combines EXTERNAL_RESEARCH + "connect to PitCrew offerings" → classify as EXTERNAL_RESEARCH (product info will be added automatically)
+11. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
 
 EXAMPLES:
 - "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
@@ -713,6 +738,9 @@ EXAMPLES:
 - "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
 - "Research Costco, find priorities, create slides for them" → EXTERNAL_RESEARCH (primary: external research)
 - "Find their recent earnings calls" → EXTERNAL_RESEARCH
+- "Research oil change shops and safety nets to understand why they're important" → EXTERNAL_RESEARCH (topic research, not company)
+- "Do research to understand tire shop workflows, then write a feature description" → EXTERNAL_RESEARCH (research + write)
+- "Learn more about automotive bay design and best practices" → EXTERNAL_RESEARCH (industry practices)
 - "What's the weather?" → REFUSE
 
 Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation"}`;

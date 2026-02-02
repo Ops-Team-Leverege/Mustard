@@ -232,7 +232,7 @@ VALID INTENTS:
 - SINGLE_MEETING: Questions about what happened in a specific meeting (what did X say, summary, next steps)
 - MULTI_MEETING: Questions across multiple meetings (search all calls, find patterns, compare)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
-- EXTERNAL_RESEARCH: Research on external companies (earnings calls, news, priorities, public info)
+- EXTERNAL_RESEARCH: Research requiring web/public information - either external companies (earnings calls, news, priorities) OR topics/concepts needing web research (industry practices, domain knowledge)
 - DOCUMENT_SEARCH: Looking for specific documents
 - GENERAL_HELP: Drafting emails, general assistance
 - REFUSE: Out-of-scope requests (weather, jokes, personal info)
@@ -325,7 +325,7 @@ VALID INTENTS:
 - SINGLE_MEETING: Questions about a specific meeting or conversation
 - MULTI_MEETING: Questions across multiple meetings (trends, patterns)
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product capabilities
-- EXTERNAL_RESEARCH: Research on external companies (earnings calls, news, priorities, public info)
+- EXTERNAL_RESEARCH: Research requiring web/public information - either external companies (earnings calls, news, priorities) OR topics/concepts needing web research (industry practices, domain knowledge)
 - DOCUMENT_SEARCH: Looking for specific documents
 - GENERAL_HELP: Drafting, writing, general assistance
 - REFUSE: Clearly out-of-scope requests
@@ -372,6 +372,8 @@ COMMON PATTERNS:
 - "research [company]" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
 - "slide deck for [external company]" or "pitch deck" → EXTERNAL_RESEARCH with SALES_DOCS_PREP contract
 - "find their strategic priorities" or "public statements" → EXTERNAL_RESEARCH
+- "research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
+- "do research... then write a feature description" → EXTERNAL_RESEARCH (research + write)
 
 CRITICAL FOLLOW-UP PATTERN:
 When the conversation history shows a list of customer questions was just provided, and the user asks something like "help me answer those questions" or "can you answer those" or "draft responses":
