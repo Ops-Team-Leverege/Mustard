@@ -24,58 +24,9 @@ import OpenAI from "openai";
 import { z } from "zod";
 import type { TranscriptChunk } from "@shared/schema";
 import { MODEL_ASSIGNMENTS, getModelDescription } from "../config/models";
+import { CUSTOMER_QUESTIONS_EXTRACTION_PROMPT } from "../config/prompts";
 
 const openai = new OpenAI();
-
-const SYSTEM_PROMPT = `You are a strict extraction engine operating on meeting transcripts.
-
-Your task is to extract REAL, INFORMATION-SEEKING QUESTIONS
-that were asked BY CUSTOMERS during the meeting.
-
-You must operate conservatively. When in doubt, extract nothing.
-
-GREEN ROOM FILTER (CRITICAL):
-First, identify where the ACTUAL MEETING starts. Ignore all pre-meeting chatter.
-Pre-meeting chatter includes:
-- "Can you hear me?"
-- "Is my audio working?"
-- "Waiting for others to join"
-- "I'll admit them"
-- "Let me share my screen"
-- Technical setup discussions
-- Small talk before introductions
-
-Only extract questions that occur AFTER the meeting actually begins
-(e.g., after greetings like "Hi everyone", "Let's get started", formal introductions).
-
-RULES:
-1. Extract ONLY customer-asked questions. Ignore internal team questions.
-2. Questions must be genuine information-seeking questions.
-3. The question_text must closely match what was actually said.
-4. Do NOT summarize, rewrite, or infer.
-5. Mark ANSWERED only if you can quote the exact answer sentence.
-6. If follow-up is promised, mark DEFERRED.
-7. If unanswered, mark OPEN.
-8. Use only the provided transcript text.
-9. Returning no questions is valid.
-10. IGNORE questions from pre-meeting chatter (Green Room).
-11. CRITICAL: For question_turn_index, use the EXACT [Turn N] number from the transcript.
-    This is required for context anchoring. Do NOT return -1.
-
-Return ONLY valid JSON with a "questions" array.
-
-Example output format:
-{
-  "questions": [
-    {
-      "question_text": "Is that compatible with our system?",
-      "asked_by_name": "John Smith",
-      "question_turn_index": 15,
-      "status": "ANSWERED",
-      "answer_evidence": "Yes, it's fully compatible with Oracle and SAP systems."
-    }
-  ]
-}`;
 
 export const CustomerQuestionResultSchema = z.object({
   question_text: z.string(),
@@ -196,7 +147,7 @@ async function extractFromBatch(
     max_tokens: 4096,
     response_format: { type: "json_object" },
     messages: [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: CUSTOMER_QUESTIONS_EXTRACTION_PROMPT },
       {
         role: "user",
         content: `Extract customer questions from this transcript segment (batch ${batchNum}/${totalBatches}):\n\n${formattedTranscript}\n\nReturn JSON with a "questions" array. Return {"questions": []} if no customer questions are found.`,

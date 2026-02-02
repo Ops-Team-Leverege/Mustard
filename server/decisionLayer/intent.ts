@@ -20,6 +20,7 @@
 
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { INTENT_CLASSIFICATION_PROMPT } from "../config/prompts";
 import { 
   interpretAmbiguousQuery,
   validateLowConfidenceIntent,
@@ -751,59 +752,11 @@ async function classifyByKeyword(
 }
 
 async function classifyByLLM(question: string): Promise<IntentClassificationResult> {
-  const systemPrompt = `You are an intent classifier for PitCrew's internal sales assistant.
-
-CONTEXT: PitCrew sells vision AI to automotive service businesses. Users ask about:
-- Customer meetings (Les Schwab, ACE, Jiffy Lube, etc.)
-- Contact interactions (Tyler Wiggins, Randy, Robert, etc.)
-- Product features and pricing
-- Document searches
-
-Classify into exactly ONE intent:
-- SINGLE_MEETING: Questions about what happened in a meeting, what someone said/asked/mentioned
-- MULTI_MEETING: Questions across multiple meetings (trends, aggregates, comparisons)
-- PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
-- DOCUMENT_SEARCH: Questions about documentation, contracts, specs
-- EXTERNAL_RESEARCH: Requests requiring PUBLIC/WEB information - either about external companies (earnings calls, news, priorities) OR about topics/concepts/industry practices that need web research (e.g., "research oil change shop safety practices", "understand more about tire shop workflows"). The PRIMARY focus is researching something EXTERNAL to our meeting data and product knowledge.
-- GENERAL_HELP: Greetings, meta questions, general assistance requests
-- REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
-- CLARIFY: Request is genuinely ambiguous about what the user wants
-
-CRITICAL RULES:
-1. If ANY person name appears (Tyler, Randy, Robert, etc.) → likely SINGLE_MEETING
-2. If ANY company name appears in context of "our meeting with X" → likely SINGLE_MEETING
-3. "What did X say/mention/ask" → SINGLE_MEETING
-4. "Find all" or "across meetings" → MULTI_MEETING
-5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
-6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
-7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
-8. "Research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
-9. Focus on the PRIMARY ask - what information source is needed? Past meetings? External research? Product docs?
-10. PRODUCT_KNOWLEDGE is always available as a follow-up. If request combines EXTERNAL_RESEARCH + "connect to PitCrew offerings" → classify as EXTERNAL_RESEARCH (product info will be added automatically)
-11. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
-
-EXAMPLES:
-- "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
-- "What did Tyler Wiggins mention about pricing?" → SINGLE_MEETING  
-- "Find all meetings that mention Walmart" → MULTI_MEETING
-- "What is PitCrew pricing?" → PRODUCT_KNOWLEDGE
-- "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
-- "Research Costco and their priorities" → EXTERNAL_RESEARCH
-- "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
-- "Research Costco, find priorities, create slides for them" → EXTERNAL_RESEARCH (primary: external research)
-- "Find their recent earnings calls" → EXTERNAL_RESEARCH
-- "Research oil change shops and safety nets to understand why they're important" → EXTERNAL_RESEARCH (topic research, not company)
-- "Do research to understand tire shop workflows, then write a feature description" → EXTERNAL_RESEARCH (research + write)
-- "Learn more about automotive bay design and best practices" → EXTERNAL_RESEARCH (industry practices)
-- "What's the weather?" → REFUSE
-
-Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation"}`;
-
   try {
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: INTENT_CLASSIFICATION_PROMPT },
         { role: "user", content: question },
       ],
       temperature: 0,

@@ -24,6 +24,11 @@
 
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { 
+  buildIntentValidationPrompt, 
+  AMBIGUOUS_QUERY_INTERPRETATION_PROMPT,
+  FALLBACK_CLARIFY_MESSAGE 
+} from "../config/prompts";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -180,13 +185,7 @@ function generateSmartClarifyMessage(
 }
 
 function generateFallbackClarifyMessage(): string {
-  return `I want to help but I'm not sure what you're looking for. Are you asking about:
-
-• A customer meeting (which company?)
-• PitCrew product info (which feature?)
-• Help with a task (what kind?)
-
-Give me a hint and I'll get you sorted!`;
+  return FALLBACK_CLARIFY_MESSAGE;
 }
 
 export type IntentValidationResult = {
@@ -217,43 +216,7 @@ export async function validateLowConfidenceIntent(
   deterministicReason: string,
   matchedSignals: string[]
 ): Promise<IntentValidationResult> {
-  const systemPrompt = `You are validating an intent classification. A deterministic classifier matched a user question, but the match was low-confidence.
-
-CONTEXT: PitCrew sells vision AI to automotive service businesses. Users ask about customer meetings, product features, and need help with tasks.
-
-THE DETERMINISTIC CLASSIFIER CHOSE:
-Intent: ${deterministicIntent}
-Reason: ${deterministicReason}
-Signals: ${matchedSignals.join(", ")}
-
-YOUR JOB: Determine if this classification is semantically correct.
-
-VALID INTENTS:
-- SINGLE_MEETING: Questions about what happened in a specific meeting (what did X say, summary, next steps)
-- MULTI_MEETING: Questions across multiple meetings (search all calls, find patterns, compare)
-- PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
-- EXTERNAL_RESEARCH: Research requiring web/public information - either external companies (earnings calls, news, priorities) OR topics/concepts needing web research (industry practices, domain knowledge)
-- DOCUMENT_SEARCH: Looking for specific documents
-- GENERAL_HELP: Drafting emails, general assistance
-- REFUSE: Out-of-scope requests (weather, jokes, personal info)
-
-KEY DISTINCTIONS:
-- "search all calls" or "recent calls" → MULTI_MEETING (not SINGLE_MEETING or GENERAL_HELP)
-- "what did X say" → SINGLE_MEETING
-- "how does PitCrew work" → PRODUCT_KNOWLEDGE
-- "research Costco" or "their earnings calls" → EXTERNAL_RESEARCH
-- "draft an email" → GENERAL_HELP
-
-Respond with JSON:
-{
-  "confirmed": true/false,
-  "suggestedIntent": "INTENT_NAME" (only if confirmed=false),
-  "suggestedContract": "CONTRACT_NAME" (only if confirmed=false),
-  "confidence": 0.0-1.0,
-  "reason": "brief explanation"
-}
-
-If confirmed=true, suggestedIntent/suggestedContract can be omitted.`;
+  const systemPrompt = buildIntentValidationPrompt(deterministicIntent, deterministicReason, matchedSignals);
 
   try {
     const response = await openai.chat.completions.create({
@@ -307,200 +270,10 @@ export async function interpretAmbiguousQuery(
   failureReason: string,
   threadContext?: ThreadContext
 ): Promise<ClarifyWithInterpretation> {
-  const systemPrompt = `You are a helpful assistant for PitCrew's sales team. Your job is to make smart clarifications that are conversational and helpful—never robotic dead ends.
-
-CONTEXT: PitCrew sells vision AI to automotive service businesses. You have access to:
-- Customer meeting data (Les Schwab, ACE, Jiffy Lube, Canadian Tire, etc.)
-- Contact information (Tyler Wiggins, Randy, Robert, etc.)
-- Product knowledge (features, pricing, integrations)
-- General assistance (drafting, summarizing, etc.)
-
-YOUR GOAL: When a request is ambiguous, provide a HELPFUL clarification that:
-1. Leads with your best guess as a natural question
-2. Offers a short partial answer if possible (so the user gets SOMETHING helpful)
-3. Lists specific alternatives (not generic options)
-4. Uses friendly, conversational language
-
-VALID INTENTS:
-- SINGLE_MEETING: Questions about a specific meeting or conversation
-- MULTI_MEETING: Questions across multiple meetings (trends, patterns)
-- PRODUCT_KNOWLEDGE: Questions about PitCrew product capabilities
-- EXTERNAL_RESEARCH: Research requiring web/public information - either external companies (earnings calls, news, priorities) OR topics/concepts needing web research (industry practices, domain knowledge)
-- DOCUMENT_SEARCH: Looking for specific documents
-- GENERAL_HELP: Drafting, writing, general assistance
-- REFUSE: Clearly out-of-scope requests
-
-VALID CONTRACTS per intent:
-- SINGLE_MEETING: MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, EXTRACTIVE_FACT, AGGREGATIVE_LIST
-- MULTI_MEETING: PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY, CROSS_MEETING_QUESTIONS
-- PRODUCT_KNOWLEDGE: PRODUCT_EXPLANATION, FEATURE_VERIFICATION, FAQ_ANSWER
-- EXTERNAL_RESEARCH: EXTERNAL_RESEARCH, SALES_DOCS_PREP, VALUE_PROPOSITION
-- GENERAL_HELP: GENERAL_RESPONSE, DRAFT_RESPONSE, DRAFT_EMAIL, VALUE_PROPOSITION
-
-RESPONSE FORMAT (JSON):
-{
-  "proposedIntent": "INTENT_NAME",
-  "proposedContract": "CONTRACT_NAME",
-  "confidence": 0.0-1.0,
-  "interpretation": "Brief summary of what user likely wants",
-  "questionForm": "A natural question to ask the user, e.g., 'Are you asking how camera installation works with PitCrew?'",
-  "canPartialAnswer": true/false,
-  "partialAnswer": "A short helpful answer IF canPartialAnswer is true. Keep it 1-2 sentences.",
-  "alternatives": [
-    {
-      "intent": "ALTERNATE_INTENT",
-      "contract": "ALTERNATE_CONTRACT",
-      "description": "Specific alternative in plain language",
-      "hint": "Examples like 'Les Schwab, ACE' or 'pricing, features' if relevant"
-    }
-  ]
-}
-
-RULES:
-1. "questionForm" should be a natural question leading with the best guess (e.g., "Are you asking about...")
-2. "partialAnswer" should give REAL value—not "I can help with that" but actual info
-3. For PRODUCT_KNOWLEDGE, you CAN provide partial answers about PitCrew (cameras, pricing model, integrations)
-4. Alternatives should be SPECIFIC—not "something else" but concrete options with hints
-5. Use contractions (it's, I'll, you're) and conversational tone
-6. Never say "I need more context"—always offer a path forward
-
-COMMON PATTERNS:
-- "how does X work" → PRODUCT_KNOWLEDGE with partial answer about X
-- "what about [company]" → SINGLE_MEETING or MULTI_MEETING depending on context
-- "pricing/cost/price" → PRODUCT_KNOWLEDGE with partial pricing model info
-- "[company] + [topic]" → SINGLE_MEETING with company-specific search
-- "research [company]" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
-- "slide deck for [external company]" or "pitch deck" → EXTERNAL_RESEARCH with SALES_DOCS_PREP contract
-- "find their strategic priorities" or "public statements" → EXTERNAL_RESEARCH
-- "research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
-- "do research... then write a feature description" → EXTERNAL_RESEARCH (research + write)
-
-CRITICAL FOLLOW-UP PATTERN:
-When the conversation history shows a list of customer questions was just provided, and the user asks something like "help me answer those questions" or "can you answer those" or "draft responses":
-- This is asking for PRODUCT_KNOWLEDGE answers to the questions in the thread
-- Use PRODUCT_KNOWLEDGE intent with FAQ_ANSWER contract
-- The user wants you to use product knowledge to provide answers to the open/unanswered questions
-- NOT just re-list the same questions again
-- Reference the specific questions from thread context and provide answers
-
-EXAMPLES:
-
-User: "how does the cameras installation work?"
-Response: {
-  "proposedIntent": "PRODUCT_KNOWLEDGE",
-  "proposedContract": "PRODUCT_EXPLANATION",
-  "confidence": 0.7,
-  "interpretation": "how PitCrew camera installation works",
-  "questionForm": "Are you asking how camera installation works with PitCrew?",
-  "canPartialAnswer": true,
-  "partialAnswer": "Cameras are typically mounted in service bays pointing at the work area. Your IT team or ours handles physical install; PitCrew then connects to the feeds over your network. I can go deeper on any part.",
-  "alternatives": [
-    {
-      "intent": "SINGLE_MEETING",
-      "contract": "EXTRACTIVE_FACT",
-      "description": "A specific customer's installation experience",
-      "hint": "Les Schwab, ACE, etc."
-    },
-    {
-      "intent": "PRODUCT_KNOWLEDGE",
-      "contract": "FAQ_ANSWER",
-      "description": "Technical requirements for your own deployment",
-      "hint": "network specs, camera specs"
-    }
-  ]
-}
-
-User: "what's the deal with Canadian Tire?"
-Response: {
-  "proposedIntent": "SINGLE_MEETING",
-  "proposedContract": "MEETING_SUMMARY",
-  "confidence": 0.6,
-  "interpretation": "summary of Canadian Tire meetings",
-  "questionForm": "Are you looking for a summary of our Canadian Tire meetings?",
-  "canPartialAnswer": false,
-  "partialAnswer": "",
-  "alternatives": [
-    {
-      "intent": "SINGLE_MEETING",
-      "contract": "NEXT_STEPS",
-      "description": "Their pilot status and next steps",
-      "hint": ""
-    },
-    {
-      "intent": "SINGLE_MEETING",
-      "contract": "EXTRACTIVE_FACT",
-      "description": "Something specific they discussed",
-      "hint": "pricing, integration, concerns"
-    }
-  ]
-}
-
-User: "can you help me with the pricing stuff?"
-Response: {
-  "proposedIntent": "PRODUCT_KNOWLEDGE",
-  "proposedContract": "FAQ_ANSWER",
-  "confidence": 0.5,
-  "interpretation": "PitCrew pricing information",
-  "questionForm": "Happy to help with pricing! Are you looking for:",
-  "canPartialAnswer": false,
-  "partialAnswer": "",
-  "alternatives": [
-    {
-      "intent": "PRODUCT_KNOWLEDGE",
-      "contract": "PRODUCT_EXPLANATION",
-      "description": "PitCrew's pricing model",
-      "hint": "I can outline the general structure"
-    },
-    {
-      "intent": "MULTI_MEETING",
-      "contract": "CROSS_MEETING_QUESTIONS",
-      "description": "What customers have asked about pricing",
-      "hint": ""
-    },
-    {
-      "intent": "GENERAL_HELP",
-      "contract": "DRAFT_RESPONSE",
-      "description": "Help structuring a quote or proposal",
-      "hint": ""
-    }
-  ]
-}
-
-User: "Research Costco and create a slide deck for their leadership team"
-Response: {
-  "proposedIntent": "EXTERNAL_RESEARCH",
-  "proposedContract": "SALES_DOCS_PREP",
-  "confidence": 0.9,
-  "interpretation": "research Costco's public priorities and create a sales pitch deck",
-  "questionForm": "You want me to research Costco's strategic priorities and create a slide deck to pitch PitCrew to their leadership?",
-  "canPartialAnswer": false,
-  "partialAnswer": "",
-  "alternatives": []
-}
-
-User: "Do research on that customer including recent earnings calls"
-Response: {
-  "proposedIntent": "EXTERNAL_RESEARCH",
-  "proposedContract": "EXTERNAL_RESEARCH",
-  "confidence": 0.85,
-  "interpretation": "research external company using public sources like earnings calls",
-  "questionForm": "You want me to research this company's recent earnings calls and public statements?",
-  "canPartialAnswer": false,
-  "partialAnswer": "",
-  "alternatives": [
-    {
-      "intent": "MULTI_MEETING",
-      "contract": "PATTERN_ANALYSIS",
-      "description": "Search our meeting notes about this company instead",
-      "hint": ""
-    }
-  ]
-}`;
-
   try {
     // Build messages array with thread context if available
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: AMBIGUOUS_QUERY_INTERPRETATION_PROMPT },
     ];
     
     // Include thread history for context (skip the current message, it's added last)

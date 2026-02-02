@@ -21,6 +21,7 @@
  */
 
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { MCP_ROUTING_PROMPT } from "../config/prompts";
 
 /**
  *   (see server/rag/composers.ts)
@@ -68,26 +69,10 @@ export async function decideCapability({
     };
   });
 
-   const systemPrompt = `You route user requests to the correct capability.
-
-CRITICAL RULES:
-1. ALWAYS call a capability when the user's INTENT is clear, even if some parameters are missing.
-2. Missing parameters like company name or meeting ID will be filled from thread context - that's not your concern.
-3. Only return a text response (no tool call) if the question is completely unrelated to any capability.
-
-Examples of when to CALL a capability (even without explicit params):
-- "Who attended the meeting?" → call get_meeting_attendees (companyId will come from context)
-- "What were the next steps?" → call get_last_meeting (context provides company/meeting)
-- "Any feedback about pricing?" → call get_last_meeting with topic extraction
-
-Examples of when to NOT call a capability:
-- "Hello" → greeting, not a data query
-- "What can you do?" → meta question about capabilities`;
-
    const response = await openai.chat.completions.create({
      model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
      messages: [
-       { role: "system", content: systemPrompt },
+       { role: "system", content: MCP_ROUTING_PROMPT },
        { role: "user", content: text },
      ],
      tools,
