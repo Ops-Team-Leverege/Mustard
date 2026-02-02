@@ -21,6 +21,7 @@
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { INTENT_CLASSIFICATION_PROMPT } from "../config/prompts";
+import { isCapabilityQuestion } from "../config/prompts/system";
 import { 
   interpretAmbiguousQuery,
   validateLowConfidenceIntent,
@@ -580,6 +581,17 @@ async function classifyByKeyword(
       intentDetectionMethod: "pattern",
       confidence: 0.95,
       reason: "Question is out of scope for this assistant",
+    };
+  }
+
+  // HARDENING: Bot capability questions route to GENERAL_HELP (not PRODUCT_KNOWLEDGE)
+  // "What can you do?" asks about the BOT, not about PitCrew product capabilities
+  if (isCapabilityQuestion(question)) {
+    return {
+      intent: Intent.GENERAL_HELP,
+      intentDetectionMethod: "pattern",
+      confidence: 0.95,
+      reason: "Meta question about bot capabilities (not PitCrew product)",
     };
   }
 
