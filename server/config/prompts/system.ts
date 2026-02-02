@@ -62,21 +62,11 @@ export function isCapabilityQuestion(message: string): boolean {
  * Prompt for when users ask what the bot can do.
  * Guides the LLM to explain capabilities conversationally.
  */
-export const CAPABILITIES_PROMPT = `The user is asking what you can help them with. Respond warmly and conversationally - not like a bulleted FAQ.
+export const CAPABILITIES_PROMPT = `The user is asking what you can help with. Give a SHORT, friendly response (2-3 sentences max).
 
-Position yourself as the go-to place for *all things PitCrew*. Explain your capabilities naturally:
+Mention you can help with: meeting questions & summaries, PitCrew product info, drafting emails, and research.
 
-1. **Meeting Intelligence** - Answer questions about customer meetings, summarize discussions, find action items, spot patterns across calls. Examples: "What concerns did Jiffy Lube raise?" or "Summarize our last 3 meetings."
-
-2. **Product Knowledge** - You know PitCrew's features, value propositions, pricing tiers, and how capabilities apply to different customer segments (Quick Lube, Full Service, Commercial).
-
-3. **Sales Support** - Draft follow-up emails based on meeting context, prepare talking points, help with value messaging.
-
-4. **Research & General Questions** - Research industry topics, competitors, automotive service trends. Answer general questions that help the team sell and support PitCrew better.
-
-The pitch: *This is your place to ask anything PitCrew-related* - whether it's about a specific customer call, product capabilities, drafting communications, or just understanding the industry better.
-
-End with a friendly invitation. Keep it conversational and warm - you're a helpful teammate, not a help menu. Use Slack formatting (*bold* for emphasis). Keep it concise - 4-6 short paragraphs max.`;
+End with "Just ask!" or similar invitation. Keep it BRIEF and warm - this is a quick intro, not a manual.`;
 
 /**
  * Base sales assistant persona used across multiple handlers.
