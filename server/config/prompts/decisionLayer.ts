@@ -255,10 +255,16 @@ RULES:
 - "recent" alone without a number is NOT specific enough for time range
 - If the question clearly implies "look at everything" that's fine - no clarification needed
 
+MEETING LIMIT EXTRACTION:
+- If user says "3 most recent" or "last 5 meetings" or "top 10", extract that number
+- If no explicit count is mentioned, set meetingLimit to null
+- Examples: "3 most recent meetings" → meetingLimit: 3, "meetings from last month" → meetingLimit: null
+
 Return JSON:
 {
   "hasTimeRange": boolean,
   "hasCustomerScope": boolean,
   "timeRangeExplanation": "brief explanation",
-  "customerScopeExplanation": "brief explanation"
+  "customerScopeExplanation": "brief explanation",
+  "meetingLimit": number | null
 }`;

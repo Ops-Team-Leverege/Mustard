@@ -33,6 +33,7 @@ export type ScopeOverride = {
   hasTimeRange?: boolean;
   timeRangeExplanation?: string;
   customerScopeExplanation?: string;
+  meetingLimit?: number | null; // e.g., "3 most recent" → 3
 };
 
 /**
@@ -54,8 +55,9 @@ export async function findRelevantMeetings(
   
   if (isAllCustomers) {
     const source = scopeOverride?.allCustomers ? "LLM scope detection" : "regex pattern";
-    console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching all available transcripts`);
-    const allMeetings = await fetchAllRecentTranscripts();
+    const meetingLimit = scopeOverride?.meetingLimit ?? null;
+    console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching ${meetingLimit ?? 'all'} transcripts`);
+    const allMeetings = await fetchAllRecentTranscripts(meetingLimit);
     const topic = extractTopic(userMessage);
     return {
       meetings: allMeetings,
@@ -140,12 +142,16 @@ export async function findRelevantMeetings(
 /**
  * Fetch all recent transcripts for "all customers" scope.
  * Returns a bounded set of recent transcripts across all companies.
+ * 
+ * @param limit - Optional limit on number of meetings (e.g., "3 most recent" → 3)
  */
-async function fetchAllRecentTranscripts(): Promise<SingleMeetingContext[]> {
+async function fetchAllRecentTranscripts(limit?: number | null): Promise<SingleMeetingContext[]> {
   const { storage } = await import("../storage");
   const { MEETING_LIMITS } = await import("../config/constants");
   
-  const MAX_TOTAL_TRANSCRIPTS = MEETING_LIMITS.MAX_TOTAL_TRANSCRIPTS;
+  // Use user-specified limit if provided, otherwise use default max
+  const effectiveLimit = (limit && limit > 0) ? limit : MEETING_LIMITS.MAX_TOTAL_TRANSCRIPTS;
+  console.log(`[MeetingResolver] Fetching up to ${effectiveLimit} transcripts (user limit: ${limit ?? 'none'})`);
   
   const rows = await storage.rawQuery(`
     SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, 
@@ -155,7 +161,7 @@ async function fetchAllRecentTranscripts(): Promise<SingleMeetingContext[]> {
     JOIN companies c ON t.company_id = c.id
     ORDER BY sort_date DESC
     LIMIT $1
-  `, [MAX_TOTAL_TRANSCRIPTS]);
+  `, [effectiveLimit]);
   
   if (!rows || rows.length === 0) {
     console.log(`[MeetingResolver] No transcripts found in database`);

@@ -98,6 +98,7 @@ export type DecisionLayerResult = {
     hasTimeRange: boolean; // True if LLM detected time range
     timeRangeExplanation?: string; // e.g., "3 most recent meetings"
     customerScopeExplanation?: string; // e.g., "we've had implies all customers"
+    meetingLimit?: number | null; // e.g., "3 most recent" → 3
   };
 };
 
@@ -117,6 +118,7 @@ interface SpecificityCheckResult {
   hasCustomerScope: boolean;
   timeRangeExplanation: string;
   customerScopeExplanation: string;
+  meetingLimit?: number | null; // e.g., "3 most recent" → 3
 }
 
 /**
@@ -141,15 +143,15 @@ async function checkAggregateSpecificity(question: string): Promise<SpecificityC
     const content = response.choices[0]?.message?.content;
     if (!content) {
       console.log("[DecisionLayer] No content from specificity check, defaulting to needs clarification");
-      return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "" };
+      return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
     }
     
     const result = JSON.parse(content) as SpecificityCheckResult;
-    console.log(`[DecisionLayer] Specificity check: hasTimeRange=${result.hasTimeRange} (${result.timeRangeExplanation}), hasCustomerScope=${result.hasCustomerScope} (${result.customerScopeExplanation})`);
+    console.log(`[DecisionLayer] Specificity check: hasTimeRange=${result.hasTimeRange} (${result.timeRangeExplanation}), hasCustomerScope=${result.hasCustomerScope} (${result.customerScopeExplanation}), meetingLimit=${result.meetingLimit}`);
     return result;
   } catch (error) {
     console.error("[DecisionLayer] Specificity check failed, defaulting to needs clarification:", error);
-    return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "" };
+    return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
   }
 }
 
@@ -217,9 +219,10 @@ export async function runDecisionLayer(
       hasTimeRange: specificity.hasTimeRange,
       timeRangeExplanation: specificity.timeRangeExplanation,
       customerScopeExplanation: specificity.customerScopeExplanation,
+      meetingLimit: specificity.meetingLimit ?? null,
     };
     
-    console.log(`[DecisionLayer] LLM scope detection: allCustomers=${scopeInfo.allCustomers} (${scopeInfo.customerScopeExplanation}), hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation})`);
+    console.log(`[DecisionLayer] LLM scope detection: allCustomers=${scopeInfo.allCustomers} (${scopeInfo.customerScopeExplanation}), hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
     
     // For aggregate contracts, check if we need clarification
     if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
