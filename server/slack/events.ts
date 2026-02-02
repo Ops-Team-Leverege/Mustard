@@ -753,8 +753,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log(`[Slack] === END DOCUMENT DECISION ===`);
       if (testRun) {
         botReply = { ts: `test-${Date.now()}` };
+      } else if (usedStreaming) {
+        // IMPORTANT: Check streaming FIRST - if streaming was used, the message is already posted
+        // Don't post again via document support or regular post
+        botReply = { ts: streamingContext!.messageTs };
+        console.log(`[Slack] Response already streamed to message: ${botReply.ts}`);
       } else if (openAssistantResultData?.answerContract && !usedSingleMeetingMode) {
         // Open Assistant responses may generate documents for specific contracts or long content
+        // Only reach here if streaming was NOT used (e.g., doc-generating contracts)
         const docResult = await sendResponseWithDocumentSupport({
           channel,
           threadTs,
@@ -765,10 +771,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
         });
         // Document upload doesn't return a message ts, so we generate a placeholder
         botReply = { ts: docResult.type === "document" ? `doc-${Date.now()}` : `msg-${Date.now()}` };
-      } else if (usedStreaming) {
-        // Streaming already updated the message - use the streaming message ts
-        botReply = { ts: streamingContext!.messageTs };
-        console.log(`[Slack] Response already streamed to message: ${botReply.ts}`);
       } else {
         botReply = await postSlackMessage({
           channel,
