@@ -407,6 +407,50 @@ export function getContractHeader(contract: AnswerContract): string {
 }
 
 /**
+ * Extract user-specified output format preferences from the message.
+ * These override our default output formats when users want specific formats.
+ * 
+ * Examples:
+ * - "no more than 3-4 sentences" → "Limit to 3-4 sentences maximum."
+ * - "in one paragraph" → "Format as a single paragraph."
+ * - "brief summary" → "Keep response brief and concise."
+ * - "bullet points only" → "Use bullet points only."
+ */
+export function extractUserFormatPreference(userMessage: string): string | null {
+  const messageLower = userMessage.toLowerCase();
+  
+  // Sentence/length limits
+  const sentenceMatch = messageLower.match(/(?:no more than|at most|max(?:imum)?|limit to|in|under)\s*(\d+(?:-\d+)?)\s*(?:sentence|word|line|bullet|point)/);
+  if (sentenceMatch) {
+    return `USER FORMAT OVERRIDE: Limit your response to ${sentenceMatch[1]} ${sentenceMatch[0].includes('word') ? 'words' : sentenceMatch[0].includes('bullet') || sentenceMatch[0].includes('point') ? 'bullet points' : 'sentences'} maximum. This is a strict requirement from the user.`;
+  }
+  
+  // "brief", "concise", "short" indicators
+  if (/\b(?:brief(?:ly)?|concise(?:ly)?|short|quick|tl;?dr)\b/.test(messageLower)) {
+    return `USER FORMAT OVERRIDE: Keep your response brief and concise. The user wants a short summary, not a detailed analysis.`;
+  }
+  
+  // Paragraph constraints
+  const paragraphMatch = messageLower.match(/(?:in |just |only |one |single )?(?:\d+ )?paragraph/);
+  if (paragraphMatch) {
+    const numMatch = paragraphMatch[0].match(/\d+/);
+    const count = numMatch ? numMatch[0] : '1';
+    return `USER FORMAT OVERRIDE: Format your response as ${count === '1' ? 'a single paragraph' : `${count} paragraphs maximum`}. Do not use bullet points or numbered lists.`;
+  }
+  
+  // Explicit format requests
+  if (/bullet(?:s| points?)? only/.test(messageLower)) {
+    return `USER FORMAT OVERRIDE: Use only bullet points, no prose or paragraphs.`;
+  }
+  
+  if (/no (?:bullet|list|format)/.test(messageLower)) {
+    return `USER FORMAT OVERRIDE: Use prose only, no bullet points or numbered lists.`;
+  }
+  
+  return null;
+}
+
+/**
  * Get coverage-aware language qualification instructions.
  * 
  * HARDENING: Coverage must constrain how confident the system is allowed to sound.
@@ -569,7 +613,18 @@ async function synthesizeAnalysis(
   const focusTopic = extractFocusTopic(userMessage);
   console.log(`[ContractExecutor] Extracted focus topic: "${focusTopic}" from question`);
   
-  const synthesisPrompt = getSynthesisPrompt(contract, coverage, companyList, focusTopic);
+  // Check for user format override (e.g., "no more than 3-4 sentences")
+  const userFormatOverride = extractUserFormatPreference(userMessage);
+  if (userFormatOverride) {
+    console.log(`[ContractExecutor] User format override detected: "${userFormatOverride}"`);
+  }
+  
+  const baseSynthesisPrompt = getSynthesisPrompt(contract, coverage, companyList, focusTopic);
+  
+  // Inject user format override at the beginning of the prompt (highest priority)
+  const synthesisPrompt = userFormatOverride 
+    ? `${userFormatOverride}\n\n${baseSynthesisPrompt}`
+    : baseSynthesisPrompt;
   
   try {
     const response = await openai.chat.completions.create({
