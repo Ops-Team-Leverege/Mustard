@@ -1,5 +1,5 @@
 {
-  "delaySeconds": 20,
+  "delaySeconds": 150,
   "messages": [
     "🔍 Still digging — hang tight...",
     "⏳ Taking a bit longer than usual — almost there...",
