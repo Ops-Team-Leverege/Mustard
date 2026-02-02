@@ -140,9 +140,12 @@ The control plane dynamically builds contract chains based on user messages, ens
 - **Constants File**: Created `server/config/constants.ts` with domain-grouped constants (MEETING_LIMITS, STREAMING, TIMEOUTS, CONTENT_LIMITS, LLM_TOKENS, SEMANTIC_SEARCH) for easier tuning.
 - **Updated Files**: meetingResolver.ts, streamingHelper.ts, getLastMeeting.ts, openAssistantHandler.ts, verify.ts now use centralized constants.
 
-### Markdown Formatting Fixes
+### Markdown Formatting System
+- **Flexible Formatter**: Created `server/utils/markdownFormatter.ts` with extensible format system supporting multiple output targets (Slack, standard, plaintext).
+- **Runtime Extension**: Use `registerFormat(name, rules)` to add new formats or `extendFormat(name, rules)` to extend existing ones without modifying core code.
+- **Pre-configured Formats**: 'slack' (converts `**bold**` → `*bold*`), 'standard' (no changes), 'plaintext' (strips formatting).
 - **Document Generator**: Created `parseInlineMarkdown()` helper function to handle `**bold**` patterns consistently. Applied to bullet items, numbered items, and regular text paragraphs.
-- **Slack Markdown Conversion**: Added `convertToSlackMarkdown()` function to convert standard markdown (`**word**`) to Slack's mrkdwn format (`*word*`). Applied to both `postSlackMessage()` and `updateSlackMessage()` functions.
+- **Slack Integration**: Uses `formatMarkdown(text, 'slack')` in both `postSlackMessage()` and `updateSlackMessage()`.
 
 ## Recent Changes (January 2026)
 

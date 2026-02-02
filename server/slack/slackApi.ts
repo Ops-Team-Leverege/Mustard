@@ -14,6 +14,8 @@
  * Layer: Integration (I/O only)
  */
 
+import { formatMarkdown } from '../utils/markdownFormatter';
+
 type PostMessageParams = {
   channel: string;
   text: string;
@@ -24,27 +26,15 @@ type PostMessageResponse = {
   ts: string; // Message timestamp (unique ID)
 };
 
-/**
- * Convert standard markdown to Slack's mrkdwn format.
- * - **word** → *word* (Slack uses single asterisks for bold)
- * - Preserves single asterisks for italic
- */
-function convertToSlackMarkdown(text: string): string {
-  // Convert **word** to *word* for Slack bold formatting
-  // Be careful not to affect single asterisks (used for italic in both formats)
-  return text.replace(/\*\*(.+?)\*\*/g, '*$1*');
-}
-
 export async function postSlackMessage(params: PostMessageParams): Promise<PostMessageResponse> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     throw new Error("Missing SLACK_BOT_TOKEN");
   }
 
-  // Convert markdown to Slack's mrkdwn format
   const slackParams = {
     ...params,
-    text: convertToSlackMarkdown(params.text),
+    text: formatMarkdown(params.text, 'slack'),
   };
 
   const response = await fetch("https://slack.com/api/chat.postMessage", {
@@ -91,10 +81,9 @@ export async function updateSlackMessage(params: UpdateMessageParams): Promise<v
     throw new Error("Missing SLACK_BOT_TOKEN");
   }
 
-  // Convert markdown to Slack's mrkdwn format
   const slackParams = {
     ...params,
-    text: convertToSlackMarkdown(params.text),
+    text: formatMarkdown(params.text, 'slack'),
   };
 
   const response = await fetch("https://slack.com/api/chat.update", {
