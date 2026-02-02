@@ -20,7 +20,7 @@ import { verifySlackSignature } from "./verify";
 import { postSlackMessage, fetchThreadHistory } from "./slackApi";
 import { sendResponseWithDocumentSupport } from "../services/documentResponse";
 import { generateAckWithMention, generateAck } from "./acknowledgments";
-import { createMCP, type MCPResult } from "../mcp/createMCP";
+import { createMCP, type MCPResult } from "../mcp/toolRouter";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";

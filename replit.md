@@ -109,8 +109,8 @@ Contract chains are dynamically built based on user messages, ensuring ordered e
 ### MCP Folder Structure
 The `server/mcp/` folder contains ONLY MCP (Model Context Protocol) plumbing and tool definitions:
 - `context.ts`: MCP context management
-- `createMCP.ts`: MCP server creation
-- `index.ts`: MCP exports
+- `toolRouter.ts`: Routes questions to appropriate MCP tools via LLM-based intent classification
+- `index.ts`: MCP exports (simple run interface)
 - `llm.ts`: LLM utilities for MCP
 - `types.ts`: MCP type definitions
 - `tools/`: MCP tool definitions
