@@ -247,6 +247,16 @@ const PRODUCT_KNOWLEDGE_KEYWORDS = [
   "integrate with pos",
   "dms integration",
   "dealer management",
+  // "Our" refers to PitCrew - internal product questions
+  "our roadmap",
+  "our product roadmap",
+  "our q1 roadmap",
+  "our q2 roadmap",
+  "our q3 roadmap",
+  "our q4 roadmap",
+  "on the roadmap",
+  "product roadmap",
+  "feature roadmap",
 ];
 
 const DOCUMENT_SEARCH_KEYWORDS = [
@@ -382,7 +392,8 @@ const EXTERNAL_RESEARCH_PATTERNS = [
   /\bresearch\s+(the\s+)?(company|website|site|business)\b/i,
   /\b(competitor|competitive)\s+(analysis|research|comparison)\b/i,
   /\banalyze\s+(their|the)\s+(company|business|offerings?)\b/i,
-  /\bwhat\s+(does|do)\s+[\w\s]+\s+(company\s+)?(do|offer|sell)\b/i,
+  // Exclude "pitcrew" - that's our product, not external research
+  /\bwhat\s+(does|do)\s+(?!pitcrew\b)[\w\s]+\s+(company\s+)?(do|offer|sell)\b/i,
   /\b(their|the\s+company'?s?)\s+(website|site|business|offerings?)\b/i,
   // Topic/concept research (not just companies)
   /\bdo\s+research\s+to\s+understand\b/i,
