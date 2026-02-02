@@ -31,20 +31,26 @@
  */
 
 import { MODEL_ASSIGNMENTS } from "../config/models";
-
-/**
- */
-
 import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
 import { AnswerContract } from "../decisionLayer/answerContracts";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
+import { 
+  type SingleMeetingContext as SharedSingleMeetingContext,
+  type SingleMeetingResult as SharedSingleMeetingResult,
+  formatMeetingDate,
+  getMeetingDateSuffix
+} from "../meeting";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
+
+// Re-export types from shared module for backward compatibility
+export type SingleMeetingContext = SharedSingleMeetingContext;
+export type SingleMeetingResult = SharedSingleMeetingResult;
 
 // Orchestrator action item type (maps from DB schema)
 // Read-only from materialized ingestion data (meeting artifacts)
@@ -67,50 +73,6 @@ type OrchestratorActionItem = {
  * @deprecated Direct use is discouraged. Prefer receiving contracts from Decision Layer.
  */
 type InternalHandlerType = "extractive" | "aggregative" | "summary" | "drafting";
-
-export type SingleMeetingContext = {
-  meetingId: string;
-  companyId: string;
-  companyName: string;
-  meetingDate?: Date | null; // Optional meeting date for display
-};
-
-export type SingleMeetingResult = {
-  answer: string;
-  intent: InternalHandlerType;
-  dataSource: "attendees" | "customer_questions" | "action_items" | "transcript" | "summary" | "semantic" | "not_found" | "clarification" | "binary_answer";
-  evidence?: string;
-  pendingOffer?: "summary"; // Indicates bot offered summary, awaiting user response
-  semanticAnswerUsed?: boolean;
-  semanticConfidence?: "high" | "medium" | "low";
-  isSemanticDebug?: boolean; // DEBUG: Track if question was classified as semantic
-  semanticError?: string; // DEBUG: Capture error message if semantic layer fails
-  isClarificationRequest?: boolean; // True when bot is asking user to clarify ambiguous question
-  isBinaryQuestion?: boolean; // True when bot detected a yes/no question
-  progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for chained operations)
-};
-
-/**
- * Format meeting date for display in responses.
- */
-function formatMeetingDate(date: Date | null | undefined): string {
-  if (!date) return "";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-/**
- * Get meeting date suffix for responses (e.g., " (Jan 20, 2026)")
- */
-function getMeetingDateSuffix(ctx: SingleMeetingContext): string {
-  if (ctx.meetingDate) {
-    return ` (${formatMeetingDate(ctx.meetingDate)})`;
-  }
-  return "";
-}
 
 const UNCERTAINTY_RESPONSE = `I don't see this explicitly mentioned in the meeting.
 If you say "yes", I'll share a brief meeting summary.`;

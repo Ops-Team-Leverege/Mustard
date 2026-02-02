@@ -20,54 +20,35 @@
 import { storage } from "../storage";
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { 
+  type MeetingResolutionResult as SharedMeetingResolutionResult,
+  type MeetingThreadContext
+} from "../meeting";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-export type MeetingResolutionResult =
-  | { resolved: true; meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null; wasAutoSelected?: boolean }
-  | { resolved: false; needsClarification: true; message: string; options?: Array<{ meetingId: string; date: Date; companyName: string }> }
-  | { resolved: false; needsClarification: false; reason: string };
+// Re-export types from shared module for backward compatibility
+export type MeetingResolutionResult = SharedMeetingResolutionResult;
+export type MeetingResolverThreadContext = MeetingThreadContext;
 
-export type MeetingResolverThreadContext = {
-  meetingId?: string | null;
-  companyId?: string | null;
-};
-
-/**
- * Temporal language patterns for meeting resolution.
- * 
- * These patterns detect when a user is asking about a specific meeting
- * using temporal language. When matched, the system should attempt
- * single-meeting resolution instead of routing to MCP.
- * 
- * IMPORTANT: Patterns must match common variations:
- * - "last meeting" / "latest meeting" / "most recent meeting"
- * - "last ACE meeting" / "latest Ivy Lane call" (company in between)
- * - "last meeting with ACE" / "latest call with Discount Tire"
- * - "meeting last week" / "call last month"
- */
 // Meeting-like words that users use to refer to meetings
 const MEETING_WORDS = "meeting|call|transcript|sync|session|conversation|chat|touchpoint|demo|visit";
 
+/**
+ * Temporal language patterns for meeting resolution.
+ * These patterns detect when a user is asking about a specific meeting using temporal language.
+ */
 const TEMPORAL_PATTERNS = {
-  // Direct: "last meeting", "latest call", "most recent sync"
   lastMeetingDirect: new RegExp(`\\b(last|latest|most recent)\\s+(${MEETING_WORDS})\\b`, 'i'),
-  // With company in middle: "last ACE meeting", "latest Discount Tire call"
   lastMeetingWithCompany: new RegExp(`\\b(last|latest|most recent)\\s+\\S+(?:\\s+\\S+)?\\s+(${MEETING_WORDS})\\b`, 'i'),
-  // With "with" suffix: "last meeting with ACE", "latest call with Discount Tire"
   lastMeetingWithSuffix: new RegExp(`\\b(last|latest|most recent)\\s+(${MEETING_WORDS})\\s+(?:with|from)\\s+`, 'i'),
-  // Date reference: "meeting on Aug 7", "call from 8/7/2025"
   dateReference: new RegExp(`\\b(${MEETING_WORDS})\\s+(?:on|from)\\s+(\\w+\\s+\\d{1,2}(?:,?\\s*\\d{4})?|\\d{1,2}(?:\\/|-)\\d{1,2}(?:(?:\\/|-)\\d{2,4})?)\\b`, 'i'),
-  // Trailing temporal: "meeting last week", "call last month"
   lastWeek: new RegExp(`\\b(${MEETING_WORDS})\\s+last\\s+week\\b`, 'i'),
   lastMonth: new RegExp(`\\b(${MEETING_WORDS})\\s+last\\s+month\\b`, 'i'),
-  // In-sentence temporal: "in the last meeting", "from the latest call"
   inTheLast: /\b(?:in|from|during)\s+(?:the|our|their)?\s*(last|latest|most recent)\s+/i,
-  // Recent with company: "recent ACE touchpoint", "our recent Discount Tire sync"
   recentWithCompany: new RegExp(`\\b(?:our|the)?\\s*recent\\s+\\S+(?:\\s+\\S+)?\\s+(${MEETING_WORDS})\\b`, 'i'),
-  // Company then temporal: "ACE, latest sync", "Ivy Lane, last meeting"
   companyThenTemporal: new RegExp(`\\b\\w+(?:\\s+\\w+)?,\\s*(last|latest|recent)\\s+(${MEETING_WORDS})`, 'i'),
 };
 

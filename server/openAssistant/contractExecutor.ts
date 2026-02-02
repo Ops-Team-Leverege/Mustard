@@ -11,7 +11,7 @@
  */
 
 import { AnswerContract, type SSOTMode, getContractConstraints, type ContractChain } from "../decisionLayer/answerContracts";
-import type { SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
+import type { SingleMeetingContext } from "../meeting";
 import { storage } from "../storage";
 import { searchAcrossMeetings } from "./meetingResolver";
 import type { ContractExecutionDecision } from "./types";

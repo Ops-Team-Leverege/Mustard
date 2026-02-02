@@ -6,14 +6,15 @@
  * finding and resolving meetings from user queries.
  */
 
-import { type SingleMeetingContext } from "../mcp/singleMeetingOrchestrator";
+import { 
+  type SingleMeetingContext,
+  type MeetingSearchResult as SharedMeetingSearchResult,
+  wantsAllCustomers
+} from "../meeting";
 import type { IntentClassification } from "./types";
 
-export type MeetingSearchResult = {
-  meetings: SingleMeetingContext[];
-  searchedFor: string;
-  topic?: string; // Topic to filter content (e.g., "cameras" from "about cameras")
-};
+// Re-export from shared module for backward compatibility
+export type MeetingSearchResult = SharedMeetingSearchResult;
 
 export type ChunkSearchResult = {
   transcriptId: string;
@@ -22,12 +23,6 @@ export type ChunkSearchResult = {
   speakerName: string | null;
   content: string;
 };
-
-// Patterns indicating user wants ALL customers (no filtering by company)
-const ALL_CUSTOMERS_PATTERNS = [
-  /\b(all\s+customers?|every\s+customer|across\s+all|everyone|all\s+calls?|all\s+meetings?)\b/i,
-  /\b(across\s+customers?|across\s+companies|across\s+the\s+board)\b/i,
-];
 
 /**
  * Find relevant meetings based on company/person names in the query.
@@ -41,8 +36,7 @@ export async function findRelevantMeetings(
   const { storage } = await import("../storage");
   
   // Check for "all customers" scope - return all available transcripts
-  const wantsAllCustomers = ALL_CUSTOMERS_PATTERNS.some(p => p.test(userMessage));
-  if (wantsAllCustomers) {
+  if (wantsAllCustomers(userMessage)) {
     console.log(`[MeetingResolver] "All customers" detected - fetching all available transcripts`);
     const allMeetings = await fetchAllRecentTranscripts();
     const topic = extractTopic(userMessage);

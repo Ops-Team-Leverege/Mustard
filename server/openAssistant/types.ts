@@ -5,7 +5,7 @@
  * Keeps types consistent and reduces duplication.
  */
 
-import type { SingleMeetingContext, SingleMeetingResult } from "../mcp/singleMeetingOrchestrator";
+import type { SingleMeetingContext, SingleMeetingResult } from "../meeting";
 import { Intent } from "../decisionLayer/intent";
 import type { AnswerContract, SSOTMode } from "../decisionLayer/answerContracts";
 import type { DecisionLayerResult } from "../decisionLayer";
