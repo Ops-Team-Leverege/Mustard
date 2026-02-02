@@ -105,3 +105,14 @@ Contract chains are dynamically built based on user messages, ensuring ordered e
 - **Empty ID Guard**: Filters out empty/undefined event IDs to prevent false positives.
 - **Schema Addition**: `slack_event_dedupe` table with index on `processed_at` for efficient cleanup.
 - **Automatic Cleanup**: Runs on startup and every 100 requests via `maybeCleanup()`.
+
+### MCP Folder Structure
+The `server/mcp/` folder contains ONLY MCP (Model Context Protocol) plumbing and tool definitions:
+- `context.ts`: MCP context management
+- `createMCP.ts`: MCP server creation
+- `index.ts`: MCP exports
+- `llm.ts`: LLM utilities for MCP
+- `types.ts`: MCP type definitions
+- `tools/`: MCP tool definitions
+
+**Note**: Application-level orchestration logic lives in `server/openAssistant/` (Execution Layer), Slack-specific resolvers in `server/slack/`, and shared meeting utilities in `server/meeting/`. Do not add business logic or orchestration to the MCP folder.
