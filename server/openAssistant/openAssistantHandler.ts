@@ -37,6 +37,7 @@ import { findRelevantMeetings, searchAcrossMeetings, type ScopeOverride } from "
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
 import { GoogleGenAI } from "@google/genai";
+import { storage } from "../storage";
 
 export type { EvidenceSource, IntentClassification, OpenAssistantContext, OpenAssistantResult };
 
@@ -83,6 +84,51 @@ ${messages}
 
 Use this conversation context to provide relevant, continuous responses. Reference specific details mentioned earlier when applicable.
 `;
+}
+
+/**
+ * Build meeting context section for product knowledge queries.
+ * When a product question is asked in a meeting thread, this fetches
+ * customer questions/concerns from that meeting to provide context.
+ * 
+ * This enables responses like:
+ * "The customer asked about X. PitCrew does support this - here's how it works..."
+ */
+async function buildMeetingContextForProductKnowledge(
+  meetingId: string,
+  companyName: string
+): Promise<string> {
+  try {
+    // Fetch customer questions from this meeting
+    const customerQuestions = await storage.getCustomerQuestionsByTranscript(meetingId);
+    
+    if (!customerQuestions || customerQuestions.length === 0) {
+      return "";
+    }
+    
+    // Format questions for context
+    const questionsSection = customerQuestions
+      .slice(0, 10) // Limit to 10 most relevant questions
+      .map((q, i) => `${i + 1}. "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}`)
+      .join("\n");
+    
+    return `
+=== MEETING CONTEXT (from ${companyName} meeting) ===
+The user is asking about a topic that may relate to questions raised in this meeting.
+Use this context to provide answers that directly address customer concerns.
+
+CUSTOMER QUESTIONS FROM THIS MEETING:
+${questionsSection}
+
+When answering:
+1. If the user's question relates to a customer concern above, acknowledge it
+2. Explain how PitCrew addresses that specific concern
+3. Provide actionable information they can share with the customer
+`.trim();
+  } catch (err) {
+    console.error(`[OpenAssistant] Failed to build meeting context:`, err);
+    return "";
+  }
 }
 
 /**
@@ -982,6 +1028,19 @@ async function handleProductKnowledgeIntent(
     console.log(`[OpenAssistant] URL detected in message: ${websiteUrl}`);
   }
   
+  // Check for meeting context - enables meeting-aware product knowledge
+  let meetingContextSection = "";
+  if (context.resolvedMeeting?.meetingId) {
+    console.log(`[OpenAssistant] Meeting context available (${context.resolvedMeeting.meetingId}) - fetching customer concerns...`);
+    meetingContextSection = await buildMeetingContextForProductKnowledge(
+      context.resolvedMeeting.meetingId,
+      context.resolvedMeeting.companyName
+    );
+    if (meetingContextSection) {
+      console.log(`[OpenAssistant] Meeting context enriched (${meetingContextSection.length} chars)`);
+    }
+  }
+  
   // Get product knowledge from snapshot (fast path) or compute on-demand
   let snapshotResult;
   let productDataPrompt: string;
@@ -1007,6 +1066,11 @@ async function handleProductKnowledgeIntent(
   // Build thread context for conversation continuity
   const threadContextSection = buildThreadContextSection(context);
   
+  // Combine thread context with meeting context if available
+  const enrichedContext = meetingContextSection 
+    ? `${threadContextSection}\n\n${meetingContextSection}` 
+    : threadContextSection;
+  
   // If URL detected + product data available → use Gemini for web-based analysis
   if (websiteUrl && hasProductData) {
     console.log(`[OpenAssistant] URL detected with product data - trying Gemini for website analysis`);
@@ -1018,11 +1082,11 @@ async function handleProductKnowledgeIntent(
     } else {
       // Gemini failed - fall back to gpt-4o without website content
       console.log(`[OpenAssistant] Gemini unavailable - falling back to gpt-4o`);
-      answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, threadContextSection);
+      answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, enrichedContext);
     }
   } else {
     // No URL - use gpt-4o directly
-    answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, threadContextSection);
+    answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, enrichedContext);
   }
 
   return {
