@@ -1352,7 +1352,26 @@ async function handleGeneralAssistanceIntent(
     meetingContextStr = `\n\nMeeting Context: ${meeting.companyName}${meeting.meetingDate ? ` (${meeting.meetingDate.toLocaleDateString()})` : ''}`;
   }
   
-  const systemPrompt = `${AMBIENT_PRODUCT_CONTEXT}
+  // Check if request would benefit from product knowledge enrichment
+  // Include product KB for PitCrew-related creative/drafting tasks (naming, presentations, value props, etc.)
+  let productKnowledgeSection = "";
+  const pitcrewContextPatterns = /pitcrew|pilot|presentation|report|deck|proposal|value prop|demo|branding|naming|title/i;
+  if (pitcrewContextPatterns.test(userMessage) || (threadContextSection && pitcrewContextPatterns.test(threadContextSection))) {
+    try {
+      const pkResult = await getProductKnowledgePrompt();
+      if (pkResult.hasData && pkResult.prompt) {
+        // Use a condensed version for GENERAL_HELP (terminology and branding focus)
+        productKnowledgeSection = `\n\n=== PITCREW PRODUCT CONTEXT (for terminology and branding alignment) ===
+${pkResult.prompt.substring(0, 2000)}...
+Use this context to align suggestions with PitCrew's terminology and value proposition.`;
+        console.log(`[OpenAssistant] GENERAL_HELP enriched with product knowledge (${pkResult.prompt.length} chars)`);
+      }
+    } catch (err) {
+      console.log(`[OpenAssistant] Could not fetch product knowledge for GENERAL_HELP: ${err}`);
+    }
+  }
+  
+  const systemPrompt = `${AMBIENT_PRODUCT_CONTEXT}${productKnowledgeSection}
 
 You are a helpful business assistant for the PitCrew team. Provide clear, professional help with the user's request.
 
