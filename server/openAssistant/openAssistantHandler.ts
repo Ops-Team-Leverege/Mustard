@@ -21,7 +21,7 @@ import { Intent, type IntentClassificationResult } from "../decisionLayer/intent
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
-import { isCapabilityQuestion, CAPABILITIES_RESPONSE } from "../config/prompts/system";
+import { isCapabilityQuestion, CAPABILITIES_PROMPT } from "../config/prompts/system";
 
 import { 
   type EvidenceSource, 
@@ -1287,11 +1287,17 @@ async function handleGeneralAssistanceIntent(
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
   
-  // Check if user is asking about capabilities - return canned response
+  // Check if user is asking about capabilities - use focused prompt for natural response
   if (isCapabilityQuestion(userMessage)) {
-    console.log(`[OpenAssistant] Capability question detected - returning capabilities response`);
+    console.log(`[OpenAssistant] Capability question detected - generating conversational capabilities response`);
+    const capabilitiesAnswer = await streamOpenAIResponse(
+      MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
+      CAPABILITIES_PROMPT,
+      userMessage,
+      context.slackStreaming
+    );
     return {
-      answer: CAPABILITIES_RESPONSE,
+      answer: capabilitiesAnswer,
       intent: "general_assistance",
       intentClassification: classification,
       controlPlaneIntent: Intent.GENERAL_HELP,

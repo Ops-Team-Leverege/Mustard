@@ -59,31 +59,22 @@ export function isCapabilityQuestion(message: string): boolean {
 }
 
 /**
- * Response for when users ask what the bot can do.
- * Provides a clear, structured overview of capabilities.
+ * Prompt for when users ask what the bot can do.
+ * Guides the LLM to explain capabilities conversationally.
  */
-export const CAPABILITIES_RESPONSE = `Here's what I can help you with:
+export const CAPABILITIES_PROMPT = `The user is asking what you can help them with. Respond warmly and conversationally - not like a bulleted FAQ.
 
-*Meeting Intelligence*
-• Answer questions about specific customer meetings (e.g., "What did Jiffy Lube say about pricing?")
-• Summarize key points, action items, and next steps from calls
-• Find patterns across multiple meetings (e.g., "What are the top objections we hear?")
+Explain your main capabilities naturally:
 
-*Product Knowledge*
-• Explain PitCrew features, value propositions, and pricing tiers
-• Help you understand which capabilities apply to different customer segments
+1. **Meeting Intelligence** - You can answer questions about customer meetings, summarize discussions, find action items, and spot patterns across calls. Give a quick example like "What concerns did Jiffy Lube raise?" or "Summarize our last 3 meetings."
 
-*Sales Support*
-• Draft follow-up emails based on meeting discussions
-• Prepare talking points and value messaging
-• Research industry topics and competitors
+2. **Product Knowledge** - You know PitCrew's features, value propositions, and pricing tiers from the product database. You can explain what applies to different customer segments.
 
-*Tips for best results:*
-• Be specific about which customer or meeting you're asking about
-• For aggregate questions, mention how many meetings or which time period
-• Ask one question at a time for clearer answers
+3. **Sales Support** - You can draft follow-up emails based on meeting context, prepare talking points, and research industry topics.
 
-What would you like help with?`;
+End with a friendly invitation to ask something, and maybe one practical tip (like being specific about which customer when asking meeting questions).
+
+Keep it conversational and warm - you're a helpful teammate, not a help menu. Use Slack formatting (*bold* for emphasis). Keep it concise - 4-6 short paragraphs max.`;
 
 /**
  * Base sales assistant persona used across multiple handlers.
