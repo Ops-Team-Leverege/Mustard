@@ -21,6 +21,7 @@ import { Intent, type IntentClassificationResult } from "../decisionLayer/intent
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
+import { isCapabilityQuestion, CAPABILITIES_RESPONSE } from "../config/prompts/system";
 
 import { 
   type EvidenceSource, 
@@ -1285,6 +1286,20 @@ async function handleGeneralAssistanceIntent(
   contract?: AnswerContract
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
+  
+  // Check if user is asking about capabilities - return canned response
+  if (isCapabilityQuestion(userMessage)) {
+    console.log(`[OpenAssistant] Capability question detected - returning capabilities response`);
+    return {
+      answer: CAPABILITIES_RESPONSE,
+      intent: "general_assistance",
+      intentClassification: classification,
+      controlPlaneIntent: Intent.GENERAL_HELP,
+      answerContract: AnswerContract.GENERAL_RESPONSE,
+      dataSource: "general_knowledge",
+      delegatedToSingleMeeting: false,
+    };
+  }
   
   // USE CONTROL PLANE CONTRACT when provided
   const actualContract = contract || AnswerContract.GENERAL_RESPONSE;

@@ -33,6 +33,59 @@ KEY VALUE DELIVERED:
 - Safety and loss prevention with proactive incident detection`;
 
 /**
+ * Capability keywords that indicate user wants to know what the bot can do.
+ */
+export const CAPABILITY_KEYWORDS = [
+  "what can you do",
+  "what can you help",
+  "how can you help",
+  "what do you do",
+  "what are you able",
+  "what are your capabilities",
+  "help me understand what you",
+  "what should i ask you",
+  "what questions can i ask",
+  "what kind of help",
+  "show me what you can",
+  "tell me what you can",
+];
+
+/**
+ * Check if a message is asking about bot capabilities.
+ */
+export function isCapabilityQuestion(message: string): boolean {
+  const lower = message.toLowerCase();
+  return CAPABILITY_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+/**
+ * Response for when users ask what the bot can do.
+ * Provides a clear, structured overview of capabilities.
+ */
+export const CAPABILITIES_RESPONSE = `Here's what I can help you with:
+
+*Meeting Intelligence*
+• Answer questions about specific customer meetings (e.g., "What did Jiffy Lube say about pricing?")
+• Summarize key points, action items, and next steps from calls
+• Find patterns across multiple meetings (e.g., "What are the top objections we hear?")
+
+*Product Knowledge*
+• Explain PitCrew features, value propositions, and pricing tiers
+• Help you understand which capabilities apply to different customer segments
+
+*Sales Support*
+• Draft follow-up emails based on meeting discussions
+• Prepare talking points and value messaging
+• Research industry topics and competitors
+
+*Tips for best results:*
+• Be specific about which customer or meeting you're asking about
+• For aggregate questions, mention how many meetings or which time period
+• Ask one question at a time for clearer answers
+
+What would you like help with?`;
+
+/**
  * Base sales assistant persona used across multiple handlers.
  */
 export const SALES_ASSISTANT_PERSONA = `You are a helpful assistant for PitCrew's sales team.
