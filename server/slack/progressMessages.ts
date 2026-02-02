@@ -104,7 +104,7 @@ The message should:
 
 Examples:
 - "Let me dig into our camera integration specs for you - pulling that info now."
-- "Good question about pricing! Gathering the latest details from our database."
+- "Gathering the latest details from our database."
 - "Checking what we know about network requirements - one moment."
 - "Looking into how that feature works - I'll have an answer shortly."`
         },
