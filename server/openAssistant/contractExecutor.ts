@@ -418,7 +418,7 @@ export function getContractHeader(contract: AnswerContract): string {
 export async function extractUserFormatPreference(userMessage: string): Promise<string | null> {
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.FORMAT_PREFERENCE_EXTRACTION,
       messages: [
         {
           role: "system",

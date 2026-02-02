@@ -1,0 +1,90 @@
+Critical Architectural Inconsistencies Found
+1. CRITICAL: Hardcoded Model Assignments Bypassing Centralized Registry
+Issue: Two critical files still contain hardcoded "gpt-4o-mini" instead of using MODEL_ASSIGNMENTS:
+
+File: 
+contractExecutor.ts
+ (Line 421)
+
+model: "gpt-4o-mini",  // ❌ HARDCODED
+Should be:
+
+model: MODEL_ASSIGNMENTS.CONTRACT_SELECTION,  // ✅ CENTRALIZED
+File: 
+index.ts
+ (Line 133)
+
+model: "gpt-4o-mini",  // ❌ HARDCODED
+Should be:
+
+model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,  // ✅ CENTRALIZED
+Impact: These bypass the centralized model registry, making it impossible to change models globally and creating inconsistency with the architectural pattern.
+
+2. HIGH: Database Schema Legacy vs New Field Inconsistency
+Issue: The schema shows a clear migration pattern from legacy to new fields, but usage is inconsistent:
+
+Legacy Fields Still Present:
+
+companyName (legacy) vs companyId (new) in transcripts, productInsights
+company (legacy) vs companyId (new) in productInsights, qaPairs
+asker (legacy) vs contactId (new) in qaPairs
+Problem: Code likely uses both patterns inconsistently, creating data integrity issues and making queries unpredictable.
+
+3. HIGH: Fragmented Caching Strategies (4 Different Patterns)
+Issue: Found 4 different caching implementations with no unified strategy:
+
+File-based config caching (progressMessages.ts, acknowledgments.ts, documentGenerator.ts)
+
+let configCache: ProgressConfig | null = null;
+Database company caching (intent.ts)
+
+let cachedCompanyNames: string[] = [];
+let companyCacheLastRefresh = 0;
+Airtable data caching (dynamicData.ts)
+
+const dataCache: Map<string, CacheEntry> = new Map();
+Event deduplication caching (eventDeduplicator.ts)
+
+Database-backed with in-memory fallback
+Problem: No consistent cache invalidation, different TTL strategies, and potential memory leaks.
+
+4. MEDIUM: Inline Prompts Still Scattered
+Issue: Found 12+ locations with inline prompts instead of using centralized server/config/prompts/:
+
+transcriptAnalyzer.ts
+ - Massive inline prompt (400+ lines)
+composer.ts
+ - Multiple inline system prompts
+extractCustomerQuestions.ts
+ - Inline extraction prompts
+llmInterpretation.ts
+ - Inline interpretation prompts
+Problem: Prompts are duplicated, hard to maintain, and not following the centralized prompt architecture.
+
+5. MEDIUM: Validation Pattern Inconsistency
+Issue: Routes use different validation approaches:
+
+Some use Zod middleware consistently
+Others have inline validation
+Some skip validation entirely
+Problem: Inconsistent error handling and request validation across the API surface.
+
+Recommended Fix Priority
+CRITICAL (Fix Immediately)
+Replace hardcoded models in contractExecutor.ts:421 and 
+index.ts 133
+Complete database schema migration - audit all queries to use new fields consistently
+HIGH (Fix This Sprint)
+Implement unified caching layer - replace 4 different patterns with single strategy
+Move inline prompts to centralized system - especially the massive one in transcriptAnalyzer.ts
+MEDIUM (Next Sprint)
+Standardize validation middleware across all routes
+Audit and fix any remaining model assignment inconsistencies
+Architecture Impact
+These inconsistencies create:
+
+Runtime Risk: Hardcoded models could fail if OpenAI changes pricing/availability
+Data Integrity Risk: Mixed legacy/new field usage could cause data corruption
+Maintainability Debt: Scattered prompts and caching make changes error-prone
+Performance Issues: Inefficient caching patterns waste memory and CPU
+The most critical fixes (hardcoded models and database schema) should be addressed immediately as they represent architectural violations that could cause production issues.

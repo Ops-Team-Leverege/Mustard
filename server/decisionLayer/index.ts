@@ -42,6 +42,7 @@ import {
 
 import OpenAI from "openai";
 import { AGGREGATE_SPECIFICITY_CHECK_PROMPT } from "../config/prompts";
+import { MODEL_ASSIGNMENTS } from "../config/models";
 
 export {
   Intent,
@@ -130,7 +131,7 @@ async function checkAggregateSpecificity(question: string): Promise<SpecificityC
     const openai = new OpenAI();
     
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: MODEL_ASSIGNMENTS.AGGREGATE_SPECIFICITY_CHECK,
       messages: [
         { role: "system", content: AGGREGATE_SPECIFICITY_CHECK_PROMPT },
         { role: "user", content: question },
