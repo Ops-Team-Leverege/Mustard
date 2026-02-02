@@ -144,3 +144,26 @@ The `server/slack/` folder is organized into specialized subfolders:
 - **Logging**: Server errors (500+) are logged with context; client errors (4xx) are not logged.
 - **Usage Pattern**: `throw new NotFoundError("Resource")` in route handlers, caught by `handleRouteError(res, error, "CONTEXT")`.
 - **Test Coverage**: 19 unit tests in `server/__tests__/errorHandler.test.ts` cover all utilities.
+
+### Centralized Prompts System
+All LLM prompts are centralized in `server/config/prompts/` for maintainability:
+
+**File Organization:**
+- `system.ts`: Base system prompts, shared context (AMBIENT_PRODUCT_CONTEXT, formatting instructions)
+- `decisionLayer.ts`: Intent classification, contract selection, validation prompts + typed builders
+- `extraction.ts`: Customer questions extraction, transcript analysis prompts
+- `singleMeeting.ts`: Single meeting handler prompts
+- `multiMeeting.ts`: Multi-meeting analysis prompts + typed builders
+- `transcript.ts`: RAG composition prompts
+- `external.ts`: External research and MCP routing prompts
+- `index.ts`: Re-exports all prompts for easy importing
+
+**Usage Pattern:**
+```typescript
+import { INTENT_CLASSIFICATION_PROMPT, buildIntentValidationPrompt } from "../config/prompts";
+```
+
+**Typed Prompt Builders:** For prompts requiring dynamic parameters, use builder functions:
+```typescript
+const prompt = buildIntentValidationPrompt(deterministicIntent, reason, signals);
+```
