@@ -9,7 +9,7 @@
  * For read-only meeting artifacts (action items, customer questions), prefer
  * the SingleMeetingOrchestrator which reads directly from the database.
  * 
- * Layer: MCP Capability
+ * Layer: MCP Tool
  */
 
 import { z } from "zod";

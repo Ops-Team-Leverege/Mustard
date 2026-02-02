@@ -5,7 +5,7 @@
  * Retrieves Q&A pairs (interpreted Q&A) for a specific company.
  * Note: For verbatim customer questions, use customer_questions table instead.
  * 
- * Layer: MCP Capability (Extended Search - blocked in Single-Meeting Orchestrator)
+ * Layer: MCP Tool (Extended Search - blocked in Single-Meeting Orchestrator)
  */
 
 import { z } from "zod";

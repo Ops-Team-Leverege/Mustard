@@ -5,7 +5,7 @@
  * Returns a summary overview of a company including notes, stage,
  * and counts of insights and Q&A pairs.
  * 
- * Layer: MCP Capability
+ * Layer: MCP Tool
  */
 
 import { z } from "zod";

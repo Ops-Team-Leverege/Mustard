@@ -24,9 +24,9 @@ export type MCPResult = {
 };
 
 /**
- * Check if a capability result is in the structured format with resolvedEntities.
+ * Check if a tool result is in the structured format with resolvedEntities.
  */
-function isCapabilityResult(result: unknown): result is CapabilityResult<unknown> {
+function isToolResult(result: unknown): result is CapabilityResult<unknown> {
   return (
     typeof result === "object" &&
     result !== null &&
@@ -36,7 +36,7 @@ function isCapabilityResult(result: unknown): result is CapabilityResult<unknown
 }
 
 /**
- * Merge thread context into capability args if they weren't explicitly provided.
+ * Merge thread context into tool args if they weren't explicitly provided.
  * 
  * IMPORTANT: This enables follow-up questions in Slack threads by reusing
  * previously resolved entity IDs (meetingId, companyId) without feeding
@@ -91,7 +91,7 @@ export function createMCP(ctx: MCPContext) {
     // Check if tool returned structured result with resolvedEntities
     // Tools can return { result, resolvedEntities } to provide IDs they resolved internally
     let finalResult: unknown;
-    if (isCapabilityResult(rawResult)) {
+    if (isToolResult(rawResult)) {
       finalResult = rawResult.result;
       // Merge tool's resolved entities (tool takes precedence)
       if (rawResult.resolvedEntities) {

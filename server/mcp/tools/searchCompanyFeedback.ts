@@ -5,7 +5,7 @@
  * Searches customer feedback across companies by keyword.
  * Returns matching product insights with company context.
  * 
- * Layer: MCP Capability (Extended Search - blocked in Single-Meeting Orchestrator)
+ * Layer: MCP Tool (Extended Search - blocked in Single-Meeting Orchestrator)
  */
 
 import { z } from "zod";

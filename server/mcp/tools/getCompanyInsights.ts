@@ -5,7 +5,7 @@
  * Retrieves product insights (features, context, quotes) for a specific company.
  * Optionally filtered by product.
  * 
- * Layer: MCP Capability
+ * Layer: MCP Tool
  */
 
 import { z } from "zod";

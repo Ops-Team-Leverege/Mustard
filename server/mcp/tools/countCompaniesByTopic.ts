@@ -5,7 +5,7 @@
  * Counts how many distinct companies mentioned a given topic.
  * Searches across product insights context and quotes.
  * 
- * Layer: MCP Capability
+ * Layer: MCP Tool
  */
 
 import { z } from "zod";
