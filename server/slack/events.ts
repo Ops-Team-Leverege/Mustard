@@ -538,23 +538,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
       
       // EARLY PROGRESS MESSAGE: Send personalized progress right after intent classification
-      // This happens BEFORE expensive operations, so users see relevant context quickly
-      // Only for intents that involve expensive operations (not CLARIFY, REFUSE, etc.)
-      const expensiveIntents = ['SINGLE_MEETING', 'MULTI_MEETING', 'PRODUCT_KNOWLEDGE', 'EXTERNAL_RESEARCH', 'GENERAL_HELP'];
-      if (!testRun && expensiveIntents.includes(decisionLayerResult.intent || '')) {
-        // Map Decision Layer intent to progress intent type
-        const intentToProgressType: Record<string, ProgressIntentType> = {
-          'SINGLE_MEETING': 'single_meeting',
-          'MULTI_MEETING': 'multi_meeting',
-          'PRODUCT_KNOWLEDGE': 'product',
-          'EXTERNAL_RESEARCH': 'research',
-          'GENERAL_HELP': 'general',
-        };
-        const progressType = intentToProgressType[decisionLayerResult.intent || ''] || 'general';
-        
-        // Generate and send personalized progress immediately (don't await in blocking way)
-        // This runs quickly (<500ms) and makes the experience feel more human
-        generatePersonalizedProgressMessage(text, progressType).then(async (personalizedProgress) => {
+      // ONLY for SINGLE_MEETING with resolved meeting - other intents use streaming which already provides feedback
+      // Streaming responses show "..." placeholder that updates in real-time, so no extra progress needed
+      // Sending async progress for streaming intents causes race conditions where progress appears AFTER the response
+      if (!testRun && decisionLayerResult.intent === 'SINGLE_MEETING' && resolvedMeeting) {
+        // Only for single-meeting path which doesn't use streaming
+        generatePersonalizedProgressMessage(text, 'single_meeting').then(async (personalizedProgress) => {
           if (progressMessageCount === 0) {
             try {
               await postSlackMessage({
@@ -704,20 +693,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
           semanticConfidence = openAssistantResultData.singleMeetingResult.semanticConfidence;
         }
         
-        // Send progress message if available (for long operations like external research, KB-assisted answers)
-        // ONLY send if no generic timer-based progress messages have been sent yet
-        // This prevents message duplication and confusing message order
-        const progressMessage = openAssistantResultData.progressMessage || 
-          openAssistantResultData.singleMeetingResult?.progressMessage;
-        if (progressMessage && !testRun && progressMessageCount === 0) {
-          console.log(`[Slack] Sending operation-specific progress message: "${progressMessage.substring(0, 50)}..."`);
-          await postSlackMessage({
-            channel,
-            text: progressMessage,
-            thread_ts: threadTs,
-          });
-        } else if (progressMessage && progressMessageCount > 0) {
-          console.log(`[Slack] Skipping operation-specific progress (${progressMessageCount} generic messages already sent)`);
+        // Skip operation-specific progress messages when streaming was used
+        // Streaming provides real-time feedback via the placeholder, so no extra progress needed
+        // Posting progress AFTER response completes creates confusing message order
+        if (streamingContext) {
+          console.log(`[Slack] Skipping operation-specific progress (streaming was used)`);
+        } else {
+          // Only send progress for non-streaming paths (document generation, etc.)
+          const progressMessage = openAssistantResultData.progressMessage || 
+            openAssistantResultData.singleMeetingResult?.progressMessage;
+          if (progressMessage && !testRun && progressMessageCount === 0) {
+            console.log(`[Slack] Sending operation-specific progress message: "${progressMessage.substring(0, 50)}..."`);
+            await postSlackMessage({
+              channel,
+              text: progressMessage,
+              thread_ts: threadTs,
+            });
+          } else if (progressMessage && progressMessageCount > 0) {
+            console.log(`[Slack] Skipping operation-specific progress (${progressMessageCount} generic messages already sent)`);
+          }
         }
         
         logger.info('Open Assistant response generated', {
