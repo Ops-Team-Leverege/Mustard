@@ -21,7 +21,6 @@
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { INTENT_CLASSIFICATION_PROMPT } from "../config/prompts";
-import { isCapabilityQuestion } from "../config/prompts/system";
 import { 
   interpretAmbiguousQuery,
   validateLowConfidenceIntent,
@@ -584,17 +583,6 @@ async function classifyByKeyword(
     };
   }
 
-  // HARDENING: Bot capability questions route to GENERAL_HELP (not PRODUCT_KNOWLEDGE)
-  // "What can you do?" asks about the BOT, not about PitCrew product capabilities
-  if (isCapabilityQuestion(question)) {
-    return {
-      intent: Intent.GENERAL_HELP,
-      intentDetectionMethod: "pattern",
-      confidence: 0.95,
-      reason: "Meta question about bot capabilities (not PitCrew product)",
-    };
-  }
-
   // HARDENING: Check for explicit multi-intent patterns
   const multiIntentCheck = detectMultiIntent(question);
   if (multiIntentCheck.needsSplit) {
@@ -647,11 +635,38 @@ async function classifyByKeyword(
     matchedSignals.push(externalResearchPatternMatch ? "external_research_pattern" : "external_research_keyword");
   }
   
+  // Check GENERAL_HELP keywords (includes "what can you do", greetings, drafting)
+  const generalHelpKeywordMatch = matchesKeywords(lower, GENERAL_HELP_KEYWORDS);
+  if (generalHelpKeywordMatch) {
+    matchingIntents.push(Intent.GENERAL_HELP);
+    matchedSignals.push("general_help_keyword");
+  }
+  
   // HARDENING: If multiple mutually exclusive intents match → CLARIFY (single-intent invariant)
   // MULTI_MEETING and SINGLE_MEETING are mutually exclusive
   // PRODUCT_KNOWLEDGE with MEETING intents is ambiguous
   // EXCEPTION: EXTERNAL_RESEARCH + PRODUCT_KNOWLEDGE → EXTERNAL_RESEARCH wins (chains product knowledge automatically)
+  // EXCEPTION: GENERAL_HELP + PRODUCT_KNOWLEDGE → GENERAL_HELP wins (GENERAL_HELP keywords are more specific phrases)
   if (matchingIntents.length > 1) {
+    // Special case: GENERAL_HELP + PRODUCT_KNOWLEDGE → GENERAL_HELP wins
+    // This handles "what can you do" which matches both (specific phrase vs generic "capabilities")
+    // GENERAL_HELP keywords are full phrases like "what can you do", more specific than "capabilities"
+    if (matchingIntents.length === 2 && 
+        matchingIntents.includes(Intent.GENERAL_HELP) && 
+        matchingIntents.includes(Intent.PRODUCT_KNOWLEDGE)) {
+      console.log(`[IntentClassifier] GENERAL_HELP + PRODUCT_KNOWLEDGE → GENERAL_HELP wins (more specific phrase match)`);
+      return {
+        intent: Intent.GENERAL_HELP,
+        intentDetectionMethod: "keyword",
+        confidence: 0.9,
+        reason: "GENERAL_HELP keyword is more specific (full phrase match takes priority)",
+        decisionMetadata: {
+          matchedSignals,
+          rejectedIntents: [{ intent: Intent.PRODUCT_KNOWLEDGE, reason: "less specific keyword match" }],
+        },
+      };
+    }
+    
     // Special case: EXTERNAL_RESEARCH + PRODUCT_KNOWLEDGE → EXTERNAL_RESEARCH wins
     // This is because EXTERNAL_RESEARCH automatically chains product knowledge for comparison
     if (matchingIntents.length === 2 && 
@@ -701,6 +716,9 @@ async function classifyByKeyword(
     if (selectedIntent !== Intent.EXTERNAL_RESEARCH && !externalResearchPatternMatch && !externalResearchKeywordMatch) {
       rejectedIntents.push({ intent: Intent.EXTERNAL_RESEARCH, reason: "no external-research patterns/keywords matched" });
     }
+    if (selectedIntent !== Intent.GENERAL_HELP && !generalHelpKeywordMatch) {
+      rejectedIntents.push({ intent: Intent.GENERAL_HELP, reason: "no general-help keywords matched" });
+    }
     
     console.log(`[IntentClassifier] Decision: ${selectedIntent} (signals: ${matchedSignals.join(", ")})`);
     return {
@@ -715,16 +733,8 @@ async function classifyByKeyword(
     };
   }
 
-  // IMPORTANT: Check for action-based GENERAL_HELP patterns BEFORE entity detection
-  // This ensures "Draft an email to Tyler" routes to drafting, not meeting lookup
-  if (matchesKeywords(lower, GENERAL_HELP_KEYWORDS)) {
-    return {
-      intent: Intent.GENERAL_HELP,
-      intentDetectionMethod: "keyword",
-      confidence: 0.85,
-      reason: "Matched general help keyword pattern (action takes priority)",
-    };
-  }
+  // NOTE: GENERAL_HELP is now checked in the main matching block above with priority rules
+  // This ensures "what can you do" → GENERAL_HELP instead of PRODUCT_KNOWLEDGE
 
   if (matchesKeywords(lower, DOCUMENT_SEARCH_KEYWORDS)) {
     return {
