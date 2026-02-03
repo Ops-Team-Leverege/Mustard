@@ -74,6 +74,9 @@ EXAMPLES:
 - "What is PitCrew pricing?" → PRODUCT_KNOWLEDGE
 - "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
 - "What are PitCrew's capabilities?" → PRODUCT_KNOWLEDGE
+- "What data sources are you connected to?" → PRODUCT_KNOWLEDGE ("you" = PitCrew)
+- "What integrations do you have?" → PRODUCT_KNOWLEDGE ("you" = PitCrew)
+- "How do you handle X?" → PRODUCT_KNOWLEDGE ("you" = PitCrew's approach)
 - "What's our recommended approach for a 10-20 store expansion pilot?" → PRODUCT_KNOWLEDGE (asking about OUR approach)
 - "How should we help customers evaluate ROI?" → PRODUCT_KNOWLEDGE (our methodology)
 - "Based on PitCrew's value props, how can we approach X?" → PRODUCT_KNOWLEDGE (strategy using our product)
