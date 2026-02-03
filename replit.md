@@ -25,16 +25,35 @@ The application includes a transcript detail view, meeting date support, and das
 ### Decision Layer Architecture (LLM-First Intent Routing)
 The system uses **true LLM-FIRST classification** for intent routing. The LLM (gpt-4o-mini) handles semantic understanding while minimal fast-paths handle only absolute certainties.
 
+**CRITICAL ARCHITECTURAL PRINCIPLE - Detection Method Trust Levels:**
+```
+TRUSTED (no LLM validation needed):
+- Entity detection: Database lookup of known customers/contacts → AUTHORITATIVE
+- Pattern detection: High-confidence regex (REFUSE, MULTI_INTENT) → AUTHORITATIVE
+
+WEAK (needs LLM validation):
+- Keyword detection: Heuristic pattern matching → MAY BE WRONG
+```
+
+**Why this matters:** When someone types a known customer name like "Les Schwab", entity detection finds it in the database and returns SINGLE_MEETING. This is AUTHORITATIVE - the database knows this is a customer. Do NOT add LLM validation that can override this. LLM validation is only for weak heuristic matches.
+
+**DO NOT:**
+- Add regex patterns to handle edge cases (LLM handles semantic nuance)
+- Add LLM validation for entity detection (database is authoritative)
+- Override entity detection with LLM interpretation
+
 **Classification Strategy:**
-1. **Minimal fast-paths** (no LLM cost):
+1. **Minimal fast-paths** (no LLM cost, TRUSTED):
    - REFUSE patterns: Weather, jokes, personal info (out of scope)
    - MULTI_INTENT patterns: Multi-step requests needing clarification
    - Simple greetings: "hello", "thanks", etc.
-   - Entity detection: Known company/contact names → meeting intent (validated by LLM)
+   - Entity detection: Known company/contact names from database → meeting intent (TRUSTED, no LLM override)
 2. **LLM semantic classification** (everything else):
    - Uses `INTENT_CLASSIFICATION_PROMPT` in `server/config/prompts/decisionLayer.ts`
    - Handles SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, EXTERNAL_RESEARCH, etc.
-   - LLM validates entity-detection matches for low-confidence cases
+3. **LLM validation** (only for WEAK detection methods):
+   - Only validates keyword detection matches
+   - NEVER validates entity detection (database is authoritative)
 
 **Key Components:**
 - **Intent Router** (`server/decisionLayer/intent.ts`): Classifies user intent using LLM semantic understanding
