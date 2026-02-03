@@ -375,6 +375,12 @@ graph TD
 - "What's our value proposition for multi-location businesses?"
 - "Help me think through how to approach this customer"
 
+**External Research** (web research and competitive intelligence):
+- "Research this company's recent earnings call"
+- "What are their current business priorities?"
+- "Find information about their technology stack"
+- "Prepare competitive analysis for this prospect"
+
 **Document Generation** (automated content creation):
 - "Create a summary of the Acme Corp relationship"
 - "Draft a follow-up email for the Starbucks meeting"

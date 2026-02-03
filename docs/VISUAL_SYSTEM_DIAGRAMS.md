@@ -282,30 +282,41 @@ graph TD
     G -->|SINGLE_MEETING| H[Single Meeting Context]
     G -->|MULTI_MEETING| I[Multi-Meeting Context]
     G -->|PRODUCT_KNOWLEDGE| J[Product SSOT Context]
-    G -->|CLARIFY| K[Clarification Required]
+    G -->|EXTERNAL_RESEARCH| K[External Research Context]
+    G -->|DOCUMENT_SEARCH| L[Document Repository Context]
+    G -->|GENERAL_HELP| M[General Assistance Context]
+    G -->|REFUSE| N[Out-of-Scope Response]
+    G -->|CLARIFY| O[Clarification Required]
     
-    H --> L[Answer Contract Selection]
-    I --> M[Scope Clarification Check]
-    J --> L
-    K --> N[Generate Clarification Message]
+    H --> P[Answer Contract Selection]
+    I --> Q[Scope Clarification Check]
+    J --> P
+    K --> P
+    L --> P
+    M --> P
+    N --> R[Generate Refusal Message]
+    O --> S[Generate Clarification Message]
     
-    M --> O{Sufficient Scope?}
-    O -->|Yes| L
-    O -->|No| P[Request Time Range & Customer Scope]
+    Q --> T{Sufficient Scope?}
+    T -->|Yes| P
+    T -->|No| U[Request Time Range & Customer Scope]
     
-    L --> Q[Contract Execution]
-    P --> R[Wait for User Response]
-    R --> A
+    P --> V[Contract Execution]
+    U --> W[Wait for User Response]
+    W --> A
     
-    Q --> S[Route to Handler]
-    S --> T{Handler Type}
-    T -->|Single Meeting| U[Single Meeting Orchestrator]
-    T -->|Multi-Meeting| V[Open Assistant Handler]
+    V --> X[Route to Handler]
+    X --> Y{Handler Type}
+    Y -->|Single Meeting| Z[Single Meeting Orchestrator]
+    Y -->|Multi-Meeting| AA[Open Assistant Handler]
+    Y -->|External Research| BB[External Research Handler]
     
-    U --> W[Generate Response]
-    V --> W
-    N --> X[Post Clarification]
-    W --> Y[Post Response with Citations]
+    Z --> CC[Generate Response]
+    AA --> CC
+    BB --> CC
+    R --> DD[Post Refusal]
+    S --> EE[Post Clarification]
+    CC --> FF[Post Response with Citations]
     
     classDef input fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
     classDef decision fill:#e1f5fe,stroke:#01579b,stroke-width:2px
@@ -313,9 +324,9 @@ graph TD
     classDef output fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     
     class A,B input
-    class C,D,E,F,G,L,M,O,Q,S,T decision
-    class H,I,J,K,N,P,R context
-    class U,V,W,X,Y output
+    class C,D,E,F,G,P,Q,T,V,X,Y decision
+    class H,I,J,K,L,M,N,O,S,U,W context
+    class Z,AA,BB,CC,DD,EE,FF output
 ```
 
 ## Production Performance Metrics

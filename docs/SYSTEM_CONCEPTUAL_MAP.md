@@ -85,6 +85,9 @@ Data Storage & Retrieval
 - **MULTI_MEETING**: Cross-meeting analysis and patterns
 - **PRODUCT_KNOWLEDGE**: Product features and capabilities
 - **DOCUMENT_SEARCH**: Find specific documents
+- **EXTERNAL_RESEARCH**: Web research on companies/prospects
+- **GENERAL_HELP**: General assistance and guidance
+- **REFUSE**: Out-of-scope requests
 - **CLARIFY**: Ambiguous queries requiring clarification
 
 **Context Layers** (`server/decisionLayer/contextLayers.ts`):
@@ -94,10 +97,29 @@ Data Storage & Retrieval
 - Document repository access
 
 **Answer Contracts** (`server/decisionLayer/answerContracts.ts`):
-- VALUE_PROPOSITION, MEETING_SUMMARY
-- CROSS_MEETING_QUESTIONS, PATTERN_ANALYSIS
-- TREND_SUMMARY, COMPARISON
-- DRAFT_EMAIL, PRODUCT_EXPLANATION
+
+**Single Meeting Contracts**:
+- MEETING_SUMMARY, NEXT_STEPS, ATTENDEES
+- CUSTOMER_QUESTIONS, EXTRACTIVE_FACT, AGGREGATIVE_LIST
+
+**Multi-Meeting Contracts**:
+- PATTERN_ANALYSIS, COMPARISON, TREND_SUMMARY
+- CROSS_MEETING_QUESTIONS
+
+**Descriptive Contracts**:
+- PRODUCT_EXPLANATION, VALUE_PROPOSITION
+- DRAFT_RESPONSE, DRAFT_EMAIL
+
+**Authoritative Contracts**:
+- FEATURE_VERIFICATION, FAQ_ANSWER
+- PRODUCT_KNOWLEDGE (chainable)
+
+**External Research Contracts**:
+- EXTERNAL_RESEARCH, SALES_DOCS_PREP
+
+**General & Terminal Contracts**:
+- DOCUMENT_ANSWER, GENERAL_RESPONSE, NOT_FOUND
+- REFUSE, CLARIFY
 
 ### 3. **AI Processing Pipeline**
 **Purpose**: Transform raw transcripts into structured business intelligence
