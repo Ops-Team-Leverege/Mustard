@@ -436,11 +436,18 @@ async function classifyByLLM(question: string): Promise<IntentClassificationResu
 const LOW_CONFIDENCE_THRESHOLD = 0.88;
 
 // Detection methods that are considered "weak" and need validation
-const WEAK_DETECTION_METHODS = ["keyword", "entity"];
+// NOTE: "entity" is NOT weak - it's based on database lookup of known customers
+const WEAK_DETECTION_METHODS = ["keyword"];
 
 function needsLLMValidation(result: IntentClassificationResult): boolean {
   // High-confidence pattern matches don't need validation
   if (result.intentDetectionMethod === "pattern" && result.confidence >= 0.9) {
+    return false;
+  }
+  
+  // Entity detection (known customers from database) doesn't need validation
+  // When someone mentions a known customer like "Les Schwab", trust it's about meetings
+  if (result.intentDetectionMethod === "entity") {
     return false;
   }
   
