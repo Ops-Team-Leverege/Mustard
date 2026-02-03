@@ -113,6 +113,14 @@ const BOT_CAPABILITIES: Array<{ capability: string; useCase: string }> = [
   { capability: "POS Detection", useCase: "Identify what POS systems prospects use" },
   { capability: "Pain Point Extraction", useCase: "Find what problems customers mention" },
   { capability: "Objection Tracking", useCase: "Track common objections across customers" },
+  
+  // General PitCrew help
+  { capability: "General Help", useCase: "Answer any question about PitCrew" },
+  { capability: "How It Works", useCase: "Explain how PitCrew's vision AI detects vehicles and services" },
+  { capability: "Integration Questions", useCase: "Explain how PitCrew connects with POS systems" },
+  { capability: "ROI Conversations", useCase: "Help you explain the business value of PitCrew" },
+  { capability: "Technical Deep Dives", useCase: "Walk through camera placement, network requirements, or data flow" },
+  { capability: "Use Case Examples", useCase: "Share real examples of how shops use PitCrew" },
 ];
 
 /**
