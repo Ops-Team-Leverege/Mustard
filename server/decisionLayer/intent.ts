@@ -223,20 +223,15 @@ async function containsKnownCompany(text: string): Promise<string | null> {
     }
   }
   
-  // Second pass: check for first word match (e.g., "TPI" matches "TPI Composites")
-  // Requirements to avoid false positives:
-  // - Minimum 3 characters for first word
-  // - Word must not appear in a common phrase context (e.g., "oil change" ≠ "Oil Changers")
-  const commonPhraseWords = ['oil', 'big', 'service', 'discount', 'east', 'full', 'true', 'team', 'test'];
-  
+  // Second pass: check for first word match ONLY for acronyms (e.g., "TPI" matches "TPI Composites")
+  // Acronym detection: all uppercase, 2-5 characters (covers TPI, ACE, CJ, OK, etc.)
+  // This avoids false positives like "oil" matching "Oil Changers"
   for (const company of companies) {
-    const firstWord = company.split(/\s+/)[0].toLowerCase();
-    if (firstWord.length >= 3) {
-      // Skip words that commonly appear in generic phrases
-      if (commonPhraseWords.includes(firstWord)) {
-        continue;
-      }
-      // Use word boundary to avoid partial matches like "ace" in "surface"
+    const firstWord = company.split(/\s+/)[0];
+    const isAcronym = /^[A-Z]{2,5}$/.test(firstWord) || /^[A-Z][A-Za-z]'?s?$/.test(firstWord);
+    
+    if (isAcronym) {
+      // Use word boundary to avoid partial matches
       const wordBoundaryRegex = new RegExp(`\\b${firstWord}\\b`, 'i');
       if (wordBoundaryRegex.test(lower)) {
         return company;
