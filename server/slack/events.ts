@@ -358,117 +358,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       return; // Done - fast path completed
     }
 
-    // 9. STEP 0: Meeting Resolution (runs before intent classification)
-    // 
-    // Resolution Order (Strict):
-    // 1. Thread context (highest priority) - always wins
-    // 2. Explicit meeting ID/link in message
-    // 3. Explicit temporal language (new threads only)
-    //    - "last meeting", "latest meeting", "most recent meeting"
-    //    - "meeting on <date>"
-    //    - "meeting last week", "meeting last month"
-    //
-    // If ambiguous → ask for clarification (no intent classification runs)
-    // If resolved → proceed to single-meeting mode
-    //
+    // INTENT-FIRST ARCHITECTURE:
+    // Run Decision Layer FIRST to classify intent, then resolve meeting only when needed.
+    // This saves ~1.5s for non-meeting requests (60% of traffic).
     let resolvedMeeting: { meetingId: string; companyId: string; companyName: string; meetingDate?: Date | null; wasAutoSelected?: boolean } | null = null;
-    let mrDuration = 0; // Meeting resolution timing
-    
-    // Only attempt temporal resolution if:
-    // - No thread context exists, OR
-    // - Message explicitly uses temporal language
-    // - A company name is mentioned (auto-select most recent meeting)
-    const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
-    const meetingDetection = { regexResult, llmCalled, llmResult, llmLatencyMs };
-    
-    // Also check if a company is mentioned - if so, we can auto-resolve to most recent meeting
-    const companyMentioned = await extractCompanyFromMessage(text);
-    const shouldAttemptResolution = !threadContext?.meetingId || hasMeetingRef || companyMentioned !== null;
-    
-    if (shouldAttemptResolution) {
-      console.log(`[Slack] Step 0: Meeting resolution (hasMeetingRef=${hasMeetingRef}, regex=${regexResult}, llm=${llmResult}, companyMentioned=${companyMentioned?.companyName || 'none'})`);
-      
-      logger.startStage('meeting_resolution');
-      const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
-      mrDuration = logger.endStage('meeting_resolution');
-      
-      if (resolution.resolved) {
-        resolvedMeeting = {
-          meetingId: resolution.meetingId,
-          companyId: resolution.companyId,
-          companyName: resolution.companyName,
-          meetingDate: resolution.meetingDate,
-          wasAutoSelected: resolution.wasAutoSelected,
-        };
-        logger.debug('Meeting resolution completed', {
-          resolved: true,
-          meetingId: resolution.meetingId,
-          companyName: resolution.companyName,
-          wasAutoSelected: resolution.wasAutoSelected,
-          duration_ms: mrDuration,
-        });
-        console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})${resolution.wasAutoSelected ? ' [auto-selected most recent]' : ''}`);
-      } else if (resolution.needsClarification) {
-        // Clarification needed - respond and stop processing
-        console.log(`[Slack] Clarification needed: ${resolution.message}`);
-        
-        if (!testRun) {
-          await postSlackMessage({
-            channel,
-            text: resolution.message,
-            thread_ts: threadTs,
-          });
-        }
-        
-        // Log interaction for clarification with structured metadata
-        logInteraction({
-          slackChannelId: channel,
-          slackThreadId: threadTs,
-          slackMessageTs: messageTs,
-          userId: userId || null,
-          companyId: null,
-          meetingId: null,
-          questionText: text,
-          answerText: resolution.message,
-          metadata: buildInteractionMetadata(
-            {},
-            {
-              entryPoint: "slack",
-              legacyIntent: "unknown",
-              answerShape: "none",
-              dataSource: "not_found",
-              llmPurposes: [],
-              companySource: "none",
-              meetingSource: "none",
-              ambiguity: {
-                detected: true,
-                clarificationAsked: true,
-                type: null,
-              },
-              testRun,
-              meetingDetection,
-            }
-          ),
-          testRun,
-        });
-        
-        clearProgressTimer();
-        return; // Stop processing - clarification required
-      }
-      // If not resolved and no clarification needed, proceed to MCP router
-    } else if (threadContext?.meetingId && threadContext?.companyId) {
-      // Thread context exists - use it
-      const [companyRows, transcriptRows] = await Promise.all([
-        storage.rawQuery(`SELECT name FROM companies WHERE id = $1`, [threadContext.companyId]),
-        storage.rawQuery(`SELECT COALESCE(meeting_date, created_at) as meeting_date FROM transcripts WHERE id = $1`, [threadContext.meetingId]),
-      ]);
-      resolvedMeeting = {
-        meetingId: threadContext.meetingId,
-        companyId: threadContext.companyId,
-        companyName: (companyRows?.[0]?.name as string) || "Unknown Company",
-        meetingDate: transcriptRows?.[0]?.meeting_date ? new Date(transcriptRows[0].meeting_date as string) : null,
-      };
-    }
+    let mrDuration = 0;
+    // meetingDetection is set after intent classification for meeting intents
+    let meetingDetection: { regexResult: boolean; llmCalled: boolean; llmResult: boolean | null; llmLatencyMs: number | null } = { regexResult: false, llmCalled: false, llmResult: null, llmLatencyMs: null };
 
     // 10. Process request
     // 
@@ -530,6 +426,98 @@ export async function slackEventsHandler(req: Request, res: Response) {
       
       decisionLayerResult = await runDecisionLayer(text, threadContextForCP);
       cpDuration = logger.endStage('decision_layer');
+      console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
+      
+      // STEP 1.5: INTENT-CONDITIONAL MEETING RESOLUTION
+      // Only resolve meeting for SINGLE_MEETING or MULTI_MEETING intents (saves ~1.5s for 60% of requests)
+      const needsMeetingResolution = decisionLayerResult.intent === 'SINGLE_MEETING' || decisionLayerResult.intent === 'MULTI_MEETING';
+      
+      if (needsMeetingResolution) {
+        console.log(`[Slack] Intent requires meeting - running meeting resolution`);
+        
+        // Check if thread already has meeting context (highest priority)
+        if (threadContext?.meetingId && threadContext?.companyId) {
+          const [companyRows, transcriptRows] = await Promise.all([
+            storage.rawQuery(`SELECT name FROM companies WHERE id = $1`, [threadContext.companyId]),
+            storage.rawQuery(`SELECT COALESCE(meeting_date, created_at) as meeting_date FROM transcripts WHERE id = $1`, [threadContext.meetingId]),
+          ]);
+          resolvedMeeting = {
+            meetingId: threadContext.meetingId,
+            companyId: threadContext.companyId,
+            companyName: (companyRows?.[0]?.name as string) || "Unknown Company",
+            meetingDate: transcriptRows?.[0]?.meeting_date ? new Date(transcriptRows[0].meeting_date as string) : null,
+          };
+          console.log(`[Slack] Meeting from thread context: ${resolvedMeeting.meetingId}`);
+        } else {
+          // Attempt meeting resolution from message
+          const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
+          meetingDetection = { regexResult, llmCalled, llmResult, llmLatencyMs };
+          const companyMentioned = await extractCompanyFromMessage(text);
+          
+          if (hasMeetingRef || companyMentioned !== null) {
+            console.log(`[Slack] Meeting resolution: hasMeetingRef=${hasMeetingRef}, company=${companyMentioned?.companyName || 'none'}`);
+            
+            logger.startStage('meeting_resolution');
+            const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
+            mrDuration = logger.endStage('meeting_resolution');
+            
+            if (resolution.resolved) {
+              resolvedMeeting = {
+                meetingId: resolution.meetingId,
+                companyId: resolution.companyId,
+                companyName: resolution.companyName,
+                meetingDate: resolution.meetingDate,
+                wasAutoSelected: resolution.wasAutoSelected,
+              };
+              console.log(`[Slack] Meeting resolved: ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})${resolution.wasAutoSelected ? ' [auto-selected]' : ''}`);
+            } else if (resolution.needsClarification) {
+              // Clarification needed - respond and stop processing
+              console.log(`[Slack] Meeting clarification needed: ${resolution.message}`);
+              
+              if (!testRun) {
+                await postSlackMessage({
+                  channel,
+                  text: resolution.message,
+                  thread_ts: threadTs,
+                });
+              }
+              
+              logInteraction({
+                slackChannelId: channel,
+                slackThreadId: threadTs,
+                slackMessageTs: messageTs,
+                userId: userId || null,
+                companyId: null,
+                meetingId: null,
+                questionText: text,
+                answerText: resolution.message,
+                metadata: buildInteractionMetadata(
+                  {},
+                  {
+                    entryPoint: "slack",
+                    legacyIntent: "unknown",
+                    answerShape: "none",
+                    dataSource: "not_found",
+                    llmPurposes: [],
+                    companySource: "none",
+                    meetingSource: "none",
+                    ambiguity: { detected: true, clarificationAsked: true, type: null },
+                    testRun,
+                    meetingDetection,
+                  }
+                ),
+                testRun,
+              });
+              
+              clearProgressTimer();
+              return; // Stop - clarification required
+            }
+          }
+        }
+      } else {
+        console.log(`[Slack] Non-meeting intent (${decisionLayerResult.intent}) - skipping meeting resolution`);
+      }
+      
       logger.info('Decision Layer completed', {
         intent: decisionLayerResult.intent,
         contract: decisionLayerResult.answerContract,
@@ -537,7 +525,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
         resolvedMeetingId: resolvedMeeting?.meetingId,
         duration_ms: cpDuration,
       });
-      console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
       
       // EARLY PROGRESS MESSAGE: Send personalized progress right after intent classification
       // ONLY for SINGLE_MEETING with resolved meeting - other intents use streaming which already provides feedback
@@ -814,7 +801,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               artifactType: mappedArtifact,
               llmPurposes,
               companySource: threadContext?.companyId ? "thread" : "extracted",
-              meetingSource: threadContext?.meetingId ? "thread" : (hasMeetingRef ? "explicit" : "last_meeting"),
+              meetingSource: threadContext?.meetingId ? "thread" : (meetingDetection.regexResult || meetingDetection.llmResult ? "explicit" : "last_meeting"),
               isBinaryQuestion,
               semanticAnswerUsed,
               semanticConfidence,

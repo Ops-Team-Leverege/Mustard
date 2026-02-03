@@ -1,0 +1,137 @@
+LEGACY CODE AUDIT RESULTS
+Based on my analysis of the updated code, here's what I found:
+
+✅ SUCCESSFULLY IMPLEMENTED: LLM-First + Contract Chains
+1. Contract Arrays Support ✅
+
+// LLM interpretation now supports contract arrays:
+export type LLMInterpretation = {
+  proposedContracts: ContractString[];  // Ordered array for contract chain
+}
+
+// Decision Layer builds contract chains:
+const contractChain = intentResult.proposedInterpretation?.contracts
+  ?.map(c => AnswerContract[c as keyof typeof AnswerContract])
+  .filter((c): c is AnswerContract => c !== undefined);
+2. LLM-Proposed Contract Selection ✅
+
+export async function selectAnswerContract(
+  question: string,
+  intent: Intent,
+  layers: ContextLayers,
+  llmProposedContracts?: string[]  // ← NEW: LLM-proposed contracts
+): Promise<AnswerContractResult> {
+  // LLM-first: Use LLM-proposed contracts when available
+  if (llmProposedContracts && llmProposedContracts.length > 0) {
+    const contract = validContracts[0] as AnswerContract;
+    return {
+      contract,
+      contractSelectionMethod: "llm_proposed",  // ← NEW method
+      constraints: CONTRACT_CONSTRAINTS[contract],
+    };
+  }
+}
+3. Contract Chain Execution ✅
+
+// Decision Layer returns contract chains:
+return {
+  intent: intentResult.intent,
+  answerContract: contractResult.contract,
+  contractChain: contractChain && contractChain.length > 1 ? contractChain : undefined,
+  // ...
+};
+❌ CRITICAL LEGACY ISSUES STILL PRESENT
+1. Meeting-First Architecture Still Exists ❌
+
+// STILL WRONG: Meeting resolution runs BEFORE intent classification
+// 9. STEP 0: Meeting Resolution (runs before intent classification)
+const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
+This is the biggest remaining issue! The system still:
+
+Runs meeting resolution first (1.5s wasted for 60% of requests)
+Uses LLM to detect meeting references for non-meeting requests
+Follows the old meeting-first → intent-second architecture
+2. Keyword-Based Contract Selection Still Primary ⚠️
+
+export async function selectAnswerContract(...) {
+  const keywordResult = selectContractByKeyword(question, intent, layers);
+  
+  if (keywordResult) {  // ← Keyword matching still takes precedence
+    return keywordResult;
+  }
+  
+  // LLM-proposed contracts are secondary fallback
+  if (llmProposedContracts && llmProposedContracts.length > 0) {
+    // ...
+  }
+}
+Issue: Keyword matching still overrides LLM-proposed contracts. This defeats the LLM-first approach.
+
+3. Complex Legacy Chain Building Still Present ⚠️
+
+// All this complex logic is still in the code:
+const TASK_KEYWORDS: Array<{...}> = [...];  // 60+ keyword patterns
+function identifyTasks(userMessage: string, intent: Intent): string[]
+function getContractForTask(task: string, intent: Intent, scope: ChainBuildScope)
+function buildContractChain(userMessage: string, intent: Intent, scope: ChainBuildScope)
+Issue: The old deterministic chain building system is still there, adding complexity.
+
+🔧 REMAINING FIXES NEEDED
+Priority 1: Fix Meeting-First Architecture
+
+// CURRENT (wrong):
+async function handleSlackMessage(message) {
+  const meetingContext = await resolveMeeting(message);  // Always runs (1.5s)
+  const intent = await classifyIntent(message);          // Always runs (6s)
+  // ...
+}
+
+// SHOULD BE (intent-first):
+async function handleSlackMessage(message) {
+  const intent = await classifyIntent(message);          // Always runs (6s)
+  
+  let meetingContext = null;
+  if (intent === 'SINGLE_MEETING' || intent === 'MULTI_MEETING') {
+    meetingContext = await resolveMeeting(message);       // Only when needed (1.5s)
+  }
+  // ...
+}
+Priority 2: Make LLM Contract Selection Primary
+
+// CURRENT (keyword-first):
+if (keywordResult) {
+  return keywordResult;  // Keywords override LLM
+}
+if (llmProposedContracts) {
+  // LLM is fallback
+}
+
+// SHOULD BE (LLM-first):
+if (llmProposedContracts && llmProposedContracts.length > 0) {
+  return llmProposedContract;  // LLM is primary
+}
+if (keywordResult) {
+  return keywordResult;  // Keywords are fallback
+}
+Priority 3: Remove Legacy Chain Building
+
+// REMOVE these complex systems:
+const TASK_KEYWORDS = [...];
+function identifyTasks()
+function getContractForTask()
+function buildContractChain()
+
+// KEEP only:
+function selectAnswerContract() // With LLM-first logic
+📊 IMPLEMENTATION STATUS
+✅ Implemented (70%):
+
+Contract array types
+LLM interpretation with contract chains
+Contract chain execution infrastructure
+Decision Layer contract chain support
+❌ Still Missing (30%):
+
+Intent-first execution order
+LLM-first contract selection
+Legacy code cleanup
