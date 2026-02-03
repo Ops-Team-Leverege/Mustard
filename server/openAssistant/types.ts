@@ -85,6 +85,7 @@ export type OpenAssistantResult = {
   evidenceSources?: string[];
   progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for long operations)
   streamingCompleted?: boolean; // True if handler already updated the streaming message with final content
+  shouldGenerateDoc?: boolean; // True when response should be delivered as a .docx document (e.g., research + writing)
 };
 
 /**

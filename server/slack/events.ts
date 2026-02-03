@@ -633,7 +633,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // Contracts that might generate documents - don't use streaming for these
         const docGeneratingContracts = [
           "VALUE_PROPOSITION", "MEETING_SUMMARY", "COMPARISON", 
-          "DRAFT_EMAIL", "PATTERN_ANALYSIS", "PRODUCT_EXPLANATION"
+          "DRAFT_EMAIL", "PATTERN_ANALYSIS", "PRODUCT_EXPLANATION",
+          "SALES_DOCS_PREP" // Research + writing produces a doc
         ];
         const mightGenerateDoc = docGeneratingContracts.includes(decisionLayerResult.answerContract || "");
         
@@ -769,6 +770,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
           }
         } else {
           console.log(`[Slack] No content to update streaming message: ${botReply.ts}`);
+        }
+        
+        // Generate document AFTER streaming if handler requested it
+        if (openAssistantResultData?.shouldGenerateDoc && responseText && responseText.length > 200) {
+          console.log(`[Slack] Handler requested doc generation - generating .docx`);
+          try {
+            const { AnswerContract } = await import("../decisionLayer/answerContracts");
+            await sendResponseWithDocumentSupport({
+              channel,
+              threadTs,
+              content: responseText,
+              contract: openAssistantResultData.answerContract ?? AnswerContract.SALES_DOCS_PREP,
+              customerName: resolvedMeeting?.companyName,
+              userQuery: text,
+            });
+            console.log(`[Slack] Document generated and uploaded`);
+          } catch (docErr) {
+            console.error(`[Slack] Failed to generate document:`, docErr);
+          }
         }
       } else if (openAssistantResultData?.answerContract && !usedSingleMeetingMode) {
         // Open Assistant responses may generate documents for specific contracts or long content

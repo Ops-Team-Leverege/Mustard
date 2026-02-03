@@ -1218,6 +1218,7 @@ async function handleExternalResearchIntent(
         delegatedToSingleMeeting: false,
         evidenceSources: researchResult.citations.map(c => c.source),
         progressMessage,
+        shouldGenerateDoc: chainIncludesSalesDocsPrep, // Generate doc when research + writing requested
       };
     } catch (styleError) {
       console.error(`[OpenAssistant] Style chaining failed, returning raw research:`, styleError);
