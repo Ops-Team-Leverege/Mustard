@@ -47,7 +47,7 @@ export enum Intent {
   CLARIFY = "CLARIFY",
 }
 
-export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "llm_validated" | "default" | "follow_up_detection";
+export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "entity_acronym" | "llm" | "llm_validated" | "default" | "follow_up_detection" | "product_signal" | "situation_advice";
 
 /**
  * Structured decision metadata for observability.
@@ -212,20 +212,25 @@ function matchesPatterns(text: string, patterns: RegExp[]): boolean {
   return patterns.some(pattern => pattern.test(text));
 }
 
-async function containsKnownCompany(text: string): Promise<string | null> {
+type CompanyMatchResult = {
+  company: string;
+  matchType: "full" | "acronym";  // full = authoritative, acronym = needs LLM validation
+};
+
+async function containsKnownCompany(text: string): Promise<CompanyMatchResult | null> {
   const lower = text.toLowerCase();
   const companies = await getKnownCompanies();
   
-  // First pass: check for full company name match
+  // First pass: check for full company name match (AUTHORITATIVE - no validation needed)
   for (const company of companies) {
     if (lower.includes(company)) {
-      return company;
+      return { company, matchType: "full" };
     }
   }
   
   // Second pass: check for first word match ONLY for acronyms (e.g., "TPI" matches "TPI Composites")
   // Acronym detection: all uppercase, 2-5 characters (covers TPI, ACE, CJ, OK, etc.)
-  // This avoids false positives like "oil" matching "Oil Changers"
+  // These matches NEED LLM validation to confirm semantic intent
   for (const company of companies) {
     const firstWord = company.split(/\s+/)[0];
     const isAcronym = /^[A-Z]{2,5}$/.test(firstWord) || /^[A-Z][A-Za-z]'?s?$/.test(firstWord);
@@ -234,7 +239,7 @@ async function containsKnownCompany(text: string): Promise<string | null> {
       // Use word boundary to avoid partial matches
       const wordBoundaryRegex = new RegExp(`\\b${firstWord}\\b`, 'i');
       if (wordBoundaryRegex.test(lower)) {
-        return company;
+        return { company, matchType: "acronym" };
       }
     }
   }
@@ -380,11 +385,15 @@ async function classifyByKeyword(
   }
 
   // Entity detection: Only triggers if no action-based pattern matched first
-  const company = await containsKnownCompany(question);
+  const companyMatch = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
   
-  if (company || contact) {
-    const entityName = company || contact;
+  if (companyMatch || contact) {
+    const entityName = companyMatch?.company || contact;
+    // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
+    const detectionMethod: IntentDetectionMethod = companyMatch?.matchType === "acronym" ? "entity_acronym" : "entity";
+    // Lower confidence for acronym matches since they need validation
+    const confidence = companyMatch?.matchType === "acronym" ? 0.70 : 0.85;
     
     // Don't trigger multi-meeting for strategic advice requests
     // "across all their stores" is about customer behavior, not "search across all meetings"
@@ -409,16 +418,16 @@ async function classifyByKeyword(
     if (hasMultiMeetingSignal) {
       return {
         intent: Intent.MULTI_MEETING,
-        intentDetectionMethod: "entity",
-        confidence: 0.85,
+        intentDetectionMethod: detectionMethod,
+        confidence,
         reason: `Contains known entity "${entityName}" with multi-meeting signal`,
       };
     }
     
     return {
       intent: Intent.SINGLE_MEETING,
-      intentDetectionMethod: "entity",
-      confidence: 0.85,
+      intentDetectionMethod: detectionMethod,
+      confidence,
       reason: `Contains known entity "${entityName}" - likely asking about meeting`,
     };
   }
@@ -487,9 +496,10 @@ async function classifyByLLM(question: string): Promise<IntentClassificationResu
 // Low-confidence threshold for LLM validation
 const LOW_CONFIDENCE_THRESHOLD = 0.88;
 
-// Detection methods that are considered "weak" and need validation
-// NOTE: "entity" is NOT weak - it's based on database lookup of known customers
-const WEAK_DETECTION_METHODS = ["keyword"];
+// Detection methods that are considered "weak" and need LLM validation
+// "entity" (full company name match) is AUTHORITATIVE - no validation needed
+// "entity_acronym" (first-word acronym match) is WEAK - needs LLM to confirm semantic intent
+const WEAK_DETECTION_METHODS: IntentDetectionMethod[] = ["keyword", "entity_acronym"];
 
 function needsLLMValidation(result: IntentClassificationResult): boolean {
   // High-confidence pattern matches don't need validation
@@ -497,9 +507,14 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
     return false;
   }
   
-  // Entity detection (known customers from database) doesn't need validation
+  // Full entity detection (known customers from database) doesn't need validation
   // When someone mentions a known customer like "Les Schwab", trust it's about meetings
   if (result.intentDetectionMethod === "entity") {
+    return false;
+  }
+  
+  // Product signal and situation_advice are high-confidence fast-paths
+  if (result.intentDetectionMethod === "product_signal" || result.intentDetectionMethod === "situation_advice") {
     return false;
   }
   
@@ -508,8 +523,9 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
     return false;
   }
   
-  // Weak detection methods need validation
+  // Weak detection methods need validation (includes entity_acronym matches)
   if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
+    console.log(`[IntentClassifier] Weak detection method "${result.intentDetectionMethod}" - will validate with LLM`);
     return true;
   }
   
