@@ -21,7 +21,7 @@
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { INTENT_CLASSIFICATION_PROMPT } from "../config/prompts";
-import { 
+import {
   interpretAmbiguousQuery,
   validateLowConfidenceIntent,
   type ClarifyWithInterpretation,
@@ -169,12 +169,12 @@ const COMPANY_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 async function getKnownCompanies(): Promise<string[]> {
   const now = Date.now();
-  
+
   // Return cache if still valid
   if (cachedCompanyNames.length > 0 && (now - companyCacheLastRefresh) < COMPANY_CACHE_TTL_MS) {
     return cachedCompanyNames;
   }
-  
+
   try {
     const companies = await storage.getCompanies("PitCrew");
     cachedCompanyNames = companies.map(c => c.name.toLowerCase());
@@ -271,9 +271,9 @@ function detectFollowUpMessage(
   };
 
   const intent = intentMap[result.inferredIntentKey] || Intent.GENERAL_HELP;
-  
+
   console.log(`[IntentClassifier] Follow-up detected: "${question}" → ${intent} (${result.reason})`);
-  
+
   return {
     intent,
     intentDetectionMethod: "follow_up_detection",
@@ -346,32 +346,38 @@ async function classifyByKeyword(
   // The LLM is better at understanding semantic intent than brittle regex patterns
   // ============================================================================
 
-  // PRODUCT_KNOWLEDGE override: Strategic advice requests should go to LLM, not entity detection
+  // PRODUCT_KNOWLEDGE override: Strategic advice requests should return PRODUCT_KNOWLEDGE immediately
   // These phrases indicate the user wants strategic advice, not meeting analysis
   const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
   if (productKnowledgeSignals.test(question)) {
-    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - delegating to LLM for nuanced classification`);
-    return null; // Let LLM handle this with full context
+    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - returning PRODUCT_KNOWLEDGE intent`);
+    return {
+      intent: Intent.PRODUCT_KNOWLEDGE,
+      intentDetectionMethod: "pattern",
+      confidence: 0.9,
+      reason: "Strategic advice request using PitCrew value propositions",
+    };
   }
 
   // Entity detection: Only triggers if no action-based pattern matched first
   const company = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
-  
+
   if (company || contact) {
     const entityName = company || contact;
-    
+
     // Don't trigger multi-meeting for strategic advice requests
     // "across all their stores" is about customer behavior, not "search across all meetings"
-    const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
+    // Be more specific about multi-meeting signals to avoid false positives
+    const hasMultiMeetingSignal = /\b(all|every|across)\s+(meetings?|calls?|customers?|companies)\b|find\s+(all|every|across)|search\s+(all|every|across)|which\s+(meetings?|calls?|customers?)/i.test(question);
     const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want|pilot)\b/i.test(question);
-    
+
     // If describing a situation (not asking to search meetings), let LLM handle it
     if (isDescribingSituation) {
       console.log(`[Intent] Message describes a situation - delegating to LLM for nuanced classification`);
       return null;
     }
-    
+
     if (hasMultiMeetingSignal) {
       return {
         intent: Intent.MULTI_MEETING,
@@ -380,7 +386,7 @@ async function classifyByKeyword(
         reason: `Contains known entity "${entityName}" with multi-meeting signal`,
       };
     }
-    
+
     return {
       intent: Intent.SINGLE_MEETING,
       intentDetectionMethod: "entity",
@@ -418,7 +424,7 @@ async function classifyByLLM(question: string): Promise<IntentClassificationResu
 
     const parsed = JSON.parse(content);
     const intentStr = parsed.intent as string;
-    
+
     if (intentStr in Intent) {
       return {
         intent: Intent[intentStr as keyof typeof Intent],
@@ -462,28 +468,28 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
   if (result.intentDetectionMethod === "pattern" && result.confidence >= 0.9) {
     return false;
   }
-  
+
   // Entity detection (known customers from database) doesn't need validation
   // When someone mentions a known customer like "Les Schwab", trust it's about meetings
   if (result.intentDetectionMethod === "entity") {
     return false;
   }
-  
+
   // CLARIFY and REFUSE intents don't need validation
   if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
     return false;
   }
-  
+
   // Weak detection methods need validation
   if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
     return true;
   }
-  
+
   // Low confidence matches need validation
   if (result.confidence < LOW_CONFIDENCE_THRESHOLD) {
     return true;
   }
-  
+
   return false;
 }
 
@@ -499,29 +505,29 @@ export async function classifyIntent(
   threadContext?: ThreadContext
 ): Promise<IntentClassificationResult> {
   const keywordResult = await classifyByKeyword(question, threadContext);
-  
+
   if (keywordResult) {
     // Check if this is already a CLARIFY due to ambiguity
-    const isAmbiguousClarify = keywordResult.intent === Intent.CLARIFY && 
-                               keywordResult.decisionMetadata?.singleIntentViolation;
-    
+    const isAmbiguousClarify = keywordResult.intent === Intent.CLARIFY &&
+      keywordResult.decisionMetadata?.singleIntentViolation;
+
     if (isAmbiguousClarify) {
       // Use LLM interpretation to provide helpful clarification
       console.log(`[IntentClassifier] Ambiguous match detected, using LLM interpretation for clarification`);
       return classifyWithInterpretation(question, "multi_intent_ambiguity", keywordResult, threadContext);
     }
-    
+
     // Check if this low-confidence match needs LLM validation
     if (needsLLMValidation(keywordResult)) {
       console.log(`[IntentClassifier] Low-confidence match (${keywordResult.intentDetectionMethod}, conf=${keywordResult.confidence}), validating with LLM...`);
-      
+
       const validation = await validateLowConfidenceIntent(
         question,
         keywordResult.intent as IntentString,
         keywordResult.reason || "No reason provided",
         keywordResult.decisionMetadata?.matchedSignals || []
       );
-      
+
       if (validation.confirmed) {
         console.log(`[IntentClassifier] LLM confirmed: ${keywordResult.intent}`);
         return {
@@ -552,7 +558,7 @@ export async function classifyIntent(
         };
       }
     }
-    
+
     console.log(`[IntentClassifier] Keyword match: ${keywordResult.intent}`);
     return keywordResult;
   }
@@ -585,16 +591,16 @@ async function classifyWithInterpretation(
 ): Promise<IntentClassificationResult> {
   try {
     const interpretation = await interpretAmbiguousQuery(question, failureReason, threadContext);
-    
+
     const proposedIntent = interpretation.proposedInterpretation.intent;
     const confidence = interpretation.metadata.confidence;
-    
+
     console.log(`[IntentClassifier] LLM interpretation: intent=${proposedIntent}, confidence=${confidence}`);
-    
+
     // HIGH CONFIDENCE PATH: Use LLM's proposed intent when confident
     // Threshold 0.6 chosen to allow reasonable certainty while not being too strict
     const CONFIDENCE_THRESHOLD = 0.6;
-    
+
     if (confidence >= CONFIDENCE_THRESHOLD && proposedIntent !== "CLARIFY") {
       // Map string intent to Intent enum
       const intentMap: Record<string, Intent> = {
@@ -607,11 +613,11 @@ async function classifyWithInterpretation(
         "REFUSE": Intent.REFUSE,
         "CLARIFY": Intent.CLARIFY,
       };
-      
+
       const resolvedIntent = intentMap[proposedIntent] || Intent.GENERAL_HELP;
-      
+
       console.log(`[IntentClassifier] Using LLM's proposed intent: ${resolvedIntent} (confidence ${confidence} >= ${CONFIDENCE_THRESHOLD})`);
-      
+
       return {
         intent: resolvedIntent,
         intentDetectionMethod: "llm",
@@ -627,10 +633,10 @@ async function classifyWithInterpretation(
         },
       };
     }
-    
+
     // LOW CONFIDENCE PATH: Ask for clarification but provide interpretation
     console.log(`[IntentClassifier] Requesting clarification (confidence ${confidence} < ${CONFIDENCE_THRESHOLD})`);
-    
+
     return {
       intent: Intent.CLARIFY,
       intentDetectionMethod: "llm",
@@ -648,7 +654,7 @@ async function classifyWithInterpretation(
     };
   } catch (error) {
     console.error("[IntentClassifier] LLM interpretation error:", error);
-    
+
     // Fallback to basic CLARIFY without interpretation
     return {
       intent: Intent.CLARIFY,
