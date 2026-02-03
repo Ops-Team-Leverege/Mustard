@@ -77,16 +77,44 @@ const defaultMessages: Record<ProgressIntentType, string> = {
 };
 
 /**
+ * Bot capability tips to educate users about other features.
+ * These are appended to progress messages to increase discoverability.
+ */
+const CAPABILITY_TIPS: string[] = [
+  "I can also help you draft emails with customized value propositions for customers.",
+  "Did you know I can research companies and write feature descriptions in PitCrew's style?",
+  "I can search across all your customer meetings to find patterns and trends.",
+  "Need a meeting summary? Just ask me about any customer call.",
+  "I can help you prepare for customer meetings by researching their business.",
+  "Ask me about PitCrew features - I have the full product database at my fingertips.",
+  "I can identify what POS systems your prospects are using from meeting notes.",
+  "Need to follow up with a customer? I can draft personalized emails based on your conversations.",
+  "I can find common questions customers ask across all your meetings.",
+  "Looking for action items from a meeting? I can pull those up for you.",
+];
+
+/**
+ * Get a random capability tip to append to progress messages.
+ * Helps educate users about the bot's other capabilities while they wait.
+ */
+function getRandomCapabilityTip(): string {
+  return pickRandom(CAPABILITY_TIPS);
+}
+
+/**
  * Generate a personalized progress message using a quick LLM call.
  * Uses gpt-4o-mini for speed - this should complete in <500ms.
  * Falls back to a default message if LLM fails.
+ * 
+ * Includes a random capability tip to educate users about other features.
  * 
  * This is meant to be called EARLY in the pipeline (right after intent classification)
  * so users see a relevant message quickly instead of waiting for generic timer-based messages.
  */
 export async function generatePersonalizedProgressMessage(
   userMessage: string,
-  intentType: ProgressIntentType
+  intentType: ProgressIntentType,
+  includeCapabilityTip: boolean = true
 ): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
@@ -118,13 +146,27 @@ Examples:
       temperature: 0.7,
     });
     
-    const generated = response.choices[0]?.message?.content?.trim();
-    if (generated && generated.length > 10 && generated.length < 150) {
-      return generated;
+    let progressMessage = response.choices[0]?.message?.content?.trim();
+    if (!progressMessage || progressMessage.length < 10 || progressMessage.length > 150) {
+      progressMessage = defaultMessages[intentType];
     }
-    return defaultMessages[intentType];
+    
+    // Append a random capability tip to help users discover other features
+    if (includeCapabilityTip) {
+      const tip = getRandomCapabilityTip();
+      return `${progressMessage}\n\n_Tip: ${tip}_`;
+    }
+    
+    return progressMessage;
   } catch (error) {
     console.log(`[ProgressMessages] Personalized message generation failed, using default`);
-    return defaultMessages[intentType];
+    const fallback = defaultMessages[intentType];
+    
+    if (includeCapabilityTip) {
+      const tip = getRandomCapabilityTip();
+      return `${fallback}\n\n_Tip: ${tip}_`;
+    }
+    
+    return fallback;
   }
 }
