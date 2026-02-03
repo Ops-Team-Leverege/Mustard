@@ -120,12 +120,77 @@ export async function performExternalResearch(
 
 /**
  * Build the research prompt for Gemini.
+ * Detects whether this is company research or topic/concept research and adjusts accordingly.
  */
 function buildResearchPrompt(
   query: string,
   companyName?: string | null,
   topic?: string | null
 ): string {
+  // Detect if this is topic/concept research (no specific company, or query is about understanding something)
+  const queryLower = query.toLowerCase();
+  const isTopicResearch = !companyName || 
+    queryLower.includes('understand more about') ||
+    queryLower.includes('research to understand') ||
+    queryLower.includes('why they') ||
+    queryLower.includes('how they') ||
+    queryLower.includes('usage of') ||
+    queryLower.includes('what is') ||
+    queryLower.includes('why are') ||
+    queryLower.includes('why is');
+  
+  if (isTopicResearch) {
+    return buildTopicResearchPrompt(query);
+  }
+  
+  return buildCompanyResearchPrompt(query, companyName);
+}
+
+/**
+ * Build prompt for topic/concept research (e.g., "safety nets in oil change shops")
+ */
+function buildTopicResearchPrompt(query: string): string {
+  return `You are a research analyst. Research this topic based on the user's request: "${query}"
+
+Please provide a comprehensive research report with:
+
+1. **Topic Overview**
+   - What this is and why it matters
+   - Key context for understanding the topic
+
+2. **Industry Context**
+   - How this applies in the relevant industry
+   - Common practices and standards
+
+3. **Safety, Compliance & Regulations**
+   - Relevant safety considerations
+   - Regulatory requirements (OSHA, industry standards, etc.)
+   - Best practices
+
+4. **Business Impact**
+   - Why businesses care about this
+   - Risks of not addressing it
+   - Benefits of proper implementation
+
+5. **Key Facts & Statistics** (if available)
+   - Relevant data points
+   - Industry statistics
+
+IMPORTANT REQUIREMENTS:
+- Focus on factual, practical information
+- Include specific regulations, standards, or guidelines when applicable
+- At the end, include a "## Sources" section listing:
+  - Type of source (regulatory body, industry publication, trade association, etc.)
+  - Specific source name when known (e.g., "OSHA 29 CFR 1910.xxx")
+  - Approximate date/timeframe if applicable
+- If you're uncertain about specific facts, clearly state that
+- Only cite sources you actually used - never fabricate sources`;
+}
+
+/**
+ * Build prompt for company-specific research
+ */
+function buildCompanyResearchPrompt(query: string, companyName?: string | null): string {
   const company = companyName || "the company mentioned";
   
   return `You are a business research analyst. Research ${company} based on this request: "${query}"
