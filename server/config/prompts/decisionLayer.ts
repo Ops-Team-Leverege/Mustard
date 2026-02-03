@@ -48,11 +48,18 @@ SINGULAR vs PLURAL MEETING DETECTION:
 15. "What was discussed in X call" (singular) → SINGLE_MEETING
 16. "What patterns across X calls" (plural) → MULTI_MEETING
 
+PRODUCT_KNOWLEDGE vs MULTI_MEETING (CRITICAL):
+17. If user DESCRIBES a situation/pattern and asks for STRATEGIC ADVICE → PRODUCT_KNOWLEDGE (NOT MULTI_MEETING)
+18. "Based on PitCrew's value props, help me think through..." → PRODUCT_KNOWLEDGE (strategic advice request)
+19. "Help me think through how we can approach this" → PRODUCT_KNOWLEDGE (asking for strategy, not meeting analysis)
+20. Even if the message mentions "patterns" or "customers", if the ASK is for strategic advice using PitCrew's products → PRODUCT_KNOWLEDGE
+21. MULTI_MEETING is ONLY for "analyze past meeting data" - NOT for "give me strategic advice about a situation"
+
 PRODUCT_KNOWLEDGE vs EXTERNAL_RESEARCH:
-17. "Our approach" or "our methodology" or "how should we approach" → PRODUCT_KNOWLEDGE (asking about PitCrew's approach/strategy)
-18. "Their approach" or "research how they" → EXTERNAL_RESEARCH (researching external company)
-19. Strategy questions using PitCrew's value props or features → PRODUCT_KNOWLEDGE
-20. Questions about pilot methodology, expansion approach, or sales strategy using PitCrew → PRODUCT_KNOWLEDGE
+22. "Our approach" or "our methodology" or "how should we approach" → PRODUCT_KNOWLEDGE (asking about PitCrew's approach/strategy)
+23. "Their approach" or "research how they" → EXTERNAL_RESEARCH (researching external company)
+24. Strategy questions using PitCrew's value props or features → PRODUCT_KNOWLEDGE
+25. Questions about pilot methodology, expansion approach, or sales strategy using PitCrew → PRODUCT_KNOWLEDGE
 
 EXAMPLES:
 - "Les Schwab" (just the company name) → SINGLE_MEETING (show their meeting info)
@@ -68,6 +75,8 @@ EXAMPLES:
 - "What's our recommended approach for a 10-20 store expansion pilot?" → PRODUCT_KNOWLEDGE (asking about OUR approach)
 - "How should we help customers evaluate ROI?" → PRODUCT_KNOWLEDGE (our methodology)
 - "Based on PitCrew's value props, how can we approach X?" → PRODUCT_KNOWLEDGE (strategy using our product)
+- "An emerging pattern we're seeing is X. Based on PitCrew's value props, help me think through how we can approach this" → PRODUCT_KNOWLEDGE (describing situation + asking for strategic advice)
+- "Customers want to evaluate ROI. How should we help them?" → PRODUCT_KNOWLEDGE (strategic advice, not meeting analysis)
 - "Research Costco and their priorities" → EXTERNAL_RESEARCH
 - "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
 - "Research Costco, find priorities, create slides for them" → EXTERNAL_RESEARCH (primary: external research)
