@@ -1,0 +1,120 @@
+2026-02-03 12:42:25.22
+ed8eea79
+User
+[OpenAssistant] Research complete (37599ms), answer length: 16404
+2026-02-03 12:42:25.22
+ed8eea79
+User
+[OpenAssistant] Chaining product knowledge for style matching...
+2026-02-03 12:42:26.52
+ed8eea79
+User
+[OpenAssistant] Style matching - feature examples length: 45 chars
+2026-02-03 12:42:26.52
+ed8eea79
+User
+[ProductData] Using snapshot: 80 records, synced 2026-02-03T09:00:26.953Z
+2026-02-03 12:42:29.32
+ed8eea79
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] Response already streamed to message: 1770151306.894139
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] === DOCUMENT DECISION ===
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] usedStreaming: true
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] === END DOCUMENT DECISION ===
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] hasContract: true
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] contract: EXTERNAL_RESEARCH
+2026-02-03 12:42:30.92
+ed8eea79
+User
+[Slack] usedSingleMeetingMode: false
+2026-02-03 12:57:24.91
+0a6b5925
+System
+starting up user application
+2026-02-03 12:57:24.91
+0a6b5925
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-03 12:57:24.91
+0a6b5925
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-03 12:57:26.75
+0a6b5925
+User
+> rest-express@1.0.0 start
+2026-02-03 12:57:26.75
+0a6b5925
+User
+> NODE_ENV=production node dist/index.js
+2026-02-03 12:57:29.16
+0a6b5925
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-03 12:57:29.17
+0a6b5925
+User
+Slack routes registered at /api/slack/events
+2026-02-03 12:57:29.57
+0a6b5925
+User
+8:57:29 PM [express] serving on port 5000
+2026-02-03 12:58:57.33
+0a6b5925
+User
+[Slack] Received event request
+2026-02-03 12:58:57.33
+0a6b5925
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-03T20:58:57.332Z ==========
+2026-02-03 12:58:57.33
+0a6b5925
+User
+Slack payload type: event_callback
+2026-02-03 12:58:57.33
+0a6b5925
+User
+[Slack] Event details: eventId=Ev0ACQMQQ2VC, clientMsgId=688c1dfc-c74d-46fd-861b-f0cdbfa48529, messageTs=1770152336.333929, threadTs=1770152336.333929, channel=D0A7A4R9C04
+2026-02-03 12:58:57.33
+0a6b5925
+User
+Event type: message
+2026-02-03 12:58:57.33
+0a6b5925
+User
+[Slack] Processing direct message
+2026-02-03 12:58:57.34
+0a6b5925
+User
+8:58:57 PM [express] POST /api/slack/events 200 in 15ms
+2026-02-03 12:58:58.85
+0a6b5925
+User
+[Dedupe] Cleaned up 24 old entries
+2026-02-03 12:59:00.85
+0a6b5925
+User
+Processing: "we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features" in channel D0A7A4R9C04 (isReply=false)
+2026-02-03 12:59:00.85
+0a6b5925
+User
+[INFO] [4c42361b] Slack event received {"correlationId":"4c42361b","channel":"D0A7A4R9C04","threadTs":"1770152336.333929","userId":"U082TV42FM0","duration":0,"text":"we have a new feature to add to the roadmap, that will detect when the net underneath the bays (prim","isReply":false,"testRun":false}
