@@ -77,16 +77,67 @@ const defaultMessages: Record<ProgressIntentType, string> = {
 };
 
 /**
+ * Bot capabilities derived from actual contracts/intents.
+ * Each capability describes what the bot can do for BD users.
+ * The LLM will pick one and elaborate it into a natural tip.
+ */
+const BOT_CAPABILITIES: Array<{ capability: string; useCase: string }> = [
+  // Meeting extraction capabilities
+  { capability: "Meeting Summaries", useCase: "Summarize any customer meeting in seconds" },
+  { capability: "Action Items", useCase: "Pull next steps and commitments from meetings" },
+  { capability: "Customer Questions", useCase: "Find questions customers asked during calls" },
+  { capability: "Attendee Lists", useCase: "Get who was in any meeting" },
+  
+  // Cross-meeting analysis
+  { capability: "Pattern Analysis", useCase: "Find recurring themes across all customer meetings" },
+  { capability: "Trend Tracking", useCase: "See how conversations change over time" },
+  { capability: "Customer Comparisons", useCase: "Compare how different customers respond" },
+  
+  // Product knowledge
+  { capability: "Product Knowledge", useCase: "Know everything about PitCrew features and capabilities" },
+  { capability: "Value Propositions", useCase: "Help craft compelling value props for customers" },
+  { capability: "Feature Verification", useCase: "Confirm what PitCrew can and can't do" },
+  
+  // Content drafting
+  { capability: "Draft Emails", useCase: "Write follow-up emails with personalized value props" },
+  { capability: "Draft Responses", useCase: "Help answer customer questions with confidence" },
+  { capability: "Technical Emails", useCase: "Draft technical content with accurate product details" },
+  { capability: "Presentation Content", useCase: "Write slide content and talking points" },
+  
+  // Research
+  { capability: "Company Research", useCase: "Research prospects before meetings" },
+  { capability: "Feature Descriptions", useCase: "Write feature descriptions in PitCrew's style" },
+  { capability: "Competitive Intel", useCase: "Understand what competitors are doing" },
+  
+  // Data extraction
+  { capability: "POS Detection", useCase: "Identify what POS systems prospects use" },
+  { capability: "Pain Point Extraction", useCase: "Find what problems customers mention" },
+  { capability: "Objection Tracking", useCase: "Track common objections across customers" },
+];
+
+/**
+ * Get a random capability tip to append to progress messages.
+ * Picks a random capability and formats it as a friendly tip.
+ */
+function getRandomCapabilityTip(): string {
+  const capability = pickRandom(BOT_CAPABILITIES);
+  return `${capability.useCase}? Just ask me!`;
+}
+
+/**
  * Generate a personalized progress message using a quick LLM call.
  * Uses gpt-4o-mini for speed - this should complete in <500ms.
  * Falls back to a default message if LLM fails.
+ * 
+ * Includes a random capability tip to educate users about other features.
  * 
  * This is meant to be called EARLY in the pipeline (right after intent classification)
  * so users see a relevant message quickly instead of waiting for generic timer-based messages.
  */
 export async function generatePersonalizedProgressMessage(
   userMessage: string,
-  intentType: ProgressIntentType
+  intentType: ProgressIntentType,
+  includeCapabilityTip: boolean = true
 ): Promise<string> {
   try {
     const response = await openai.chat.completions.create({
@@ -118,13 +169,27 @@ Examples:
       temperature: 0.7,
     });
     
-    const generated = response.choices[0]?.message?.content?.trim();
-    if (generated && generated.length > 10 && generated.length < 150) {
-      return generated;
+    let progressMessage = response.choices[0]?.message?.content?.trim();
+    if (!progressMessage || progressMessage.length < 10 || progressMessage.length > 150) {
+      progressMessage = defaultMessages[intentType];
     }
-    return defaultMessages[intentType];
+    
+    // Append a random capability tip to help users discover other features
+    if (includeCapabilityTip) {
+      const tip = getRandomCapabilityTip();
+      return `${progressMessage}\n\n_Tip: ${tip}_`;
+    }
+    
+    return progressMessage;
   } catch (error) {
     console.log(`[ProgressMessages] Personalized message generation failed, using default`);
-    return defaultMessages[intentType];
+    const fallback = defaultMessages[intentType];
+    
+    if (includeCapabilityTip) {
+      const tip = getRandomCapabilityTip();
+      return `${fallback}\n\n_Tip: ${tip}_`;
+    }
+    
+    return fallback;
   }
 }

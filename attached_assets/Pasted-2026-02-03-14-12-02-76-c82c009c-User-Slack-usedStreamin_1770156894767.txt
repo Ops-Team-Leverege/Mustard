@@ -1,0 +1,184 @@
+2026-02-03 14:12:02.76
+c82c009c
+User
+[Slack] usedStreaming: false
+2026-02-03 14:12:02.76
+c82c009c
+User
+[Slack] contract: PRODUCT_EXPLANATION
+2026-02-03 14:12:02.76
+c82c009c
+User
+[Slack] hasContract: true
+2026-02-03 14:12:02.76
+c82c009c
+User
+[Slack] Open Assistant response: intent=meeting_data, controlPlane=PRODUCT_KNOWLEDGE, contract=PRODUCT_EXPLANATION, delegated=false
+2026-02-03 14:12:02.96
+c82c009c
+User
+[DocumentGenerator] Checking contract="PRODUCT_EXPLANATION" (type: string) against list=["VALUE_PROPOSITION","MEETING_SUMMARY","COMPARISON","DRAFT_EMAIL","PATTERN_ANALYSIS","PRODUCT_EXPLANATION"], wordCount=274, threshold=300
+2026-02-03 14:12:02.96
+c82c009c
+User
+[DocumentResponse] Contract: PRODUCT_EXPLANATION, Words: 274, Generate doc: true
+2026-02-03 14:12:02.96
+c82c009c
+User
+[DocumentGenerator] Contract "PRODUCT_EXPLANATION" in list: true, exact match test: true
+2026-02-03 14:12:02.96
+c82c009c
+User
+[DocumentResponse] Starting document generation for contract: PRODUCT_EXPLANATION
+2026-02-03 14:12:02.96
+c82c009c
+User
+[DocumentGenerator] Contract "PRODUCT_EXPLANATION" is in doc list - will generate document
+2026-02-03 14:12:04.56
+c82c009c
+User
+[DocumentResponse] Successfully uploaded document: General_Pattern_Analysis_2026-02-03.docx
+2026-02-03 14:12:04.56
+c82c009c
+User
+[INFO] [2cb076ae] Request completed successfully {"correlationId":"2cb076ae","channel":"C0A80S3HJNL","threadTs":"1770156668.481979","userId":"U082TV42FM0","duration":54096,"intent":"MULTI_MEETING","contract":"PATTERN_ANALYSIS","responseLength":912,"totalTimeMs":35901,"stages":{"meeting_resolution":1199,"decision_layer":15295,"handler":8802}}
+2026-02-03 14:12:07.76
+c82c009c
+User
+[DocumentResponse] Parsed 3 sections
+2026-02-03 14:12:07.76
+c82c009c
+User
+[DocumentResponse] Document title: PitCrew: What Is PitCrew?
+2026-02-03 14:12:13.66
+c82c009c
+User
+[OpenAssistant] Calling performExternalResearch...
+2026-02-03 14:12:13.66
+c82c009c
+User
+[OpenAssistant] Progress message ready (12601ms)
+2026-02-03 14:12:14.16
+c82c009c
+User
+[ExternalResearch] Research request: query="we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features", company="to understand more about oil change shops", topic="null"
+2026-02-03 14:12:14.16
+c82c009c
+User
+[ExternalResearch] Gemini client initialized successfully
+2026-02-03 14:12:15.76
+c82c009c
+User
+[ExternalResearch] Calling Gemini for web research...
+2026-02-03 14:12:20.76
+c82c009c
+User
+[DocumentResponse] Generated document buffer: 19978 bytes
+2026-02-03 14:12:21.26
+c82c009c
+User
+[DocumentResponse] Uploading to Slack: General_Product_Explanation_2026-02-03.docx
+2026-02-03 14:12:23.56
+c82c009c
+User
+[DocumentResponse] Successfully uploaded document: General_Product_Explanation_2026-02-03.docx
+2026-02-03 14:12:23.86
+c82c009c
+User
+[INFO] [a99d4977] Request completed successfully {"correlationId":"a99d4977","channel":"C0A80S3HJNL","threadTs":"1770156685.651429","userId":"U082TV42FM0","duration":56195,"intent":"PRODUCT_KNOWLEDGE","contract":"PRODUCT_EXPLANATION","responseLength":2100,"totalTimeMs":33002,"stages":{"meeting_resolution":0,"decision_layer":13041,"handler":16258}}
+2026-02-03 14:12:46.46
+c82c009c
+User
+[ExternalResearch] Gemini response received (32300ms)
+2026-02-03 14:12:46.46
+c82c009c
+User
+[OpenAssistant] Research complete (45402ms), answer length: 17146
+2026-02-03 14:12:46.46
+c82c009c
+User
+[OpenAssistant] Chaining product knowledge for style matching...
+2026-02-03 14:12:46.46
+c82c009c
+User
+[OpenAssistant] === STYLE MATCHING START ===
+2026-02-03 14:12:47.46
+c82c009c
+User
+[ProductData] Using snapshot: 80 records, synced 2026-02-03T09:00:26.953Z
+2026-02-03 14:12:47.46
+c82c009c
+User
+[OpenAssistant] Product knowledge from cache (997ms)
+2026-02-03 14:12:47.56
+c82c009c
+User
+[OpenAssistant] Calling OpenAI for style-matched writing...
+2026-02-03 14:12:47.56
+c82c009c
+User
+[OpenAssistant] Style matching - feature examples length: 2000 chars
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] Open Assistant response: intent=external_research, controlPlane=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, delegated=false
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] hasOpenAssistantData: true
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] Pipeline completed in 67050ms, progressMessages=0
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] contract: EXTERNAL_RESEARCH
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] Response already streamed to message: 1770156720.308469
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] willGenerateDoc: true
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] hasContract: true
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] usedStreaming: true
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] === DOCUMENT DECISION ===
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] === END DOCUMENT DECISION ===
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-03 14:12:49.61
+c82c009c
+User
+[OpenAssistant] Style matching complete (3147ms)
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] testRun: false
+2026-02-03 14:12:49.61
+c82c009c
+User
+[INFO] [ccd0b1b4] Open Assistant response generated {"correlationId":"ccd0b1b4","channel":"C0A80S3HJNL","threadTs":"1770156699.891739","userId":"U082TV42FM0","duration":67733,"intent":"external_research","contract":"EXTERNAL_RESEARCH","delegated":false,"duration_ms":49047}
+2026-02-03 14:12:49.61
+c82c009c
+User
+[Slack] usedSingleMeetingMode: false
+2026-02-03 14:12:49.61
+c82c009c
+User
+[INFO] [ccd0b1b4] Request completed successfully {"correlationId":"ccd0b1b4","channel":"C0A80S3HJNL","threadTs":"1770156699.891739","userId":"U082TV42FM0","duration":67734,"intent":"EXTERNAL_RESEARCH","contract":"EXTERNAL_RESEARCH","responseLength":1996,"totalTimeMs":67050,"stages":{"meeting_resolution":0,"decision_layer":14201,"handler":49047}}

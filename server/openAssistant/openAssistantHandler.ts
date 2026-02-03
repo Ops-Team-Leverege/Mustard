@@ -1116,6 +1116,7 @@ async function handleProductKnowledgeIntent(
     delegatedToSingleMeeting: false,
     evidenceSources: hasProductData ? tablesWithData : undefined,
     progressMessage,
+    streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
   };
 }
 
@@ -1490,6 +1491,7 @@ async function handleGeneralAssistanceIntent(
       answerContract: AnswerContract.GENERAL_RESPONSE,
       dataSource: "general_knowledge",
       delegatedToSingleMeeting: false,
+      streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
     };
   }
   
@@ -1598,6 +1600,7 @@ If you're unsure whether something requires evidence, err on the side of asking 
     dataSource: "general_knowledge",
     delegatedToSingleMeeting: false,
     progressMessage,
+    streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
   };
 }
 

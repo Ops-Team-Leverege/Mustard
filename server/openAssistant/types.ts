@@ -84,6 +84,7 @@ export type OpenAssistantResult = {
   delegatedToSingleMeeting: boolean;
   evidenceSources?: string[];
   progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for long operations)
+  streamingCompleted?: boolean; // True if handler already updated the streaming message with final content
 };
 
 /**
