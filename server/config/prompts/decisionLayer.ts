@@ -93,10 +93,30 @@ EXAMPLES:
 - "Learn more about automotive bay design and best practices" → EXTERNAL_RESEARCH (industry practices)
 - "What can you do?" → GENERAL_HELP (asking about the BOT, not PitCrew product)
 - "How can you help me?" → GENERAL_HELP (meta question about the assistant)
+- "What data sources are you connected to?" → GENERAL_HELP (asking what the BOT accesses)
+- "What systems do you integrate with?" → GENERAL_HELP (asking about the BOT's integrations)
+- "Where do you get your information?" → GENERAL_HELP (asking about BOT's data sources)
 - "Hello!" → GENERAL_HELP
 - "What's the weather?" → REFUSE
 
-FOLLOW-UP MESSAGES (CRITICAL):
+BOT vs PITCREW DISAMBIGUATION:
+When user says "you" - determine if they mean the bot (PitCrew Sauce) or PitCrew the product:
+- Questions about what the BOT can do, access, or connect to → GENERAL_HELP
+- Questions about PitCrew PRODUCT features, value props, roadmap → PRODUCT_KNOWLEDGE
+Examples:
+- "What data sources are you connected to?" → GENERAL_HELP (bot's connections)
+- "What data sources does PitCrew support?" → PRODUCT_KNOWLEDGE (product integrations)
+
+CONVERSATIONAL FRAGMENTS (CRITICAL):
+Short, informal messages that are reactions or comments (NOT actionable requests) should be GENERAL_HELP:
+- "but you as the bot!" → GENERAL_HELP (conversational reaction, not a question)
+- "haha" / "lol" / "nice" → GENERAL_HELP (reaction)
+- "I see" / "got it" / "ok" → GENERAL_HELP (acknowledgment)
+- "wait what?" / "huh?" → CLARIFY (confused, needs explanation)
+
+These are NOT product questions - don't generate documents for conversational fragments.
+
+FOLLOW-UP MESSAGES:
 When you see conversation history, understand that short messages may be FOLLOW-UPS refining a previous request:
 - "can you include the names?" → Same intent as the previous response (e.g., if bot gave meeting summary → MULTI_MEETING)
 - "also add the dates" → Refinement of previous task, keep same intent
