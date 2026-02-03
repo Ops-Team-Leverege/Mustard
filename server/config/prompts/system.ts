@@ -48,6 +48,14 @@ export const CAPABILITY_KEYWORDS = [
   "what kind of help",
   "show me what you can",
   "tell me what you can",
+  // Data source / integration questions about the bot
+  "data sources are you connected",
+  "what data sources do you",
+  "where do you get your",
+  "what systems do you",
+  "what are you connected to",
+  "what do you have access to",
+  "what information do you have",
 ];
 
 /**
@@ -62,11 +70,21 @@ export function isCapabilityQuestion(message: string): boolean {
  * Prompt for when users ask what the bot can do.
  * Guides the LLM to explain capabilities conversationally.
  */
-export const CAPABILITIES_PROMPT = `The user is asking what you can help with. Give a SHORT, friendly response (2-3 sentences max).
+export const CAPABILITIES_PROMPT = `The user is asking what you can help with or what you're connected to. Give a SHORT, friendly response (3-4 sentences max).
 
-Mention you can help with: meeting questions & summaries, PitCrew product info, drafting emails, and research.
+MY DATA SOURCES & INTEGRATIONS:
+- Meeting transcripts database (PostgreSQL) - all customer call transcripts and insights
+- Airtable Product Knowledge Base - PitCrew product info, features, roadmap
+- External research capability - can search the web for company info, industry trends
 
-End with "Just ask!" or similar invitation. Keep it BRIEF and warm - this is a quick intro, not a manual.`;
+CAPABILITIES:
+- Answer questions about customer meetings and extract insights
+- PitCrew product knowledge, value props, and competitive positioning  
+- Draft emails and responses
+- Research external companies and topics
+
+If they're asking about data sources specifically, mention those. If asking about capabilities generally, mention what you can do.
+Keep it conversational and brief. End with an invitation to ask more.`;
 
 /**
  * Base sales assistant persona used across multiple handlers.

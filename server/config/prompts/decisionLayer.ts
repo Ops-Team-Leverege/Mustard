@@ -74,6 +74,9 @@ EXAMPLES:
 - "What is PitCrew pricing?" → PRODUCT_KNOWLEDGE
 - "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
 - "What are PitCrew's capabilities?" → PRODUCT_KNOWLEDGE
+- "What data sources are you connected to?" → PRODUCT_KNOWLEDGE ("you" = PitCrew)
+- "What integrations do you have?" → PRODUCT_KNOWLEDGE ("you" = PitCrew)
+- "How do you handle X?" → PRODUCT_KNOWLEDGE ("you" = PitCrew's approach)
 - "What's our recommended approach for a 10-20 store expansion pilot?" → PRODUCT_KNOWLEDGE (asking about OUR approach)
 - "How should we help customers evaluate ROI?" → PRODUCT_KNOWLEDGE (our methodology)
 - "Based on PitCrew's value props, how can we approach X?" → PRODUCT_KNOWLEDGE (strategy using our product)
@@ -90,10 +93,42 @@ EXAMPLES:
 - "Learn more about automotive bay design and best practices" → EXTERNAL_RESEARCH (industry practices)
 - "What can you do?" → GENERAL_HELP (asking about the BOT, not PitCrew product)
 - "How can you help me?" → GENERAL_HELP (meta question about the assistant)
+- "What data sources are you connected to?" → GENERAL_HELP (asking what the BOT accesses)
+- "What systems do you integrate with?" → GENERAL_HELP (asking about the BOT's integrations)
+- "Where do you get your information?" → GENERAL_HELP (asking about BOT's data sources)
 - "Hello!" → GENERAL_HELP
 - "What's the weather?" → REFUSE
 
-Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation"}`;
+BOT vs PITCREW DISAMBIGUATION:
+When user says "you" - determine if they mean the bot (PitCrew Sauce) or PitCrew the product:
+- Questions about what the BOT can do, access, or connect to → GENERAL_HELP
+- Questions about PitCrew PRODUCT features, value props, roadmap → PRODUCT_KNOWLEDGE
+Examples:
+- "What data sources are you connected to?" → GENERAL_HELP (bot's connections)
+- "What data sources does PitCrew support?" → PRODUCT_KNOWLEDGE (product integrations)
+
+CONVERSATIONAL FRAGMENTS (CRITICAL):
+Short, informal messages that are reactions or comments (NOT actionable requests) should be GENERAL_HELP:
+- "but you as the bot!" → GENERAL_HELP (conversational reaction, not a question)
+- "haha" / "lol" / "nice" → GENERAL_HELP (reaction)
+- "I see" / "got it" / "ok" → GENERAL_HELP (acknowledgment)
+- "wait what?" / "huh?" → CLARIFY (confused, needs explanation)
+
+These are NOT product questions - don't generate documents for conversational fragments.
+
+FOLLOW-UP MESSAGES:
+When you see conversation history, understand that short messages may be FOLLOW-UPS refining a previous request:
+- "can you include the names?" → Same intent as the previous response (e.g., if bot gave meeting summary → MULTI_MEETING)
+- "also add the dates" → Refinement of previous task, keep same intent
+- "yes" / "yes please" / "go ahead" → Confirmation to proceed with previous proposed action
+- "no, I meant X" → Correction, re-classify based on X
+- "what about for Costco?" → Applying previous task type to a new entity
+
+The conversation history shows previous exchanges. Use it to understand what the user is refining or continuing.
+If user's short message clearly refines a previous bot response about meetings → keep the meeting intent.
+If user's short message clearly refines a previous bot response about product knowledge → PRODUCT_KNOWLEDGE.
+
+Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation", "isFollowUp": true/false}`;
 
 /**
  * Contract selection system prompt.
@@ -228,7 +263,7 @@ VALID CONTRACTS per intent:
 RESPONSE FORMAT (JSON):
 {
   "proposedIntent": "INTENT_NAME",
-  "proposedContract": "CONTRACT_NAME",
+  "proposedContracts": ["CONTRACT_NAME", ...],
   "confidence": 0.0-1.0,
   "interpretation": "Brief summary of what user likely wants",
   "questionForm": "A natural question to ask the user, e.g., 'Are you asking how camera installation works with PitCrew?'",
@@ -237,12 +272,19 @@ RESPONSE FORMAT (JSON):
   "alternatives": [
     {
       "intent": "ALTERNATE_INTENT",
-      "contract": "ALTERNATE_CONTRACT",
+      "contracts": ["ALTERNATE_CONTRACT", ...],
       "description": "Specific alternative in plain language",
       "hint": "Examples like 'Les Schwab, ACE' or 'pricing, features' if relevant"
     }
   ]
 }
+
+CONTRACT CHAINS:
+For multi-step requests, return contracts in execution order:
+- "Research X then write a feature description" → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "Research company then create pitch deck" → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "Summarize the meeting then draft follow-up" → ["MEETING_SUMMARY", "DRAFT_EMAIL"]
+- "What did they ask?" → ["CUSTOMER_QUESTIONS"] (single step = single contract)
 
 RULES:
 1. "questionForm" should be a natural question leading with the best guess (e.g., "Are you asking about...")
@@ -253,15 +295,15 @@ RULES:
 6. Never say "I need more context"—always offer a path forward
 
 COMMON PATTERNS:
-- "how does X work" → PRODUCT_KNOWLEDGE with partial answer about X
-- "what about [company]" → SINGLE_MEETING or MULTI_MEETING depending on context
-- "pricing/cost/price" → PRODUCT_KNOWLEDGE with partial pricing model info
-- "[company] + [topic]" → SINGLE_MEETING with company-specific search
-- "research [company]" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
-- "slide deck for [external company]" or "pitch deck" → EXTERNAL_RESEARCH with SALES_DOCS_PREP contract
-- "find their strategic priorities" or "public statements" → EXTERNAL_RESEARCH
-- "research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
-- "do research... then write a feature description" → EXTERNAL_RESEARCH (research + write)
+- "how does X work" → PRODUCT_KNOWLEDGE with partial answer about X → ["PRODUCT_EXPLANATION"]
+- "what about [company]" → SINGLE_MEETING or MULTI_MEETING → ["EXTRACTIVE_FACT"] or ["PATTERN_ANALYSIS"]
+- "pricing/cost/price" → PRODUCT_KNOWLEDGE → ["FAQ_ANSWER"]
+- "[company] + [topic]" → SINGLE_MEETING → ["EXTRACTIVE_FACT"]
+- "research [company]" or "earnings calls" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH"]
+- "slide deck for [external company]" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "research [topic] to understand" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH"]
+- "do research... then write a feature description" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "research X company... then create pitch" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
 
 CRITICAL FOLLOW-UP PATTERN:
 When the conversation history shows a list of customer questions was just provided, and the user asks something like "help me answer those questions" or "can you answer those" or "draft responses":

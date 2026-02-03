@@ -54,7 +54,7 @@ export type ContractString =
 
 export type LLMInterpretation = {
   proposedIntent: IntentString;
-  proposedContract: ContractString;
+  proposedContracts: ContractString[];  // Ordered array for contract chain
   confidence: number; // 0.0 – 1.0
   interpretation: string; // human-readable summary
   alternatives?: LLMInterpretationAlternative[];
@@ -68,7 +68,7 @@ export type SmartClarification = {
   bestGuess: {
     interpretation: string;
     intent: IntentString;
-    contract: ContractString;
+    contracts: ContractString[];  // Ordered array for contract chain
     confidence: number;
     questionForm: string;
     partialAnswer?: string;
@@ -76,7 +76,7 @@ export type SmartClarification = {
   alternatives: Array<{
     interpretation: string;
     intent: IntentString;
-    contract: ContractString;
+    contracts: ContractString[];  // Ordered array for contract chain
     hint?: string;
   }>;
   canPartialAnswer: boolean;
@@ -84,14 +84,14 @@ export type SmartClarification = {
 
 export type LLMInterpretationAlternative = {
   intent: IntentString;
-  contract: ContractString;
+  contracts: ContractString[];  // Ordered array for contract chain
   description: string;
   hint?: string; // Specific examples like "Les Schwab, ACE, etc."
 };
 
 export type InterpretationMetadata = {
   proposedIntent: IntentString;
-  proposedContract: ContractString;
+  proposedContracts: ContractString[];  // Ordered array for contract chain
   confidence: number;
   failureReason: string;
   interpretationSource: "llm_fallback" | "ambiguity_resolution";
@@ -101,7 +101,7 @@ export type ClarifyWithInterpretation = {
   outcome: "CLARIFY";
   proposedInterpretation: {
     intent: IntentString;
-    contract: ContractString;
+    contracts: ContractString[];  // Ordered array for contract chain
     summary: string;
   };
   alternatives?: LLMInterpretationAlternative[];
@@ -306,7 +306,8 @@ export async function interpretAmbiguousQuery(
 
     const parsed = JSON.parse(content) as {
       proposedIntent: string;
-      proposedContract: string;
+      proposedContract?: string;           // Legacy: single contract
+      proposedContracts?: string[];        // New: contract array
       confidence: number;
       interpretation: string;
       questionForm?: string;
@@ -314,7 +315,8 @@ export async function interpretAmbiguousQuery(
       partialAnswer?: string;
       alternatives?: Array<{
         intent: string;
-        contract: string;
+        contract?: string;                 // Legacy: single contract
+        contracts?: string[];              // New: contract array
         description: string;
         hint?: string;
       }>;
@@ -323,9 +325,17 @@ export async function interpretAmbiguousQuery(
     const proposedIntent: IntentString = isValidIntent(parsed.proposedIntent) 
       ? parsed.proposedIntent 
       : "GENERAL_HELP";
-    const proposedContract: ContractString = isValidContract(parsed.proposedContract)
-      ? parsed.proposedContract
-      : getDefaultContractForIntent(proposedIntent);
+    
+    // Handle both legacy single contract and new contract array format
+    const rawContracts = parsed.proposedContracts || 
+      (parsed.proposedContract ? [parsed.proposedContract] : []);
+    const proposedContracts: ContractString[] = rawContracts
+      .filter(c => isValidContract(c))
+      .map(c => c as ContractString);
+    if (proposedContracts.length === 0) {
+      proposedContracts.push(getDefaultContractForIntent(proposedIntent));
+    }
+    
     const confidence = Math.max(0, Math.min(1, parsed.confidence ?? 0.5));
     const interpretation = parsed.interpretation || "you have a question I'd like to help with";
     const questionForm = parsed.questionForm || `Are you asking about ${interpretation}?`;
@@ -334,17 +344,27 @@ export async function interpretAmbiguousQuery(
 
     const alternatives: LLMInterpretationAlternative[] = (parsed.alternatives || [])
       .slice(0, 3) // Allow up to 3 alternatives for better UX
-      .map(alt => ({
-        intent: (isValidIntent(alt.intent) ? alt.intent : "GENERAL_HELP") as IntentString,
-        contract: (isValidContract(alt.contract) ? alt.contract : "GENERAL_RESPONSE") as ContractString,
-        description: alt.description,
-        hint: alt.hint || undefined,
-      }))
-      .filter(alt => alt.intent !== proposedIntent || alt.contract !== proposedContract);
+      .map(alt => {
+        // Handle both legacy single contract and new contract array format
+        const altRawContracts = alt.contracts || (alt.contract ? [alt.contract] : []);
+        const altContracts: ContractString[] = altRawContracts
+          .filter(c => isValidContract(c))
+          .map(c => c as ContractString);
+        if (altContracts.length === 0) {
+          altContracts.push("GENERAL_RESPONSE");
+        }
+        return {
+          intent: (isValidIntent(alt.intent) ? alt.intent : "GENERAL_HELP") as IntentString,
+          contracts: altContracts,
+          description: alt.description,
+          hint: alt.hint || undefined,
+        };
+      })
+      .filter(alt => alt.intent !== proposedIntent || JSON.stringify(alt.contracts) !== JSON.stringify(proposedContracts));
 
     const llmInterpretation: LLMInterpretation = {
       proposedIntent,
-      proposedContract,
+      proposedContracts,  // Full contract chain
       confidence,
       interpretation,
       alternatives: alternatives.length > 0 ? alternatives : undefined,
@@ -355,20 +375,20 @@ export async function interpretAmbiguousQuery(
 
     const message = generateSmartClarifyMessage(llmInterpretation, alternatives);
 
-    console.log(`[LLMInterpretation] Interpretation: intent=${proposedIntent}, contract=${proposedContract}, confidence=${confidence}, reason=${failureReason}`);
+    console.log(`[LLMInterpretation] Interpretation: intent=${proposedIntent}, contracts=[${proposedContracts.join(" → ")}], confidence=${confidence}, reason=${failureReason}`);
 
     return {
       outcome: "CLARIFY",
       proposedInterpretation: {
         intent: proposedIntent,
-        contract: proposedContract,
+        contracts: proposedContracts,
         summary: interpretation,
       },
       alternatives: alternatives.length > 0 ? alternatives : undefined,
       message,
       metadata: {
         proposedIntent,
-        proposedContract,
+        proposedContracts,
         confidence,
         failureReason,
         interpretationSource: "llm_fallback",
@@ -385,13 +405,13 @@ function createFallbackClarify(_question: string, failureReason: string): Clarif
     outcome: "CLARIFY",
     proposedInterpretation: {
       intent: "GENERAL_HELP",
-      contract: "GENERAL_RESPONSE",
+      contracts: ["GENERAL_RESPONSE"],
       summary: "you have a question I'd like to help with",
     },
     message: generateFallbackClarifyMessage(),
     metadata: {
       proposedIntent: "GENERAL_HELP",
-      proposedContract: "GENERAL_RESPONSE",
+      proposedContracts: ["GENERAL_RESPONSE"],
       confidence: 0,
       failureReason,
       interpretationSource: "llm_fallback",

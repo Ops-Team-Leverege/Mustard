@@ -1,0 +1,49 @@
+Your Solution is Correct: LLM Contract Array
+Here's what needs to be modified:
+
+1. Update LLM Interpretation Types
+export type ContractString = 
+  | "MEETING_SUMMARY" | "NEXT_STEPS" | "ATTENDEES" | "CUSTOMER_QUESTIONS" | "EXTRACTIVE_FACT" | "AGGREGATIVE_LIST"
+  | "PATTERN_ANALYSIS" | "COMPARISON" | "TREND_SUMMARY" | "CROSS_MEETING_QUESTIONS"
+  | "PRODUCT_EXPLANATION" | "FEATURE_VERIFICATION" | "FAQ_ANSWER"
+  | "EXTERNAL_RESEARCH" | "SALES_DOCS_PREP"
+  | "DOCUMENT_ANSWER" | "GENERAL_RESPONSE" | "DRAFT_RESPONSE" | "DRAFT_EMAIL" | "VALUE_PROPOSITION"
+  | "REFUSE" | "CLARIFY";
+
+// Change from single contract to contract array:
+export type ProposedInterpretation = {
+  intent: IntentString;
+  contracts: ContractString[];  // ← Changed from single to array
+  summary: string;
+};
+2. Update LLM Prompt
+const systemPrompt = `You are analyzing user requests to propose intent and contract execution chains.
+
+For multi-step requests, return multiple contracts in execution order.
+
+Examples:
+- "Research X company then write a pitch deck" → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "Do research to understand oil change shops then write feature description" → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "Summarize the meeting then draft follow-up email" → ["MEETING_SUMMARY", "DRAFT_EMAIL"]
+- "What did they ask?" → ["CUSTOMER_QUESTIONS"]
+
+Respond with JSON: {
+  "intent": "INTENT_NAME",
+  "contracts": ["CONTRACT1", "CONTRACT2", ...],
+  "summary": "explanation of what you'll do"
+}`;
+3. The Result
+For your request:
+
+"Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features"
+LLM would return:
+
+{
+  "intent": "EXTERNAL_RESEARCH",
+  "contracts": ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"],
+  "summary": "I'll research oil change shop safety practices and net usage, then write a feature description matching your existing feature format"
+}
+System would execute:
+
+EXTERNAL_RESEARCH → Research oil change shops and nets
+SALES_DOCS_PREP → Write feature description using research + existing feature style

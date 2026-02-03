@@ -150,12 +150,13 @@ async function generatePersonalizedProgress(
   };
   
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
-      messages: [
-        {
-          role: "system",
-          content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
+        messages: [
+          {
+            role: "system",
+            content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
 The message should:
 - Be warm and conversational (not robotic)
 - Reference what they're asking about specifically
@@ -168,15 +169,17 @@ Examples:
 - "Good question about pricing! Gathering the latest details from our database."
 - "Checking what we know about network requirements - one moment."
 - "Looking into how that feature works - I'll have an answer shortly."`
-        },
-        {
-          role: "user",
-          content: `Question type: ${intentType}\nUser's question: "${userMessage.substring(0, 150)}"`
-        }
-      ],
-      max_tokens: 50,
-      temperature: 0.7,
-    });
+          },
+          {
+            role: "user",
+            content: `Question type: ${intentType}\nUser's question: "${userMessage.substring(0, 150)}"`
+          }
+        ],
+        max_tokens: 50,
+        temperature: 0.7,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Progress message timeout')), 10000))
+    ]);
     
     const generated = response.choices[0]?.message?.content?.trim();
     if (generated && generated.length > 10 && generated.length < 150) {
@@ -705,22 +708,22 @@ Give me a hint and I'll get you sorted!`;
     console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Decision Layer: ${cpResult.intent} -> ${cpResult.answerContract})`);
     
     if (cpResult.intent === Intent.SINGLE_MEETING) {
-      return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
     if (cpResult.intent === Intent.MULTI_MEETING) {
-      return handleMultiMeetingIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleMultiMeetingIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
     if (cpResult.intent === Intent.PRODUCT_KNOWLEDGE) {
-      return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
     if (cpResult.intent === Intent.EXTERNAL_RESEARCH) {
-      return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
-    return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
+    return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
   }
   
   // DECISION LAYER REQUIRED: No fallback to separate classifier
@@ -745,9 +748,10 @@ async function handleMeetingDataIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to meeting data path${contract ? ` (CP contract: ${contract})` : ''}`);
+  console.log(`[OpenAssistant] Routing to meeting data path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
   
   if (context.resolvedMeeting) {
     const scope = {
@@ -761,8 +765,13 @@ async function handleMeetingDataIntent(
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
     
-    if (contract) {
-      // Decision Layer provided the contract - use it directly
+    if (dlContractChain && dlContractChain.length > 0) {
+      // Decision Layer provided a contract chain - use it directly
+      primaryContract = dlContractChain[0];
+      contractChain = dlContractChain;
+      console.log(`[OpenAssistant] Using DL-provided chain: [${dlContractChain.join(" → ")}]`);
+    } else if (contract) {
+      // Decision Layer provided a single contract - wrap it
       primaryContract = contract;
       contractChain = [contract];
       console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
@@ -921,9 +930,10 @@ async function handleMultiMeetingIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}`);
+  console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
   
   // Pass LLM-determined scope from Decision Layer (if available)
   const scopeOverride: ScopeOverride | undefined = context.decisionLayerResult?.scope;
@@ -960,8 +970,13 @@ async function handleMultiMeetingIntent(
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
   
-  if (contract) {
-    // Decision Layer provided the contract - use it directly
+  if (dlContractChain && dlContractChain.length > 0) {
+    // Decision Layer provided a contract chain - use it directly
+    primaryContract = dlContractChain[0];
+    contractChain = dlContractChain;
+    console.log(`[OpenAssistant] Using DL-provided chain: [${dlContractChain.join(" → ")}]`);
+  } else if (contract) {
+    // Decision Layer provided a single contract - wrap it
     primaryContract = contract;
     contractChain = [contract];
     console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
@@ -1014,7 +1029,8 @@ async function handleProductKnowledgeIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  _dlContractChain?: AnswerContract[]  // Reserved for future chain support
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
   
@@ -1111,9 +1127,12 @@ async function handleExternalResearchIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}`);
+  console.log(`[OpenAssistant] === EXTERNAL RESEARCH START ===`);
+  console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
+  const startTime = Date.now();
   
   const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
   
@@ -1122,24 +1141,27 @@ async function handleExternalResearchIntent(
   
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
   
-  // TODO: Refactor to use proper contract chain execution
-  // For now, detect product knowledge enrichment needs inline
+  // Determine what chaining is needed based on LLM contract chain or fallback detection
+  const chainIncludesSalesDocsPrep = dlContractChain?.includes(AnswerContract.SALES_DOCS_PREP) ?? false;
   const needsProductKnowledge = detectProductKnowledgeEnrichment(userMessage);
-  console.log(`[OpenAssistant] Product knowledge enrichment needed: ${needsProductKnowledge}`);
+  // LLM contract chain takes precedence over heuristic detection
+  const needsStyleMatching = chainIncludesSalesDocsPrep || detectStyleMatchingRequest(userMessage);
   
-  // Detect if user wants to write content matching existing product style
-  const needsStyleMatching = detectStyleMatchingRequest(userMessage);
-  console.log(`[OpenAssistant] Style matching needed: ${needsStyleMatching}`);
+  console.log(`[OpenAssistant] Chain-based style matching: ${chainIncludesSalesDocsPrep}, Product knowledge enrichment: ${needsProductKnowledge}, Style matching needed: ${needsStyleMatching}`);
   
   // Generate personalized progress message
+  console.log(`[OpenAssistant] Generating progress message...`);
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
+  console.log(`[OpenAssistant] Progress message ready (${Date.now() - startTime}ms)`);
   
   // Perform the research
+  console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
     userMessage,
     companyName,
     null // topic derived from message
   );
+  console.log(`[OpenAssistant] Research complete (${Date.now() - startTime}ms), answer length: ${researchResult.answer?.length || 0}`);
   
   if (!researchResult.answer) {
     return {
@@ -1308,7 +1330,7 @@ async function chainProductKnowledgeEnrichment(
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
   const response = await openai.chat.completions.create({
-    model: MODEL_CONFIG.productKnowledge.model,
+    model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
     messages: [
       {
         role: "system",
@@ -1350,26 +1372,33 @@ async function chainProductStyleWriting(
   researchContent: string,
   context: OpenAssistantContext
 ): Promise<string> {
+  console.log(`[OpenAssistant] === STYLE MATCHING START ===`);
+  const startTime = Date.now();
+  
   const { getProductKnowledgePrompt } = await import("../airtable/productData");
   
-  // Fetch existing feature descriptions as style examples
+  // Fetch existing feature descriptions as style examples (cached daily)
   const snapshotResult = await getProductKnowledgePrompt();
+  console.log(`[OpenAssistant] Product knowledge from cache (${Date.now() - startTime}ms)`);
   
   // Extract just the features section for style reference
-  // Matches both "=== Current Product Features" and "=== Roadmap Features"
-  const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[\s\S]*?(?===|$)/);
+  // Matches "=== Current Product Features (Available Now) ===" or "=== Roadmap Features (Planned/In Development) ==="
+  // Sections are separated by \n\n
+  const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[^\n]*\n[\s\S]*?(?=\n\n===|$)/);
   const featureExamples = featuresMatch ? featuresMatch[0].slice(0, 2000) : "";
   
   console.log(`[OpenAssistant] Style matching - feature examples length: ${featureExamples.length} chars`);
   
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
-  const response = await openai.chat.completions.create({
-    model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
-    messages: [
-      {
-        role: "system",
-        content: `You are writing a feature description for PitCrew. You MUST match the exact style and tone of our existing feature descriptions.
+  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing...`);
+  const response = await Promise.race([
+    openai.chat.completions.create({
+      model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
+      messages: [
+        {
+          role: "system",
+          content: `You are writing a feature description for PitCrew. You MUST match the exact style and tone of our existing feature descriptions.
 
 === STYLE EXAMPLES (match this format exactly) ===
 ${featureExamples}
@@ -1396,10 +1425,13 @@ OUTPUT ONLY the feature description. No preamble, no "Here's the description", n
         content: `Write the feature description for: ${originalRequest.split("feature").pop()?.split(".")[0]?.trim() || "this feature"}`,
       },
     ],
-    temperature: 0.2,
-    max_tokens: 150,
-  });
+      temperature: 0.2,
+      max_tokens: 150,
+    }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
+  ]);
   
+  console.log(`[OpenAssistant] Style matching complete (${Date.now() - startTime}ms)`);
   return response.choices[0]?.message?.content || researchContent;
 }
 
@@ -1436,7 +1468,8 @@ async function handleGeneralAssistanceIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  _dlContractChain?: AnswerContract[]  // Reserved for future chain support
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
   

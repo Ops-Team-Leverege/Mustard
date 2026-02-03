@@ -74,6 +74,8 @@ async function isDuplicateEvent(eventId: string, clientMsgId: string | undefined
 
 
 export async function slackEventsHandler(req: Request, res: Response) {
+  console.log(`[Slack] ========== EVENT RECEIVED AT ${new Date().toISOString()} ==========`);
+  
   // Check for Slack retry headers
   const retryNum = req.headers['x-slack-retry-num'];
   const retryReason = req.headers['x-slack-retry-reason'];

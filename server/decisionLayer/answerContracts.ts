@@ -156,7 +156,7 @@ export enum AnswerContract {
   PRODUCT_INFO = "PRODUCT_INFO",
 }
 
-export type ContractSelectionMethod = "keyword" | "llm" | "default" | "validation_failure";
+export type ContractSelectionMethod = "keyword" | "llm" | "llm_proposed" | "default" | "validation_failure";
 
 export type AnswerContractResult = {
   contract: AnswerContract;
@@ -1170,13 +1170,31 @@ Respond with JSON: {"contract": "CONTRACT_NAME", "reason": "brief explanation"}`
 export async function selectAnswerContract(
   question: string,
   intent: Intent,
-  layers: ContextLayers
+  layers: ContextLayers,
+  llmProposedContracts?: string[]
 ): Promise<AnswerContractResult> {
   const keywordResult = selectContractByKeyword(question, intent, layers);
   
   if (keywordResult) {
     console.log(`[AnswerContract] Selected: ${keywordResult.contract} (${keywordResult.contractSelectionMethod})`);
     return keywordResult;
+  }
+
+  // LLM-first: If LLM interpretation proposed valid contracts, use the first one as primary
+  // The full contract chain will be available via proposedInterpretation.contracts
+  if (llmProposedContracts && llmProposedContracts.length > 0) {
+    const validContracts = llmProposedContracts.filter(c => 
+      Object.values(AnswerContract).includes(c as AnswerContract)
+    );
+    if (validContracts.length > 0) {
+      const contract = validContracts[0] as AnswerContract;
+      console.log(`[AnswerContract] Selected: ${contract} (llm_proposed) - chain: [${validContracts.join(" → ")}]`);
+      return {
+        contract,
+        contractSelectionMethod: "llm_proposed",
+        constraints: CONTRACT_CONSTRAINTS[contract],
+      };
+    }
   }
 
   console.log(`[AnswerContract] No keyword match, using LLM fallback`);

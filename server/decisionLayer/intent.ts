@@ -47,7 +47,7 @@ export enum Intent {
   CLARIFY = "CLARIFY",
 }
 
-export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "llm" | "llm_validated" | "default" | "follow_up_detection";
+export type IntentDetectionMethod = "keyword" | "pattern" | "entity" | "entity_acronym" | "llm" | "llm_validated" | "default" | "follow_up_detection" | "product_signal" | "situation_advice";
 
 /**
  * Structured decision metadata for observability.
@@ -63,7 +63,7 @@ export type IntentDecisionMetadata = {
   singleIntentViolation?: boolean;     // True if multiple intents matched
   llmInterpretation?: {                // LLM interpretation for clarification
     proposedIntent: IntentString;
-    proposedContract: ContractString;
+    proposedContracts: ContractString[];  // Ordered array for contract chain
     confidence: number;
     failureReason: string;
     interpretationSource: "llm_fallback" | "ambiguity_resolution";
@@ -83,10 +83,13 @@ export type IntentDecisionMetadata = {
  * Proposed interpretation for CLARIFY responses.
  * Enables intelligent clarification without automatic execution.
  * Uses string types to avoid circular dependencies.
+ * 
+ * For multi-step requests, contracts is an ordered array representing
+ * the execution chain (e.g., ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]).
  */
 export type ProposedInterpretation = {
   intent: IntentString;
-  contract: ContractString;
+  contracts: ContractString[];  // Ordered array for contract chain
   summary: string;
 };
 
@@ -212,14 +215,38 @@ function matchesPatterns(text: string, patterns: RegExp[]): boolean {
   return patterns.some(pattern => pattern.test(text));
 }
 
-async function containsKnownCompany(text: string): Promise<string | null> {
+type CompanyMatchResult = {
+  company: string;
+  matchType: "full" | "acronym";  // full = authoritative, acronym = needs LLM validation
+};
+
+async function containsKnownCompany(text: string): Promise<CompanyMatchResult | null> {
   const lower = text.toLowerCase();
   const companies = await getKnownCompanies();
+  
+  // First pass: check for full company name match (AUTHORITATIVE - no validation needed)
   for (const company of companies) {
     if (lower.includes(company)) {
-      return company;
+      return { company, matchType: "full" };
     }
   }
+  
+  // Second pass: check for first word match ONLY for acronyms (e.g., "TPI" matches "TPI Composites")
+  // Acronym detection: all uppercase, 2-5 characters (covers TPI, ACE, CJ, OK, etc.)
+  // These matches NEED LLM validation to confirm semantic intent
+  for (const company of companies) {
+    const firstWord = company.split(/\s+/)[0];
+    const isAcronym = /^[A-Z]{2,5}$/.test(firstWord) || /^[A-Z][A-Za-z]'?s?$/.test(firstWord);
+    
+    if (isAcronym) {
+      // Use word boundary to avoid partial matches
+      const wordBoundaryRegex = new RegExp(`\\b${firstWord}\\b`, 'i');
+      if (wordBoundaryRegex.test(lower)) {
+        return { company, matchType: "acronym" };
+      }
+    }
+  }
+  
   return null;
 }
 
@@ -263,10 +290,13 @@ function detectFollowUpMessage(
   if (!result) return null;
 
   // Map the service result to an IntentClassificationResult
+  // All actionable intents should be here for follow-up handling
   const intentMap: Record<string, Intent> = {
     "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
     "SINGLE_MEETING": Intent.SINGLE_MEETING,
+    "MULTI_MEETING": Intent.MULTI_MEETING,
     "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
+    "DOCUMENT_SEARCH": Intent.DOCUMENT_SEARCH,
     "GENERAL_HELP": Intent.GENERAL_HELP,
   };
 
@@ -296,13 +326,9 @@ async function classifyByKeyword(
 ): Promise<IntentClassificationResult | null> {
   const lower = question.toLowerCase();
 
-  // EARLY CHECK: Detect follow-up/refinement messages that need thread context
-  // These are short messages that refine a previous request
-  const followUpResult = detectFollowUpMessage(question, threadContext);
-  if (followUpResult) {
-    console.log(`[IntentClassifier] Follow-up message detected: "${followUpResult.reason}"`);
-    return followUpResult;
-  }
+  // NOTE: Follow-up detection removed from fast-path. 
+  // The LLM classifier sees thread context and handles follow-ups semantically.
+  // Pattern-based follow-up detection was "keyword creep" - LLM should understand intent.
 
   // HARDENING: Check for REFUSE first (highest priority)
   if (matchesPatterns(question, REFUSE_PATTERNS)) {
@@ -346,6 +372,7 @@ async function classifyByKeyword(
   // The LLM is better at understanding semantic intent than brittle regex patterns
   // ============================================================================
 
+<<<<<<< HEAD
   // PRODUCT_KNOWLEDGE override: Strategic advice requests should return PRODUCT_KNOWLEDGE immediately
   // These phrases indicate the user wants strategic advice, not meeting analysis
   const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
@@ -356,12 +383,26 @@ async function classifyByKeyword(
       intentDetectionMethod: "pattern",
       confidence: 0.9,
       reason: "Strategic advice request using PitCrew value propositions",
+=======
+  // PRODUCT_KNOWLEDGE fast-path: Strategic advice requests should go directly to PRODUCT_KNOWLEDGE
+  // These phrases indicate the user wants strategic advice using PitCrew's products
+  // Also catches "our roadmap" (internal product roadmap) vs "their roadmap" (external)
+  const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how|our\s+(q[1-4]\s+)?roadmap|what['']?s\s+on\s+our\s+roadmap|features?\s+coming\s+next|our\s+recommended\s+approach|what['']?s\s+our\s+(recommended\s+)?approach)\b/i;
+  if (productKnowledgeSignals.test(question)) {
+    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - fast-path to PRODUCT_KNOWLEDGE (strategic advice request)`);
+    return {
+      intent: Intent.PRODUCT_KNOWLEDGE,
+      intentDetectionMethod: "product_signal",
+      confidence: 0.92,
+      reason: "Strategic advice request detected (based on PitCrew / help me think through)",
+>>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
     };
   }
 
   // Entity detection: Only triggers if no action-based pattern matched first
-  const company = await containsKnownCompany(question);
+  const companyMatch = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
+<<<<<<< HEAD
 
   if (company || contact) {
     const entityName = company || contact;
@@ -373,24 +414,49 @@ async function classifyByKeyword(
     const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want|pilot)\b/i.test(question);
 
     // If describing a situation (not asking to search meetings), let LLM handle it
+=======
+  
+  if (companyMatch || contact) {
+    const entityName = companyMatch?.company || contact;
+    // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
+    const detectionMethod: IntentDetectionMethod = companyMatch?.matchType === "acronym" ? "entity_acronym" : "entity";
+    // Lower confidence for acronym matches since they need validation
+    const confidence = companyMatch?.matchType === "acronym" ? 0.70 : 0.85;
+    
+    // Don't trigger multi-meeting for strategic advice requests
+    // "across all their stores" is about customer behavior, not "search across all meetings"
+    const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
+    const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want)\b/i.test(question);
+    
+    // If describing a situation with a strategic advice request, go to PRODUCT_KNOWLEDGE
+>>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
     if (isDescribingSituation) {
-      console.log(`[Intent] Message describes a situation - delegating to LLM for nuanced classification`);
-      return null;
+      // Check if it's asking for strategic advice (how to approach, what to do)
+      const wantsAdvice = /\b(how\s+(can|should|do)\s+we|help\s+me|what\s+should|approach\s+this)\b/i.test(question);
+      if (wantsAdvice) {
+        console.log(`[Intent] Situation description + advice request - fast-path to PRODUCT_KNOWLEDGE`);
+        return {
+          intent: Intent.PRODUCT_KNOWLEDGE,
+          intentDetectionMethod: "situation_advice",
+          confidence: 0.90,
+          reason: "Describing customer situation and asking for strategic advice",
+        };
+      }
     }
 
     if (hasMultiMeetingSignal) {
       return {
         intent: Intent.MULTI_MEETING,
-        intentDetectionMethod: "entity",
-        confidence: 0.85,
+        intentDetectionMethod: detectionMethod,
+        confidence,
         reason: `Contains known entity "${entityName}" with multi-meeting signal`,
       };
     }
 
     return {
       intent: Intent.SINGLE_MEETING,
-      intentDetectionMethod: "entity",
-      confidence: 0.85,
+      intentDetectionMethod: detectionMethod,
+      confidence,
       reason: `Contains known entity "${entityName}" - likely asking about meeting`,
     };
   }
@@ -398,14 +464,34 @@ async function classifyByKeyword(
   return null;
 }
 
-async function classifyByLLM(question: string): Promise<IntentClassificationResult> {
+async function classifyByLLM(
+  question: string,
+  threadContext?: ThreadContext
+): Promise<IntentClassificationResult> {
   try {
+    // Build messages array with thread context for semantic follow-up detection
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: INTENT_CLASSIFICATION_PROMPT },
+    ];
+    
+    // Include thread history so LLM can understand follow-ups semantically
+    if (threadContext?.messages && threadContext.messages.length > 1) {
+      const historyMessages = threadContext.messages.slice(0, -1); // Exclude current message
+      for (const msg of historyMessages) {
+        messages.push({
+          role: msg.isBot ? "assistant" : "user",
+          content: msg.text,
+        });
+      }
+      console.log(`[IntentClassifier] LLM classification with ${historyMessages.length} messages of thread context`);
+    }
+    
+    // Add current question
+    messages.push({ role: "user", content: question });
+    
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
-      messages: [
-        { role: "system", content: INTENT_CLASSIFICATION_PROMPT },
-        { role: "user", content: question },
-      ],
+      messages,
       temperature: 0,
       response_format: { type: "json_object" },
     });
@@ -459,29 +545,50 @@ async function classifyByLLM(question: string): Promise<IntentClassificationResu
 // Low-confidence threshold for LLM validation
 const LOW_CONFIDENCE_THRESHOLD = 0.88;
 
-// Detection methods that are considered "weak" and need validation
-// NOTE: "entity" is NOT weak - it's based on database lookup of known customers
-const WEAK_DETECTION_METHODS = ["keyword"];
+// Detection methods that are considered "weak" and need LLM validation
+// "entity" (full company name match) is AUTHORITATIVE - no validation needed
+// "entity_acronym" (first-word acronym match) is WEAK - needs LLM to confirm semantic intent
+const WEAK_DETECTION_METHODS: IntentDetectionMethod[] = ["keyword", "entity_acronym"];
 
 function needsLLMValidation(result: IntentClassificationResult): boolean {
   // High-confidence pattern matches don't need validation
   if (result.intentDetectionMethod === "pattern" && result.confidence >= 0.9) {
     return false;
   }
+<<<<<<< HEAD
 
   // Entity detection (known customers from database) doesn't need validation
+=======
+  
+  // Full entity detection (known customers from database) doesn't need validation
+>>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   // When someone mentions a known customer like "Les Schwab", trust it's about meetings
   if (result.intentDetectionMethod === "entity") {
     return false;
   }
+<<<<<<< HEAD
 
+=======
+  
+  // Product signal and situation_advice are high-confidence fast-paths
+  if (result.intentDetectionMethod === "product_signal" || result.intentDetectionMethod === "situation_advice") {
+    return false;
+  }
+  
+>>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   // CLARIFY and REFUSE intents don't need validation
   if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
     return false;
   }
+<<<<<<< HEAD
 
   // Weak detection methods need validation
+=======
+  
+  // Weak detection methods need validation (includes entity_acronym matches)
+>>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
+    console.log(`[IntentClassifier] Weak detection method "${result.intentDetectionMethod}" - will validate with LLM`);
     return true;
   }
 

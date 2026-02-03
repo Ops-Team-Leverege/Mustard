@@ -74,7 +74,7 @@ export {
 
 export type ProposedInterpretation = {
   intent: string;
-  contract: string;
+  contracts: string[];  // Ordered array for contract chain
   summary: string;
 };
 
@@ -89,7 +89,8 @@ export type DecisionLayerResult = {
   intent: Intent;
   intentDetectionMethod: string;
   contextLayers: ContextLayers;
-  answerContract: AnswerContract;
+  answerContract: AnswerContract;  // Primary contract (first in chain)
+  contractChain?: AnswerContract[];  // Full contract chain for multi-step requests
   contractSelectionMethod: string;
   clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
@@ -158,7 +159,7 @@ async function checkAggregateSpecificity(question: string): Promise<SpecificityC
 
 function generateAggregateClarifyMessage(hasTime: boolean, hasScope: boolean): string {
   if (!hasTime && !hasScope) {
-    return `Great question! To give you the best analysis, could you clarify:
+    return `To give you the best analysis, could you clarify:
 
 1. **Time range**: Last month, last quarter, or all time?
 2. **Scope**: All customers, or a specific customer?
@@ -167,7 +168,7 @@ For example: "Show me customer concerns from the last quarter across all custome
   }
   
   if (!hasTime) {
-    return `I can help with that! What time range would you like me to analyze?
+    return `What time range would you like me to analyze?
 
 - Last month
 - Last quarter  
@@ -177,7 +178,7 @@ For example: "...from the last quarter"`;
   }
   
   if (!hasScope) {
-    return `Got it! Would you like me to look at:
+    return `Would you like me to look at:
 
 - **All customers** - patterns across everyone
 - **A specific customer** - just mention their name
@@ -203,7 +204,8 @@ export async function runDecisionLayer(
   const contractResult = await selectAnswerContract(
     question,
     intentResult.intent,
-    layersMeta.layers
+    layersMeta.layers,
+    intentResult.proposedInterpretation?.contracts
   );
   
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
@@ -240,7 +242,7 @@ export async function runDecisionLayer(
           clarifyMessage,
           proposedInterpretation: {
             intent: intentResult.intent.toString(),
-            contract: contractResult.contract.toString(),
+            contracts: [contractResult.contract.toString()],
             summary: "Aggregate analysis - awaiting scope",
           },
           scope: scopeInfo,
@@ -249,11 +251,17 @@ export async function runDecisionLayer(
     }
   }
 
+  // Build contract chain from LLM-proposed contracts if available
+  const contractChain = intentResult.proposedInterpretation?.contracts
+    ?.map(c => AnswerContract[c as keyof typeof AnswerContract])
+    .filter((c): c is AnswerContract => c !== undefined);
+
   return {
     intent: intentResult.intent,
     intentDetectionMethod: intentResult.intentDetectionMethod,
     contextLayers: layersMeta.layers,
     answerContract: contractResult.contract,
+    contractChain: contractChain && contractChain.length > 1 ? contractChain : undefined,
     contractSelectionMethod: contractResult.contractSelectionMethod,
     clarifyMessage: intentResult.clarifyMessage,
     proposedInterpretation: intentResult.proposedInterpretation,

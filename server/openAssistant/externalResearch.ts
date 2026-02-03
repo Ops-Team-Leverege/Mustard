@@ -84,10 +84,16 @@ export async function performExternalResearch(
   try {
     const researchPrompt = buildResearchPrompt(query, companyName, topic);
     
-    const response = await gemini.models.generateContent({
-      model: MODEL_ASSIGNMENTS.EXTERNAL_RESEARCH_WEB,
-      contents: researchPrompt,
-    });
+    console.log(`[ExternalResearch] Calling Gemini for web research...`);
+    const startTime = Date.now();
+    const response = await Promise.race([
+      gemini.models.generateContent({
+        model: MODEL_ASSIGNMENTS.EXTERNAL_RESEARCH_WEB,
+        contents: researchPrompt,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Gemini timeout after 60s')), 60000))
+    ]);
+    console.log(`[ExternalResearch] Gemini response received (${Date.now() - startTime}ms)`);
     
     const content = response.text;
     if (!content) {
@@ -172,12 +178,14 @@ async function provideGeneralKnowledge(
 ): Promise<ResearchResult> {
   console.log(`[ExternalResearch] Providing general knowledge (Gemini not available)`);
   
-  const response = await openai.chat.completions.create({
-    model: MODEL_ASSIGNMENTS.EXTERNAL_RESEARCH,
-    messages: [
-      {
-        role: "system",
-        content: `You are a helpful assistant providing general knowledge about companies and business topics.
+  const startTime = Date.now();
+  const response = await Promise.race([
+    openai.chat.completions.create({
+      model: MODEL_ASSIGNMENTS.EXTERNAL_RESEARCH,
+      messages: [
+        {
+          role: "system",
+          content: `You are a helpful assistant providing general knowledge about companies and business topics.
 
 IMPORTANT RULES:
 - Provide helpful general information based on your training data
@@ -186,13 +194,16 @@ IMPORTANT RULES:
 - Include timeframes for factual claims when known
 - If you're not confident about specific facts, say so
 - Recommend the user verify important information from official sources`,
-      },
-      {
-        role: "user",
-        content: query,
-      },
-    ],
-  });
+        },
+        {
+          role: "user",
+          content: query,
+        },
+      ],
+    }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
+  ]);
+  console.log(`[ExternalResearch] OpenAI response received (${Date.now() - startTime}ms)`);
 
   const answer = response.choices[0]?.message?.content || "I'm not able to provide information on this topic right now.";
   const date = extractionDate || getExtractionDate();
