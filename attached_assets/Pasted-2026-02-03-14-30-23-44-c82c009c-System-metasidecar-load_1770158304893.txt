@@ -1,0 +1,184 @@
+2026-02-03 14:30:23.44
+c82c009c
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-03 14:30:23.44
+c82c009c
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-03 14:30:24.45
+c82c009c
+User
+> rest-express@1.0.0 start
+2026-02-03 14:30:25.88
+c82c009c
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-03 14:30:25.88
+c82c009c
+User
+Slack routes registered at /api/slack/events
+2026-02-03 14:30:26.20
+c82c009c
+User
+10:30:26 PM [express] serving on port 5000
+2026-02-03 14:35:38.86
+efb8c798
+System
+starting up user application
+2026-02-03 14:35:38.86
+efb8c798
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-03 14:35:38.87
+efb8c798
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-03 14:35:41.71
+efb8c798
+User
+> NODE_ENV=production node dist/index.js
+2026-02-03 14:35:41.71
+efb8c798
+User
+> rest-express@1.0.0 start
+2026-02-03 14:35:44.68
+efb8c798
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-03 14:35:44.69
+efb8c798
+User
+Slack routes registered at /api/slack/events
+2026-02-03 14:35:45.08
+efb8c798
+User
+10:35:44 PM [express] serving on port 5000
+2026-02-03 14:36:13.83
+efb8c798
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-03T22:36:13.832Z ==========
+2026-02-03 14:36:13.83
+efb8c798
+User
+[Slack] Received event request
+2026-02-03 14:36:13.83
+efb8c798
+User
+Slack payload type: event_callback
+2026-02-03 14:36:13.83
+efb8c798
+User
+Event type: app_mention
+2026-02-03 14:36:13.83
+efb8c798
+User
+[Slack] Processing app_mention
+2026-02-03 14:36:13.83
+efb8c798
+User
+[Slack] Event details: eventId=Ev0ACBUDQY4X, clientMsgId=e4c68bd1-496a-4182-b438-8132d73a6c99, messageTs=1770158172.618179, threadTs=1770158172.618179, channel=C0A80S3HJNL
+2026-02-03 14:36:13.83
+efb8c798
+User
+10:36:13 PM [express] POST /api/slack/events 200 in 6ms
+2026-02-03 14:36:14.43
+efb8c798
+User
+[Dedupe] Cleaned up 6 old entries
+2026-02-03 14:36:16.06
+efb8c798
+User
+[INFO] [23e1634b] Slack event received {"correlationId":"23e1634b","channel":"C0A80S3HJNL","threadTs":"1770158172.618179","userId":"U082TV42FM0","duration":0,"text":"we have a new feature to add to the roadmap, that will detect when the net underneath the bays (prim","isReply":false,"testRun":false}
+2026-02-03 14:36:16.06
+efb8c798
+User
+Processing: "we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features" in channel C0A80S3HJNL (isReply=false)
+2026-02-03 14:36:18.76
+efb8c798
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-03 14:36:20.26
+efb8c798
+User
+[Slack] Fetched 2 messages from thread for context
+2026-02-03 14:36:22.66
+efb8c798
+User
+[IntentClassifier] No keyword match, using LLM interpretation for clarification
+2026-02-03 14:36:22.66
+efb8c798
+User
+[Intent] Loaded 36 companies from database
+2026-02-03 14:36:22.86
+efb8c798
+User
+[LLMInterpretation] Including 1 messages from thread history
+2026-02-03 14:36:31.46
+efb8c798
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":true,"single_meeting":false,"multi_meeting":false,"document_context":false}
+2026-02-03 14:36:31.46
+efb8c798
+User
+[DecisionLayer] Intent: EXTERNAL_RESEARCH (llm)
+2026-02-03 14:36:31.46
+efb8c798
+User
+[IntentClassifier] Using LLM's proposed intent: EXTERNAL_RESEARCH (confidence 0.9 >= 0.6)
+2026-02-03 14:36:31.46
+efb8c798
+User
+[IntentClassifier] LLM interpretation: intent=EXTERNAL_RESEARCH, confidence=0.9
+2026-02-03 14:36:31.46
+efb8c798
+User
+[DecisionLayer] Contract: EXTERNAL_RESEARCH (llm_proposed)
+2026-02-03 14:36:31.46
+efb8c798
+User
+[LLMInterpretation] Interpretation: intent=EXTERNAL_RESEARCH, contracts=[EXTERNAL_RESEARCH → SALES_DOCS_PREP], confidence=0.9, reason=no_intent_match
+2026-02-03 14:36:31.46
+efb8c798
+User
+[AnswerContract] Selected: EXTERNAL_RESEARCH (llm_proposed) - chain: [EXTERNAL_RESEARCH → SALES_DOCS_PREP]
+2026-02-03 14:36:31.66
+efb8c798
+User
+[Slack] Control plane: intent=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, method=llm, layers={"product_identity":true,"product_ssot":true,"single_meeting":false,"multi_meeting":false,"document_context":false}
+2026-02-03 14:36:31.66
+efb8c798
+User
+[Slack] Non-meeting intent (EXTERNAL_RESEARCH) - skipping meeting resolution
+2026-02-03 14:36:31.66
+efb8c798
+User
+[INFO] [23e1634b] Decision Layer completed {"correlationId":"23e1634b","channel":"C0A80S3HJNL","threadTs":"1770158172.618179","userId":"U082TV42FM0","duration":15700,"intent":"EXTERNAL_RESEARCH","contract":"EXTERNAL_RESEARCH","method":"llm","duration_ms":12502}
+2026-02-03 14:36:31.66
+efb8c798
+User
+[Slack] Open Assistant mode - intent=EXTERNAL_RESEARCH, routing to appropriate handler
+2026-02-03 14:36:32.96
+efb8c798
+User
+[Slack] Streaming placeholder posted: ts=1770158192.428269
+2026-02-03 14:36:32.96
+efb8c798
+User
+[OpenAssistant] Evidence source: general_assistance (from Decision Layer: EXTERNAL_RESEARCH -> EXTERNAL_RESEARCH)
+2026-02-03 14:36:32.96
+efb8c798
+User
+[OpenAssistant] Processing: "we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features"
+2026-02-03 14:36:32.96
+efb8c798
+User
+[OpenAssistant] Using full Decision Layer result: intent=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, method=llm
+2026-02-03 14:36:33.16
+efb8c798
+User
+[OpenAssistant] External research for: to understand more about oil change shops
+2026-02-03 14:36:33.16
+efb8c798
+User
+[OpenAssistant] Routing to external research path (CP contract: EXTERNAL_RESEARCH) (chain: [EXTERNAL_RESEARCH → SALES_DOCS_PREP])
