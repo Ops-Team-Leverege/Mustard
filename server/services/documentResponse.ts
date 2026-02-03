@@ -275,6 +275,8 @@ async function generateTitleFromQuery(query?: string, contract?: AnswerContract,
     AnswerContract.PATTERN_ANALYSIS,
     AnswerContract.TREND_SUMMARY,
     AnswerContract.CROSS_MEETING_QUESTIONS,
+    AnswerContract.EXTERNAL_RESEARCH,
+    AnswerContract.SALES_DOCS_PREP,
   ];
   
   // If contract doesn't benefit from query-based titles, use contract-based
