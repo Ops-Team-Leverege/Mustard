@@ -29,17 +29,18 @@ Classify into exactly ONE intent:
 
 CRITICAL RULES:
 1. If ANY person name appears (Tyler, Randy, Robert, etc.) → likely SINGLE_MEETING
-2. If ANY company name appears in context of "our meeting with X" → likely SINGLE_MEETING
-3. "What did X say/mention/ask" → SINGLE_MEETING
-4. "Find all" or "across meetings" or "across all customers" → MULTI_MEETING
-5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
-6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
-7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
-8. "Research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
-9. Focus on the PRIMARY ask - what information source is needed? Past meetings? External research? Product docs?
-10. PRODUCT_KNOWLEDGE is always available as a follow-up. If request combines EXTERNAL_RESEARCH + "connect to PitCrew offerings" → classify as EXTERNAL_RESEARCH (product info will be added automatically)
-11. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
-12. "What can you do?" or "what can you help with?" or "how can you help me?" → GENERAL_HELP (these are META questions about the BOT's capabilities, NOT questions about PitCrew product features)
+2. If a KNOWN customer company name appears (Les Schwab, ACE, Jiffy Lube, etc.) → SINGLE_MEETING (they want meeting info)
+3. Just typing a known customer name like "Les Schwab" → SINGLE_MEETING (show their meeting info, NOT external research)
+4. "What did X say/mention/ask" → SINGLE_MEETING
+5. "Find all" or "across meetings" or "across all customers" → MULTI_MEETING
+6. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
+7. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH (only for companies we DON'T have meetings with)
+8. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
+9. "Research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
+10. Focus on the PRIMARY ask - what information source is needed? Past meetings? External research? Product docs?
+11. PRODUCT_KNOWLEDGE is always available as a follow-up. If request combines EXTERNAL_RESEARCH + "connect to PitCrew offerings" → classify as EXTERNAL_RESEARCH (product info will be added automatically)
+12. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
+13. "What can you do?" or "what can you help with?" or "how can you help me?" → GENERAL_HELP (these are META questions about the BOT's capabilities, NOT questions about PitCrew product features)
 
 SINGULAR vs PLURAL MEETING DETECTION:
 13. "last [company] call" or "last [company] meeting" or "last call with [company]" → SINGLE_MEETING (singular reference)
@@ -54,6 +55,8 @@ PRODUCT_KNOWLEDGE vs EXTERNAL_RESEARCH:
 20. Questions about pilot methodology, expansion approach, or sales strategy using PitCrew → PRODUCT_KNOWLEDGE
 
 EXAMPLES:
+- "Les Schwab" (just the company name) → SINGLE_MEETING (show their meeting info)
+- "ACE Hardware" (just the company name) → SINGLE_MEETING (show their meeting info)
 - "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
 - "What did Tyler Wiggins mention about pricing?" → SINGLE_MEETING  
 - "What warranty terms were discussed in the last Pomp's call?" → SINGLE_MEETING (singular: "last call")
@@ -136,22 +139,31 @@ Signals: ${matchedSignals.join(", ")}
 
 YOUR JOB: Determine if this classification is semantically correct.
 
+IMPORTANT - KNOWN CUSTOMERS VS EXTERNAL RESEARCH:
+When the reason mentions "known entity" or "known company", that means this company is in our CRM/meeting database. For known customers:
+- Just typing the company name (e.g., "Les Schwab") → SINGLE_MEETING (show their meeting info)
+- "Les Schwab calls" or "meetings with Les Schwab" → MULTI_MEETING
+- NEVER override to EXTERNAL_RESEARCH for known customers - they want meeting data, not web research
+
+EXTERNAL_RESEARCH is for companies we DON'T have meetings with, or explicit research requests like "research [company] earnings".
+
 VALID INTENTS:
-- SINGLE_MEETING: Questions about what happened in a specific meeting (what did X say, summary, next steps)
-- MULTI_MEETING: Questions across multiple meetings (search all calls, find patterns, compare)
+- SINGLE_MEETING: Questions about what happened in a specific meeting, OR mentions of a known customer (what did X say, summary, next steps, or just the company name)
+- MULTI_MEETING: Questions across multiple meetings (search all calls, find patterns, compare, or "all [company] calls")
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
-- EXTERNAL_RESEARCH: Research requiring web/public information - either external companies (earnings calls, news, priorities) OR topics/concepts needing web research (industry practices, domain knowledge)
+- EXTERNAL_RESEARCH: Research about companies NOT in our meeting database, OR explicit external research requests (earnings calls, news, market analysis)
 - DOCUMENT_SEARCH: Looking for specific documents
 - GENERAL_HELP: Drafting emails, general assistance
 - REFUSE: Out-of-scope requests (weather, jokes, personal info)
 
 KEY DISTINCTIONS:
+- Just a known company name like "Les Schwab" → SINGLE_MEETING (they want meeting info)
 - "search all calls" or "recent calls" → MULTI_MEETING (not SINGLE_MEETING or GENERAL_HELP)
 - "what did X say" → SINGLE_MEETING
 - "how does PitCrew work" → PRODUCT_KNOWLEDGE
 - "what are PitCrew's capabilities" → PRODUCT_KNOWLEDGE (asking about the product)
 - "what can you do?" or "how can you help me?" → GENERAL_HELP (META question about the BOT, not PitCrew)
-- "research Costco" or "their earnings calls" → EXTERNAL_RESEARCH
+- "research Costco" or "their earnings calls" → EXTERNAL_RESEARCH (for unknown companies)
 - "draft an email" → GENERAL_HELP
 
 Respond with JSON:
