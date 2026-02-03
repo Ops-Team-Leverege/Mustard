@@ -150,12 +150,13 @@ async function generatePersonalizedProgress(
   };
   
   try {
-    const response = await openai.chat.completions.create({
-      model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
-      messages: [
-        {
-          role: "system",
-          content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
+    const response = await Promise.race([
+      openai.chat.completions.create({
+        model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
+        messages: [
+          {
+            role: "system",
+            content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
 The message should:
 - Be warm and conversational (not robotic)
 - Reference what they're asking about specifically
@@ -168,15 +169,17 @@ Examples:
 - "Good question about pricing! Gathering the latest details from our database."
 - "Checking what we know about network requirements - one moment."
 - "Looking into how that feature works - I'll have an answer shortly."`
-        },
-        {
-          role: "user",
-          content: `Question type: ${intentType}\nUser's question: "${userMessage.substring(0, 150)}"`
-        }
-      ],
-      max_tokens: 50,
-      temperature: 0.7,
-    });
+          },
+          {
+            role: "user",
+            content: `Question type: ${intentType}\nUser's question: "${userMessage.substring(0, 150)}"`
+          }
+        ],
+        max_tokens: 50,
+        temperature: 0.7,
+      }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Progress message timeout')), 10000))
+    ]);
     
     const generated = response.choices[0]?.message?.content?.trim();
     if (generated && generated.length > 10 && generated.length < 150) {
