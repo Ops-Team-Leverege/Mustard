@@ -26,14 +26,18 @@ The application includes a transcript detail view, meeting date support, and das
 The system uses **true LLM-FIRST classification** for intent routing. The LLM (gpt-4o-mini) handles semantic understanding while minimal fast-paths handle only absolute certainties.
 
 **Classification Strategy:**
-1. **Minimal fast-paths** (no LLM cost):
-   - Simple greetings: "hello", "thanks", etc.
+1. **Minimal fast-paths** (no LLM cost, ordered by priority):
    - REFUSE patterns: Weather, jokes, personal info (out of scope)
    - MULTI_INTENT patterns: Multi-step requests needing clarification
+   - Simple greetings: "hello", "thanks", etc.
+   - SINGLE_MEETING: "last [company] call/meeting" (singular) - excludes aggregate phrases
+   - PRODUCT_KNOWLEDGE: "our approach/methodology" - only if no meeting context
    - Entity detection: Known company/contact names → meeting intent
 2. **LLM semantic classification** (everything else):
    - Uses `INTENT_CLASSIFICATION_PROMPT` in `server/config/prompts/decisionLayer.ts`
    - Handles all nuanced classification: meetings, product knowledge, external research, etc.
+
+**Important Routing Order:** SINGLE_MEETING must come before PRODUCT_KNOWLEDGE to prevent "our messaging in last X call" misrouting.
 
 **Key Components:**
 - **Intent Router** (`server/decisionLayer/intent.ts`): Classifies user intent using LLM semantic understanding
