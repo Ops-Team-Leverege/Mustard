@@ -77,28 +77,51 @@ const defaultMessages: Record<ProgressIntentType, string> = {
 };
 
 /**
- * Bot capability tips to educate users about other features.
- * These are appended to progress messages to increase discoverability.
+ * Bot capabilities derived from actual contracts/intents.
+ * Each capability describes what the bot can do for BD users.
+ * The LLM will pick one and elaborate it into a natural tip.
  */
-const CAPABILITY_TIPS: string[] = [
-  "I can also help you draft emails with customized value propositions for customers.",
-  "Did you know I can research companies and write feature descriptions in PitCrew's style?",
-  "I can search across all your customer meetings to find patterns and trends.",
-  "Need a meeting summary? Just ask me about any customer call.",
-  "I can help you prepare for customer meetings by researching their business.",
-  "Ask me about PitCrew features - I have the full product database at my fingertips.",
-  "I can identify what POS systems your prospects are using from meeting notes.",
-  "Need to follow up with a customer? I can draft personalized emails based on your conversations.",
-  "I can find common questions customers ask across all your meetings.",
-  "Looking for action items from a meeting? I can pull those up for you.",
+const BOT_CAPABILITIES: Array<{ capability: string; useCase: string }> = [
+  // Meeting extraction capabilities
+  { capability: "Meeting Summaries", useCase: "Summarize any customer meeting in seconds" },
+  { capability: "Action Items", useCase: "Pull next steps and commitments from meetings" },
+  { capability: "Customer Questions", useCase: "Find questions customers asked during calls" },
+  { capability: "Attendee Lists", useCase: "Get who was in any meeting" },
+  
+  // Cross-meeting analysis
+  { capability: "Pattern Analysis", useCase: "Find recurring themes across all customer meetings" },
+  { capability: "Trend Tracking", useCase: "See how conversations change over time" },
+  { capability: "Customer Comparisons", useCase: "Compare how different customers respond" },
+  
+  // Product knowledge
+  { capability: "Product Knowledge", useCase: "Know everything about PitCrew features and capabilities" },
+  { capability: "Value Propositions", useCase: "Help craft compelling value props for customers" },
+  { capability: "Feature Verification", useCase: "Confirm what PitCrew can and can't do" },
+  
+  // Content drafting
+  { capability: "Draft Emails", useCase: "Write follow-up emails with personalized value props" },
+  { capability: "Draft Responses", useCase: "Help answer customer questions with confidence" },
+  { capability: "Technical Emails", useCase: "Draft technical content with accurate product details" },
+  { capability: "Presentation Content", useCase: "Write slide content and talking points" },
+  
+  // Research
+  { capability: "Company Research", useCase: "Research prospects before meetings" },
+  { capability: "Feature Descriptions", useCase: "Write feature descriptions in PitCrew's style" },
+  { capability: "Competitive Intel", useCase: "Understand what competitors are doing" },
+  
+  // Data extraction
+  { capability: "POS Detection", useCase: "Identify what POS systems prospects use" },
+  { capability: "Pain Point Extraction", useCase: "Find what problems customers mention" },
+  { capability: "Objection Tracking", useCase: "Track common objections across customers" },
 ];
 
 /**
  * Get a random capability tip to append to progress messages.
- * Helps educate users about the bot's other capabilities while they wait.
+ * Picks a random capability and formats it as a friendly tip.
  */
 function getRandomCapabilityTip(): string {
-  return pickRandom(CAPABILITY_TIPS);
+  const capability = pickRandom(BOT_CAPABILITIES);
+  return `${capability.useCase}? Just ask me!`;
 }
 
 /**
