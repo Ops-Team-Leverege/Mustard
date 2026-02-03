@@ -346,13 +346,31 @@ async function classifyByKeyword(
   // The LLM is better at understanding semantic intent than brittle regex patterns
   // ============================================================================
 
+  // PRODUCT_KNOWLEDGE override: Strategic advice requests should go to LLM, not entity detection
+  // These phrases indicate the user wants strategic advice, not meeting analysis
+  const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
+  if (productKnowledgeSignals.test(question)) {
+    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - delegating to LLM for nuanced classification`);
+    return null; // Let LLM handle this with full context
+  }
+
   // Entity detection: Only triggers if no action-based pattern matched first
   const company = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
   
   if (company || contact) {
     const entityName = company || contact;
+    
+    // Don't trigger multi-meeting for strategic advice requests
+    // "across all their stores" is about customer behavior, not "search across all meetings"
     const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
+    const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want|pilot)\b/i.test(question);
+    
+    // If describing a situation (not asking to search meetings), let LLM handle it
+    if (isDescribingSituation) {
+      console.log(`[Intent] Message describes a situation - delegating to LLM for nuanced classification`);
+      return null;
+    }
     
     if (hasMultiMeetingSignal) {
       return {
