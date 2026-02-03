@@ -1308,7 +1308,7 @@ async function chainProductKnowledgeEnrichment(
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
   const response = await openai.chat.completions.create({
-    model: MODEL_CONFIG.productKnowledge.model,
+    model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
     messages: [
       {
         role: "system",
