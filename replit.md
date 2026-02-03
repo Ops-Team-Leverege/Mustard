@@ -36,8 +36,16 @@ The system employs **true LLM-FIRST classification** for intent routing, using g
 **Routing Flow:**
 The Intent Router classifies intent, the Orchestrator computes context layers and selects an answer contract, and the Execution Layer executes the contract chain. LLM-determined scope (e.g., "all customers") is propagated downstream to avoid redundant detection. Contract chains are dynamically built based on user messages.
 
-**Contract Selection Strategy:**
-Prioritizes keyword fast-paths for absolute certainties, followed by LLM-proposed contracts from intent classification, and finally an LLM fallback for contract selection if neither previous method yields a result.
+**Contract Selection Strategy (LLM-First):**
+1. **Keyword fast-path**: Minimal keywords for absolute certainties (e.g., "slide deck" → SALES_DOCS_PREP)
+2. **LLM-proposed contract chain**: If LLM interpretation proposed contracts during intent classification, use them
+3. **LLM fallback**: Only if no keyword match AND no LLM proposal, run separate contract selection LLM call
+
+**Contract Chains (Multi-Step Requests):**
+LLM can propose multiple contracts for multi-step requests (e.g., "research X then write feature description"):
+- `ProposedInterpretation.contracts: ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]`
+- First contract is primary, chain is executed in order
+- Examples: `["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]`, `["MEETING_SUMMARY", "DRAFT_EMAIL"]`
 
 ### Recent Architectural Improvements
 -   **Markdown Formatting System**: Flexible `markdownFormatter.ts` supporting multiple output targets (slack, standard, plaintext).

@@ -74,7 +74,7 @@ export {
 
 export type ProposedInterpretation = {
   intent: string;
-  contract: string;
+  contracts: string[];  // Ordered array for contract chain
   summary: string;
 };
 
@@ -89,7 +89,8 @@ export type DecisionLayerResult = {
   intent: Intent;
   intentDetectionMethod: string;
   contextLayers: ContextLayers;
-  answerContract: AnswerContract;
+  answerContract: AnswerContract;  // Primary contract (first in chain)
+  contractChain?: AnswerContract[];  // Full contract chain for multi-step requests
   contractSelectionMethod: string;
   clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
@@ -204,7 +205,7 @@ export async function runDecisionLayer(
     question,
     intentResult.intent,
     layersMeta.layers,
-    intentResult.proposedInterpretation?.contract
+    intentResult.proposedInterpretation?.contracts
   );
   
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
@@ -241,7 +242,7 @@ export async function runDecisionLayer(
           clarifyMessage,
           proposedInterpretation: {
             intent: intentResult.intent.toString(),
-            contract: contractResult.contract.toString(),
+            contracts: [contractResult.contract.toString()],
             summary: "Aggregate analysis - awaiting scope",
           },
           scope: scopeInfo,
@@ -250,11 +251,17 @@ export async function runDecisionLayer(
     }
   }
 
+  // Build contract chain from LLM-proposed contracts if available
+  const contractChain = intentResult.proposedInterpretation?.contracts
+    ?.map(c => AnswerContract[c as keyof typeof AnswerContract])
+    .filter((c): c is AnswerContract => c !== undefined);
+
   return {
     intent: intentResult.intent,
     intentDetectionMethod: intentResult.intentDetectionMethod,
     contextLayers: layersMeta.layers,
     answerContract: contractResult.contract,
+    contractChain: contractChain && contractChain.length > 1 ? contractChain : undefined,
     contractSelectionMethod: contractResult.contractSelectionMethod,
     clarifyMessage: intentResult.clarifyMessage,
     proposedInterpretation: intentResult.proposedInterpretation,

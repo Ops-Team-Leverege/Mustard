@@ -708,22 +708,22 @@ Give me a hint and I'll get you sorted!`;
     console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Decision Layer: ${cpResult.intent} -> ${cpResult.answerContract})`);
     
     if (cpResult.intent === Intent.SINGLE_MEETING) {
-      return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
     if (cpResult.intent === Intent.MULTI_MEETING) {
-      return handleMultiMeetingIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleMultiMeetingIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
     if (cpResult.intent === Intent.PRODUCT_KNOWLEDGE) {
-      return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
     if (cpResult.intent === Intent.EXTERNAL_RESEARCH) {
-      return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract);
+      return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
     
-    return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
+    return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
   }
   
   // DECISION LAYER REQUIRED: No fallback to separate classifier
@@ -748,9 +748,10 @@ async function handleMeetingDataIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to meeting data path${contract ? ` (CP contract: ${contract})` : ''}`);
+  console.log(`[OpenAssistant] Routing to meeting data path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
   
   if (context.resolvedMeeting) {
     const scope = {
@@ -764,8 +765,13 @@ async function handleMeetingDataIntent(
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
     
-    if (contract) {
-      // Decision Layer provided the contract - use it directly
+    if (dlContractChain && dlContractChain.length > 0) {
+      // Decision Layer provided a contract chain - use it directly
+      primaryContract = dlContractChain[0];
+      contractChain = dlContractChain;
+      console.log(`[OpenAssistant] Using DL-provided chain: [${dlContractChain.join(" → ")}]`);
+    } else if (contract) {
+      // Decision Layer provided a single contract - wrap it
       primaryContract = contract;
       contractChain = [contract];
       console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
@@ -924,9 +930,10 @@ async function handleMultiMeetingIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}`);
+  console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
   
   // Pass LLM-determined scope from Decision Layer (if available)
   const scopeOverride: ScopeOverride | undefined = context.decisionLayerResult?.scope;
@@ -963,8 +970,13 @@ async function handleMultiMeetingIntent(
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
   
-  if (contract) {
-    // Decision Layer provided the contract - use it directly
+  if (dlContractChain && dlContractChain.length > 0) {
+    // Decision Layer provided a contract chain - use it directly
+    primaryContract = dlContractChain[0];
+    contractChain = dlContractChain;
+    console.log(`[OpenAssistant] Using DL-provided chain: [${dlContractChain.join(" → ")}]`);
+  } else if (contract) {
+    // Decision Layer provided a single contract - wrap it
     primaryContract = contract;
     contractChain = [contract];
     console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
@@ -1017,7 +1029,8 @@ async function handleProductKnowledgeIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  _dlContractChain?: AnswerContract[]  // Reserved for future chain support
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
   
@@ -1114,10 +1127,11 @@ async function handleExternalResearchIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] === EXTERNAL RESEARCH START ===`);
-  console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}`);
+  console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
   const startTime = Date.now();
   
   const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
@@ -1127,14 +1141,13 @@ async function handleExternalResearchIntent(
   
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
   
-  // TODO: Refactor to use proper contract chain execution
-  // For now, detect product knowledge enrichment needs inline
+  // Determine what chaining is needed based on LLM contract chain or fallback detection
+  const chainIncludesSalesDocsPrep = dlContractChain?.includes(AnswerContract.SALES_DOCS_PREP) ?? false;
   const needsProductKnowledge = detectProductKnowledgeEnrichment(userMessage);
-  console.log(`[OpenAssistant] Product knowledge enrichment needed: ${needsProductKnowledge}`);
+  // LLM contract chain takes precedence over heuristic detection
+  const needsStyleMatching = chainIncludesSalesDocsPrep || detectStyleMatchingRequest(userMessage);
   
-  // Detect if user wants to write content matching existing product style
-  const needsStyleMatching = detectStyleMatchingRequest(userMessage);
-  console.log(`[OpenAssistant] Style matching needed: ${needsStyleMatching}`);
+  console.log(`[OpenAssistant] Chain-based style matching: ${chainIncludesSalesDocsPrep}, Product knowledge enrichment: ${needsProductKnowledge}, Style matching needed: ${needsStyleMatching}`);
   
   // Generate personalized progress message
   console.log(`[OpenAssistant] Generating progress message...`);
@@ -1455,7 +1468,8 @@ async function handleGeneralAssistanceIntent(
   userMessage: string,
   context: OpenAssistantContext,
   classification: IntentClassification,
-  contract?: AnswerContract
+  contract?: AnswerContract,
+  _dlContractChain?: AnswerContract[]  // Reserved for future chain support
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
   

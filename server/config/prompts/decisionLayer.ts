@@ -263,7 +263,7 @@ VALID CONTRACTS per intent:
 RESPONSE FORMAT (JSON):
 {
   "proposedIntent": "INTENT_NAME",
-  "proposedContract": "CONTRACT_NAME",
+  "proposedContracts": ["CONTRACT_NAME", ...],
   "confidence": 0.0-1.0,
   "interpretation": "Brief summary of what user likely wants",
   "questionForm": "A natural question to ask the user, e.g., 'Are you asking how camera installation works with PitCrew?'",
@@ -272,12 +272,19 @@ RESPONSE FORMAT (JSON):
   "alternatives": [
     {
       "intent": "ALTERNATE_INTENT",
-      "contract": "ALTERNATE_CONTRACT",
+      "contracts": ["ALTERNATE_CONTRACT", ...],
       "description": "Specific alternative in plain language",
       "hint": "Examples like 'Les Schwab, ACE' or 'pricing, features' if relevant"
     }
   ]
 }
+
+CONTRACT CHAINS:
+For multi-step requests, return contracts in execution order:
+- "Research X then write a feature description" → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "Research company then create pitch deck" → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "Summarize the meeting then draft follow-up" → ["MEETING_SUMMARY", "DRAFT_EMAIL"]
+- "What did they ask?" → ["CUSTOMER_QUESTIONS"] (single step = single contract)
 
 RULES:
 1. "questionForm" should be a natural question leading with the best guess (e.g., "Are you asking about...")
@@ -288,15 +295,15 @@ RULES:
 6. Never say "I need more context"—always offer a path forward
 
 COMMON PATTERNS:
-- "how does X work" → PRODUCT_KNOWLEDGE with partial answer about X
-- "what about [company]" → SINGLE_MEETING or MULTI_MEETING depending on context
-- "pricing/cost/price" → PRODUCT_KNOWLEDGE with partial pricing model info
-- "[company] + [topic]" → SINGLE_MEETING with company-specific search
-- "research [company]" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
-- "slide deck for [external company]" or "pitch deck" → EXTERNAL_RESEARCH with SALES_DOCS_PREP contract
-- "find their strategic priorities" or "public statements" → EXTERNAL_RESEARCH
-- "research [topic] to understand" or "learn about [industry practice]" → EXTERNAL_RESEARCH
-- "do research... then write a feature description" → EXTERNAL_RESEARCH (research + write)
+- "how does X work" → PRODUCT_KNOWLEDGE with partial answer about X → ["PRODUCT_EXPLANATION"]
+- "what about [company]" → SINGLE_MEETING or MULTI_MEETING → ["EXTRACTIVE_FACT"] or ["PATTERN_ANALYSIS"]
+- "pricing/cost/price" → PRODUCT_KNOWLEDGE → ["FAQ_ANSWER"]
+- "[company] + [topic]" → SINGLE_MEETING → ["EXTRACTIVE_FACT"]
+- "research [company]" or "earnings calls" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH"]
+- "slide deck for [external company]" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "research [topic] to understand" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH"]
+- "do research... then write a feature description" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+- "research X company... then create pitch" → EXTERNAL_RESEARCH → ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
 
 CRITICAL FOLLOW-UP PATTERN:
 When the conversation history shows a list of customer questions was just provided, and the user asks something like "help me answer those questions" or "can you answer those" or "draft responses":

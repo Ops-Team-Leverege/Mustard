@@ -63,7 +63,7 @@ export type IntentDecisionMetadata = {
   singleIntentViolation?: boolean;     // True if multiple intents matched
   llmInterpretation?: {                // LLM interpretation for clarification
     proposedIntent: IntentString;
-    proposedContract: ContractString;
+    proposedContracts: ContractString[];  // Ordered array for contract chain
     confidence: number;
     failureReason: string;
     interpretationSource: "llm_fallback" | "ambiguity_resolution";
@@ -83,10 +83,13 @@ export type IntentDecisionMetadata = {
  * Proposed interpretation for CLARIFY responses.
  * Enables intelligent clarification without automatic execution.
  * Uses string types to avoid circular dependencies.
+ * 
+ * For multi-step requests, contracts is an ordered array representing
+ * the execution chain (e.g., ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]).
  */
 export type ProposedInterpretation = {
   intent: IntentString;
-  contract: ContractString;
+  contracts: ContractString[];  // Ordered array for contract chain
   summary: string;
 };
 

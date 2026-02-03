@@ -1171,7 +1171,7 @@ export async function selectAnswerContract(
   question: string,
   intent: Intent,
   layers: ContextLayers,
-  llmProposedContract?: string
+  llmProposedContracts?: string[]
 ): Promise<AnswerContractResult> {
   const keywordResult = selectContractByKeyword(question, intent, layers);
   
@@ -1180,15 +1180,21 @@ export async function selectAnswerContract(
     return keywordResult;
   }
 
-  // LLM-first: If LLM interpretation proposed a valid contract, use it
-  if (llmProposedContract && Object.values(AnswerContract).includes(llmProposedContract as AnswerContract)) {
-    const contract = llmProposedContract as AnswerContract;
-    console.log(`[AnswerContract] Selected: ${contract} (llm_proposed)`);
-    return {
-      contract,
-      contractSelectionMethod: "llm_proposed",
-      constraints: CONTRACT_CONSTRAINTS[contract],
-    };
+  // LLM-first: If LLM interpretation proposed valid contracts, use the first one as primary
+  // The full contract chain will be available via proposedInterpretation.contracts
+  if (llmProposedContracts && llmProposedContracts.length > 0) {
+    const validContracts = llmProposedContracts.filter(c => 
+      Object.values(AnswerContract).includes(c as AnswerContract)
+    );
+    if (validContracts.length > 0) {
+      const contract = validContracts[0] as AnswerContract;
+      console.log(`[AnswerContract] Selected: ${contract} (llm_proposed) - chain: [${validContracts.join(" → ")}]`);
+      return {
+        contract,
+        contractSelectionMethod: "llm_proposed",
+        constraints: CONTRACT_CONSTRAINTS[contract],
+      };
+    }
   }
 
   console.log(`[AnswerContract] No keyword match, using LLM fallback`);
