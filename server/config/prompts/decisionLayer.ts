@@ -60,6 +60,8 @@ PRODUCT_KNOWLEDGE vs EXTERNAL_RESEARCH:
 23. "Their approach" or "research how they" → EXTERNAL_RESEARCH (researching external company)
 24. Strategy questions using PitCrew's value props or features → PRODUCT_KNOWLEDGE
 25. Questions about pilot methodology, expansion approach, or sales strategy using PitCrew → PRODUCT_KNOWLEDGE
+26. "Our roadmap" or "our Q1 roadmap" or "what's on our roadmap" → PRODUCT_KNOWLEDGE (internal product roadmap)
+27. "Their roadmap" or "company X's roadmap" → EXTERNAL_RESEARCH (external company's plans)
 
 EXAMPLES:
 - "Les Schwab" (just the company name) → SINGLE_MEETING (show their meeting info)
@@ -77,6 +79,8 @@ EXAMPLES:
 - "Based on PitCrew's value props, how can we approach X?" → PRODUCT_KNOWLEDGE (strategy using our product)
 - "An emerging pattern we're seeing is X. Based on PitCrew's value props, help me think through how we can approach this" → PRODUCT_KNOWLEDGE (describing situation + asking for strategic advice)
 - "Customers want to evaluate ROI. How should we help them?" → PRODUCT_KNOWLEDGE (strategic advice, not meeting analysis)
+- "What's on our Q1 roadmap?" → PRODUCT_KNOWLEDGE (OUR roadmap = internal product plans)
+- "What features are coming next?" → PRODUCT_KNOWLEDGE (internal roadmap question)
 - "Research Costco and their priorities" → EXTERNAL_RESEARCH
 - "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
 - "Research Costco, find priorities, create slides for them" → EXTERNAL_RESEARCH (primary: external research)
