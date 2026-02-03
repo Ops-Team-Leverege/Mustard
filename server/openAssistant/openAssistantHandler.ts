@@ -1176,33 +1176,14 @@ async function handleExternalResearchIntent(
     };
   }
   
-  // If user is asking about PitCrew (value props, features, etc.), enrich with internal product knowledge
-  if (needsProductKnowledge) {
-    console.log(`[OpenAssistant] Chaining product knowledge for PitCrew context enrichment...`);
-    try {
-      const enrichedOutput = await chainProductKnowledgeEnrichment(userMessage, researchResult.answer, context);
-      const sourcesSection = researchResult.citations.length > 0 
-        ? formatCitationsForDisplay(researchResult.citations)
-        : "";
-      
-      return {
-        answer: enrichedOutput + (sourcesSection ? "\n\n" + sourcesSection : ""),
-        intent: "external_research",
-        intentClassification: classification,
-        controlPlaneIntent: Intent.EXTERNAL_RESEARCH,
-        answerContract: actualContract,
-        dataSource: "product_ssot",
-        delegatedToSingleMeeting: false,
-        evidenceSources: ["PitCrew Product Database (Airtable)", ...researchResult.citations.map(c => c.source)],
-        progressMessage,
-      };
-    } catch (pkError) {
-      console.error(`[OpenAssistant] Product knowledge enrichment failed, falling back:`, pkError);
-      // Fall through to other enrichment options
-    }
+  // LLM contract chain takes PRIORITY over heuristic detection
+  // If LLM explicitly requested style matching (SALES_DOCS_PREP), do that first
+  if (chainIncludesSalesDocsPrep) {
+    console.log(`[OpenAssistant] LLM requested style matching via contract chain - prioritizing over product knowledge enrichment`);
   }
   
-  // If user wants style-matched output, chain product knowledge for style examples
+  // If user wants style-matched output (LLM chain or heuristic detection), chain product knowledge for style examples
+  // This runs FIRST when LLM explicitly requested it via contract chain
   if (needsStyleMatching) {
     console.log(`[OpenAssistant] Chaining product knowledge for style matching...`);
     try {
@@ -1224,6 +1205,33 @@ async function handleExternalResearchIntent(
       };
     } catch (styleError) {
       console.error(`[OpenAssistant] Style chaining failed, returning raw research:`, styleError);
+      // Fall through to product knowledge enrichment or raw research
+    }
+  }
+  
+  // If user is asking about PitCrew (value props, features, etc.) but NOT style matching,
+  // enrich with internal product knowledge
+  if (needsProductKnowledge && !needsStyleMatching) {
+    console.log(`[OpenAssistant] Chaining product knowledge for PitCrew context enrichment...`);
+    try {
+      const enrichedOutput = await chainProductKnowledgeEnrichment(userMessage, researchResult.answer, context);
+      const sourcesSection = researchResult.citations.length > 0 
+        ? formatCitationsForDisplay(researchResult.citations)
+        : "";
+      
+      return {
+        answer: enrichedOutput + (sourcesSection ? "\n\n" + sourcesSection : ""),
+        intent: "external_research",
+        intentClassification: classification,
+        controlPlaneIntent: Intent.EXTERNAL_RESEARCH,
+        answerContract: actualContract,
+        dataSource: "product_ssot",
+        delegatedToSingleMeeting: false,
+        evidenceSources: ["PitCrew Product Database (Airtable)", ...researchResult.citations.map(c => c.source)],
+        progressMessage,
+      };
+    } catch (pkError) {
+      console.error(`[OpenAssistant] Product knowledge enrichment failed, falling back:`, pkError);
       // Fall through to return raw research
     }
   }
