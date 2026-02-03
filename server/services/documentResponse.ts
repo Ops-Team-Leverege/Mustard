@@ -237,7 +237,12 @@ function extractTopicFromQuery(query?: string): string | null {
   // Clean leading punctuation and whitespace
   let topic = query
     .replace(/^[\s,;:\-]+/, '')
-    .replace(/^(what|how|can you|please|could you|tell me|explain|give me|show me|i need|i want)\s+(is|are|about|the|a|an)?\s*/gi, '')
+    // Remove question starters
+    .replace(/^(what|how|which|where|can you|please|could you|tell me|explain|give me|show me|i need|i want)\s+(is|are|about|the|a|an)?\s*/gi, '')
+    // Remove "are you/do you/does it" patterns (e.g., "are you connected to" → "connected to")
+    .replace(/^(are you|do you|does it|is it|have you)\s+/gi, '')
+    // Remove trailing "to" that creates awkward phrases
+    .replace(/\s+(connected|linked|integrated)\s+to\s*$/gi, (match, verb) => ` ${verb}`)
     .replace(/^[\s,;:\-]+/, '')
     .replace(/\?+$/g, '')
     .trim();
@@ -361,6 +366,9 @@ function generateSlackMessage(query?: string, contract?: AnswerContract): string
     }
     if (topicLower.includes('comparison') || topicLower.includes('vs') || topicLower.includes('difference')) {
       return `Here's the comparison you requested.`;
+    }
+    if (topicLower.includes('data source') || topicLower.includes('connected') || topicLower.includes('integration')) {
+      return `Here's an overview of our connected data sources.`;
     }
     
     // Generic but topic-specific message
