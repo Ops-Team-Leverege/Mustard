@@ -693,9 +693,9 @@ const TASK_KEYWORDS: Array<{
   { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for|draft.*slides?|create.*slides?/i, task: "sales_docs_prep", 
     contracts: [AnswerContract.SALES_DOCS_PREP],
     intent: [Intent.EXTERNAL_RESEARCH] },
-  { pattern: /value\s+prop|connect.*pitcrew|align.*offering|match.*product|our\s+offer|pitcrew\s+offer/i, task: "product_connection", 
+  { pattern: /value\s*prop|pitcrew['']?s?\s+value|our\s+value|connect.*pitcrew|align.*offering|match.*product|our\s+offer|pitcrew\s+offer|based\s+on\s+pitcrew|pitcrew['']?s?\s+(?:features?|capabilities?|approach)/i, task: "product_connection", 
     contracts: [AnswerContract.PRODUCT_KNOWLEDGE],
-    intent: [Intent.EXTERNAL_RESEARCH, Intent.GENERAL_HELP] },
+    intent: [Intent.EXTERNAL_RESEARCH, Intent.GENERAL_HELP, Intent.SINGLE_MEETING, Intent.MULTI_MEETING, Intent.PRODUCT_KNOWLEDGE] },
 ];
 
 /**

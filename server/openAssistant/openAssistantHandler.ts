@@ -1122,6 +1122,11 @@ async function handleExternalResearchIntent(
   
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
   
+  // TODO: Refactor to use proper contract chain execution
+  // For now, detect product knowledge enrichment needs inline
+  const needsProductKnowledge = detectProductKnowledgeEnrichment(userMessage);
+  console.log(`[OpenAssistant] Product knowledge enrichment needed: ${needsProductKnowledge}`);
+  
   // Detect if user wants to write content matching existing product style
   const needsStyleMatching = detectStyleMatchingRequest(userMessage);
   console.log(`[OpenAssistant] Style matching needed: ${needsStyleMatching}`);
@@ -1146,6 +1151,32 @@ async function handleExternalResearchIntent(
       dataSource: "external_research",
       delegatedToSingleMeeting: false,
     };
+  }
+  
+  // If user is asking about PitCrew (value props, features, etc.), enrich with internal product knowledge
+  if (needsProductKnowledge) {
+    console.log(`[OpenAssistant] Chaining product knowledge for PitCrew context enrichment...`);
+    try {
+      const enrichedOutput = await chainProductKnowledgeEnrichment(userMessage, researchResult.answer, context);
+      const sourcesSection = researchResult.citations.length > 0 
+        ? formatCitationsForDisplay(researchResult.citations)
+        : "";
+      
+      return {
+        answer: enrichedOutput + (sourcesSection ? "\n\n" + sourcesSection : ""),
+        intent: "external_research",
+        intentClassification: classification,
+        controlPlaneIntent: Intent.EXTERNAL_RESEARCH,
+        answerContract: actualContract,
+        dataSource: "product_ssot",
+        delegatedToSingleMeeting: false,
+        evidenceSources: ["PitCrew Product Database (Airtable)", ...researchResult.citations.map(c => c.source)],
+        progressMessage,
+      };
+    } catch (pkError) {
+      console.error(`[OpenAssistant] Product knowledge enrichment failed, falling back:`, pkError);
+      // Fall through to other enrichment options
+    }
   }
   
   // If user wants style-matched output, chain product knowledge for style examples
@@ -1209,6 +1240,105 @@ function detectStyleMatchingRequest(message: string): boolean {
   ];
   
   return stylePatterns.some(pattern => pattern.test(lower));
+}
+
+/**
+ * Detect if the user is asking about PitCrew's own value props/features.
+ * When this is true, we should include internal product knowledge from Airtable
+ * instead of (or in addition to) web research.
+ */
+function detectPitCrewContext(message: string): boolean {
+  const lower = message.toLowerCase();
+  const pitcrewContextPatterns = [
+    /pitcrew['']?s?\s+value\s+prop/i,
+    /our\s+value\s+prop/i,
+    /pitcrew['']?s?\s+(?:features?|capabilities?|offerings?)/i,
+    /our\s+(?:features?|capabilities?|offerings?|approach|methodology)/i,
+    /how\s+pitcrew\s+(?:works?|helps?|can\s+help)/i,
+    /what\s+pitcrew\s+(?:does|offers?|provides?)/i,
+    /based\s+on\s+pitcrew/i,
+    /using\s+pitcrew['']?s?\s+(?:product|features?|value)/i,
+  ];
+  
+  return pitcrewContextPatterns.some(pattern => pattern.test(lower));
+}
+
+/**
+ * Detect if the user wants to connect external research with PitCrew's
+ * internal product knowledge (value props, features, etc.).
+ * 
+ * TODO: This should be replaced by proper contract chain detection.
+ * Currently used as interim solution for EXTERNAL_RESEARCH intent.
+ */
+function detectProductKnowledgeEnrichment(message: string): boolean {
+  const lower = message.toLowerCase();
+  const enrichmentPatterns = [
+    /pitcrew['']?s?\s+value/i,
+    /our\s+value/i,
+    /based\s+on\s+pitcrew/i,
+    /connect.*pitcrew/i,
+    /align.*(?:our|pitcrew)/i,
+    /how\s+(?:we|pitcrew)\s+(?:can|could)\s+(?:address|help|solve)/i,
+    /approach\s+this\s+(?:with|using)\s+pitcrew/i,
+    /pitcrew['']?s?\s+(?:features?|capabilities?|approach|offerings?)/i,
+    /think\s+through.*(?:our|pitcrew)/i,
+  ];
+  
+  return enrichmentPatterns.some(pattern => pattern.test(lower));
+}
+
+/**
+ * Chain product knowledge to enrich external research results with
+ * internal PitCrew product data from Airtable.
+ * 
+ * TODO: Refactor to use proper contract chain execution via contractExecutor.
+ */
+async function chainProductKnowledgeEnrichment(
+  originalRequest: string,
+  researchContent: string,
+  context: OpenAssistantContext
+): Promise<string> {
+  const { getProductKnowledgePrompt } = await import("../airtable/productData");
+  
+  // Fetch product knowledge from Airtable SSOT
+  const snapshotResult = await getProductKnowledgePrompt();
+  
+  console.log(`[OpenAssistant] Product knowledge enrichment - SSOT length: ${snapshotResult.promptText.length} chars`);
+  
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+  
+  const response = await openai.chat.completions.create({
+    model: MODEL_CONFIG.productKnowledge.model,
+    messages: [
+      {
+        role: "system",
+        content: `You are a PitCrew sales and product strategist. Your task is to synthesize external research 
+with internal product knowledge to provide strategic recommendations.
+
+Use the following PitCrew product information as your AUTHORITATIVE source:
+${snapshotResult.promptText}
+
+When connecting external research to PitCrew's offerings:
+1. Reference specific PitCrew features that address the customer's needs
+2. Use PitCrew terminology and value propositions
+3. Be specific about which capabilities would help
+4. Format clearly with sections if needed`
+      },
+      {
+        role: "user",
+        content: `Original Request: ${originalRequest}
+
+External Research Results:
+${researchContent}
+
+Please synthesize this research with PitCrew's product capabilities to provide strategic recommendations.`
+      }
+    ],
+    temperature: 0.7,
+    max_tokens: 2000,
+  });
+  
+  return response.choices[0]?.message?.content || researchContent;
 }
 
 /**

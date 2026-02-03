@@ -143,6 +143,20 @@ Contract chains are dynamically built based on user messages, ensuring ordered e
 - **Schema Addition**: `slack_event_dedupe` table with index on `processed_at` for efficient cleanup.
 - **Automatic Cleanup**: Runs on startup and every 100 requests via `maybeCleanup()`.
 
+### Product Knowledge Enrichment (Interim Pattern)
+**Architecture Gap**: EXTERNAL_RESEARCH intent doesn't use contract chain execution (only MULTI_MEETING does). This causes product knowledge enrichment to be ad-hoc rather than chain-based.
+
+**Interim Solution** (`server/openAssistant/openAssistantHandler.ts`):
+- `detectProductKnowledgeEnrichment()`: Detects when user wants PitCrew context (e.g., "PitCrew's value props", "based on PitCrew", "our value").
+- `chainProductKnowledgeEnrichment()`: Fetches Airtable SSOT and synthesizes with external research.
+- **Data Source**: Returns `"product_ssot"` when enrichment is applied.
+
+**TASK_KEYWORDS Pattern** (`server/decisionLayer/answerContracts.ts`):
+- Pattern: `/value\s*prop|pitcrew['']?s?\s+value|our\s+value|based\s+on\s+pitcrew|.../i`
+- Triggers PRODUCT_KNOWLEDGE contract for intents: EXTERNAL_RESEARCH, GENERAL_HELP, SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE.
+
+**TODO**: Refactor EXTERNAL_RESEARCH to use proper contract chain execution via `executeContractChain()` like MULTI_MEETING does.
+
 ### MCP Folder Structure
 The `server/mcp/` folder contains ONLY MCP (Model Context Protocol) plumbing and tool definitions:
 - `context.ts`: MCP context management
