@@ -1440,8 +1440,20 @@ OUTPUT ONLY the feature description. No preamble, no "Here's the description", n
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
   ]);
   
-  console.log(`[OpenAssistant] Style matching complete (${Date.now() - startTime}ms)`);
-  return response.choices[0]?.message?.content || researchContent;
+  console.log(`[OpenAssistant] Style matching OpenAI call complete (${Date.now() - startTime}ms)`);
+  
+  // Validate the OpenAI response - don't silently fall back to research content
+  const styledContent = response.choices[0]?.message?.content?.trim();
+  
+  if (!styledContent || styledContent.length < 20) {
+    console.error(`[OpenAssistant] Style matching produced invalid response: "${styledContent || '(empty)'}"`);
+    console.error(`[OpenAssistant] Feature examples length: ${featureExamples.length} chars`);
+    console.error(`[OpenAssistant] Research content length: ${researchContent.length} chars`);
+    throw new Error(`Style matching failed - OpenAI returned invalid response (${styledContent?.length || 0} chars)`);
+  }
+  
+  console.log(`[OpenAssistant] Style matching produced valid description (${styledContent.length} chars): "${styledContent.substring(0, 100)}${styledContent.length > 100 ? '...' : ''}"`);
+  return styledContent;
 }
 
 /**
