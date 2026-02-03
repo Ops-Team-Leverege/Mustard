@@ -1356,10 +1356,14 @@ async function chainProductStyleWriting(
   researchContent: string,
   context: OpenAssistantContext
 ): Promise<string> {
+  console.log(`[OpenAssistant] === STYLE MATCHING START ===`);
+  const startTime = Date.now();
+  
   const { getProductKnowledgePrompt } = await import("../airtable/productData");
   
-  // Fetch existing feature descriptions as style examples
+  // Fetch existing feature descriptions as style examples (cached daily)
   const snapshotResult = await getProductKnowledgePrompt();
+  console.log(`[OpenAssistant] Product knowledge from cache (${Date.now() - startTime}ms)`);
   
   // Extract just the features section for style reference
   // Matches both "=== Current Product Features" and "=== Roadmap Features"
@@ -1370,12 +1374,14 @@ async function chainProductStyleWriting(
   
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
-  const response = await openai.chat.completions.create({
-    model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
-    messages: [
-      {
-        role: "system",
-        content: `You are writing a feature description for PitCrew. You MUST match the exact style and tone of our existing feature descriptions.
+  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing...`);
+  const response = await Promise.race([
+    openai.chat.completions.create({
+      model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
+      messages: [
+        {
+          role: "system",
+          content: `You are writing a feature description for PitCrew. You MUST match the exact style and tone of our existing feature descriptions.
 
 === STYLE EXAMPLES (match this format exactly) ===
 ${featureExamples}
@@ -1402,10 +1408,13 @@ OUTPUT ONLY the feature description. No preamble, no "Here's the description", n
         content: `Write the feature description for: ${originalRequest.split("feature").pop()?.split(".")[0]?.trim() || "this feature"}`,
       },
     ],
-    temperature: 0.2,
-    max_tokens: 150,
-  });
+      temperature: 0.2,
+      max_tokens: 150,
+    }),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
+  ]);
   
+  console.log(`[OpenAssistant] Style matching complete (${Date.now() - startTime}ms)`);
   return response.choices[0]?.message?.content || researchContent;
 }
 
