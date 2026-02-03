@@ -1155,6 +1155,21 @@ async function handleExternalResearchIntent(
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
   console.log(`[OpenAssistant] Progress message ready (${Date.now() - startTime}ms)`);
   
+  // Update streaming placeholder with progress message BEFORE starting research
+  if (context.slackStreaming && progressMessage) {
+    try {
+      const { updateSlackMessage } = await import("../slack/slackApi");
+      await updateSlackMessage({
+        channel: context.slackStreaming.channel,
+        ts: context.slackStreaming.messageTs,
+        text: progressMessage,
+      });
+      console.log(`[OpenAssistant] Updated streaming placeholder with progress message`);
+    } catch (updateError) {
+      console.error(`[OpenAssistant] Failed to update streaming placeholder with progress:`, updateError);
+    }
+  }
+  
   // Perform the research
   console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
