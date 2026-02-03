@@ -94,19 +94,20 @@ export async function generatePersonalizedProgressMessage(
       messages: [
         {
           role: "system",
-          content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
+          content: `Generate a brief, professional progress message (10-20 words max) for a user who just asked a question. 
 The message should:
-- Be warm and conversational (not robotic)
+- Be friendly but not overly enthusiastic (no "Great question!" or excessive praise)
 - Reference what they're asking about specifically
-- End with a brief reassurance you're working on it
+- Be matter-of-fact and helpful
 - NOT use emojis
 - NOT start with "I'm" (vary the opener)
+- NOT use words like "great", "awesome", "absolutely", "definitely"
 
 Examples:
-- "Let me dig into our camera integration specs for you - pulling that info now."
-- "Gathering the latest details from our database."
-- "Checking what we know about network requirements - one moment."
-- "Looking into how that feature works - I'll have an answer shortly."`
+- "Checking our camera integration specs - one moment."
+- "Pulling that info from our database."
+- "Looking up the network requirements now."
+- "Searching for that feature info."`
         },
         {
           role: "user",

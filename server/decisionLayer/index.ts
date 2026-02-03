@@ -158,7 +158,7 @@ async function checkAggregateSpecificity(question: string): Promise<SpecificityC
 
 function generateAggregateClarifyMessage(hasTime: boolean, hasScope: boolean): string {
   if (!hasTime && !hasScope) {
-    return `Great question! To give you the best analysis, could you clarify:
+    return `To give you the best analysis, could you clarify:
 
 1. **Time range**: Last month, last quarter, or all time?
 2. **Scope**: All customers, or a specific customer?
@@ -167,7 +167,7 @@ For example: "Show me customer concerns from the last quarter across all custome
   }
   
   if (!hasTime) {
-    return `I can help with that! What time range would you like me to analyze?
+    return `What time range would you like me to analyze?
 
 - Last month
 - Last quarter  
@@ -177,7 +177,7 @@ For example: "...from the last quarter"`;
   }
   
   if (!hasScope) {
-    return `Got it! Would you like me to look at:
+    return `Would you like me to look at:
 
 - **All customers** - patterns across everyone
 - **A specific customer** - just mention their name

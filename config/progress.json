@@ -1,21 +1,20 @@
 {
   "delaySeconds": 150,
   "messages": [
-    "🔍 Still digging — hang tight...",
-    "⏳ Taking a bit longer than usual — almost there...",
-    "📚 Lots to look through — still on it...",
-    "🔎 Still searching — one moment...",
-    "⚙️ Working on it — pulling everything together...",
-    "🧠 Thinking through this one — bear with me...",
-    "📝 Almost there — just putting it together...",
-    "💼 Still gathering the info — hang tight...",
-    "🔄 Processing — this one's a bit complex...",
-    "✨ Polishing up your answer — almost done...",
-    "🎯 Still on it — almost there...",
-    "👀 Still looking — one more moment...",
-    "📂 Digging through the details — hang tight...",
-    "💡 Working through this — nearly there...",
-    "🚀 Still working — thanks for your patience...",
-    "🙌 Almost got it — just a bit longer..."
+    "Still searching - hang tight...",
+    "Taking a bit longer than usual - almost there...",
+    "Lots to look through - still on it...",
+    "Still searching - one moment...",
+    "Working on it - pulling everything together...",
+    "Thinking through this one - bear with me...",
+    "Almost there - just putting it together...",
+    "Still gathering the info - hang tight...",
+    "Processing - this one's a bit complex...",
+    "Wrapping up your answer - almost done...",
+    "Still on it - almost there...",
+    "Still looking - one more moment...",
+    "Digging through the details - hang tight...",
+    "Working through this - nearly there...",
+    "Still working - thanks for your patience..."
   ]
 }
