@@ -287,11 +287,13 @@ function detectFollowUpMessage(
   if (!result) return null;
 
   // Map the service result to an IntentClassificationResult
+  // All actionable intents should be here for follow-up handling
   const intentMap: Record<string, Intent> = {
     "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
     "SINGLE_MEETING": Intent.SINGLE_MEETING,
     "MULTI_MEETING": Intent.MULTI_MEETING,
     "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
+    "DOCUMENT_SEARCH": Intent.DOCUMENT_SEARCH,
     "GENERAL_HELP": Intent.GENERAL_HELP,
   };
 

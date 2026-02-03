@@ -67,7 +67,7 @@ const defaultIntentInferenceRules: IntentInferenceRule[] = [
     description: "Meeting-related task" 
   },
   { 
-    markers: ["pitcrew pricing", "pitcrew feature", "integration", "product knowledge"], 
+    markers: ["pitcrew pricing", "pitcrew feature", "integration", "product knowledge", "pitcrew can", "our approach"], 
     intentKey: "PRODUCT_KNOWLEDGE", 
     description: "Product knowledge task" 
   },
@@ -75,6 +75,16 @@ const defaultIntentInferenceRules: IntentInferenceRule[] = [
     markers: ["across", "meetings", "companies", "calls", "themes", "pattern analysis", "summary of recent", "customer themes"],
     intentKey: "MULTI_MEETING",
     description: "Multi-meeting analysis"
+  },
+  {
+    markers: ["document", "contract", "spec", "pdf", "file", "attachment", "deck", "presentation"],
+    intentKey: "DOCUMENT_SEARCH",
+    description: "Document search task"
+  },
+  {
+    markers: ["draft", "email", "write", "compose", "help you", "assist"],
+    intentKey: "GENERAL_HELP",
+    description: "General assistance task"
   },
 ];
 
