@@ -368,7 +368,8 @@ async function classifyByKeyword(
   // FAST-PATH: PRODUCT_KNOWLEDGE for "our approach/methodology" questions
   // Only match when asking about PitCrew's strategy, not meeting-specific questions
   // ============================================================================
-  const hasMultiMeetingContext = /\b(across|all\s+customers|recent\s+calls|last\s+\d+|meetings|which\s+meetings)\b/i.test(question);
+  // Only exclude when there's MEETING-specific multi-meeting context, not general "across all" phrases
+  const hasMultiMeetingContext = /\b(across\s+all\s+customers|across\s+our\s+meetings|recent\s+calls|last\s+\d+\s+(calls|meetings)|meetings\s+we'?v?e?\s+had|which\s+meetings)\b/i.test(question);
   const hasSingularMeetingContext = /\b(last|this|that)\s+[\w\s'-]*(call|meeting|check-?in)\b/i.test(question);
   
   // Only trigger for clear product strategy questions, not when asking about meetings

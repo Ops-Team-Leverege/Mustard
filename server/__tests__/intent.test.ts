@@ -306,6 +306,15 @@ describe('Intent Classification - LLM-First Architecture', () => {
       expect(result.intent).toBe(Intent.PRODUCT_KNOWLEDGE);
     });
 
+    it('classifies "based on PitCrew value props" with business context as PRODUCT_KNOWLEDGE', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      // This has "across all their stores" which should NOT trigger multi-meeting context
+      const result = await classifyIntent('pilot customers wants to expand to 10-20 stores before committing to a large scale rollout across all their stores. Based on PitCrew\'s value props, help me think through how we can approach this.');
+      
+      expect(result.intent).toBe(Intent.PRODUCT_KNOWLEDGE);
+    });
+
     it('classifies "how should I describe" as PRODUCT_KNOWLEDGE', async () => {
       const { classifyIntent, Intent } = await import('../decisionLayer/intent');
       
