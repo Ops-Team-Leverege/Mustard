@@ -215,11 +215,27 @@ function matchesPatterns(text: string, patterns: RegExp[]): boolean {
 async function containsKnownCompany(text: string): Promise<string | null> {
   const lower = text.toLowerCase();
   const companies = await getKnownCompanies();
+  
+  // First pass: check for full company name match
   for (const company of companies) {
     if (lower.includes(company)) {
       return company;
     }
   }
+  
+  // Second pass: check for first word match (e.g., "TPI" matches "TPI Composites")
+  // Only match if the first word is at least 3 characters to avoid false positives
+  for (const company of companies) {
+    const firstWord = company.split(/\s+/)[0];
+    if (firstWord.length >= 3) {
+      // Use word boundary to avoid partial matches like "ace" in "surface"
+      const wordBoundaryRegex = new RegExp(`\\b${firstWord}\\b`, 'i');
+      if (wordBoundaryRegex.test(lower)) {
+        return company;
+      }
+    }
+  }
+  
   return null;
 }
 
