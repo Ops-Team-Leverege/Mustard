@@ -1056,6 +1056,14 @@ function selectContractByKeyword(
         constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DOCS_PREP],
       };
     }
+    // Check for feature description / product documentation keywords
+    if (lower.includes("feature") && (lower.includes("description") || lower.includes("similar to") || lower.includes("like other"))) {
+      return {
+        contract: AnswerContract.SALES_DOCS_PREP,
+        contractSelectionMethod: "keyword",
+        constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DOCS_PREP],
+      };
+    }
     if (lower.includes("value prop")) {
       return {
         contract: AnswerContract.VALUE_PROPOSITION,
