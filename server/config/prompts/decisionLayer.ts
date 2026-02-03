@@ -93,7 +93,19 @@ EXAMPLES:
 - "Hello!" → GENERAL_HELP
 - "What's the weather?" → REFUSE
 
-Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation"}`;
+FOLLOW-UP MESSAGES (CRITICAL):
+When you see conversation history, understand that short messages may be FOLLOW-UPS refining a previous request:
+- "can you include the names?" → Same intent as the previous response (e.g., if bot gave meeting summary → MULTI_MEETING)
+- "also add the dates" → Refinement of previous task, keep same intent
+- "yes" / "yes please" / "go ahead" → Confirmation to proceed with previous proposed action
+- "no, I meant X" → Correction, re-classify based on X
+- "what about for Costco?" → Applying previous task type to a new entity
+
+The conversation history shows previous exchanges. Use it to understand what the user is refining or continuing.
+If user's short message clearly refines a previous bot response about meetings → keep the meeting intent.
+If user's short message clearly refines a previous bot response about product knowledge → PRODUCT_KNOWLEDGE.
+
+Respond with JSON: {"intent": "INTENT_NAME", "confidence": 0.0-1.0, "reason": "brief explanation", "isFollowUp": true/false}`;
 
 /**
  * Contract selection system prompt.

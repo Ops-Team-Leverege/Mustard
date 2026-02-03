@@ -323,13 +323,9 @@ async function classifyByKeyword(
 ): Promise<IntentClassificationResult | null> {
   const lower = question.toLowerCase();
 
-  // EARLY CHECK: Detect follow-up/refinement messages that need thread context
-  // These are short messages that refine a previous request
-  const followUpResult = detectFollowUpMessage(question, threadContext);
-  if (followUpResult) {
-    console.log(`[IntentClassifier] Follow-up message detected: "${followUpResult.reason}"`);
-    return followUpResult;
-  }
+  // NOTE: Follow-up detection removed from fast-path. 
+  // The LLM classifier sees thread context and handles follow-ups semantically.
+  // Pattern-based follow-up detection was "keyword creep" - LLM should understand intent.
 
   // HARDENING: Check for REFUSE first (highest priority)
   if (matchesPatterns(question, REFUSE_PATTERNS)) {
@@ -438,14 +434,34 @@ async function classifyByKeyword(
   return null;
 }
 
-async function classifyByLLM(question: string): Promise<IntentClassificationResult> {
+async function classifyByLLM(
+  question: string,
+  threadContext?: ThreadContext
+): Promise<IntentClassificationResult> {
   try {
+    // Build messages array with thread context for semantic follow-up detection
+    const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+      { role: "system", content: INTENT_CLASSIFICATION_PROMPT },
+    ];
+    
+    // Include thread history so LLM can understand follow-ups semantically
+    if (threadContext?.messages && threadContext.messages.length > 1) {
+      const historyMessages = threadContext.messages.slice(0, -1); // Exclude current message
+      for (const msg of historyMessages) {
+        messages.push({
+          role: msg.isBot ? "assistant" : "user",
+          content: msg.text,
+        });
+      }
+      console.log(`[IntentClassifier] LLM classification with ${historyMessages.length} messages of thread context`);
+    }
+    
+    // Add current question
+    messages.push({ role: "user", content: question });
+    
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
-      messages: [
-        { role: "system", content: INTENT_CLASSIFICATION_PROMPT },
-        { role: "user", content: question },
-      ],
+      messages,
       temperature: 0,
       response_format: { type: "json_object" },
     });
