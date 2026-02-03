@@ -156,7 +156,7 @@ export enum AnswerContract {
   PRODUCT_INFO = "PRODUCT_INFO",
 }
 
-export type ContractSelectionMethod = "keyword" | "llm" | "default" | "validation_failure";
+export type ContractSelectionMethod = "keyword" | "llm" | "llm_proposed" | "default" | "validation_failure";
 
 export type AnswerContractResult = {
   contract: AnswerContract;
@@ -1056,14 +1056,6 @@ function selectContractByKeyword(
         constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DOCS_PREP],
       };
     }
-    // Check for feature description / product documentation keywords
-    if (lower.includes("feature") && (lower.includes("description") || lower.includes("similar to") || lower.includes("like other"))) {
-      return {
-        contract: AnswerContract.SALES_DOCS_PREP,
-        contractSelectionMethod: "keyword",
-        constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DOCS_PREP],
-      };
-    }
     if (lower.includes("value prop")) {
       return {
         contract: AnswerContract.VALUE_PROPOSITION,
@@ -1178,13 +1170,25 @@ Respond with JSON: {"contract": "CONTRACT_NAME", "reason": "brief explanation"}`
 export async function selectAnswerContract(
   question: string,
   intent: Intent,
-  layers: ContextLayers
+  layers: ContextLayers,
+  llmProposedContract?: string
 ): Promise<AnswerContractResult> {
   const keywordResult = selectContractByKeyword(question, intent, layers);
   
   if (keywordResult) {
     console.log(`[AnswerContract] Selected: ${keywordResult.contract} (${keywordResult.contractSelectionMethod})`);
     return keywordResult;
+  }
+
+  // LLM-first: If LLM interpretation proposed a valid contract, use it
+  if (llmProposedContract && Object.values(AnswerContract).includes(llmProposedContract as AnswerContract)) {
+    const contract = llmProposedContract as AnswerContract;
+    console.log(`[AnswerContract] Selected: ${contract} (llm_proposed)`);
+    return {
+      contract,
+      contractSelectionMethod: "llm_proposed",
+      constraints: CONTRACT_CONSTRAINTS[contract],
+    };
   }
 
   console.log(`[AnswerContract] No keyword match, using LLM fallback`);

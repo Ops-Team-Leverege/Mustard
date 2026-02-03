@@ -203,7 +203,8 @@ export async function runDecisionLayer(
   const contractResult = await selectAnswerContract(
     question,
     intentResult.intent,
-    layersMeta.layers
+    layersMeta.layers,
+    intentResult.proposedInterpretation?.contract
   );
   
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
