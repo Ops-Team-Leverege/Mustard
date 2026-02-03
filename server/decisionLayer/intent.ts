@@ -346,12 +346,17 @@ async function classifyByKeyword(
   // The LLM is better at understanding semantic intent than brittle regex patterns
   // ============================================================================
 
-  // PRODUCT_KNOWLEDGE override: Strategic advice requests should go to LLM, not entity detection
-  // These phrases indicate the user wants strategic advice, not meeting analysis
+  // PRODUCT_KNOWLEDGE fast-path: Strategic advice requests should go directly to PRODUCT_KNOWLEDGE
+  // These phrases indicate the user wants strategic advice using PitCrew's products
   const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
   if (productKnowledgeSignals.test(question)) {
-    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - delegating to LLM for nuanced classification`);
-    return null; // Let LLM handle this with full context
+    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - fast-path to PRODUCT_KNOWLEDGE (strategic advice request)`);
+    return {
+      intent: Intent.PRODUCT_KNOWLEDGE,
+      intentDetectionMethod: "product_signal",
+      confidence: 0.92,
+      reason: "Strategic advice request detected (based on PitCrew / help me think through)",
+    };
   }
 
   // Entity detection: Only triggers if no action-based pattern matched first
@@ -364,12 +369,21 @@ async function classifyByKeyword(
     // Don't trigger multi-meeting for strategic advice requests
     // "across all their stores" is about customer behavior, not "search across all meetings"
     const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
-    const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want|pilot)\b/i.test(question);
+    const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want)\b/i.test(question);
     
-    // If describing a situation (not asking to search meetings), let LLM handle it
+    // If describing a situation with a strategic advice request, go to PRODUCT_KNOWLEDGE
     if (isDescribingSituation) {
-      console.log(`[Intent] Message describes a situation - delegating to LLM for nuanced classification`);
-      return null;
+      // Check if it's asking for strategic advice (how to approach, what to do)
+      const wantsAdvice = /\b(how\s+(can|should|do)\s+we|help\s+me|what\s+should|approach\s+this)\b/i.test(question);
+      if (wantsAdvice) {
+        console.log(`[Intent] Situation description + advice request - fast-path to PRODUCT_KNOWLEDGE`);
+        return {
+          intent: Intent.PRODUCT_KNOWLEDGE,
+          intentDetectionMethod: "situation_advice",
+          confidence: 0.90,
+          reason: "Describing customer situation and asking for strategic advice",
+        };
+      }
     }
     
     if (hasMultiMeetingSignal) {

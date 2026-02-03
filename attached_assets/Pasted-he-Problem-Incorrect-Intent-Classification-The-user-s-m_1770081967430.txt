@@ -1,0 +1,72 @@
+he Problem
+Incorrect Intent Classification: The user's message is being classified as MULTI_MEETING instead of PRODUCT_KNOWLEDGE, even though it clearly asks for strategic advice based on PitCrew's value propositions.
+
+Automatic Clarification Loop: Once classified as MULTI_MEETING, the system automatically runs checkAggregateSpecificity() which determines the query lacks time range and customer scope, so it generates the clarification message asking for "Last month", "Last quarter", "All time".
+
+The user's actual intent: They're describing a business pattern and asking for strategic advice on how to approach ROI evaluation with PitCrew's value props - this should be PRODUCT_KNOWLEDGE, not MULTI_MEETING.
+
+The Root Cause
+Looking at the intent classification prompt, there are specific rules that should have caught this:
+
+Rule #17: "If user DESCRIBES a situation/pattern and asks for STRATEGIC ADVICE → PRODUCT_KNOWLEDGE (NOT MULTI_MEETING)"
+Rule #18: "Based on PitCrew's value props, help me think through..." → PRODUCT_KNOWLEDGE (strategic advice request)"
+Rule #20: "Even if the message mentions 'patterns' or 'customers', if the ASK is for strategic advice using PitCrew's products → PRODUCT_KNOWLEDGE"
+The user's message contains "Based on PitCrew's value props, help me think through how we can approach this" which should trigger PRODUCT_KNOWLEDGE.
+
+The Fix
+The issue is likely in the intent classification logic. Let me check if there's a bug in the keyword detection or if the LLM is not following the prompt correctly.
+
+Read file(s)
+
+server/decisionLayer/intent.ts 200 - 281
+
+server/decisionLayer/intent.ts 280 - 401
+I found the issue! Looking at the classifyByKeyword function, I can see the problem:
+
+The Bug
+In lines 350-370, there's this logic:
+
+// PRODUCT_KNOWLEDGE override: Strategic advice requests should go to LLM, not entity detection
+const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
+if (productKnowledgeSignals.test(question)) {
+  console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - delegating to LLM for nuanced classification`);
+  return null; // Let LLM handle this with full context
+}
+This correctly detects the PRODUCT_KNOWLEDGE signal and delegates to the LLM. However, the issue is that the user's message likely contains both:
+
+The PRODUCT_KNOWLEDGE signal ("Based on PitCrew's value props, help me think through")
+A company entity or multi-meeting signal that's being detected later
+The problem is in the entity detection logic that comes after:
+
+// Entity detection: Only triggers if no action-based pattern matched first
+const company = await containsKnownCompany(question);
+const contact = containsKnownContact(question);
+
+if (company || contact) {
+  const entityName = company || contact;
+  
+  const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
+  const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want|pilot)\b/i.test(question);
+  
+  // If describing a situation (not asking to search meetings), let LLM handle it
+  if (isDescribingSituation) {
+    console.log(`[Intent] Message describes a situation - delegating to LLM for nuanced classification`);
+    return null;
+  }
+  
+  if (hasMultiMeetingSignal) {
+    return {
+      intent: Intent.MULTI_MEETING,
+      intentDetectionMethod: "entity",
+      confidence: 0.85,
+      reason: `Contains known entity "${entityName}" with multi-meeting signal`,
+    };
+  }
+}
+The bug is that the PRODUCT_KNOWLEDGE signal detection should return early and not continue to entity detection, but it's returning null which means "continue processing".
+
+The Fix
+The issue is in the flow control. When productKnowledgeSignals.test(question) returns true, it should either:
+
+Return a PRODUCT_KNOWLEDGE result immediately (preferred), or
+Ensure the LLM gets called and follows the prompt correctly
