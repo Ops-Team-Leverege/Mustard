@@ -120,13 +120,15 @@ export async function findRelevantMeetings(
     const source = scopeOverride?.allCustomers ? "LLM scope detection" : "regex pattern";
     const meetingLimit = scopeOverride?.meetingLimit ?? null;
     
-    // Parse time range from user message
-    const timeRange = parseTimeRange(userMessage);
+    // Parse time range - prefer LLM's timeRangeExplanation over re-parsing user message
+    // The LLM already did semantic understanding in checkAggregateSpecificity()
+    const timeRangeSource = scopeOverride?.timeRangeExplanation || userMessage;
+    const timeRange = parseTimeRange(timeRangeSource);
     const startDate = scopeOverride?.startDate ?? timeRange.startDate;
     
     console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching ${meetingLimit ?? 'all'} transcripts`);
     console.log(`[MeetingResolver] Scope override received:`, JSON.stringify(scopeOverride));
-    console.log(`[MeetingResolver] Time range filter: ${startDate ? startDate.toISOString() : 'none'}`);
+    console.log(`[MeetingResolver] Time range source: "${timeRangeSource}", filter: ${startDate ? startDate.toISOString() : 'none'}`);
     
     const allMeetings = await fetchAllRecentTranscripts(meetingLimit, startDate);
     const topic = extractTopic(userMessage);
