@@ -348,7 +348,8 @@ async function classifyByKeyword(
 
   // PRODUCT_KNOWLEDGE fast-path: Strategic advice requests should go directly to PRODUCT_KNOWLEDGE
   // These phrases indicate the user wants strategic advice using PitCrew's products
-  const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
+  // Also catches "our roadmap" (internal product roadmap) vs "their roadmap" (external)
+  const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how|our\s+(q[1-4]\s+)?roadmap|what['']?s\s+on\s+our\s+roadmap|features?\s+coming\s+next)\b/i;
   if (productKnowledgeSignals.test(question)) {
     console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - fast-path to PRODUCT_KNOWLEDGE (strategic advice request)`);
     return {
