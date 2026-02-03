@@ -1366,8 +1366,8 @@ async function chainProductStyleWriting(
   console.log(`[OpenAssistant] Product knowledge from cache (${Date.now() - startTime}ms)`);
   
   // Extract just the features section for style reference
-  // Matches both "=== Current Product Features" and "=== Roadmap Features"
-  const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[\s\S]*?(?===|$)/);
+  // Matches "=== Current Product Features (Available Now) ===" or "=== Roadmap Features (Planned/In Development) ==="
+  const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[^=]*===[\s\S]*?(?=\n===|$)/);
   const featureExamples = featuresMatch ? featuresMatch[0].slice(0, 2000) : "";
   
   console.log(`[OpenAssistant] Style matching - feature examples length: ${featureExamples.length} chars`);
