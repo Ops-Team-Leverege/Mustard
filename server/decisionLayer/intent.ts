@@ -224,10 +224,18 @@ async function containsKnownCompany(text: string): Promise<string | null> {
   }
   
   // Second pass: check for first word match (e.g., "TPI" matches "TPI Composites")
-  // Only match if the first word is at least 3 characters to avoid false positives
+  // Requirements to avoid false positives:
+  // - Minimum 3 characters for first word
+  // - Word must not appear in a common phrase context (e.g., "oil change" ≠ "Oil Changers")
+  const commonPhraseWords = ['oil', 'big', 'service', 'discount', 'east', 'full', 'true', 'team', 'test'];
+  
   for (const company of companies) {
-    const firstWord = company.split(/\s+/)[0];
+    const firstWord = company.split(/\s+/)[0].toLowerCase();
     if (firstWord.length >= 3) {
+      // Skip words that commonly appear in generic phrases
+      if (commonPhraseWords.includes(firstWord)) {
+        continue;
+      }
       // Use word boundary to avoid partial matches like "ace" in "surface"
       const wordBoundaryRegex = new RegExp(`\\b${firstWord}\\b`, 'i');
       if (wordBoundaryRegex.test(lower)) {
