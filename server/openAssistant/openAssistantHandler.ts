@@ -1400,59 +1400,71 @@ async function chainProductStyleWriting(
   
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
-  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing...`);
+  const featureName = extractFeatureName(originalRequest);
+  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing (feature: ${featureName})...`);
+  
   const response = await Promise.race([
     openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
       messages: [
         {
           role: "system",
-          content: `You are writing a feature description for PitCrew. You MUST match the exact style and tone of our existing feature descriptions.
+          content: `You are a PitCrew product writer creating documentation for a new feature. Your output has TWO parts:
 
-=== STYLE EXAMPLES (match this format exactly) ===
+PART 1 - RESEARCH SUMMARY (2-4 bullet points)
+Summarize the key findings from the research that justify this feature. Focus on:
+- Industry context (why this matters)
+- Safety/compliance considerations
+- Business impact
+
+PART 2 - FEATURE DESCRIPTION (1-2 sentences, PitCrew style)
+Write the feature description matching our existing style:
+
+=== STYLE EXAMPLES ===
 ${featureExamples}
 
-=== STYLE RULES (CRITICAL - FOLLOW EXACTLY) ===
-1. MAXIMUM 1-2 sentences - typically 15-30 words total
-2. Start with an action verb (Detects, Identifies, Shows, Enables, Monitors, Alerts, etc.)
-3. Describe WHAT it does and WHY it matters in ONE concise statement
-4. Be specific about the capability
-5. NO marketing fluff, NO buzzwords, NO effusive language
-6. Professional but accessible tone - match the examples above EXACTLY
+=== STYLE RULES ===
+1. MAXIMUM 1-2 sentences - typically 15-30 words
+2. Start with an action verb (Detects, Identifies, Shows, Enables, Monitors, Alerts)
+3. Describe WHAT it does and WHY it matters
+4. Professional, concise, no marketing fluff
 
-BAD: "Enhance safety in your oil change shop with our cutting-edge capability that monitors the presence of protective nets underneath service bays, ensuring they are always in place. If a net is detected to be missing, an immediate alert is sent to your team, helping prevent potential safety hazards."
-
-GOOD: "Detects missing safety nets underneath service bays and alerts staff immediately, preventing fall hazards in oil change facilities."
-
-=== RESEARCH CONTEXT (for your understanding only) ===
+=== RESEARCH CONTEXT ===
 ${researchContent}
 
-OUTPUT ONLY the feature description. No preamble, no "Here's the description", no extra explanation. Just the 1-2 sentence description.`,
+=== OUTPUT FORMAT (follow exactly) ===
+*Research Summary:*
+• [Key finding 1]
+• [Key finding 2]
+• [Key finding 3]
+
+*Feature Description:*
+[1-2 sentence description in PitCrew style]`,
       },
       {
         role: "user",
-        content: `Write the feature description for: ${extractFeatureName(originalRequest)}`,
+        content: `Create documentation for the "${featureName}" feature based on the research.`,
       },
     ],
-      temperature: 0.2,
-      max_tokens: 150,
+      temperature: 0.3,
+      max_tokens: 400,
     }),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
   ]);
   
   console.log(`[OpenAssistant] Style matching OpenAI call complete (${Date.now() - startTime}ms)`);
   
-  // Validate the OpenAI response - don't silently fall back to research content
+  // Validate the OpenAI response
   const styledContent = response.choices[0]?.message?.content?.trim();
   
-  if (!styledContent || styledContent.length < 20) {
+  if (!styledContent || styledContent.length < 50) {
     console.error(`[OpenAssistant] Style matching produced invalid response: "${styledContent || '(empty)'}"`);
     console.error(`[OpenAssistant] Feature examples length: ${featureExamples.length} chars`);
     console.error(`[OpenAssistant] Research content length: ${researchContent.length} chars`);
     throw new Error(`Style matching failed - OpenAI returned invalid response (${styledContent?.length || 0} chars)`);
   }
   
-  console.log(`[OpenAssistant] Style matching produced valid description (${styledContent.length} chars): "${styledContent.substring(0, 100)}${styledContent.length > 100 ? '...' : ''}"`);
+  console.log(`[OpenAssistant] Style matching produced valid output (${styledContent.length} chars)`);
   return styledContent;
 }
 
