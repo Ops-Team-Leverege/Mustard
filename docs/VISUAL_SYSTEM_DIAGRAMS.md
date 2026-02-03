@@ -126,40 +126,52 @@ graph TD
     F --> G[Intent Classification]
     G --> H{Intent Type?}
     
-    H -->|SINGLE_MEETING| I[Meeting Resolution]
-    H -->|MULTI_MEETING| J[Cross-Meeting Search]
-    H -->|PRODUCT_KNOWLEDGE| K[Product Database Query]
-    H -->|CLARIFY| L[Ask for Clarification]
+    H -->|SINGLE_MEETING| I[Check Meeting Resolution]
+    H -->|MULTI_MEETING| J[Open Assistant Handler]
+    H -->|PRODUCT_KNOWLEDGE| J
+    H -->|EXTERNAL_RESEARCH| J
+    H -->|DOCUMENT_SEARCH| J
+    H -->|GENERAL_HELP| J
+    H -->|REFUSE| K[Post Refusal Message]
+    H -->|CLARIFY| L[Post Clarification Request]
     
-    I --> M[Single Meeting Orchestrator]
-    J --> N[Open Assistant Handler]
-    K --> N
-    L --> O[Post Clarification Question]
+    I --> M{Meeting Resolved?}
+    M -->|Yes| N[Single Meeting Orchestrator]
+    M -->|No| O[Ask for Meeting Clarification]
     
-    M --> P[Retrieve Meeting Chunks]
-    N --> Q[Search Across Meetings]
-    P --> R[Generate Response with Citations]
-    Q --> R
+    J --> P[Contract Chain Execution]
+    P --> Q{Uses Streaming?}
+    Q -->|Yes| R[Stream Response in Real-time]
+    Q -->|No| S[Generate Complete Response]
     
-    R --> S[Post Response to Slack Thread]
-    S --> T{Complex Response?}
-    T -->|Yes| U[Generate Word Document]
-    T -->|No| V[Log Interaction for Audit]
-    U --> W[Upload Document to Slack]
-    W --> V
+    N --> T[Extract from Meeting Data]
+    T --> U[Generate Response with Evidence]
     
-    O --> V
-    V --> X[Complete - User Can Follow Up]
+    S --> V{Should Generate Document?}
+    V -->|Yes| W[Create Word Document]
+    V -->|No| X[Post Text Response]
+    
+    R --> Y[Response Complete]
+    U --> Y
+    W --> Z[Upload Document to Slack]
+    X --> Y
+    O --> Y
+    K --> Y
+    L --> Y
+    Z --> Y
+    
+    Y --> AA[Log Interaction for Audit]
+    AA --> BB[User Can Ask Follow-ups]
     
     classDef user fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
     classDef slack fill:#e1f5fe,stroke:#01579b,stroke-width:2px
     classDef decision fill:#fff3e0,stroke:#ef6c00,stroke-width:2px
     classDef processing fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     
-    class A,O,S,U,W,X user
-    class B,C,D,E slack
-    class F,G,H,I,J,K,L decision
-    class M,N,P,Q,R,T,V processing
+    class A,B,C,D,E user
+    class F,G,H slack
+    class I,J,M,P,Q,V decision
+    class N,T,U,S,R,W,X,O,K,L,Y,Z,AA,BB processing
 ```
 
 ### Workflow 3: Browse Intelligence via Web Dashboard
@@ -301,22 +313,23 @@ graph TD
     T -->|Yes| P
     T -->|No| U[Request Time Range & Customer Scope]
     
-    P --> V[Contract Execution]
-    U --> W[Wait for User Response]
-    W --> A
+    P --> V{Intent Routing}
+    V -->|SINGLE_MEETING + Resolved Meeting| W[Single Meeting Orchestrator]
+    V -->|All Other Intents| X[Open Assistant Handler]
     
-    V --> X[Route to Handler]
-    X --> Y{Handler Type}
-    Y -->|Single Meeting| Z[Single Meeting Orchestrator]
-    Y -->|Multi-Meeting| AA[Open Assistant Handler]
-    Y -->|External Research| BB[External Research Handler]
+    U --> Y[Wait for User Response]
+    Y --> A
     
-    Z --> CC[Generate Response]
-    AA --> CC
-    BB --> CC
+    W --> Z[Extract from Meeting Data]
+    X --> AA[Contract Chain Execution]
+    
+    Z --> BB[Generate Response with Evidence]
+    AA --> CC[Generate Response with Citations]
+    
     R --> DD[Post Refusal]
     S --> EE[Post Clarification]
-    CC --> FF[Post Response with Citations]
+    BB --> FF[Post Response]
+    CC --> FF
     
     classDef input fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
     classDef decision fill:#e1f5fe,stroke:#01579b,stroke-width:2px
@@ -324,9 +337,9 @@ graph TD
     classDef output fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
     
     class A,B input
-    class C,D,E,F,G,P,Q,T,V,X,Y decision
-    class H,I,J,K,L,M,N,O,S,U,W context
-    class Z,AA,BB,CC,DD,EE,FF output
+    class C,D,E,F,G,P,Q,T,V decision
+    class H,I,J,K,L,M,N,O,S,U,Y context
+    class W,X,Z,AA,BB,CC,DD,EE,FF output
 ```
 
 ## Production Performance Metrics
