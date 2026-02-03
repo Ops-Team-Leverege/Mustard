@@ -290,6 +290,7 @@ function detectFollowUpMessage(
   const intentMap: Record<string, Intent> = {
     "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
     "SINGLE_MEETING": Intent.SINGLE_MEETING,
+    "MULTI_MEETING": Intent.MULTI_MEETING,
     "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
     "GENERAL_HELP": Intent.GENERAL_HELP,
   };

@@ -47,6 +47,12 @@ const defaultPatternRules: PatternRule[] = [
   { pattern: /^not\s+quite/i, description: "not quite" },
   { pattern: /^(tweak|adjust|refine|revise)\s+(it|this|that)/i, description: "tweak it" },
   { pattern: /^can\s+you\s+(redo|rewrite|revise)/i, description: "can you redo" },
+  // Modification requests - asking to add/include/change something in the previous output
+  { pattern: /^can\s+you\s+(include|add|also\s+show|also\s+include|put\s+in)/i, description: "can you include X" },
+  { pattern: /^(include|add)\s+(the|their|customer|company)/i, description: "include the X" },
+  { pattern: /^(also|and)\s+(include|add|show)/i, description: "also include X" },
+  { pattern: /^(what\s+about|how\s+about)\s+(adding|including)/i, description: "what about adding X" },
+  { pattern: /^(could\s+you|would\s+you)\s+(add|include)/i, description: "could you add X" },
 ];
 
 const defaultIntentInferenceRules: IntentInferenceRule[] = [
@@ -64,6 +70,11 @@ const defaultIntentInferenceRules: IntentInferenceRule[] = [
     markers: ["pitcrew pricing", "pitcrew feature", "integration", "product knowledge"], 
     intentKey: "PRODUCT_KNOWLEDGE", 
     description: "Product knowledge task" 
+  },
+  {
+    markers: ["across", "meetings", "companies", "calls", "themes", "pattern analysis", "summary of recent", "customer themes"],
+    intentKey: "MULTI_MEETING",
+    description: "Multi-meeting analysis"
   },
 ];
 
