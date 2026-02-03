@@ -738,10 +738,38 @@ export async function slackEventsHandler(req: Request, res: Response) {
       if (testRun) {
         botReply = { ts: `test-${Date.now()}` };
       } else if (usedStreaming) {
-        // IMPORTANT: Check streaming FIRST - if streaming was used, the message is already posted
-        // Don't post again via document support or regular post
+        // Streaming placeholder was created - check if handler already updated it
         botReply = { ts: streamingContext!.messageTs };
-        console.log(`[Slack] Response already streamed to message: ${botReply.ts}`);
+        
+        // Check if handler already completed streaming (set streamingCompleted: true)
+        const handlerAlreadyStreamed = openAssistantResultData?.streamingCompleted === true;
+        
+        if (handlerAlreadyStreamed) {
+          // Handler already updated the message with final content (e.g., streaming OpenAI)
+          console.log(`[Slack] Handler already streamed to message: ${botReply.ts}`);
+        } else if (responseText && responseText !== "...") {
+          // Handler returned result but didn't update the placeholder - do it now
+          try {
+            const { updateSlackMessage } = await import("./slackApi");
+            await updateSlackMessage({
+              channel: streamingContext!.channel,
+              ts: streamingContext!.messageTs,
+              text: responseText,
+            });
+            console.log(`[Slack] Updated streaming placeholder with final content (${responseText.length} chars)`);
+          } catch (updateErr) {
+            console.error(`[Slack] Failed to update streaming message, posting new:`, updateErr);
+            // Fall back to posting a new message if update fails
+            const fallbackReply = await postSlackMessage({
+              channel,
+              text: responseText,
+              thread_ts: threadTs,
+            });
+            botReply = fallbackReply;
+          }
+        } else {
+          console.log(`[Slack] No content to update streaming message: ${botReply.ts}`);
+        }
       } else if (openAssistantResultData?.answerContract && !usedSingleMeetingMode) {
         // Open Assistant responses may generate documents for specific contracts or long content
         // Only reach here if streaming was NOT used (e.g., doc-generating contracts)
