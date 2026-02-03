@@ -1187,7 +1187,8 @@ async function handleExternalResearchIntent(
   if (needsStyleMatching) {
     console.log(`[OpenAssistant] Chaining product knowledge for style matching...`);
     try {
-      const styledOutput = await chainProductStyleWriting(userMessage, researchResult.answer, context);
+      // Pass true if this is from contract chain (user explicitly asked for research + writing)
+      const styledOutput = await chainProductStyleWriting(userMessage, researchResult.answer, context, chainIncludesSalesDocsPrep);
       const sourcesSection = researchResult.citations.length > 0 
         ? formatCitationsForDisplay(researchResult.citations)
         : "";
@@ -1375,11 +1376,13 @@ Please synthesize this research with PitCrew's product capabilities to provide s
 /**
  * Chain product knowledge to generate styled output that matches existing
  * feature descriptions in tone and format.
+ * @param fromResearchChain - true if this follows EXTERNAL_RESEARCH in contract chain (user explicitly asked for research + writing)
  */
 async function chainProductStyleWriting(
   originalRequest: string,
   researchContent: string,
-  context: OpenAssistantContext
+  context: OpenAssistantContext,
+  fromResearchChain: boolean = false
 ): Promise<string> {
   console.log(`[OpenAssistant] === STYLE MATCHING START ===`);
   const startTime = Date.now();
@@ -1400,54 +1403,59 @@ async function chainProductStyleWriting(
   
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
   
-  const featureName = extractFeatureName(originalRequest);
-  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing (feature: ${featureName})...`);
+  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing (fromResearchChain: ${fromResearchChain})...`);
   
+  // When user explicitly asked for research + writing (contract chain), require research summary
+  const researchChainInstructions = fromResearchChain ? `
+IMPORTANT: The user explicitly asked for research AND writing. You MUST include:
+1. A brief research summary (2-4 bullet points) with key findings from the research
+2. Then the content they asked for (feature description, email, etc.)
+
+Format:
+*Key Research Findings:*
+• [Finding 1 - industry context or why this matters]
+• [Finding 2 - relevant data or insight]
+• [Finding 3 - business/safety/compliance impact]
+
+*[Content Type - e.g., Feature Description]:*
+[The actual content in PitCrew style]` : `
+Include relevant context from the research when helpful.`;
+
   const response = await Promise.race([
     openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
       messages: [
         {
           role: "system",
-          content: `You are a PitCrew product writer creating documentation for a new feature. Your output has TWO parts:
+          content: `You are a PitCrew content writer. Your job is to fulfill the user's request using the research provided, writing in PitCrew's professional voice.
 
-PART 1 - RESEARCH SUMMARY (2-4 bullet points)
-Summarize the key findings from the research that justify this feature. Focus on:
-- Industry context (why this matters)
-- Safety/compliance considerations
-- Business impact
-
-PART 2 - FEATURE DESCRIPTION (1-2 sentences, PitCrew style)
-Write the feature description matching our existing style:
-
-=== STYLE EXAMPLES ===
+=== PITCREW STYLE REFERENCE ===
 ${featureExamples}
 
-=== STYLE RULES ===
-1. MAXIMUM 1-2 sentences - typically 15-30 words
-2. Start with an action verb (Detects, Identifies, Shows, Enables, Monitors, Alerts)
-3. Describe WHAT it does and WHY it matters
-4. Professional, concise, no marketing fluff
+=== PITCREW VOICE ===
+- Professional but accessible
+- Concise and direct - no marketing fluff
+- Action-oriented (use verbs: Detects, Identifies, Shows, Enables, Monitors, Alerts)
+- Focused on business value and outcomes
 
 === RESEARCH CONTEXT ===
 ${researchContent}
 
-=== OUTPUT FORMAT (follow exactly) ===
-*Research Summary:*
-• [Key finding 1]
-• [Key finding 2]
-• [Key finding 3]
-
-*Feature Description:*
-[1-2 sentence description in PitCrew style]`,
+=== INSTRUCTIONS ===
+1. Read the user's original request carefully
+2. Use the research to inform your response
+3. Write in PitCrew's voice and style
+4. Structure your response appropriately for what they asked
+5. If they asked for a feature description specifically, make it 1-2 concise sentences starting with an action verb
+${researchChainInstructions}`,
       },
       {
         role: "user",
-        content: `Create documentation for the "${featureName}" feature based on the research.`,
+        content: originalRequest,
       },
     ],
       temperature: 0.3,
-      max_tokens: 400,
+      max_tokens: 800,
     }),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
   ]);

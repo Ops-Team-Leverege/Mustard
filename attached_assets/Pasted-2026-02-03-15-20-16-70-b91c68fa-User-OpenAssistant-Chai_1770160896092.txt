@@ -1,0 +1,100 @@
+2026-02-03 15:20:16.70
+b91c68fa
+User
+[OpenAssistant] Chaining product knowledge for style matching...
+2026-02-03 15:20:16.70
+b91c68fa
+User
+[OpenAssistant] Research complete (30302ms), answer length: 17317
+2026-02-03 15:20:16.70
+b91c68fa
+User
+[OpenAssistant] LLM requested style matching via contract chain - prioritizing over product knowledge enrichment
+2026-02-03 15:20:16.70
+b91c68fa
+User
+[OpenAssistant] === STYLE MATCHING START ===
+2026-02-03 15:20:18.20
+b91c68fa
+User
+[OpenAssistant] Product knowledge from cache (1497ms)
+2026-02-03 15:20:18.20
+b91c68fa
+User
+[ProductData] Using snapshot: 80 records, synced 2026-02-03T09:00:26.953Z
+2026-02-03 15:20:18.30
+b91c68fa
+User
+[OpenAssistant] Calling OpenAI for style-matched writing...
+2026-02-03 15:20:18.30
+b91c68fa
+User
+[OpenAssistant] Style matching - feature examples length: 2000 chars
+2026-02-03 15:20:22.10
+b91c68fa
+User
+[OpenAssistant] Style matching OpenAI call complete (5398ms)
+2026-02-03 15:20:22.10
+b91c68fa
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-03 15:20:22.10
+b91c68fa
+User
+[OpenAssistant] Style matching produced valid output (330 chars)
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] willGenerateDoc: true
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[INFO] [ed108df1] Open Assistant response generated {"correlationId":"ed108df1","channel":"C0A80S3HJNL","threadTs":"1770160766.599509","userId":"U082TV42FM0","duration":51401,"intent":"external_research","contract":"EXTERNAL_RESEARCH","delegated":false,"duration_ms":36063}
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] === DOCUMENT DECISION ===
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] usedSingleMeetingMode: false
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] contract: EXTERNAL_RESEARCH
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] === END DOCUMENT DECISION ===
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] hasOpenAssistantData: true
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] hasContract: true
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] usedStreaming: true
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] Open Assistant response: intent=external_research, controlPlane=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, delegated=false
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] Pipeline completed in 50197ms, progressMessages=0
+2026-02-03 15:20:22.40
+b91c68fa
+User
+[Slack] testRun: false
+2026-02-03 15:20:23.40
+b91c68fa
+User
+[Slack] Updated streaming placeholder with final content (1797 chars)
+2026-02-03 15:20:23.41
+b91c68fa
+User
+[INFO] [ed108df1] Request completed successfully {"correlationId":"ed108df1","channel":"C0A80S3HJNL","threadTs":"1770160766.599509","userId":"U082TV42FM0","duration":52702,"intent":"EXTERNAL_RESEARCH","contract":"EXTERNAL_RESEARCH","responseLength":1797,"totalTimeMs":50197,"stages":{"meeting_resolution":0,"decision_layer":10100,"handler":36063}}
