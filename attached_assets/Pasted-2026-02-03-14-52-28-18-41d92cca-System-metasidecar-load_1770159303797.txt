@@ -1,0 +1,184 @@
+2026-02-03 14:52:28.18
+41d92cca
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-03 14:52:28.21
+41d92cca
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-03 14:52:30.68
+41d92cca
+User
+> NODE_ENV=production node dist/index.js
+2026-02-03 14:52:30.68
+41d92cca
+User
+> rest-express@1.0.0 start
+2026-02-03 14:52:33.29
+41d92cca
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-03 14:52:33.30
+41d92cca
+User
+Slack routes registered at /api/slack/events
+2026-02-03 14:52:33.82
+41d92cca
+User
+10:52:33 PM [express] serving on port 5000
+2026-02-03 14:53:09.90
+41d92cca
+User
+[Slack] Received event request
+2026-02-03 14:53:09.90
+41d92cca
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-03T22:53:09.900Z ==========
+2026-02-03 14:53:09.90
+41d92cca
+User
+[Slack] Event details: eventId=Ev0ACM349ZTM, clientMsgId=acfb15ae-2921-4f18-96cf-030d893dcd24, messageTs=1770159186.425859, threadTs=1770159186.425859, channel=C0A80S3HJNL
+2026-02-03 14:53:09.90
+41d92cca
+User
+[Slack] Processing app_mention
+2026-02-03 14:53:09.90
+41d92cca
+User
+Event type: app_mention
+2026-02-03 14:53:09.90
+41d92cca
+User
+Slack payload type: event_callback
+2026-02-03 14:53:09.90
+41d92cca
+User
+10:53:09 PM [express] POST /api/slack/events 200 in 7ms
+2026-02-03 14:53:13.14
+41d92cca
+User
+[INFO] [365e23bf] Slack event received {"correlationId":"365e23bf","channel":"C0A80S3HJNL","threadTs":"1770159186.425859","userId":"U082TV42FM0","duration":0,"text":"we have a new feature to add to the roadmap, that will detect when the net underneath the bays (prim","isReply":false,"testRun":false}
+2026-02-03 14:53:13.14
+41d92cca
+User
+Processing: "we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features" in channel C0A80S3HJNL (isReply=false)
+2026-02-03 14:53:15.84
+41d92cca
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-03 14:53:17.24
+41d92cca
+User
+[Slack] Fetched 2 messages from thread for context
+2026-02-03 14:53:19.14
+41d92cca
+User
+[Intent] Loaded 36 companies from database
+2026-02-03 14:53:19.24
+41d92cca
+User
+[IntentClassifier] No keyword match, using LLM interpretation for clarification
+2026-02-03 14:53:19.54
+41d92cca
+User
+[LLMInterpretation] Including 1 messages from thread history
+2026-02-03 14:53:32.64
+41d92cca
+User
+[IntentClassifier] LLM interpretation: intent=EXTERNAL_RESEARCH, confidence=0.9
+2026-02-03 14:53:32.64
+41d92cca
+User
+[LLMInterpretation] Interpretation: intent=EXTERNAL_RESEARCH, contracts=[EXTERNAL_RESEARCH → SALES_DOCS_PREP], confidence=0.9, reason=no_intent_match
+2026-02-03 14:53:32.64
+41d92cca
+User
+[IntentClassifier] Using LLM's proposed intent: EXTERNAL_RESEARCH (confidence 0.9 >= 0.6)
+2026-02-03 14:53:32.64
+41d92cca
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":true,"single_meeting":false,"multi_meeting":false,"document_context":false}
+2026-02-03 14:53:32.64
+41d92cca
+User
+[AnswerContract] Selected: EXTERNAL_RESEARCH (llm_proposed) - chain: [EXTERNAL_RESEARCH → SALES_DOCS_PREP]
+2026-02-03 14:53:32.64
+41d92cca
+User
+[DecisionLayer] Contract: EXTERNAL_RESEARCH (llm_proposed)
+2026-02-03 14:53:32.64
+41d92cca
+User
+[DecisionLayer] Intent: EXTERNAL_RESEARCH (llm)
+2026-02-03 14:53:32.64
+41d92cca
+User
+[Slack] Control plane: intent=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, method=llm, layers={"product_identity":true,"product_ssot":true,"single_meeting":false,"multi_meeting":false,"document_context":false}
+2026-02-03 14:53:32.64
+41d92cca
+User
+[Slack] Non-meeting intent (EXTERNAL_RESEARCH) - skipping meeting resolution
+2026-02-03 14:53:32.84
+41d92cca
+User
+[Slack] Open Assistant mode - intent=EXTERNAL_RESEARCH, routing to appropriate handler
+2026-02-03 14:53:32.84
+41d92cca
+User
+[INFO] [365e23bf] Decision Layer completed {"correlationId":"365e23bf","channel":"C0A80S3HJNL","threadTs":"1770159186.425859","userId":"U082TV42FM0","duration":19702,"intent":"EXTERNAL_RESEARCH","contract":"EXTERNAL_RESEARCH","method":"llm","duration_ms":16801}
+2026-02-03 14:53:34.34
+41d92cca
+User
+[Slack] Streaming placeholder posted: ts=1770159213.912969
+2026-02-03 14:53:34.34
+41d92cca
+User
+[OpenAssistant] Evidence source: general_assistance (from Decision Layer: EXTERNAL_RESEARCH -> EXTERNAL_RESEARCH)
+2026-02-03 14:53:34.34
+41d92cca
+User
+[OpenAssistant] Processing: "we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features"
+2026-02-03 14:53:34.34
+41d92cca
+User
+[OpenAssistant] Using full Decision Layer result: intent=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, method=llm
+2026-02-03 14:53:34.54
+41d92cca
+User
+[OpenAssistant] Routing to external research path (CP contract: EXTERNAL_RESEARCH) (chain: [EXTERNAL_RESEARCH → SALES_DOCS_PREP])
+2026-02-03 14:53:34.54
+41d92cca
+User
+[OpenAssistant] === EXTERNAL RESEARCH START ===
+2026-02-03 14:53:34.54
+41d92cca
+User
+[OpenAssistant] External research for: to understand more about oil change shops
+2026-02-03 14:53:34.74
+41d92cca
+User
+[OpenAssistant] Chain-based style matching: true, Product knowledge enrichment: false, Style matching needed: true
+2026-02-03 14:53:34.74
+41d92cca
+User
+[OpenAssistant] Generating progress message...
+2026-02-03 14:53:37.94
+41d92cca
+User
+[OpenAssistant] Calling performExternalResearch...
+2026-02-03 14:53:37.94
+41d92cca
+User
+[OpenAssistant] Progress message ready (3400ms)
+2026-02-03 14:53:38.04
+41d92cca
+User
+[ExternalResearch] Research request: query="we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features", company="to understand more about oil change shops", topic="null"
+2026-02-03 14:53:38.04
+41d92cca
+User
+[ExternalResearch] Gemini client initialized successfully
+2026-02-03 14:53:38.04
+41d92cca
+User
+[ExternalResearch] Calling Gemini for web research...

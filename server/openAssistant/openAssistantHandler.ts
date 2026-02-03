@@ -1431,7 +1431,7 @@ OUTPUT ONLY the feature description. No preamble, no "Here's the description", n
       },
       {
         role: "user",
-        content: `Write the feature description for: ${originalRequest.split("feature").pop()?.split(".")[0]?.trim() || "this feature"}`,
+        content: `Write the feature description for: ${extractFeatureName(originalRequest)}`,
       },
     ],
       temperature: 0.2,
@@ -1454,6 +1454,48 @@ OUTPUT ONLY the feature description. No preamble, no "Here's the description", n
   
   console.log(`[OpenAssistant] Style matching produced valid description (${styledContent.length} chars): "${styledContent.substring(0, 100)}${styledContent.length > 100 ? '...' : ''}"`);
   return styledContent;
+}
+
+/**
+ * Extract feature name from user message for style matching.
+ * Looks for patterns like 'feature is called "X"', 'feature named "X"', etc.
+ */
+function extractFeatureName(message: string): string {
+  // Try to find quoted feature name first (most reliable)
+  const quotedPatterns = [
+    /(?:feature|capability)\s+(?:is\s+)?called\s+[""]([^""]+)[""]/i,
+    /(?:feature|capability)\s+(?:is\s+)?named\s+[""]([^""]+)[""]/i,
+    /[""]([^""]+)[""]\s+(?:feature|capability)/i,
+    /called\s+[""]([^""]+)[""]/i,
+  ];
+  
+  for (const pattern of quotedPatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      console.log(`[OpenAssistant] Extracted feature name from quotes: "${match[1]}"`);
+      return match[1].trim();
+    }
+  }
+  
+  // Try unquoted patterns
+  const unquotedPatterns = [
+    /(?:new\s+)?feature\s+(?:is\s+)?called\s+(\w+(?:\s+\w+){0,3}?)(?:\.|,|\s+that|\s+which|\s+to|\s+do)/i,
+    /(?:new\s+)?feature\s+(?:is\s+)?named\s+(\w+(?:\s+\w+){0,3}?)(?:\.|,|\s+that|\s+which|\s+to)/i,
+  ];
+  
+  for (const pattern of unquotedPatterns) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      console.log(`[OpenAssistant] Extracted feature name (unquoted): "${match[1]}"`);
+      return match[1].trim();
+    }
+  }
+  
+  // Fallback: include the full context for the LLM to understand
+  console.log(`[OpenAssistant] Could not extract feature name, using full message context`);
+  // Return a summary of the request for the LLM
+  const shortContext = message.length > 200 ? message.substring(0, 200) + "..." : message;
+  return `the feature described in this request: "${shortContext}"`;
 }
 
 /**
