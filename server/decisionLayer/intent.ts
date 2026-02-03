@@ -341,6 +341,52 @@ async function classifyByKeyword(
     };
   }
 
+  // ============================================================================
+  // FAST-PATH: SINGLE_MEETING for "last [company] call/meeting" (singular)
+  // MUST come before PRODUCT_KNOWLEDGE to prevent "our messaging in last X call" misrouting
+  // ============================================================================
+  // Exclusion patterns for aggregate/trend questions
+  const aggregatePhrases = /\b(last\s+(month|quarter|week|year)|recent\s+(calls|meetings)|across|all\s+customers|trend|patterns?)\b/i;
+  const pluralMeetings = /\blast\s+\d+\s+(meetings?|calls?)\b/i;
+  
+  // Only match "last [company] call/meeting" when it's clearly a singular reference
+  const lastCallPattern = /\blast\s+[\w\s'-]+\s+(call|meeting|check-?in)\b/i;
+  const lastCallWithPattern = /\blast\s+(call|meeting|check-?in)\s+with\b/i;
+  
+  if ((lastCallPattern.test(question) || lastCallWithPattern.test(question)) && 
+      !aggregatePhrases.test(question) && !pluralMeetings.test(question)) {
+    console.log(`[IntentClassifier] Fast-path: SINGLE_MEETING - "last [company] call" detected`);
+    return {
+      intent: Intent.SINGLE_MEETING,
+      intentDetectionMethod: "pattern",
+      confidence: 0.9,
+      reason: "Singular reference to last meeting/call",
+    };
+  }
+
+  // ============================================================================
+  // FAST-PATH: PRODUCT_KNOWLEDGE for "our approach/methodology" questions
+  // Only match when asking about PitCrew's strategy, not meeting-specific questions
+  // ============================================================================
+  const hasMultiMeetingContext = /\b(across|all\s+customers|recent\s+calls|last\s+\d+|meetings|which\s+meetings)\b/i.test(question);
+  const hasSingularMeetingContext = /\b(last|this|that)\s+[\w\s'-]*(call|meeting|check-?in)\b/i.test(question);
+  
+  // Only trigger for clear product strategy questions, not when asking about meetings
+  const productStrategyPattern = /\b(what'?s?\s+)?(our|pitcrew'?s?)\s+(recommended\s+approach|methodology|messaging\s+for|value\s+prop)/i;
+  const basedOnPitcrewPattern = /\bbased\s+on\s+pitcrew'?s?\s+(value\s+props?|features?)/i;
+  const howShouldWeApproach = /\bhow\s+(should|can)\s+(we|I)\s+(approach|help\s+customers|describe)/i;
+  
+  if (!hasMultiMeetingContext && !hasSingularMeetingContext && 
+      (productStrategyPattern.test(question) || basedOnPitcrewPattern.test(question) || howShouldWeApproach.test(question))) {
+    console.log(`[IntentClassifier] Fast-path: PRODUCT_KNOWLEDGE - product strategy question detected`);
+    return {
+      intent: Intent.PRODUCT_KNOWLEDGE,
+      intentDetectionMethod: "pattern",
+      confidence: 0.9,
+      reason: "Question about PitCrew approach/methodology/strategy",
+    };
+  }
+
   // Entity detection: Only triggers if no action-based pattern matched first
   const company = await containsKnownCompany(question);
   const contact = containsKnownContact(question);

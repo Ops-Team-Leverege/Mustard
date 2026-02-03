@@ -31,7 +31,7 @@ CRITICAL RULES:
 1. If ANY person name appears (Tyler, Randy, Robert, etc.) → likely SINGLE_MEETING
 2. If ANY company name appears in context of "our meeting with X" → likely SINGLE_MEETING
 3. "What did X say/mention/ask" → SINGLE_MEETING
-4. "Find all" or "across meetings" → MULTI_MEETING
+4. "Find all" or "across meetings" or "across all customers" → MULTI_MEETING
 5. "How does PitCrew work" or "pricing" → PRODUCT_KNOWLEDGE
 6. "Research X company" or "earnings calls" or "their priorities" → EXTERNAL_RESEARCH
 7. "Slide deck for X" or "pitch deck for X" with external company → EXTERNAL_RESEARCH
@@ -41,13 +41,30 @@ CRITICAL RULES:
 11. When in doubt between SINGLE_MEETING and GENERAL_HELP → choose SINGLE_MEETING
 12. "What can you do?" or "what can you help with?" or "how can you help me?" → GENERAL_HELP (these are META questions about the BOT's capabilities, NOT questions about PitCrew product features)
 
+SINGULAR vs PLURAL MEETING DETECTION:
+13. "last [company] call" or "last [company] meeting" or "last call with [company]" → SINGLE_MEETING (singular reference)
+14. "last 3 meetings" or "recent meetings" or "all meetings" → MULTI_MEETING (plural reference)
+15. "What was discussed in X call" (singular) → SINGLE_MEETING
+16. "What patterns across X calls" (plural) → MULTI_MEETING
+
+PRODUCT_KNOWLEDGE vs EXTERNAL_RESEARCH:
+17. "Our approach" or "our methodology" or "how should we approach" → PRODUCT_KNOWLEDGE (asking about PitCrew's approach/strategy)
+18. "Their approach" or "research how they" → EXTERNAL_RESEARCH (researching external company)
+19. Strategy questions using PitCrew's value props or features → PRODUCT_KNOWLEDGE
+20. Questions about pilot methodology, expansion approach, or sales strategy using PitCrew → PRODUCT_KNOWLEDGE
+
 EXAMPLES:
 - "What did Les Schwab say about the dashboard?" → SINGLE_MEETING
 - "What did Tyler Wiggins mention about pricing?" → SINGLE_MEETING  
+- "What warranty terms were discussed in the last Pomp's call?" → SINGLE_MEETING (singular: "last call")
+- "What questions did Les Schwab's IT team need answers on?" → SINGLE_MEETING (specific meeting reference)
 - "Find all meetings that mention Walmart" → MULTI_MEETING
 - "What is PitCrew pricing?" → PRODUCT_KNOWLEDGE
 - "Does PitCrew integrate with POS?" → PRODUCT_KNOWLEDGE
 - "What are PitCrew's capabilities?" → PRODUCT_KNOWLEDGE
+- "What's our recommended approach for a 10-20 store expansion pilot?" → PRODUCT_KNOWLEDGE (asking about OUR approach)
+- "How should we help customers evaluate ROI?" → PRODUCT_KNOWLEDGE (our methodology)
+- "Based on PitCrew's value props, how can we approach X?" → PRODUCT_KNOWLEDGE (strategy using our product)
 - "Research Costco and their priorities" → EXTERNAL_RESEARCH
 - "Create a slide deck for Costco leadership" → EXTERNAL_RESEARCH
 - "Research Costco, find priorities, create slides for them" → EXTERNAL_RESEARCH (primary: external research)

@@ -246,4 +246,111 @@ describe('Intent Classification - LLM-First Architecture', () => {
       expect(['llm_interpretation', 'default']).toContain(result.intentDetectionMethod);
     });
   });
+
+  // ============================================================================
+  // REGRESSION TESTS: Specific failing queries from stress tests
+  // ============================================================================
+  describe('Regression: Singular vs Plural Meeting Detection', () => {
+    it('classifies "last Pomp\'s call" as SINGLE_MEETING (singular)', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What warranty terms were discussed in the last Pomp\'s call?');
+      
+      expect(result.intent).toBe(Intent.SINGLE_MEETING);
+      // Can be pattern or entity detection - both are valid fast-paths
+      expect(['pattern', 'entity']).toContain(result.intentDetectionMethod);
+    });
+
+    it('classifies "last Les Schwab check-in" as SINGLE_MEETING', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('List all the open items from our last Les Schwab check-in.');
+      
+      expect(result.intent).toBe(Intent.SINGLE_MEETING);
+      // Can be pattern or entity detection - both are valid fast-paths
+      expect(['pattern', 'entity']).toContain(result.intentDetectionMethod);
+    });
+
+    it('does NOT match plural "last 3 meetings" as SINGLE_MEETING', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What are the key takeaways from our last 3 meetings?');
+      
+      // Should NOT be SINGLE_MEETING - should go to LLM or MULTI_MEETING
+      expect(result.intent).not.toBe(Intent.SINGLE_MEETING);
+    });
+  });
+
+  describe('Regression: Our Approach vs External Research', () => {
+    it('classifies "our recommended approach" as PRODUCT_KNOWLEDGE', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What\'s our recommended approach for a 10-20 store expansion pilot?');
+      
+      expect(result.intent).toBe(Intent.PRODUCT_KNOWLEDGE);
+    });
+
+    it('classifies "our messaging for" as PRODUCT_KNOWLEDGE', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What\'s our messaging for multi-location benchmarking?');
+      
+      expect(result.intent).toBe(Intent.PRODUCT_KNOWLEDGE);
+    });
+
+    it('classifies "based on PitCrew value props" as PRODUCT_KNOWLEDGE', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('Based on PitCrew\'s value props, help me think through how we can approach this.');
+      
+      expect(result.intent).toBe(Intent.PRODUCT_KNOWLEDGE);
+    });
+
+    it('classifies "how should I describe" as PRODUCT_KNOWLEDGE', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('How should I describe our mobile app capabilities?');
+      
+      expect(result.intent).toBe(Intent.PRODUCT_KNOWLEDGE);
+    });
+  });
+
+  describe('Regression: False Positive Prevention', () => {
+    it('does NOT match "our strategy across all customers" as PRODUCT_KNOWLEDGE (aggregate context)', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What is our strategy based on what we heard across all customers?');
+      
+      // Should NOT be PRODUCT_KNOWLEDGE due to multi-meeting context
+      expect(result.intent).not.toBe(Intent.PRODUCT_KNOWLEDGE);
+    });
+
+    it('does NOT match "last quarter meetings" as SINGLE_MEETING', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What trends did we see in last quarter\'s meetings?');
+      
+      // Should NOT be SINGLE_MEETING due to aggregate phrase
+      expect(result.intent).not.toBe(Intent.SINGLE_MEETING);
+    });
+
+    it('does NOT match "recent calls" as SINGLE_MEETING', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      const result = await classifyIntent('What patterns emerged from recent calls?');
+      
+      // Should NOT be SINGLE_MEETING due to aggregate phrase
+      expect(result.intent).not.toBe(Intent.SINGLE_MEETING);
+    });
+
+    it('prioritizes SINGLE_MEETING over PRODUCT_KNOWLEDGE for "our messaging in last call"', async () => {
+      const { classifyIntent, Intent } = await import('../decisionLayer/intent');
+      
+      // This tests the conflict: "our messaging" could match PRODUCT_KNOWLEDGE
+      // but "last Les Schwab call" should win and route to SINGLE_MEETING
+      const result = await classifyIntent('What was our messaging in the last Les Schwab call?');
+      
+      expect(result.intent).toBe(Intent.SINGLE_MEETING);
+    });
+  });
 });
