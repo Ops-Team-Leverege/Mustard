@@ -35,7 +35,69 @@ export type ScopeOverride = {
   timeRangeExplanation?: string;
   customerScopeExplanation?: string;
   meetingLimit?: number | null; // e.g., "3 most recent" → 3
+  startDate?: Date; // Parsed from time range (e.g., "last month" → 30 days ago)
+  endDate?: Date;   // Defaults to now
 };
+
+/**
+ * Parse time range from user message into actual dates.
+ * Supports: "last month", "last quarter", "last week", "all time", etc.
+ */
+export function parseTimeRange(message: string): { startDate: Date | null; endDate: Date } {
+  const lower = message.toLowerCase();
+  const now = new Date();
+  const endDate = now;
+  
+  // Last month
+  if (/last\s+month|past\s+month/.test(lower)) {
+    const startDate = new Date(now);
+    startDate.setMonth(startDate.getMonth() - 1);
+    return { startDate, endDate };
+  }
+  
+  // Last quarter (3 months)
+  if (/last\s+quarter|past\s+quarter|past\s+3\s+months|last\s+3\s+months/.test(lower)) {
+    const startDate = new Date(now);
+    startDate.setMonth(startDate.getMonth() - 3);
+    return { startDate, endDate };
+  }
+  
+  // Last week
+  if (/last\s+week|past\s+week/.test(lower)) {
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - 7);
+    return { startDate, endDate };
+  }
+  
+  // Last 2 weeks
+  if (/last\s+2\s+weeks|past\s+2\s+weeks|past\s+two\s+weeks/.test(lower)) {
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - 14);
+    return { startDate, endDate };
+  }
+  
+  // Last 6 months
+  if (/last\s+6\s+months|past\s+6\s+months|past\s+six\s+months/.test(lower)) {
+    const startDate = new Date(now);
+    startDate.setMonth(startDate.getMonth() - 6);
+    return { startDate, endDate };
+  }
+  
+  // Last year
+  if (/last\s+year|past\s+year/.test(lower)) {
+    const startDate = new Date(now);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    return { startDate, endDate };
+  }
+  
+  // All time - no start date filter
+  if (/all\s+time/.test(lower)) {
+    return { startDate: null, endDate };
+  }
+  
+  // Default: no time range detected
+  return { startDate: null, endDate };
+}
 
 /**
  * Find relevant meetings based on company/person names in the query.
@@ -57,9 +119,16 @@ export async function findRelevantMeetings(
   if (isAllCustomers) {
     const source = scopeOverride?.allCustomers ? "LLM scope detection" : "regex pattern";
     const meetingLimit = scopeOverride?.meetingLimit ?? null;
+    
+    // Parse time range from user message
+    const timeRange = parseTimeRange(userMessage);
+    const startDate = scopeOverride?.startDate ?? timeRange.startDate;
+    
     console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching ${meetingLimit ?? 'all'} transcripts`);
     console.log(`[MeetingResolver] Scope override received:`, JSON.stringify(scopeOverride));
-    const allMeetings = await fetchAllRecentTranscripts(meetingLimit);
+    console.log(`[MeetingResolver] Time range filter: ${startDate ? startDate.toISOString() : 'none'}`);
+    
+    const allMeetings = await fetchAllRecentTranscripts(meetingLimit, startDate);
     const topic = extractTopic(userMessage);
     return {
       meetings: allMeetings,
@@ -146,24 +215,41 @@ export async function findRelevantMeetings(
  * Returns a bounded set of recent transcripts across all companies.
  * 
  * @param limit - Optional limit on number of meetings (e.g., "3 most recent" → 3)
+ * @param startDate - Optional start date for time range filter (e.g., "last month" → 30 days ago)
  */
-async function fetchAllRecentTranscripts(limit?: number | null): Promise<SingleMeetingContext[]> {
+async function fetchAllRecentTranscripts(limit?: number | null, startDate?: Date | null): Promise<SingleMeetingContext[]> {
   const { storage } = await import("../storage");
   const { MEETING_LIMITS } = await import("../config/constants");
   
   // Use user-specified limit if provided, otherwise use default max
   const effectiveLimit = (limit && limit > 0) ? limit : MEETING_LIMITS.MAX_TOTAL_TRANSCRIPTS;
-  console.log(`[MeetingResolver] Fetching up to ${effectiveLimit} transcripts (user limit: ${limit ?? 'none'})`);
+  console.log(`[MeetingResolver] Fetching up to ${effectiveLimit} transcripts (user limit: ${limit ?? 'none'}, startDate: ${startDate?.toISOString() ?? 'none'})`);
   
-  const rows = await storage.rawQuery(`
-    SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, 
-           c.id as company_id, c.name as company_name,
-           COALESCE(t.meeting_date, t.created_at) as sort_date
-    FROM transcripts t
-    JOIN companies c ON t.company_id = c.id
-    ORDER BY sort_date DESC
-    LIMIT $1
-  `, [effectiveLimit]);
+  let rows;
+  if (startDate) {
+    // Apply time range filter
+    rows = await storage.rawQuery(`
+      SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, 
+             c.id as company_id, c.name as company_name,
+             COALESCE(t.meeting_date, t.created_at) as sort_date
+      FROM transcripts t
+      JOIN companies c ON t.company_id = c.id
+      WHERE COALESCE(t.meeting_date, t.created_at) >= $1
+      ORDER BY sort_date DESC
+      LIMIT $2
+    `, [startDate.toISOString(), effectiveLimit]);
+  } else {
+    // No time range filter
+    rows = await storage.rawQuery(`
+      SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, 
+             c.id as company_id, c.name as company_name,
+             COALESCE(t.meeting_date, t.created_at) as sort_date
+      FROM transcripts t
+      JOIN companies c ON t.company_id = c.id
+      ORDER BY sort_date DESC
+      LIMIT $1
+    `, [effectiveLimit]);
+  }
   
   if (!rows || rows.length === 0) {
     console.log(`[MeetingResolver] No transcripts found in database`);
@@ -177,7 +263,7 @@ async function fetchAllRecentTranscripts(limit?: number | null): Promise<SingleM
     meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
   }));
   
-  console.log(`[MeetingResolver] Fetched ${meetings.length} transcripts for "all customers" scope`);
+  console.log(`[MeetingResolver] Fetched ${meetings.length} transcripts for "all customers" scope${startDate ? ` (since ${startDate.toISOString()})` : ''}`);
   return meetings;
 }
 
