@@ -1113,7 +1113,9 @@ async function handleExternalResearchIntent(
   classification: IntentClassification,
   contract?: AnswerContract
 ): Promise<OpenAssistantResult> {
+  console.log(`[OpenAssistant] === EXTERNAL RESEARCH START ===`);
   console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}`);
+  const startTime = Date.now();
   
   const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
   
@@ -1132,14 +1134,18 @@ async function handleExternalResearchIntent(
   console.log(`[OpenAssistant] Style matching needed: ${needsStyleMatching}`);
   
   // Generate personalized progress message
+  console.log(`[OpenAssistant] Generating progress message...`);
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
+  console.log(`[OpenAssistant] Progress message ready (${Date.now() - startTime}ms)`);
   
   // Perform the research
+  console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
     userMessage,
     companyName,
     null // topic derived from message
   );
+  console.log(`[OpenAssistant] Research complete (${Date.now() - startTime}ms), answer length: ${researchResult.answer?.length || 0}`);
   
   if (!researchResult.answer) {
     return {
