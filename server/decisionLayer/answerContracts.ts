@@ -1173,15 +1173,8 @@ export async function selectAnswerContract(
   layers: ContextLayers,
   llmProposedContracts?: string[]
 ): Promise<AnswerContractResult> {
-  const keywordResult = selectContractByKeyword(question, intent, layers);
-  
-  if (keywordResult) {
-    console.log(`[AnswerContract] Selected: ${keywordResult.contract} (${keywordResult.contractSelectionMethod})`);
-    return keywordResult;
-  }
-
-  // LLM-first: If LLM interpretation proposed valid contracts, use the first one as primary
-  // The full contract chain will be available via proposedInterpretation.contracts
+  // LLM-FIRST: If LLM interpretation proposed valid contracts, use them (primary selection method)
+  // This respects the semantic understanding from intent classification
   if (llmProposedContracts && llmProposedContracts.length > 0) {
     const validContracts = llmProposedContracts.filter(c => 
       Object.values(AnswerContract).includes(c as AnswerContract)
@@ -1197,6 +1190,15 @@ export async function selectAnswerContract(
     }
   }
 
-  console.log(`[AnswerContract] No keyword match, using LLM fallback`);
+  // Keyword fallback: Only used when LLM didn't propose contracts (e.g., legacy paths or absolute certainties)
+  const keywordResult = selectContractByKeyword(question, intent, layers);
+  
+  if (keywordResult) {
+    console.log(`[AnswerContract] Selected: ${keywordResult.contract} (${keywordResult.contractSelectionMethod})`);
+    return keywordResult;
+  }
+
+  // LLM classification fallback: If no LLM-proposed contracts and no keyword match
+  console.log(`[AnswerContract] No LLM proposal or keyword match, using LLM classification fallback`);
   return selectContractByLLM(question, intent, layers);
 }

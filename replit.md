@@ -37,9 +37,12 @@ The system employs **true LLM-FIRST classification** for intent routing, using g
 The Intent Router classifies intent, the Orchestrator computes context layers and selects an answer contract, and the Execution Layer executes the contract chain. LLM-determined scope (e.g., "all customers") is propagated downstream to avoid redundant detection. Contract chains are dynamically built based on user messages.
 
 **Contract Selection Strategy (LLM-First):**
-1. **Keyword fast-path**: Minimal keywords for absolute certainties (e.g., "slide deck" → SALES_DOCS_PREP)
-2. **LLM-proposed contract chain**: If LLM interpretation proposed contracts during intent classification, use them
-3. **LLM fallback**: Only if no keyword match AND no LLM proposal, run separate contract selection LLM call
+1. **LLM-proposed contracts (primary)**: If LLM interpretation proposed contracts during intent classification, use them
+2. **Keyword fallback**: Only when LLM didn't propose contracts (legacy paths or absolute certainties)
+3. **LLM classification fallback**: If no LLM proposal and no keyword match, run separate contract selection LLM call
+
+**Intent-First Meeting Resolution (Feb 2026):**
+Meeting resolution (hasTemporalMeetingReference, resolveMeetingFromSlackMessage) only runs AFTER intent classification, and only when intent is SINGLE_MEETING or MULTI_MEETING. This saves ~1.5s for non-meeting requests (60% of traffic).
 
 **Contract Chains (Multi-Step Requests):**
 LLM can propose multiple contracts for multi-step requests (e.g., "research X then write feature description"):
