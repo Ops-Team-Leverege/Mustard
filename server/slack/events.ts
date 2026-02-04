@@ -619,30 +619,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         duration_ms: cpDuration,
       });
 
-      // EARLY PROGRESS MESSAGE: Send personalized progress right after intent classification
-      // ONLY for SINGLE_MEETING with resolved meeting - other intents use streaming which already provides feedback
-      // Streaming responses show "..." placeholder that updates in real-time, so no extra progress needed
-      // Sending async progress for streaming intents causes race conditions where progress appears AFTER the response
-      if (!testRun && decisionLayerResult.intent === 'SINGLE_MEETING' && resolvedMeeting) {
-        // Only for single-meeting path which doesn't use streaming
-        generatePersonalizedProgressMessage(text, 'single_meeting').then(async (personalizedProgress) => {
-          if (progressMessageCount === 0) {
-            try {
-              await postSlackMessage({
-                channel,
-                text: personalizedProgress,
-                thread_ts: threadTs,
-              });
-              progressMessageCount++;
-              console.log(`[Slack] Early personalized progress sent: "${personalizedProgress.substring(0, 50)}..."`);
-            } catch (err) {
-              console.error(`[Slack] Failed to send early progress:`, err);
-            }
-          }
-        }).catch(err => {
-          console.log(`[Slack] Personalized progress generation failed:`, err);
-        });
-      }
+      // NOTE: Progress messages for SINGLE_MEETING removed to avoid race conditions
+      // The semantic answer path is fast enough (~2-4s) that progress messages often post AFTER the response
+      // Streaming paths use "..." placeholder which updates in real-time, so they don't need extra progress
 
       // STEP 2: Handle CLARIFY intent - ask user for clarification
       if (decisionLayerResult.intent === "CLARIFY") {
