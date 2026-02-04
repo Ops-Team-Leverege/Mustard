@@ -91,4 +91,10 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 ### Integrations
 -   Replit Auth
 -   Jira Integration
--   Airtable (PitCrew Product Database)
+-   Airtable (PitCrew Product Database for product knowledge sync)
+
+### Airtable Webhook
+-   **Endpoint**: `POST https://mustard.leverege.com/api/airtable/webhook`
+-   **Authentication**: Header `X-Airtable-Secret`
+-   **Behavior**: Waits for sync, auto-discovers new tables, and auto-adds new columns.
+-   **Trigger**: Zapier automation on Airtable record changes.
