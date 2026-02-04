@@ -582,7 +582,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         intentClassification = "single_meeting_clarify";
         dataSource = "none";
         isClarificationRequest = true;
-        console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification`);
+        // Preserve company context from message for follow-up clarifications
+        resolvedCompanyId = companyMentioned?.companyId || threadContext?.companyId || null;
+        console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification, preserving company: ${resolvedCompanyId || 'none'}`);
       }
       // STEP 4: Route based on classified intent
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
