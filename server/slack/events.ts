@@ -778,15 +778,30 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Checking if response needs document generation (word count check)`);
           try {
             const { AnswerContract } = await import("../decisionLayer/answerContracts");
-            await sendResponseWithDocumentSupport({
+            const docResult = await sendResponseWithDocumentSupport({
               channel,
               threadTs,
               content: responseText,
               contract: openAssistantResultData?.answerContract ?? AnswerContract.GENERAL_RESPONSE,
               customerName: resolvedMeeting?.companyName,
               userQuery: text,
-              documentOnly: true, // Message already updated - only generate document
+              documentOnly: true, // Only generate document, no message
             });
+            
+            // If document was generated, update streaming message to remove duplicate content
+            if (docResult.type === "document" && docResult.success && botReply.ts) {
+              console.log(`[Slack] Document generated - updating streaming message to summary`);
+              try {
+                const { updateSlackMessage: updateMsg } = await import("./slackApi");
+                await updateMsg({
+                  channel,
+                  ts: botReply.ts,
+                  text: "_See the attached document for full details._",
+                });
+              } catch (updateErr) {
+                console.error(`[Slack] Failed to update streaming message after doc:`, updateErr);
+              }
+            }
             console.log(`[Slack] Document check complete`);
           } catch (docErr) {
             console.error(`[Slack] Failed to generate document:`, docErr);
