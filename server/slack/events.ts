@@ -407,6 +407,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let cpDuration = 0;
       let smDuration = 0;
       let oaDuration = 0;
+      
+      // Company mentioned in message - extracted early and preserved for clarification flows
+      let companyMentioned: { companyId: string; companyName: string } | null = null;
 
       // STEP 1: ALWAYS run Decision Layer first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Decision Layer for intent classification`);
@@ -427,6 +430,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
       decisionLayerResult = await runDecisionLayer(text, threadContextForCP);
       cpDuration = logger.endStage('decision_layer');
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
+      
+      // Extract company from message BEFORE meeting resolution - preserves context for CLARIFY flows
+      // Only extract if not already available from thread context
+      if (!threadContext?.companyId) {
+        companyMentioned = await extractCompanyFromMessage(text);
+        if (companyMentioned) {
+          console.log(`[Slack] Company extracted from message: ${companyMentioned.companyName}`);
+        }
+      }
       
       // STEP 1.5: INTENT-CONDITIONAL MEETING RESOLUTION
       // Only resolve meeting for SINGLE_MEETING or MULTI_MEETING intents (saves ~1.5s for 60% of requests)
@@ -449,10 +461,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
           };
           console.log(`[Slack] Meeting from thread context: ${resolvedMeeting.meetingId}`);
         } else {
-          // Attempt meeting resolution from message
+          // Attempt meeting resolution from message (company already extracted above)
           const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
           meetingDetection = { regexResult, llmCalled, llmResult, llmLatencyMs };
-          const companyMentioned = await extractCompanyFromMessage(text);
           
           if (hasMeetingRef || companyMentioned !== null) {
             console.log(`[Slack] Meeting resolution: hasMeetingRef=${hasMeetingRef}, company=${companyMentioned?.companyName || 'none'}`);
@@ -487,7 +498,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 slackThreadId: threadTs,
                 slackMessageTs: messageTs,
                 userId: userId || null,
-                companyId: null,
+                companyId: companyMentioned?.companyId || null,
                 meetingId: null,
                 questionText: text,
                 answerText: resolution.message,
@@ -499,7 +510,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                     answerShape: "none",
                     dataSource: "not_found",
                     llmPurposes: [],
-                    companySource: "none",
+                    companySource: companyMentioned ? "extracted" : "none",
                     meetingSource: "none",
                     ambiguity: { detected: true, clarificationAsked: true, type: null },
                     testRun,
@@ -560,7 +571,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         intentClassification = "clarify";
         dataSource = "none";
         isClarificationRequest = true;
-        console.log(`[Slack] Clarification requested: ${clarifyMessage}`);
+        // Preserve company context from message for follow-up clarifications
+        resolvedCompanyId = companyMentioned?.companyId || threadContext?.companyId || null;
+        console.log(`[Slack] Clarification requested: ${clarifyMessage}, preserving company: ${resolvedCompanyId || 'none'}`);
       }
       // STEP 3: Handle SINGLE_MEETING without resolved meeting - ask for clarification
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {

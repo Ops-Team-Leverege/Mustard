@@ -59,6 +59,7 @@ LLM can propose multiple contracts for multi-step requests (e.g., "research X th
 -   **Slack Module Organization**: `server/slack/` is organized into `handlers/`, `context/`, and root files for core event handling and API.
 -   **Standardized Error Handling**: `errorHandler.ts` provides centralized error handling with custom error classes, unified response format, ZodError support, and logging.
 -   **Centralized Prompts System**: All LLM prompts are organized in `server/config/prompts/` with typed builders for dynamic parameters.
+-   **Thread Context Company Preservation (Feb 2026)**: Company names extracted from messages (e.g., "Ivy Lane") are now preserved when CLARIFY intent is returned, preventing redundant "which customer?" clarification requests on follow-ups. The `companyMentioned` extraction happens BEFORE meeting resolution so it's available for all intent paths.
 
 ## External Dependencies
 
