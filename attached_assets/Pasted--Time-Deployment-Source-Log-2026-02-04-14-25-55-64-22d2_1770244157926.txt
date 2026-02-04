@@ -1,0 +1,193 @@
+
+Time
+Deployment
+Source
+Log
+2026-02-04 14:25:55.64
+22d23235
+System
+starting up user application
+2026-02-04 14:25:55.64
+22d23235
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-04 14:25:55.64
+22d23235
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-04 14:25:57.08
+22d23235
+User
+> NODE_ENV=production node dist/index.js
+2026-02-04 14:25:57.08
+22d23235
+User
+> rest-express@1.0.0 start
+2026-02-04 14:25:59.97
+22d23235
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-04 14:25:59.98
+22d23235
+User
+Slack routes registered at /api/slack/events
+2026-02-04 14:26:00.54
+22d23235
+User
+10:26:00 PM [express] serving on port 5000
+2026-02-04 14:26:44.46
+22d23235
+User
+[Slack] Received event request
+2026-02-04 14:26:44.46
+22d23235
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-04T22:26:44.464Z ==========
+2026-02-04 14:26:44.46
+22d23235
+User
+Event type: app_mention
+2026-02-04 14:26:44.46
+22d23235
+User
+[Slack] Event details: eventId=Ev0ACYSB00CV, clientMsgId=32382fb2-0661-4072-9048-ad1bef29f71c, messageTs=1770244002.932159, threadTs=1770229282.259239, channel=C0A80S3HJNL
+2026-02-04 14:26:44.46
+22d23235
+User
+Slack payload type: event_callback
+2026-02-04 14:26:44.46
+22d23235
+User
+[Slack] Processing app_mention
+2026-02-04 14:26:44.46
+22d23235
+User
+10:26:44 PM [express] POST /api/slack/events 200 in 9ms
+2026-02-04 14:26:47.15
+22d23235
+User
+[INFO] [c823b288] Slack event received {"correlationId":"c823b288","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":0,"text":"what actions items should we make sure to mention from last weeks call","isReply":true,"testRun":false}
+2026-02-04 14:26:47.15
+22d23235
+User
+Processing: "what actions items should we make sure to mention from last weeks call" in channel C0A80S3HJNL (isReply=true)
+2026-02-04 14:26:50.15
+22d23235
+User
+[ThreadResolver] ✅ CONTEXT CHECKPOINT 1 - Thread Resolution:
+2026-02-04 14:26:50.45
+22d23235
+User
+Meeting: 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 14:26:50.45
+22d23235
+User
+Thread: 1770229282.259239
+2026-02-04 14:26:50.45
+22d23235
+User
+Company: cc803926-327f-453a-baa6-8933b0197dce (no name)
+2026-02-04 14:26:50.55
+22d23235
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-04 14:26:50.55
+22d23235
+User
+Proposed Interpretation: none
+2026-02-04 14:26:50.55
+22d23235
+User
+Awaiting Clarification: none
+2026-02-04 14:26:50.55
+22d23235
+User
+Last Response Type: semantic
+2026-02-04 14:26:51.15
+22d23235
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-04 14:26:51.15
+22d23235
+User
+Last 3 messages:
+2026-02-04 14:26:51.15
+22d23235
+User
+3. Bot: ":mag_right: Got it, <@U082TV42FM0> — looking into it..."
+2026-02-04 14:26:51.15
+22d23235
+User
+Messages: 7
+2026-02-04 14:26:51.15
+22d23235
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-04 14:26:51.15
+22d23235
+User
+Ya one of the reasons I want to really lean on the UI/reports for insights, is as..."
+2026-02-04 14:26:51.15
+22d23235
+User
+1. User: "*calum* [6:59 AM]
+2026-02-04 14:26:51.15
+22d23235
+User
+Thread: 1770229282.259239
+2026-02-04 14:26:51.15
+22d23235
+User
+Bot: ":mag_right: Got it, <@U082TV42FM0> — looking into it..."
+2026-02-04 14:26:51.15
+22d23235
+User
+User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks..."
+2026-02-04 14:26:51.15
+22d23235
+User
+Thread Messages Preview:
+2026-02-04 14:26:51.15
+22d23235
+User
+Question: "what actions items should we make sure to mention from last weeks call"
+2026-02-04 14:26:51.15
+22d23235
+User
+2. User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks call"
+2026-02-04 14:26:51.15
+22d23235
+User
+Thread Context: 7 messages
+2026-02-04 14:26:52.35
+22d23235
+User
+[IntentClassifier] No keyword match, using LLM classification with semantic context extraction
+2026-02-04 14:26:52.35
+22d23235
+User
+[Intent] Loaded 36 companies from database
+2026-02-04 14:26:52.65
+22d23235
+User
+[IntentClassifier] LLM classification with 6 messages of thread context
+2026-02-04 14:26:57.35
+22d23235
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 14:26:57.35
+22d23235
+User
+[AnswerContract] Selected: NEXT_STEPS (llm_proposed) - chain: [NEXT_STEPS]
+2026-02-04 14:26:57.35
+22d23235
+User
+[IntentClassifier] LLM: intent=SINGLE_MEETING, company=ACE, contracts=NEXT_STEPS
+2026-02-04 14:26:57.35
+22d23235
+User
+[DecisionLayer] Intent: SINGLE_MEETING (llm)
+2026-02-04 14:26:57.35
+22d23235
+User
+[DecisionLayer] Contract: NEXT_STEPS (llm_proposed)

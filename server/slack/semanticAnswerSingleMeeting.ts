@@ -87,7 +87,7 @@ export function detectAnswerShape(question: string): AnswerShape {
     /\bnext steps\b/,
     /\battendees?\b/,
     /\bwho (?:all |was |were )?(?:there|attended|present)\b/,
-    /\baction items?\b/,
+    /\bactions?\s*items?\b/,  // Handles "action items", "actions items" (typo), "action item"
     /\bwhat (?:are|were) the\b.*\b(?:steps|items|actions|tasks|issues|concerns|questions)\b/,
     /\blist\b/,
     /\bopen questions\b/,
@@ -97,6 +97,10 @@ export function detectAnswerShape(question: string): AnswerShape {
     /\bwhat concerns\b/,
     /\bwhat questions\b/,
     /\bwhat problems\b/,
+    // Judgment/prioritization questions about lists
+    /\bshould\s+(?:we|i|you)\s+(?:mention|bring|discuss|highlight|note|include|cover)\b/,
+    /\bmake\s+sure\s+(?:to\s+)?(?:mention|bring|discuss|note|include|cover)\b/,
+    /\bwhat\s+(?:to\s+)?(?:mention|discuss|bring|note)\b/,
   ];
   if (listPatterns.some(p => p.test(q))) {
     return "list";
@@ -204,19 +208,29 @@ Example bad response:
       
     case "list":
       shapeInstructions = `
-ANSWER FORMAT: List
-The user asked for a list of items (next steps, attendees, etc).
+ANSWER FORMAT: List (Next Steps / Action Items)
+The user asked for a list of action items, next steps, or things to mention.
 
 RESPOND WITH:
-- A structured bullet list
-- Do not paraphrase unnecessarily
-- Do not add interpretation
-- Only include items explicitly present in the data
+- A structured bullet list with rich formatting
+- Each item on its own line starting with •
+- Include WHO is responsible (if known), and any DEADLINE (if mentioned)
+- Include a brief citation in _italics_ showing the speaker's actual words
+- Filter/prioritize based on what the user asked (e.g., "should we mention" = most important items)
+
+FORMAT EACH ITEM AS:
+• [Action description] — [Owner] _(deadline if any)_
+  _"[Brief quote from transcript]"_
+  — [Speaker name]
 
 Example good response:
-"*Next Steps:*
-• Send camera specs to Ron — Ryan
-• Schedule follow-up call — Spencer"`;
+• Remove specific bays from report calculations — Eric
+  _"Eric's asking if we can remove the bays from those calculations."_
+  — Corey Chang
+
+• Set up text messaging alerts for the manager — Rob _(End of day)_
+  _"We're going to set up the text messaging so that way the manager gets alerts today."_
+  — Corey Chang`;
       break;
       
     case "summary":
