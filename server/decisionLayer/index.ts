@@ -126,17 +126,36 @@ interface SpecificityCheckResult {
 /**
  * Use LLM to check if the question has sufficient specificity for aggregate queries.
  * This replaces brittle regex patterns with semantic understanding.
+ * 
+ * When threadContext is provided, we include the full conversation history
+ * so the LLM can see scope information from earlier messages (e.g., company names).
  */
-async function checkAggregateSpecificity(question: string): Promise<SpecificityCheckResult> {
+async function checkAggregateSpecificity(question: string, threadContext?: ThreadContext): Promise<SpecificityCheckResult> {
   try {
     const openai = new OpenAI();
     
+    // Build messages array with thread history for context
+    const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
+      { role: "system", content: AGGREGATE_SPECIFICITY_CHECK_PROMPT },
+    ];
+    
+    // Include thread history so LLM can see company/scope from earlier messages
+    if (threadContext?.messages && threadContext.messages.length > 1) {
+      const historyMessages = threadContext.messages.slice(0, -1); // Exclude current message
+      for (const msg of historyMessages) {
+        messages.push({
+          role: msg.isBot ? "assistant" : "user",
+          content: msg.text,
+        });
+      }
+    }
+    
+    // Add current question
+    messages.push({ role: "user", content: question });
+    
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.AGGREGATE_SPECIFICITY_CHECK,
-      messages: [
-        { role: "system", content: AGGREGATE_SPECIFICITY_CHECK_PROMPT },
-        { role: "user", content: question },
-      ],
+      messages,
       temperature: 0,
       max_tokens: 200,
       response_format: { type: "json_object" },
@@ -215,7 +234,7 @@ export async function runDecisionLayer(
   let scopeInfo: DecisionLayerResult["scope"];
   
   if (intentResult.intent === Intent.MULTI_MEETING) {
-    const specificity = await checkAggregateSpecificity(question);
+    const specificity = await checkAggregateSpecificity(question, threadContext);
     
     scopeInfo = {
       allCustomers: specificity.hasCustomerScope,
