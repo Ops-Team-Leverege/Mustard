@@ -30,6 +30,7 @@ interface DocumentResponseParams {
   customerName?: string;
   title?: string;
   userQuery?: string;
+  documentOnly?: boolean; // If true, only generate document - don't post message as fallback
 }
 
 interface DocumentResponseResult {
@@ -64,7 +65,7 @@ function isErrorOrClarificationContent(content: string): boolean {
 export async function sendResponseWithDocumentSupport(
   params: DocumentResponseParams
 ): Promise<DocumentResponseResult> {
-  const { channel, threadTs, content, contract, customerName, title, userQuery } = params;
+  const { channel, threadTs, content, contract, customerName, title, userQuery, documentOnly } = params;
   
   // Primary check: Don't generate documents for CLARIFY/REFUSE contracts
   const isNonDocContract = NON_DOCUMENT_CONTRACTS.includes(contract);
@@ -72,6 +73,11 @@ export async function sendResponseWithDocumentSupport(
   const isErrorContent = isErrorOrClarificationContent(content);
   
   if (isNonDocContract || isErrorContent) {
+    // In document-only mode, skip message posting entirely
+    if (documentOnly) {
+      console.log(`[DocumentResponse] Document-only mode, skipping for non-doc contract or error content`);
+      return { type: "message", success: true };
+    }
     console.log(`[DocumentResponse] Skipping document: contract=${contract} (nonDoc=${isNonDocContract}), errorContent=${isErrorContent}`);
     try {
       await postSlackMessage({
@@ -96,6 +102,11 @@ export async function sendResponseWithDocumentSupport(
   console.log(`[DocumentResponse] Contract: ${contract}, Words: ${wordCount}, Generate doc: ${shouldGenerate}`);
   
   if (!shouldGenerate) {
+    // In document-only mode, skip message posting entirely
+    if (documentOnly) {
+      console.log(`[DocumentResponse] Document-only mode, skipping message (word count ${wordCount} below threshold)`);
+      return { type: "message", success: true };
+    }
     try {
       await postSlackMessage({
         channel,

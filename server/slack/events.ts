@@ -784,6 +784,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               contract: openAssistantResultData.answerContract ?? AnswerContract.SALES_DOCS_PREP,
               customerName: resolvedMeeting?.companyName,
               userQuery: text,
+              documentOnly: true, // Message already updated - only generate document
             });
             console.log(`[Slack] Document generated and uploaded`);
           } catch (docErr) {
