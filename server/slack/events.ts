@@ -462,10 +462,20 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // Check if LLM extracted a company from conversation context
         if (decisionLayerResult.extractedCompany) {
           // Look up company ID from extracted name
-          const companyRows = await storage.rawQuery(
+          // Try exact match first, then partial match (for "ACE" → "ACE Hardware")
+          let companyRows = await storage.rawQuery(
             `SELECT id, name FROM companies WHERE LOWER(name) = LOWER($1)`,
             [decisionLayerResult.extractedCompany]
           );
+
+          // If no exact match, try partial match (company name starts with extracted name)
+          if (!companyRows || companyRows.length === 0) {
+            companyRows = await storage.rawQuery(
+              `SELECT id, name FROM companies WHERE LOWER(name) LIKE LOWER($1) || '%'`,
+              [decisionLayerResult.extractedCompany]
+            );
+          }
+
           if (companyRows && companyRows.length > 0) {
             companyMentioned = {
               companyId: companyRows[0].id as string,
@@ -530,7 +540,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             console.log(`[Slack] Meeting resolution: hasMeetingRef=${hasMeetingRef}, company=${companyMentioned?.companyName || 'none'}`);
 
             logger.startStage('meeting_resolution');
-            const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { 
+            const resolution = await resolveMeetingFromSlackMessage(text, threadContext, {
               llmMeetingRefDetected: llmResult === true,
               extractedCompanyContext: companyMentioned || undefined
             });
