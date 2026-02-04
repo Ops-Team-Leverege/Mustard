@@ -458,6 +458,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Use LLM-extracted company from Decision Layer (semantic understanding)
       // This replaces regex-based extraction with conversation-aware context extraction
+      console.log(`[Slack] Thread context check: companyId=${threadContext?.companyId || 'none'}, extractedCompany=${decisionLayerResult.extractedCompany || 'none'}`);
       if (!threadContext?.companyId) {
         // Check if LLM extracted a company from conversation context
         if (decisionLayerResult.extractedCompany) {

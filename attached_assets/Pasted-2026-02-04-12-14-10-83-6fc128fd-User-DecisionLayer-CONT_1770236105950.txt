@@ -1,0 +1,176 @@
+2026-02-04 12:14:10.83
+6fc128fd
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-04 12:14:10.83
+6fc128fd
+User
+Thread Context: 7 messages
+2026-02-04 12:14:10.83
+6fc128fd
+User
+Thread Messages Preview:
+2026-02-04 12:14:10.83
+6fc128fd
+User
+1. User: "*calum* [6:59 AM]
+2026-02-04 12:14:10.83
+6fc128fd
+User
+Question: "what actions items should we make sure to mention from last weeks call"
+2026-02-04 12:14:10.83
+6fc128fd
+User
+3. Bot: ":white_check_mark: Got it, <@U082TV42FM0> — checking now..."
+2026-02-04 12:14:10.83
+6fc128fd
+User
+Ya one of the reasons I want to really lean on the UI/reports for insights, is as..."
+2026-02-04 12:14:11.23
+6fc128fd
+User
+Bot: ":white_check_mark: Got it, <@U082TV42FM0> — checking now..."
+2026-02-04 12:14:11.23
+6fc128fd
+User
+User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks..."
+2026-02-04 12:14:11.83
+6fc128fd
+User
+[IntentClassifier] No keyword match, using LLM classification with semantic context extraction
+2026-02-04 12:14:11.83
+6fc128fd
+User
+[Intent] Loaded 36 companies from database
+2026-02-04 12:14:11.83
+6fc128fd
+User
+[IntentClassifier] LLM classification with 6 messages of thread context
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Context: User is looking for action items from the previous week's call related to ACE weekly slides and discussions.
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Ambiguous: no
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Clarification: none
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Topics: action items, last week's call, ACE
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Intent: SINGLE_MEETING
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Companies: none
+2026-02-04 12:14:20.13
+6fc128fd
+User
+[DecisionLayer] Intent: SINGLE_MEETING (llm)
+2026-02-04 12:14:20.13
+6fc128fd
+User
+[IntentClassifier] ✅ SEMANTIC CONTEXT EXTRACTED:
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Should Proceed: yes
+2026-02-04 12:14:20.13
+6fc128fd
+User
+Company: ACE
+2026-02-04 12:14:20.13
+6fc128fd
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[Slack] Intent requires meeting - running meeting resolution
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[MeetingResolver] Meeting reference detected via REGEX: "what actions items should we make sure t..."
+2026-02-04 12:14:20.23
+6fc128fd
+User
+- Conversation Context: User is looking for action items from the previous week's call related to ACE weekly slides and discussions.
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Semantic Context:
+2026-02-04 12:14:20.23
+6fc128fd
+User
+- Extracted Companies: none
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[Slack] Meeting resolution: hasMeetingRef=true, company=none
+2026-02-04 12:14:20.23
+6fc128fd
+User
+- Key Topics: action items, last week's call, ACE
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Intent: SINGLE_MEETING (llm)
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[AnswerContract] Selected: EXTRACTIVE_FACT (default)
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[DecisionLayer] Contract: EXTRACTIVE_FACT (default)
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[MeetingResolver] Resolving meeting from message: "what actions items should we make sure to mention ..." (llmDetected=false)
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[Slack] Control plane: intent=SINGLE_MEETING, contract=EXTRACTIVE_FACT, method=llm, layers={"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Scope: undefined
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Final Intent: SINGLE_MEETING
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-04 12:14:20.23
+6fc128fd
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Contract: EXTRACTIVE_FACT
+2026-02-04 12:14:20.23
+6fc128fd
+User
+- Extracted Company: ACE
+2026-02-04 12:14:20.23
+6fc128fd
+User
+Scope Info: none
+2026-02-04 12:14:20.23
+6fc128fd
+User
+- Should Proceed: yes
