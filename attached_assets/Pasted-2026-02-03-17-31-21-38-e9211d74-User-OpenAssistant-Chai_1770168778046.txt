@@ -1,0 +1,184 @@
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] Chain-based style matching: true, Product knowledge enrichment: false, Style matching needed: true
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] Evidence source: general_assistance (from Decision Layer: EXTERNAL_RESEARCH -> EXTERNAL_RESEARCH)
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] === EXTERNAL RESEARCH START ===
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] Generating progress message...
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] Routing to external research path (CP contract: EXTERNAL_RESEARCH) (chain: [EXTERNAL_RESEARCH → SALES_DOCS_PREP])
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] External research for: to understand more about oil change shops
+2026-02-03 17:31:21.38
+e9211d74
+User
+[OpenAssistant] Using full Decision Layer result: intent=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, method=llm
+2026-02-03 17:31:23.18
+e9211d74
+User
+[OpenAssistant] Progress message ready (1900ms)
+2026-02-03 17:31:23.98
+e9211d74
+User
+[OpenAssistant] Updated streaming placeholder with progress message
+2026-02-03 17:31:23.98
+e9211d74
+User
+[OpenAssistant] Calling performExternalResearch...
+2026-02-03 17:31:24.48
+e9211d74
+User
+[ExternalResearch] Gemini client initialized successfully
+2026-02-03 17:31:24.48
+e9211d74
+User
+[ExternalResearch] Research request: query="we have a new feature to add to the roadmap, that will detect when the net underneath the bays (primarily for oil change shops) isn't there and alert, since this is a safety hazard. The feature is called "Net Safety Alerts". Do research to understand more about oil change shops and usage of nets and why they're important, then write the description for the feature making it similar to the descriptions for other features", company="to understand more about oil change shops", topic="null"
+2026-02-03 17:31:24.48
+e9211d74
+User
+[ExternalResearch] Calling Gemini for web research...
+2026-02-03 17:31:55.88
+e9211d74
+User
+[ExternalResearch] Gemini response received (31400ms)
+2026-02-03 17:31:56.38
+e9211d74
+User
+[OpenAssistant] Research complete (34999ms), answer length: 13323
+2026-02-03 17:31:56.38
+e9211d74
+User
+[OpenAssistant] Chaining product knowledge for style matching...
+2026-02-03 17:31:56.38
+e9211d74
+User
+[OpenAssistant] === STYLE MATCHING START ===
+2026-02-03 17:31:56.38
+e9211d74
+User
+[OpenAssistant] LLM requested style matching via contract chain - prioritizing over product knowledge enrichment
+2026-02-03 17:31:57.58
+e9211d74
+User
+[OpenAssistant] Product knowledge from cache (1301ms)
+2026-02-03 17:31:57.58
+e9211d74
+User
+[ProductData] Using snapshot: 80 records, synced 2026-02-03T09:00:26.953Z
+2026-02-03 17:31:57.58
+e9211d74
+User
+[OpenAssistant] Style matching - feature examples length: 2000 chars
+2026-02-03 17:31:57.98
+e9211d74
+User
+[OpenAssistant] Calling OpenAI for style-matched writing (fromResearchChain: true)...
+2026-02-03 17:32:03.18
+e9211d74
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-03 17:32:03.18
+e9211d74
+User
+[OpenAssistant] Style matching OpenAI call complete (6900ms)
+2026-02-03 17:32:03.18
+e9211d74
+User
+[OpenAssistant] Style matching produced valid output (672 chars)
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] hasContract: true
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] === DOCUMENT DECISION ===
+2026-02-03 17:32:03.48
+e9211d74
+User
+[INFO] [658320f6] Open Assistant response generated {"correlationId":"658320f6","channel":"C0A80S3HJNL","threadTs":"1770168664.898179","userId":"U082TV42FM0","duration":53200,"intent":"external_research","contract":"EXTERNAL_RESEARCH","delegated":false,"duration_ms":41901}
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] usedStreaming: true
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] willGenerateDoc: true
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] === END DOCUMENT DECISION ===
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] hasOpenAssistantData: true
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] Pipeline completed in 51100ms, progressMessages=0
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] testRun: false
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] Open Assistant response: intent=external_research, controlPlane=EXTERNAL_RESEARCH, contract=EXTERNAL_RESEARCH, delegated=false
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] usedSingleMeetingMode: false
+2026-02-03 17:32:03.48
+e9211d74
+User
+[Slack] contract: EXTERNAL_RESEARCH
+2026-02-03 17:32:04.58
+e9211d74
+User
+[Slack] Updated streaming placeholder with final content (1527 chars)
+2026-02-03 17:32:04.58
+e9211d74
+User
+[Slack] Handler requested doc generation - generating .docx
+2026-02-03 17:32:05.28
+e9211d74
+User
+[DocumentGenerator] Contract not in list, checking word count: 217 > 300 = false
+2026-02-03 17:32:05.28
+e9211d74
+User
+[Slack] Document generated and uploaded
+2026-02-03 17:32:05.28
+e9211d74
+User
+[DocumentResponse] Contract: EXTERNAL_RESEARCH, Words: 217, Generate doc: false
+2026-02-03 17:32:05.28
+e9211d74
+User
+[DocumentGenerator] Checking contract="EXTERNAL_RESEARCH" (type: string) against list=["VALUE_PROPOSITION","MEETING_SUMMARY","COMPARISON","DRAFT_EMAIL","PATTERN_ANALYSIS","PRODUCT_EXPLANATION","SALES_DOCS_PREP"], wordCount=217, threshold=300
+2026-02-03 17:32:05.28
+e9211d74
+User
+[DocumentGenerator] Contract "EXTERNAL_RESEARCH" in list: false, exact match test: false
+2026-02-03 17:32:05.28
+e9211d74
+User
+[DocumentResponse] Document-only mode, skipping message (word count 217 below threshold)
+2026-02-03 17:32:05.48
+e9211d74
+User
+[INFO] [658320f6] Request completed successfully {"correlationId":"658320f6","channel":"C0A80S3HJNL","threadTs":"1770168664.898179","userId":"U082TV42FM0","duration":55501,"intent":"EXTERNAL_RESEARCH","contract":"EXTERNAL_RESEARCH","responseLength":1527,"totalTimeMs":51100,"stages":{"meeting_resolution":0,"decision_layer":7392,"handler":41901}}

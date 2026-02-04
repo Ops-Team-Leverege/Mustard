@@ -5,10 +5,9 @@
     "COMPARISON",
     "DRAFT_EMAIL",
     "PATTERN_ANALYSIS",
-    "PRODUCT_EXPLANATION",
-    "SALES_DOCS_PREP"
+    "PRODUCT_EXPLANATION"
   ],
-  "wordThreshold": 300,
+  "wordThreshold": 200,
   "fileNamePattern": "{customer}_{type}_{date}.docx",
   "messages": {
     "VALUE_PROPOSITION": "Here's your value proposition doc — ready to edit and make it your own.",

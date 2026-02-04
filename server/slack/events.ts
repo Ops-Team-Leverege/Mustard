@@ -407,6 +407,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let cpDuration = 0;
       let smDuration = 0;
       let oaDuration = 0;
+      
+      // Company mentioned in message - extracted early and preserved for clarification flows
+      let companyMentioned: { companyId: string; companyName: string } | null = null;
 
       // STEP 1: ALWAYS run Decision Layer first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Decision Layer for intent classification`);
@@ -427,6 +430,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
       decisionLayerResult = await runDecisionLayer(text, threadContextForCP);
       cpDuration = logger.endStage('decision_layer');
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
+      
+      // Extract company from message BEFORE meeting resolution - preserves context for CLARIFY flows
+      // Only extract if not already available from thread context
+      if (!threadContext?.companyId) {
+        companyMentioned = await extractCompanyFromMessage(text);
+        if (companyMentioned) {
+          console.log(`[Slack] Company extracted from message: ${companyMentioned.companyName}`);
+        }
+      }
       
       // STEP 1.5: INTENT-CONDITIONAL MEETING RESOLUTION
       // Only resolve meeting for SINGLE_MEETING or MULTI_MEETING intents (saves ~1.5s for 60% of requests)
@@ -449,10 +461,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
           };
           console.log(`[Slack] Meeting from thread context: ${resolvedMeeting.meetingId}`);
         } else {
-          // Attempt meeting resolution from message
+          // Attempt meeting resolution from message (company already extracted above)
           const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
           meetingDetection = { regexResult, llmCalled, llmResult, llmLatencyMs };
-          const companyMentioned = await extractCompanyFromMessage(text);
           
           if (hasMeetingRef || companyMentioned !== null) {
             console.log(`[Slack] Meeting resolution: hasMeetingRef=${hasMeetingRef}, company=${companyMentioned?.companyName || 'none'}`);
@@ -487,7 +498,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 slackThreadId: threadTs,
                 slackMessageTs: messageTs,
                 userId: userId || null,
-                companyId: null,
+                companyId: companyMentioned?.companyId || null,
                 meetingId: null,
                 questionText: text,
                 answerText: resolution.message,
@@ -499,7 +510,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                     answerShape: "none",
                     dataSource: "not_found",
                     llmPurposes: [],
-                    companySource: "none",
+                    companySource: companyMentioned ? "extracted" : "none",
                     meetingSource: "none",
                     ambiguity: { detected: true, clarificationAsked: true, type: null },
                     testRun,
@@ -560,7 +571,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         intentClassification = "clarify";
         dataSource = "none";
         isClarificationRequest = true;
-        console.log(`[Slack] Clarification requested: ${clarifyMessage}`);
+        // Preserve company context from message for follow-up clarifications
+        resolvedCompanyId = companyMentioned?.companyId || threadContext?.companyId || null;
+        console.log(`[Slack] Clarification requested: ${clarifyMessage}, preserving company: ${resolvedCompanyId || 'none'}`);
       }
       // STEP 3: Handle SINGLE_MEETING without resolved meeting - ask for clarification
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {
@@ -569,7 +582,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         intentClassification = "single_meeting_clarify";
         dataSource = "none";
         isClarificationRequest = true;
-        console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification`);
+        // Preserve company context from message for follow-up clarifications
+        resolvedCompanyId = companyMentioned?.companyId || threadContext?.companyId || null;
+        console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification, preserving company: ${resolvedCompanyId || 'none'}`);
       }
       // STEP 4: Route based on classified intent
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
@@ -772,26 +787,37 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] No content to update streaming message: ${botReply.ts}`);
         }
         
-        // Generate document AFTER streaming if:
-        // 1. Handler explicitly requested it (SALES_DOCS_PREP in chain), OR
-        // 2. Contract is EXTERNAL_RESEARCH and response is long enough (>300 words checked in sendResponseWithDocumentSupport)
-        const { AnswerContract } = await import("../decisionLayer/answerContracts");
-        const isExternalResearch = openAssistantResultData?.answerContract === AnswerContract.EXTERNAL_RESEARCH;
-        const shouldAttemptDocGeneration = openAssistantResultData?.shouldGenerateDoc || isExternalResearch;
-        
-        if (shouldAttemptDocGeneration && responseText && responseText.length > 200) {
-          console.log(`[Slack] Attempting doc generation - explicit: ${openAssistantResultData?.shouldGenerateDoc}, research: ${isExternalResearch}`);
+        // Generate document AFTER streaming for ANY response above word threshold
+        // Word count check happens in sendResponseWithDocumentSupport
+        if (responseText && responseText.length > 200) {
+          console.log(`[Slack] Checking if response needs document generation (word count check)`);
           try {
-            await sendResponseWithDocumentSupport({
+            const { AnswerContract } = await import("../decisionLayer/answerContracts");
+            const docResult = await sendResponseWithDocumentSupport({
               channel,
               threadTs,
               content: responseText,
-              contract: openAssistantResultData?.answerContract ?? AnswerContract.SALES_DOCS_PREP,
+              contract: openAssistantResultData?.answerContract ?? AnswerContract.GENERAL_RESPONSE,
               customerName: resolvedMeeting?.companyName,
               userQuery: text,
-              documentOnly: true, // Message already updated - only generate document
+              documentOnly: true, // Only generate document, no message
             });
-            console.log(`[Slack] Document generated and uploaded`);
+            
+            // If document was generated, update streaming message to remove duplicate content
+            if (docResult.type === "document" && docResult.success && botReply.ts) {
+              console.log(`[Slack] Document generated - updating streaming message to summary`);
+              try {
+                const { updateSlackMessage: updateMsg } = await import("./slackApi");
+                await updateMsg({
+                  channel,
+                  ts: botReply.ts,
+                  text: "_See the attached document for full details._",
+                });
+              } catch (updateErr) {
+                console.error(`[Slack] Failed to update streaming message after doc:`, updateErr);
+              }
+            }
+            console.log(`[Slack] Document check complete`);
           } catch (docErr) {
             console.error(`[Slack] Failed to generate document:`, docErr);
           }
