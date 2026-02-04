@@ -75,11 +75,11 @@ async function isDuplicateEvent(eventId: string, clientMsgId: string | undefined
 
 export async function slackEventsHandler(req: Request, res: Response) {
   console.log(`[Slack] ========== EVENT RECEIVED AT ${new Date().toISOString()} ==========`);
-  
+
   // Check for Slack retry headers
   const retryNum = req.headers['x-slack-retry-num'];
   const retryReason = req.headers['x-slack-retry-reason'];
-  
+
   if (retryNum) {
     console.log(`[Slack] Retry #${retryNum} received (reason: ${retryReason})`);
     // If this is a retry due to http_timeout, we already processed it
@@ -89,7 +89,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       return res.status(200).send();
     }
   }
-  
+
   console.log("[Slack] Received event request");
   try {
     // Handle body in multiple formats:
@@ -149,27 +149,27 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const channelType = event?.channel_type;
     const isDirectMessage = eventType === "message" && channelType === "im";
     const isAppMention = eventType === "app_mention";
-    
+
     // Ignore bot's own messages to prevent loops
     const botId = event?.bot_id;
     if (botId) {
       console.log("[Slack] Ignoring bot message (preventing loop)");
       return;
     }
-    
+
     // Ignore message subtypes (edits, deletes, etc.) - only process original messages
     const subtype = event?.subtype;
     if (subtype) {
       console.log(`[Slack] Ignoring message subtype: ${subtype}`);
       return;
     }
-    
+
     // Only process app_mentions, DMs, or test runs
     if (!isAppMention && !isDirectMessage && !testRun) {
       console.log(`[Slack] Ignoring event: type=${eventType}, channel_type=${channelType}`);
       return;
     }
-    
+
     if (testRun) {
       console.log("[Slack] Test run mode - bypassing event type check");
     } else if (isDirectMessage) {
@@ -183,20 +183,20 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const messageTs = String(event.ts); // This specific message's timestamp
     // For thread replies, use thread_ts (parent message); otherwise use ts (this message starts a thread)
     const threadTs = String(event.thread_ts || event.ts);
-    
+
     // 6. Dedupe events using robust deduplication
     // Uses event_id, client_msg_id, AND message timestamp for reliable duplicate detection
     const eventId = String(payload.event_id || "");
     const clientMsgId = event?.client_msg_id as string | undefined;
-    
+
     // Log event details for debugging duplicate issues
     console.log(`[Slack] Event details: eventId=${eventId}, clientMsgId=${clientMsgId}, messageTs=${messageTs}, threadTs=${threadTs}, channel=${channel}`);
-    
+
     if (await isDuplicateEvent(eventId, clientMsgId)) {
       console.log(`[Slack] Duplicate event detected - skipping (eventId=${eventId}, clientMsgId=${clientMsgId})`);
       return;
     }
-    
+
     // Also dedupe by message timestamp to catch Slack sending multiple events for same message
     if (await isDuplicateEvent(`ts:${messageTs}`, undefined)) {
       console.log(`[Slack] Duplicate message timestamp detected - skipping (ts=${messageTs})`);
@@ -211,7 +211,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     // Initialize structured logger for this request
     const logger = new RequestLogger(channel, threadTs, userId);
-    logger.info('Slack event received', { 
+    logger.info('Slack event received', {
       text: text.substring(0, 100),
       isReply,
       testRun
@@ -241,7 +241,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     let progressMessageCount = 0;
     const MAX_PROGRESS_MESSAGES = 4;
     let progressInterval: ReturnType<typeof setInterval> | null = null;
-    
+
     if (!testRun) {
       progressInterval = setInterval(async () => {
         if (progressMessageCount >= MAX_PROGRESS_MESSAGES) {
@@ -261,7 +261,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         }
       }, getProgressDelayMs());
     }
-    
+
     // Helper to clear progress interval
     const clearProgressTimer = () => {
       if (progressInterval) {
@@ -309,7 +309,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const storedProposedInterpretation = threadResolution.storedProposedInterpretation;
     const originalQuestion = threadResolution.originalQuestion;
     const lastResponseType = threadResolution.lastResponseType;
-    
+
     // 8.5 CLARIFICATION RESPONSE HANDLING (fast path)
     // Extracted to handlers/clarificationHandler.ts
     const clarificationCtx = {
@@ -325,13 +325,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       storedProposedInterpretation,
       originalQuestion,
     };
-    
+
     const nextStepsResult = await handleNextStepsOrSummaryResponse(clarificationCtx);
     if (nextStepsResult.handled) {
       clearProgressTimer();
       return; // Done - fast path completed
     }
-    
+
     // 8.6 PROPOSED INTERPRETATION FOLLOW-UP (for "yes", "1", etc. responses)
     // Extracted to handlers/clarificationHandler.ts
     const confirmationResult = await handleProposedInterpretationConfirmation(clarificationCtx);
@@ -339,7 +339,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       clearProgressTimer();
       return; // Done - clarification follow-up completed
     }
-    
+
     // 8.7 "ANSWER THOSE QUESTIONS" FOLLOW-UP HANDLING
     // Extracted to handlers/answerQuestionsHandler.ts
     const answerQuestionsResult = await handleAnswerQuestions({
@@ -396,25 +396,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Conversational behavior tracking
       let isClarificationRequest: boolean | undefined;
       let isBinaryQuestion: boolean | undefined;
-      
+
       // Decision Layer and Open Assistant results (for metadata logging)
       let decisionLayerResult: DecisionLayerResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
       let usedSingleMeetingMode = false;
       let streamingContext: SlackStreamingContext | undefined;
-      
+
       // Stage timing tracking
       let cpDuration = 0;
       let smDuration = 0;
       let oaDuration = 0;
-      
+
       // Company mentioned in message - extracted early and preserved for clarification flows
       let companyMentioned: { companyId: string; companyName: string } | null = null;
 
       // STEP 1: ALWAYS run Decision Layer first to classify intent from full message
       console.log(`[Slack] LLM-first architecture - running Decision Layer for intent classification`);
       logger.startStage('decision_layer');
-      
+
       // Fetch thread history for context-aware intent classification
       let threadContextForCP: { messages: Array<{ text: string; isBot: boolean }> } | undefined;
       if (threadTs) {
@@ -426,11 +426,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Fetched ${threadHistory.length} messages from thread for context`);
         }
       }
-      
+
       decisionLayerResult = await runDecisionLayer(text, threadContextForCP);
       cpDuration = logger.endStage('decision_layer');
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
-      
+
       // Extract company from message BEFORE meeting resolution - preserves context for CLARIFY flows
       // Only extract if not already available from thread context
       if (!threadContext?.companyId) {
@@ -439,14 +439,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Company extracted from message: ${companyMentioned.companyName}`);
         }
       }
-      
+
       // STEP 1.5: INTENT-CONDITIONAL MEETING RESOLUTION
       // Only resolve meeting for SINGLE_MEETING or MULTI_MEETING intents (saves ~1.5s for 60% of requests)
       const needsMeetingResolution = decisionLayerResult.intent === 'SINGLE_MEETING' || decisionLayerResult.intent === 'MULTI_MEETING';
-      
+
       if (needsMeetingResolution) {
         console.log(`[Slack] Intent requires meeting - running meeting resolution`);
-        
+
         // Check if thread already has meeting context (highest priority)
         if (threadContext?.meetingId && threadContext?.companyId) {
           const [companyRows, transcriptRows] = await Promise.all([
@@ -464,14 +464,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
           // Attempt meeting resolution from message (company already extracted above)
           const { hasMeetingRef, regexResult, llmCalled, llmResult, llmLatencyMs } = await hasTemporalMeetingReference(text);
           meetingDetection = { regexResult, llmCalled, llmResult, llmLatencyMs };
-          
+
           if (hasMeetingRef || companyMentioned !== null) {
             console.log(`[Slack] Meeting resolution: hasMeetingRef=${hasMeetingRef}, company=${companyMentioned?.companyName || 'none'}`);
-            
+
             logger.startStage('meeting_resolution');
             const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
             mrDuration = logger.endStage('meeting_resolution');
-            
+
             if (resolution.resolved) {
               resolvedMeeting = {
                 meetingId: resolution.meetingId,
@@ -484,7 +484,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             } else if (resolution.needsClarification) {
               // Clarification needed - respond and stop processing
               console.log(`[Slack] Meeting clarification needed: ${resolution.message}`);
-              
+
               if (!testRun) {
                 await postSlackMessage({
                   channel,
@@ -492,7 +492,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                   thread_ts: threadTs,
                 });
               }
-              
+
               logInteraction({
                 slackChannelId: channel,
                 slackThreadId: threadTs,
@@ -519,7 +519,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 ),
                 testRun,
               });
-              
+
               clearProgressTimer();
               return; // Stop - clarification required
             }
@@ -528,7 +528,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       } else {
         console.log(`[Slack] Non-meeting intent (${decisionLayerResult.intent}) - skipping meeting resolution`);
       }
-      
+
       logger.info('Decision Layer completed', {
         intent: decisionLayerResult.intent,
         contract: decisionLayerResult.answerContract,
@@ -536,7 +536,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         resolvedMeetingId: resolvedMeeting?.meetingId,
         duration_ms: cpDuration,
       });
-      
+
       // EARLY PROGRESS MESSAGE: Send personalized progress right after intent classification
       // ONLY for SINGLE_MEETING with resolved meeting - other intents use streaming which already provides feedback
       // Streaming responses show "..." placeholder that updates in real-time, so no extra progress needed
@@ -561,10 +561,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Personalized progress generation failed:`, err);
         });
       }
-      
+
       // STEP 2: Handle CLARIFY intent - ask user for clarification
       if (decisionLayerResult.intent === "CLARIFY") {
-        const clarifyMessage = decisionLayerResult.clarifyMessage 
+        const clarifyMessage = decisionLayerResult.clarifyMessage
           || "I'm not sure what you're asking. Could you please clarify?";
         responseText = clarifyMessage;
         capabilityName = "clarify";
@@ -591,7 +591,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // SINGLE_MEETING intent with resolved meeting → use SingleMeetingOrchestrator
         usedSingleMeetingMode = true;
         console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
-        
+
         // Check for pending summary offer from last interaction in this thread
         let hasPendingOffer = false;
         if (threadTs) {
@@ -602,19 +602,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
             console.log(`[Slack] Thread has pending offer: ${hasPendingOffer}`);
           }
         }
-        
+
         const singleMeetingContext: SingleMeetingContext = {
           meetingId: resolvedMeeting.meetingId,
           companyId: resolvedMeeting.companyId,
           companyName: resolvedMeeting.companyName,
           meetingDate: resolvedMeeting.meetingDate,
         };
-        
+
         logger.startStage('single_meeting');
         // Pass Decision Layer contract to enforce single authority for intent classification
         const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer, decisionLayerResult.answerContract);
         smDuration = logger.endStage('single_meeting');
-        
+
         // Add note about auto-selection if we picked the most recent meeting automatically
         if (resolvedMeeting.wasAutoSelected && resolvedMeeting.meetingDate) {
           const dateStr = resolvedMeeting.meetingDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -634,7 +634,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         semanticError = result.semanticError;
         isClarificationRequest = result.isClarificationRequest;
         isBinaryQuestion = result.isBinaryQuestion;
-        
+
         logger.info('Single meeting response generated', {
           intent: result.intent,
           dataSource: result.dataSource,
@@ -644,15 +644,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
       } else {
         // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, etc.) → Open Assistant
         console.log(`[Slack] Open Assistant mode - intent=${decisionLayerResult.intent}, routing to appropriate handler`);
-        
+
         // Contracts that might generate documents - don't use streaming for these
         const docGeneratingContracts = [
-          "VALUE_PROPOSITION", "MEETING_SUMMARY", "COMPARISON", 
+          "VALUE_PROPOSITION", "MEETING_SUMMARY", "COMPARISON",
           "DRAFT_EMAIL", "PATTERN_ANALYSIS", "PRODUCT_EXPLANATION",
           "SALES_DOCS_PREP" // Research + writing produces a doc
         ];
         const mightGenerateDoc = docGeneratingContracts.includes(decisionLayerResult.answerContract || "");
-        
+
         // Create placeholder message for streaming (if not a test run and not generating a doc)
         if (!testRun && !mightGenerateDoc) {
           const placeholderMsg = await postSlackMessage({
@@ -669,12 +669,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
         } else if (mightGenerateDoc) {
           console.log(`[Slack] Skipping streaming for doc-generating contract: ${decisionLayerResult.answerContract}`);
         }
-        
+
         logger.startStage('open_assistant');
         openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
           threadId: threadTs,
-          conversationContext: threadContext ? `Company: ${resolvedMeeting?.companyName || 'unknown'}` : undefined,
+          conversationContext: threadContext ? `Company: ${resolvedMeeting?.companyName || 'unknown'}` :
+            companyMentioned ? `Company: ${companyMentioned.companyName}` : undefined,
           threadMessages: threadContextForCP?.messages,
           resolvedMeeting: resolvedMeeting ? {
             meetingId: resolvedMeeting.meetingId,
@@ -686,19 +687,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
           slackStreaming: streamingContext,
         });
         oaDuration = logger.endStage('open_assistant');
-        
+
         responseText = openAssistantResultData.answer;
         capabilityName = `open_assistant_${openAssistantResultData.intent}`;
         intentClassification = openAssistantResultData.intent;
         dataSource = openAssistantResultData.dataSource;
-        
+
         if (openAssistantResultData.singleMeetingResult) {
           resolvedCompanyId = resolvedMeeting?.companyId || null;
           resolvedMeetingId = resolvedMeeting?.meetingId || null;
           semanticAnswerUsed = openAssistantResultData.singleMeetingResult.semanticAnswerUsed;
           semanticConfidence = openAssistantResultData.singleMeetingResult.semanticConfidence;
         }
-        
+
         // Skip operation-specific progress messages when streaming was used
         // Streaming provides real-time feedback via the placeholder, so no extra progress needed
         // Posting progress AFTER response completes creates confusing message order
@@ -706,7 +707,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Skipping operation-specific progress (streaming was used)`);
         } else {
           // Only send progress for non-streaming paths (document generation, etc.)
-          const progressMessage = openAssistantResultData.progressMessage || 
+          const progressMessage = openAssistantResultData.progressMessage ||
             openAssistantResultData.singleMeetingResult?.progressMessage;
           if (progressMessage && !testRun && progressMessageCount === 0) {
             console.log(`[Slack] Sending operation-specific progress message: "${progressMessage.substring(0, 50)}..."`);
@@ -719,7 +720,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             console.log(`[Slack] Skipping operation-specific progress (${progressMessageCount} generic messages already sent)`);
           }
         }
-        
+
         logger.info('Open Assistant response generated', {
           intent: openAssistantResultData.intent,
           contract: openAssistantResultData.answerContract,
@@ -731,7 +732,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Clear progress timer now that we have a response ready
       clearProgressTimer();
-      
+
       // Calculate total pipeline time
       const totalTimeMs = Date.now() - pipelineStartTime;
       console.log(`[Slack] Pipeline completed in ${totalTimeMs}ms, progressMessages=${progressMessageCount}`);
@@ -756,10 +757,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
       } else if (usedStreaming) {
         // Streaming placeholder was created - check if handler already updated it
         botReply = { ts: streamingContext!.messageTs };
-        
+
         // Check if handler already completed streaming (set streamingCompleted: true)
         const handlerAlreadyStreamed = openAssistantResultData?.streamingCompleted === true;
-        
+
         if (handlerAlreadyStreamed) {
           // Handler already updated the message with final content (e.g., streaming OpenAI)
           console.log(`[Slack] Handler already streamed to message: ${botReply.ts}`);
@@ -786,7 +787,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         } else {
           console.log(`[Slack] No content to update streaming message: ${botReply.ts}`);
         }
-        
+
         // Generate document AFTER streaming for ANY response above word threshold
         // Word count check happens in sendResponseWithDocumentSupport
         if (responseText && responseText.length > 200) {
@@ -802,7 +803,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               userQuery: text,
               documentOnly: true, // Only generate document, no message
             });
-            
+
             // If document was generated, update streaming message to remove duplicate content
             if (docResult.type === "document" && docResult.success && botReply.ts) {
               console.log(`[Slack] Document generated - updating streaming message to summary`);
@@ -849,28 +850,28 @@ export async function slackEventsHandler(req: Request, res: Response) {
         if (usedSingleMeetingMode) {
           // Map dataSource to our structured format
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
-          
+
           // Map to artifact type
           const mappedArtifact: MeetingArtifactType = mapLegacyArtifactType(dataSource);
-          
+
           // Map intent
           const mappedIntent: LegacyIntent =
             intentClassification === "summary" ? "summary" :
-            isBinaryQuestion ? "binary" :
-            dataSource === "attendees" ? "attendees" :
-            dataSource === "action_items" ? "next_steps" : "content";
-          
+              isBinaryQuestion ? "binary" :
+                dataSource === "attendees" ? "attendees" :
+                  dataSource === "action_items" ? "next_steps" : "content";
+
           // Map answer shape - customer_questions, action_items, attendees are all lists
           const mappedShape: AnswerShape =
             intentClassification === "summary" ? "summary" :
-            isBinaryQuestion ? "yes_no" :
-            (dataSource === "attendees" || dataSource === "action_items" || dataSource === "customer_questions") ? "list" : "single_value";
-          
+              isBinaryQuestion ? "yes_no" :
+                (dataSource === "attendees" || dataSource === "action_items" || dataSource === "customer_questions") ? "list" : "single_value";
+
           // Collect LLM purposes
           const llmPurposes: LlmPurpose[] = [];
           if (semanticAnswerUsed) llmPurposes.push("semantic_answer");
           if (intentClassification === "summary") llmPurposes.push("summary");
-          
+
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
@@ -894,14 +895,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
         } else {
           // Open Assistant path - use actual Decision Layer results
           const mappedDataSource: DataSource = mapLegacyDataSource(dataSource);
-          
+
           // Use Decision Layer result directly (full pipeline with intent, contract, layers)
           // OpenAssistant may override contract if it does additional processing
           const actualIntent = decisionLayerResult?.intent || openAssistantResultData?.controlPlaneIntent || "GENERAL_HELP";
           const actualContract = decisionLayerResult?.answerContract || openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
           const actualContractChain = openAssistantResultData?.answerContractChain;
           const actualSsotMode = openAssistantResultData?.ssotMode || "none";
-          
+
           // Use context layers from Decision Layer result directly
           const contextLayers = (decisionLayerResult?.contextLayers || {
             product_identity: true, // Always on
@@ -910,13 +911,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
             multi_meeting: actualIntent === "MULTI_MEETING",
             document_context: actualIntent === "DOCUMENT_SEARCH",
           }) as any;
-          
+
           // Store proposedInterpretation for CLARIFY follow-ups
           if (actualIntent === "CLARIFY" && decisionLayerResult?.proposedInterpretation) {
             contextLayers.proposedInterpretation = decisionLayerResult.proposedInterpretation;
             contextLayers.awaitingClarification = "proposed_interpretation";
           }
-          
+
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
@@ -926,10 +927,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
                 intentDetectionMethod: (decisionLayerResult?.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "keyword",
                 contextLayers,
                 answerContract: actualContract as any,
-                contractChain: actualContractChain?.map((c: any) => ({ 
-                  contract: String(c), 
-                  ssot_mode: actualSsotMode as any, 
-                  selection_method: "default" as const 
+                contractChain: actualContractChain?.map((c: any) => ({
+                  contract: String(c),
+                  ssot_mode: actualSsotMode as any,
+                  selection_method: "default" as const
                 })),
                 contractSelectionMethod: (decisionLayerResult?.contractSelectionMethod as "keyword" | "llm" | "default") || "default",
                 ssotMode: actualSsotMode as any,
@@ -952,7 +953,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           );
         }
       })();
-      
+
       logInteraction({
         slackChannelId: channel,
         slackThreadId: threadTs,
@@ -967,7 +968,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         totalTimeMs,
         progressMessageCount,
       });
-      
+
       // Log successful completion with stage breakdown
       logger.info('Request completed successfully', {
         intent: decisionLayerResult?.intent,
@@ -980,10 +981,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
           handler: smDuration || oaDuration,
         },
       });
-      
+
       // Track progress message overhead
       if (progressMessageCount > 0) {
-        logger.debug('Progress messages were sent', { 
+        logger.debug('Progress messages were sent', {
           count: progressMessageCount,
           delayMs: getProgressDelayMs(),
           totalTimeMs,
@@ -992,24 +993,24 @@ export async function slackEventsHandler(req: Request, res: Response) {
     } catch (err) {
       // CRITICAL: Cancel progress timer to prevent sending progress message after error
       clearProgressTimer();
-      
+
       // Detect specific error types for better user messaging
       const errorMessage = err instanceof Error ? err.message : String(err);
       const errorCode = (err as any)?.code || (err as any)?.status;
-      
+
       let userMessage: string;
       let errorType: string;
-      
+
       // OpenAI quota/rate limit errors
-      if (errorCode === 'insufficient_quota' || errorCode === 429 || 
-          errorMessage.includes('exceeded your current quota') ||
-          errorMessage.includes('rate limit')) {
+      if (errorCode === 'insufficient_quota' || errorCode === 429 ||
+        errorMessage.includes('exceeded your current quota') ||
+        errorMessage.includes('rate limit')) {
         errorType = "openai_quota";
         userMessage = "I can't process this right now — the AI service quota has been exceeded. Please contact an admin to check the OpenAI billing settings.";
-      } 
+      }
       // OpenAI API key errors
-      else if (errorCode === 401 || errorMessage.includes('Incorrect API key') || 
-               errorMessage.includes('invalid_api_key')) {
+      else if (errorCode === 401 || errorMessage.includes('Incorrect API key') ||
+        errorMessage.includes('invalid_api_key')) {
         errorType = "openai_auth";
         userMessage = "I can't process this right now — there's an issue with the AI service configuration. Please contact an admin.";
       }
@@ -1018,7 +1019,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         errorType = "internal";
         userMessage = "Sorry — I hit an internal error while processing that request.";
       }
-      
+
       // Log with full context to persistent file AND console
       const fullStack = err instanceof Error ? err.stack : undefined;
       console.error(`[PIPELINE ERROR] ${errorType}:`, errorMessage, fullStack);
@@ -1029,7 +1030,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         stack: fullStack,
         text: text.substring(0, 100),
       });
-      
+
       if (!testRun) {
         await postSlackMessage({
           channel,

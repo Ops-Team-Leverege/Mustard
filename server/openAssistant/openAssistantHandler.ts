@@ -23,14 +23,14 @@ import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, CAPABILITIES_PROMPT, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
 
-import { 
-  type EvidenceSource, 
-  type IntentClassification, 
-  type OpenAssistantContext, 
+import {
+  type EvidenceSource,
+  type IntentClassification,
+  type OpenAssistantContext,
   type OpenAssistantResult,
   type SlackStreamingContext,
   defaultClassification,
-  deriveEvidenceSource 
+  deriveEvidenceSource
 } from "./types";
 import { streamOpenAIResponse } from "./streamingHelper";
 import { findRelevantMeetings, searchAcrossMeetings, type ScopeOverride } from "./meetingResolver";
@@ -72,12 +72,12 @@ function buildThreadContextSection(context: OpenAssistantContext): string {
   if (!context.threadMessages || context.threadMessages.length === 0) {
     return '';
   }
-  
+
   const messages = context.threadMessages.map(msg => {
     const speaker = msg.isBot ? 'PitCrew Sauce' : 'User';
     return `${speaker}: ${msg.text}`;
   }).join('\n');
-  
+
   return `
 ## Previous Conversation in This Thread
 ${messages}
@@ -101,17 +101,17 @@ async function buildMeetingContextForProductKnowledge(
   try {
     // Fetch customer questions from this meeting
     const customerQuestions = await storage.getCustomerQuestionsByTranscript(meetingId);
-    
+
     if (!customerQuestions || customerQuestions.length === 0) {
       return "";
     }
-    
+
     // Format questions for context
     const questionsSection = customerQuestions
       .slice(0, 10) // Limit to 10 most relevant questions
       .map((q, i) => `${i + 1}. "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}`)
       .join("\n");
-    
+
     return `
 === MEETING CONTEXT (from ${companyName} meeting) ===
 The user is asking about a topic that may relate to questions raised in this meeting.
@@ -161,7 +161,7 @@ function generateContractChainProgress(
   if (contracts.length <= 1) {
     return undefined;
   }
-  
+
   // Map contracts to user-friendly descriptions (short versions for length control)
   const contractDescriptions: Record<AnswerContract, string> = {
     [AnswerContract.MEETING_SUMMARY]: "summarizing",
@@ -190,9 +190,9 @@ function generateContractChainProgress(
     [AnswerContract.REFUSE]: "reviewing",
     [AnswerContract.CLARIFY]: "understanding",
   };
-  
+
   const steps = contracts.map(c => contractDescriptions[c] || c.toLowerCase().replace(/_/g, ' '));
-  
+
   // Build a natural-sounding progress message
   let message: string;
   if (steps.length === 2) {
@@ -203,12 +203,12 @@ function generateContractChainProgress(
     // For 4+ steps, only show first 3 and indicate there's more
     message = `This will take a moment—I'll be ${steps[0]}, ${steps[1]}, ${steps[2]}, and more.`;
   }
-  
+
   // Enforce length limit
   if (message.length > MAX_PROGRESS_MESSAGE_LENGTH) {
     message = message.substring(0, MAX_PROGRESS_MESSAGE_LENGTH - 3) + '...';
   }
-  
+
   return message;
 }
 
@@ -219,35 +219,35 @@ function generateContractChainProgress(
 function isUrlSafe(urlString: string): { safe: boolean; error?: string } {
   try {
     const url = new URL(urlString);
-    
+
     // Must be HTTPS only (no HTTP in production)
     if (url.protocol !== 'https:') {
       return { safe: false, error: 'Only HTTPS URLs are supported for security' };
     }
-    
+
     // Strict domain allowlist - most secure approach
     const hostname = url.hostname.toLowerCase();
-    const isAllowed = ALLOWED_DOMAINS.some(domain => 
+    const isAllowed = ALLOWED_DOMAINS.some(domain =>
       hostname === domain || hostname.endsWith('.' + domain)
     );
-    
+
     if (!isAllowed) {
       console.log(`[OpenAssistant] Domain not in allowlist: ${hostname}`);
-      return { 
-        safe: false, 
-        error: `Domain "${hostname}" is not in the allowed list. I can only fetch content from trusted domains (${ALLOWED_DOMAINS.join(', ')}). Please provide product knowledge from the database instead, or ask an admin to add this domain to the allowlist.` 
+      return {
+        safe: false,
+        error: `Domain "${hostname}" is not in the allowed list. I can only fetch content from trusted domains (${ALLOWED_DOMAINS.join(', ')}). Please provide product knowledge from the database instead, or ask an admin to add this domain to the allowlist.`
       };
     }
-    
+
     // Additional sanity checks
     if (url.username || url.password) {
       return { safe: false, error: 'URLs with credentials are not allowed' };
     }
-    
+
     if (url.port && url.port !== '443') {
       return { safe: false, error: 'Only standard HTTPS port (443) is allowed' };
     }
-    
+
     return { safe: true };
   } catch {
     return { safe: false, error: 'Invalid URL format' };
@@ -266,10 +266,10 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
     console.log(`[OpenAssistant] URL validation failed: ${urlCheck.error}`);
     return { success: false, error: urlCheck.error, isProductOnly: true };
   }
-  
+
   try {
     console.log(`[OpenAssistant] Fetching website content: ${url}`);
-    
+
     // First try with manual redirect handling (allow one redirect within allowed domains)
     let response = await fetch(url, {
       headers: {
@@ -279,20 +279,20 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
       redirect: 'manual', // Handle redirects manually for safety
       signal: AbortSignal.timeout(TIMEOUTS.WEBSITE_FETCH_MS),
     });
-    
+
     // Handle redirects safely - only follow if redirect stays on allowed domain
     if (response.status >= 300 && response.status < 400) {
       const redirectUrl = response.headers.get('location');
       if (redirectUrl) {
         const absoluteRedirect = new URL(redirectUrl, url).toString();
         console.log(`[OpenAssistant] Redirect to: ${absoluteRedirect}`);
-        
+
         // Validate redirect URL is also safe
         const redirectCheck = isUrlSafe(absoluteRedirect);
         if (!redirectCheck.safe) {
           return { success: false, error: `Redirect to blocked domain: ${absoluteRedirect}`, isProductOnly: true };
         }
-        
+
         // Follow the safe redirect
         response = await fetch(absoluteRedirect, {
           headers: {
@@ -304,13 +304,13 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
         });
       }
     }
-    
+
     if (!response.ok) {
       return { success: false, error: `HTTP ${response.status}: ${response.statusText}`, isProductOnly: true };
     }
-    
+
     const html = await response.text();
-    
+
     // Extract text content from HTML (basic extraction)
     // Remove script and style tags first
     let textContent = html
@@ -325,24 +325,24 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
       .replace(/&#39;/gi, "'")
       .replace(/\n\s*\n/g, '\n') // Collapse multiple newlines
       .trim();
-    
+
     // Validate content is meaningful (not empty/too short)
     // Lower threshold to 20 words to handle short FAQ pages
     const wordCount = textContent.split(/\s+/).filter(w => w.length > 0).length;
     if (wordCount < 20) {
       console.log(`[OpenAssistant] Content too sparse: ${wordCount} words (may be JS-rendered site)`);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: `Website returned very little text content (${wordCount} words). This may be a JavaScript-rendered site that requires browser execution to display content.`,
         isProductOnly: true
       };
     }
-    
+
     // Truncate if too long
     if (textContent.length > CONTENT_LIMITS.WEBSITE_CONTENT_MAX_CHARS) {
       textContent = textContent.substring(0, CONTENT_LIMITS.WEBSITE_CONTENT_MAX_CHARS) + '\n\n[Content truncated...]';
     }
-    
+
     console.log(`[OpenAssistant] Fetched website content: ${textContent.length} chars, ${wordCount} words`);
     return { success: true, content: textContent, isProductOnly: false };
   } catch (error) {
@@ -371,7 +371,7 @@ async function analyzeWebsiteWithGemini(
   // STEP 1: Server-side fetch of website content
   console.log(`[OpenAssistant] Step 1: Server-side fetch of website content`);
   const fetchResult = await fetchWebsiteContent(websiteUrl);
-  
+
   if (!fetchResult.success || !fetchResult.content) {
     console.log(`[OpenAssistant] Website fetch failed: ${fetchResult.error}`);
     // Return a clear error message explaining the limitation
@@ -393,10 +393,10 @@ ${productDataPrompt.substring(0, 2000)}${productDataPrompt.length > 2000 ? '\n\n
   }
 
   console.log(`[OpenAssistant] Step 1 complete: Fetched ${fetchResult.content.length} chars from live site`);
-  
+
   // STEP 2: Use Gemini to analyze the fetched content vs product knowledge
   console.log(`[OpenAssistant] Step 2: Gemini analysis of fetched content vs product knowledge`);
-  
+
   try {
     const response = await gemini.models.generateContent({
       model: MODEL_ASSIGNMENTS.WEBSITE_ANALYSIS,
@@ -518,7 +518,7 @@ AUTHORITY RULES (without product data):
   try {
     const startTime = Date.now();
     console.log(`[OpenAssistant] Calling ${getModelDescription(MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE)} for product knowledge response (prompt: ${systemPrompt.length} chars, streaming: ${!!streamingContext})...`);
-    
+
     // Use streaming when Slack context is available
     const answer = await streamOpenAIResponse(
       MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
@@ -526,7 +526,7 @@ AUTHORITY RULES (without product data):
       userMessage,
       streamingContext
     );
-    
+
     console.log(`[OpenAssistant] ${getModelDescription(MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE)} response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
     return answer || "I'd be happy to help with product information. Could you be more specific about what you'd like to know?";
   } catch (openaiError) {
@@ -552,9 +552,9 @@ function wouldBenefitFromEvidence(message: string): { needsEvidence: boolean; re
   const lower = message.toLowerCase();
   for (const pattern of NEEDS_FACTUAL_EVIDENCE_PATTERNS) {
     if (pattern.test(lower)) {
-      return { 
-        needsEvidence: true, 
-        reason: "This question appears to ask about specific meeting outcomes or product capabilities." 
+      return {
+        needsEvidence: true,
+        reason: "This question appears to ask about specific meeting outcomes or product capabilities."
       };
     }
   }
@@ -572,11 +572,11 @@ export async function handleOpenAssistant(
   context: OpenAssistantContext
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Processing: "${userMessage}"`);
-  
+
   if (context.decisionLayerResult) {
     const cpResult = context.decisionLayerResult;
     console.log(`[OpenAssistant] Using full Decision Layer result: intent=${cpResult.intent}, contract=${cpResult.answerContract}, method=${cpResult.intentDetectionMethod}`);
-    
+
     if (cpResult.intent === Intent.REFUSE) {
       return {
         answer: "I'm sorry, but that question is outside of what I can help with. I'm designed to assist with PitCrew-related topics, customer meetings, and product information.",
@@ -588,7 +588,7 @@ export async function handleOpenAssistant(
         delegatedToSingleMeeting: false,
       };
     }
-    
+
     if (cpResult.intent === Intent.CLARIFY) {
       // Check if the contract suggests meeting data is needed - if so, attempt meeting search
       // instead of immediately returning clarification
@@ -602,26 +602,26 @@ export async function handleOpenAssistant(
         AnswerContract.CUSTOMER_QUESTIONS,
         AnswerContract.CROSS_MEETING_QUESTIONS,
       ];
-      
+
       // General/creative contracts that should execute without clarifying
       const executeWithoutClarifyContracts = [
         AnswerContract.DRAFT_EMAIL,
         AnswerContract.DRAFT_RESPONSE,
         AnswerContract.GENERAL_RESPONSE,
       ];
-      
+
       if (meetingRelatedContracts.includes(cpResult.answerContract)) {
         console.log(`[OpenAssistant] CLARIFY intent but meeting-related contract (${cpResult.answerContract}) - attempting meeting search`);
         const classification = defaultClassification("Clarification with meeting-related contract - attempting search");
         return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract);
       }
-      
+
       if (executeWithoutClarifyContracts.includes(cpResult.answerContract)) {
         console.log(`[OpenAssistant] CLARIFY intent but execute-without-clarify contract (${cpResult.answerContract}) - routing to general assistance`);
         const classification = defaultClassification("Clarification with general contract - executing directly");
         return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract);
       }
-      
+
       // Use the smart clarification message from Decision Layer (or fallback to friendly message)
       const clarifyMessage = cpResult.clarifyMessage || `I want to help but I'm not sure what you're looking for. Are you asking about:
 
@@ -630,7 +630,7 @@ export async function handleOpenAssistant(
 • Help with a task (what kind?)
 
 Give me a hint and I'll get you sorted!`;
-      
+
       return {
         answer: clarifyMessage,
         intent: "general_assistance",
@@ -641,7 +641,7 @@ Give me a hint and I'll get you sorted!`;
         delegatedToSingleMeeting: false,
       };
     }
-    
+
     const evidenceSource = deriveEvidenceSource(cpResult.intent);
     const classification: IntentClassification = {
       intent: evidenceSource,
@@ -658,32 +658,32 @@ Give me a hint and I'll get you sorted!`;
         topicForResearch: null,
       },
     };
-    
+
     console.log(`[OpenAssistant] Evidence source: ${evidenceSource} (from Decision Layer: ${cpResult.intent} -> ${cpResult.answerContract})`);
-    
+
     if (cpResult.intent === Intent.SINGLE_MEETING) {
       return handleMeetingDataIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
-    
+
     if (cpResult.intent === Intent.MULTI_MEETING) {
       return handleMultiMeetingIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
-    
+
     if (cpResult.intent === Intent.PRODUCT_KNOWLEDGE) {
       return handleProductKnowledgeIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
-    
+
     if (cpResult.intent === Intent.EXTERNAL_RESEARCH) {
       return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
     }
-    
+
     return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
   }
-  
+
   // DECISION LAYER REQUIRED: No fallback to separate classifier
   console.log(`[OpenAssistant] WARNING: No Decision Layer intent provided, defaulting to CLARIFY`);
   const fallbackClassification = defaultClassification("No Decision Layer intent provided - clarification needed");
-  
+
   return {
     answer: "I need a bit more context to help you effectively. Could you tell me more about what you're looking for?",
     intent: "general_assistance",
@@ -706,19 +706,19 @@ async function handleMeetingDataIntent(
   dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to meeting data path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
-  
+
   if (context.resolvedMeeting) {
     const scope = {
       meetingId: context.resolvedMeeting.meetingId,
       companyId: context.resolvedMeeting.companyId,
       companyName: context.resolvedMeeting.companyName,
     };
-    
+
     // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
     // Only fall back to internal selection when DL contract not provided (legacy paths)
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
-    
+
     if (dlContractChain && dlContractChain.length > 0) {
       // Decision Layer provided a contract chain - use it directly
       primaryContract = dlContractChain[0];
@@ -736,10 +736,10 @@ async function handleMeetingDataIntent(
       contractChain = chain.contracts;
       console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
     }
-    
+
     // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
-    
+
     // Pass the primary contract to the orchestrator to skip deprecated classification
     const singleMeetingResult = await handleSingleMeetingQuestion(
       context.resolvedMeeting,
@@ -764,11 +764,11 @@ async function handleMeetingDataIntent(
   }
 
   console.log(`[OpenAssistant] No meeting resolved, searching for relevant meetings`);
-  
+
   // Pass LLM-determined scope from Decision Layer (if available)
   const scopeOverride: ScopeOverride | undefined = context.decisionLayerResult?.scope;
-  const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride);
-  
+  const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride, context.conversationContext);
+
   if (meetingSearch.meetings.length === 0) {
     console.log(`[OpenAssistant] Scope resolution failed: SINGLE_MEETING intent, searched for: "${meetingSearch.searchedFor || 'nothing specific'}", candidates found: 0`);
     console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria)`);
@@ -787,17 +787,17 @@ async function handleMeetingDataIntent(
   if (meetingSearch.meetings.length === 1) {
     const meeting = meetingSearch.meetings[0];
     console.log(`[OpenAssistant] Found single meeting: ${meeting.companyName} (${meeting.meetingId})`);
-    
+
     const scope = {
       meetingId: meeting.meetingId,
       companyId: meeting.companyId,
       companyName: meeting.companyName,
     };
-    
+
     // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
-    
+
     if (contract) {
       primaryContract = contract;
       contractChain = [contract];
@@ -808,10 +808,10 @@ async function handleMeetingDataIntent(
       contractChain = chain.contracts;
       console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
     }
-    
+
     // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
-    
+
     // Pass the primary contract to the orchestrator
     const singleMeetingResult = await handleSingleMeetingQuestion(
       meeting,
@@ -837,7 +837,7 @@ async function handleMeetingDataIntent(
 
   // Multiple meetings found - route through MULTI_MEETING path
   console.log(`[OpenAssistant] Found ${meetingSearch.meetings.length} meetings, routing to MULTI_MEETING path`);
-  
+
   const uniqueCompanies = new Set(meetingSearch.meetings.map(m => m.companyId));
   const scope = {
     type: "multi_meeting" as const,
@@ -849,19 +849,19 @@ async function handleMeetingDataIntent(
       uniqueCompaniesRepresented: uniqueCompanies.size,
     },
   };
-  
+
   const chain = selectMultiMeetingContractChain(userMessage, scope);
   console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (coverage: ${scope.coverage.matchingMeetingsCount} meetings)${meetingSearch.topic ? ` topic: "${meetingSearch.topic}"` : ''}`);
-  
+
   // Build progress message: multi-meeting context + contract chain steps (if multiple)
   const meetingProgress = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}.`;
   const chainProgress = generateContractChainProgress(chain.contracts);
-  const progressMessage = chainProgress 
-    ? `${meetingProgress} ${chainProgress}` 
+  const progressMessage = chainProgress
+    ? `${meetingProgress} ${chainProgress}`
     : `${meetingProgress} I'll analyze them and compile the insights.`;
-  
+
   const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings, meetingSearch.topic);
-  
+
   return {
     answer: chainResult.finalOutput,
     intent: "meeting_data",
@@ -888,11 +888,11 @@ async function handleMultiMeetingIntent(
   dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to MULTI_MEETING path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
-  
+
   // Pass LLM-determined scope from Decision Layer (if available)
   const scopeOverride: ScopeOverride | undefined = context.decisionLayerResult?.scope;
-  const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride);
-  
+  const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride, context.conversationContext);
+
   if (meetingSearch.meetings.length === 0) {
     console.log(`[OpenAssistant] Scope resolution failed: MULTI_MEETING intent, searched for: "${meetingSearch.searchedFor || 'all meetings'}", candidates found: 0`);
     console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria for cross-meeting analysis)`);
@@ -907,7 +907,7 @@ async function handleMultiMeetingIntent(
       delegatedToSingleMeeting: false,
     };
   }
-  
+
   const uniqueCompanies = new Set(meetingSearch.meetings.map(m => m.companyId));
   const scope = {
     type: "multi_meeting" as const,
@@ -919,11 +919,11 @@ async function handleMultiMeetingIntent(
       uniqueCompaniesRepresented: uniqueCompanies.size,
     },
   };
-  
+
   // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
-  
+
   if (dlContractChain && dlContractChain.length > 0) {
     // Decision Layer provided a contract chain - use it directly
     primaryContract = dlContractChain[0];
@@ -941,21 +941,21 @@ async function handleMultiMeetingIntent(
     contractChain = chain.contracts;
     console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
   }
-  
+
   // Build progress message: multi-meeting context + contract chain steps (if multiple)
   const meetingProgress = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}.`;
   const chainProgress = generateContractChainProgress(contractChain);
-  const progressMessage = chainProgress 
-    ? `${meetingProgress} ${chainProgress}` 
+  const progressMessage = chainProgress
+    ? `${meetingProgress} ${chainProgress}`
     : `${meetingProgress} I'll analyze them and compile the insights.`;
-  
+
   const chainResult = await executeContractChain(
     { contracts: contractChain, primaryContract, selectionMethod: "keyword" },
     userMessage,
     meetingSearch.meetings,
     meetingSearch.topic
   );
-  
+
   return {
     answer: chainResult.finalOutput,
     intent: "meeting_data",
@@ -987,9 +987,9 @@ async function handleProductKnowledgeIntent(
   _dlContractChain?: AnswerContract[]  // Reserved for future chain support
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
-  
+
   const actualContract = contract || AnswerContract.PRODUCT_EXPLANATION;
-  
+
   // Check for URLs in the message
   let websiteUrl: string | null = null;
   const urlMatch = userMessage.match(/https?:\/\/[\w\-\.]+\.\w+[\w\/\-\.\?\=\&]*/i);
@@ -997,7 +997,7 @@ async function handleProductKnowledgeIntent(
     websiteUrl = urlMatch[0];
     console.log(`[OpenAssistant] URL detected in message: ${websiteUrl}`);
   }
-  
+
   // Check for meeting context - enables meeting-aware product knowledge
   let meetingContextSection = "";
   if (context.resolvedMeeting?.meetingId) {
@@ -1010,7 +1010,7 @@ async function handleProductKnowledgeIntent(
       console.log(`[OpenAssistant] Meeting context enriched (${meetingContextSection.length} chars)`);
     }
   }
-  
+
   // Get product knowledge from snapshot (fast path) or compute on-demand
   let snapshotResult;
   let productDataPrompt: string;
@@ -1025,27 +1025,27 @@ async function handleProductKnowledgeIntent(
     console.error(`[OpenAssistant] PRODUCT_KNOWLEDGE database error:`, dbError);
     throw new Error(`Product knowledge database error: ${dbError instanceof Error ? dbError.message : String(dbError)}`);
   }
-  
+
   const hasProductData = snapshotResult.recordCount > 0;
-  
+
   // Generate personalized progress message (runs quickly in parallel conceptually)
   const progressMessage = await generatePersonalizedProgress(userMessage, 'product');
-  
+
   let answer: string;
-  
+
   // Build thread context for conversation continuity
   const threadContextSection = buildThreadContextSection(context);
-  
+
   // Combine thread context with meeting context if available
-  const enrichedContext = meetingContextSection 
-    ? `${threadContextSection}\n\n${meetingContextSection}` 
+  const enrichedContext = meetingContextSection
+    ? `${threadContextSection}\n\n${meetingContextSection}`
     : threadContextSection;
-  
+
   // If URL detected + product data available → use Gemini for web-based analysis
   if (websiteUrl && hasProductData) {
     console.log(`[OpenAssistant] URL detected with product data - trying Gemini for website analysis`);
     const geminiResult = await analyzeWebsiteWithGemini(websiteUrl, userMessage, productDataPrompt);
-    
+
     if (geminiResult) {
       answer = geminiResult;
       console.log(`[OpenAssistant] Gemini analysis successful (${answer.length} chars)`);
@@ -1088,27 +1088,27 @@ async function handleExternalResearchIntent(
   console.log(`[OpenAssistant] === EXTERNAL RESEARCH START ===`);
   console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
   const startTime = Date.now();
-  
+
   const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
-  
+
   // Extract company name from the user message
   const companyName = extractCompanyFromMessage(userMessage);
-  
+
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
-  
+
   // Determine what chaining is needed based on LLM contract chain or fallback detection
   const chainIncludesSalesDocsPrep = dlContractChain?.includes(AnswerContract.SALES_DOCS_PREP) ?? false;
   const needsProductKnowledge = detectProductKnowledgeEnrichment(userMessage);
   // LLM contract chain takes precedence over heuristic detection
   const needsStyleMatching = chainIncludesSalesDocsPrep || detectStyleMatchingRequest(userMessage);
-  
+
   console.log(`[OpenAssistant] Chain-based style matching: ${chainIncludesSalesDocsPrep}, Product knowledge enrichment: ${needsProductKnowledge}, Style matching needed: ${needsStyleMatching}`);
-  
+
   // Generate personalized progress message
   console.log(`[OpenAssistant] Generating progress message...`);
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
   console.log(`[OpenAssistant] Progress message ready (${Date.now() - startTime}ms)`);
-  
+
   // Update streaming placeholder with progress message BEFORE starting research
   if (context.slackStreaming && progressMessage) {
     try {
@@ -1123,7 +1123,7 @@ async function handleExternalResearchIntent(
       console.error(`[OpenAssistant] Failed to update streaming placeholder with progress:`, updateError);
     }
   }
-  
+
   // Perform the research
   console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
@@ -1132,7 +1132,7 @@ async function handleExternalResearchIntent(
     null // topic derived from message
   );
   console.log(`[OpenAssistant] Research complete (${Date.now() - startTime}ms), answer length: ${researchResult.answer?.length || 0}`);
-  
+
   if (!researchResult.answer) {
     return {
       answer: "I wasn't able to complete the research. Please try rephrasing your request or specifying the company name more clearly.",
@@ -1144,13 +1144,13 @@ async function handleExternalResearchIntent(
       delegatedToSingleMeeting: false,
     };
   }
-  
+
   // LLM contract chain takes PRIORITY over heuristic detection
   // If LLM explicitly requested style matching (SALES_DOCS_PREP), do that first
   if (chainIncludesSalesDocsPrep) {
     console.log(`[OpenAssistant] LLM requested style matching via contract chain - prioritizing over product knowledge enrichment`);
   }
-  
+
   // If user wants style-matched output (LLM chain or heuristic detection), chain product knowledge for style examples
   // This runs FIRST when LLM explicitly requested it via contract chain
   if (needsStyleMatching) {
@@ -1158,10 +1158,10 @@ async function handleExternalResearchIntent(
     try {
       // Pass true if this is from contract chain (user explicitly asked for research + writing)
       const styledOutput = await chainProductStyleWriting(userMessage, researchResult.answer, context, chainIncludesSalesDocsPrep);
-      const sourcesSection = researchResult.citations.length > 0 
+      const sourcesSection = researchResult.citations.length > 0
         ? formatCitationsForDisplay(researchResult.citations)
         : "";
-      
+
       return {
         answer: styledOutput + sourcesSection,
         intent: "external_research",
@@ -1179,17 +1179,17 @@ async function handleExternalResearchIntent(
       // Fall through to product knowledge enrichment or raw research
     }
   }
-  
+
   // If user is asking about PitCrew (value props, features, etc.) but NOT style matching,
   // enrich with internal product knowledge
   if (needsProductKnowledge && !needsStyleMatching) {
     console.log(`[OpenAssistant] Chaining product knowledge for PitCrew context enrichment...`);
     try {
       const enrichedOutput = await chainProductKnowledgeEnrichment(userMessage, researchResult.answer, context);
-      const sourcesSection = researchResult.citations.length > 0 
+      const sourcesSection = researchResult.citations.length > 0
         ? formatCitationsForDisplay(researchResult.citations)
         : "";
-      
+
       return {
         answer: enrichedOutput + (sourcesSection ? "\n\n" + sourcesSection : ""),
         intent: "external_research",
@@ -1206,12 +1206,12 @@ async function handleExternalResearchIntent(
       // Fall through to return raw research
     }
   }
-  
+
   // Include sources in the response
-  const sourcesSection = researchResult.citations.length > 0 
+  const sourcesSection = researchResult.citations.length > 0
     ? formatCitationsForDisplay(researchResult.citations)
     : "";
-  
+
   return {
     answer: researchResult.answer + sourcesSection,
     intent: "external_research",
@@ -1240,7 +1240,7 @@ function detectStyleMatchingRequest(message: string): boolean {
     /making\s+it\s+similar/i,
     /write\s+(?:the|a)\s+description\s+for\s+(?:the\s+)?feature/i,
   ];
-  
+
   return stylePatterns.some(pattern => pattern.test(lower));
 }
 
@@ -1261,7 +1261,7 @@ function detectPitCrewContext(message: string): boolean {
     /based\s+on\s+pitcrew/i,
     /using\s+pitcrew['']?s?\s+(?:product|features?|value)/i,
   ];
-  
+
   return pitcrewContextPatterns.some(pattern => pattern.test(lower));
 }
 
@@ -1285,7 +1285,7 @@ function detectProductKnowledgeEnrichment(message: string): boolean {
     /pitcrew['']?s?\s+(?:features?|capabilities?|approach|offerings?)/i,
     /think\s+through.*(?:our|pitcrew)/i,
   ];
-  
+
   return enrichmentPatterns.some(pattern => pattern.test(lower));
 }
 
@@ -1301,14 +1301,14 @@ async function chainProductKnowledgeEnrichment(
   context: OpenAssistantContext
 ): Promise<string> {
   const { getProductKnowledgePrompt } = await import("../airtable/productData");
-  
+
   // Fetch product knowledge from Airtable SSOT
   const snapshotResult = await getProductKnowledgePrompt();
-  
+
   console.log(`[OpenAssistant] Product knowledge enrichment - SSOT length: ${snapshotResult.promptText.length} chars`);
-  
+
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-  
+
   const response = await openai.chat.completions.create({
     model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
     messages: [
@@ -1339,7 +1339,7 @@ Please synthesize this research with PitCrew's product capabilities to provide s
     temperature: 0.7,
     max_tokens: 2000,
   });
-  
+
   return response.choices[0]?.message?.content || researchContent;
 }
 
@@ -1356,25 +1356,25 @@ async function chainProductStyleWriting(
 ): Promise<string> {
   console.log(`[OpenAssistant] === STYLE MATCHING START ===`);
   const startTime = Date.now();
-  
+
   const { getProductKnowledgePrompt } = await import("../airtable/productData");
-  
+
   // Fetch existing feature descriptions as style examples (cached daily)
   const snapshotResult = await getProductKnowledgePrompt();
   console.log(`[OpenAssistant] Product knowledge from cache (${Date.now() - startTime}ms)`);
-  
+
   // Extract just the features section for style reference
   // Matches "=== Current Product Features (Available Now) ===" or "=== Roadmap Features (Planned/In Development) ==="
   // Sections are separated by \n\n
   const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[^\n]*\n[\s\S]*?(?=\n\n===|$)/);
   const featureExamples = featuresMatch ? featuresMatch[0].slice(0, 2000) : "";
-  
+
   console.log(`[OpenAssistant] Style matching - feature examples length: ${featureExamples.length} chars`);
-  
+
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-  
+
   console.log(`[OpenAssistant] Calling OpenAI for style-matched writing (fromResearchChain: ${fromResearchChain})...`);
-  
+
   // When user explicitly asked for research + writing (contract chain), require research summary
   const researchChainInstructions = fromResearchChain ? `
 IMPORTANT: The user explicitly asked for research AND writing. You MUST include:
@@ -1418,30 +1418,30 @@ ${researchContent}
 4. Structure your response appropriately for what they asked
 5. If they asked for a feature description specifically, make it 1-2 concise sentences starting with an action verb
 ${researchChainInstructions}`,
-      },
-      {
-        role: "user",
-        content: originalRequest,
-      },
-    ],
+        },
+        {
+          role: "user",
+          content: originalRequest,
+        },
+      ],
       temperature: 0.3,
       max_tokens: 800,
     }),
     new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
   ]);
-  
+
   console.log(`[OpenAssistant] Style matching OpenAI call complete (${Date.now() - startTime}ms)`);
-  
+
   // Validate the OpenAI response
   const styledContent = response.choices[0]?.message?.content?.trim();
-  
+
   if (!styledContent || styledContent.length < 50) {
     console.error(`[OpenAssistant] Style matching produced invalid response: "${styledContent || '(empty)'}"`);
     console.error(`[OpenAssistant] Feature examples length: ${featureExamples.length} chars`);
     console.error(`[OpenAssistant] Research content length: ${researchContent.length} chars`);
     throw new Error(`Style matching failed - OpenAI returned invalid response (${styledContent?.length || 0} chars)`);
   }
-  
+
   console.log(`[OpenAssistant] Style matching produced valid output (${styledContent.length} chars)`);
   return styledContent;
 }
@@ -1458,7 +1458,7 @@ function extractFeatureName(message: string): string {
     /[""]([^""]+)[""]\s+(?:feature|capability)/i,
     /called\s+[""]([^""]+)[""]/i,
   ];
-  
+
   for (const pattern of quotedPatterns) {
     const match = message.match(pattern);
     if (match && match[1]) {
@@ -1466,13 +1466,13 @@ function extractFeatureName(message: string): string {
       return match[1].trim();
     }
   }
-  
+
   // Try unquoted patterns
   const unquotedPatterns = [
     /(?:new\s+)?feature\s+(?:is\s+)?called\s+(\w+(?:\s+\w+){0,3}?)(?:\.|,|\s+that|\s+which|\s+to|\s+do)/i,
     /(?:new\s+)?feature\s+(?:is\s+)?named\s+(\w+(?:\s+\w+){0,3}?)(?:\.|,|\s+that|\s+which|\s+to)/i,
   ];
-  
+
   for (const pattern of unquotedPatterns) {
     const match = message.match(pattern);
     if (match && match[1]) {
@@ -1480,7 +1480,7 @@ function extractFeatureName(message: string): string {
       return match[1].trim();
     }
   }
-  
+
   // Fallback: include the full context for the LLM to understand
   console.log(`[OpenAssistant] Could not extract feature name, using full message context`);
   // Return a summary of the request for the LLM
@@ -1499,7 +1499,7 @@ function extractCompanyFromMessage(message: string): string | null {
     /(?:about|on)\s+([A-Z][a-zA-Z\s&]+?)(?:'s|\s+and|\s+to|$)/i,
     /([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)?)\s+(?:earnings|priorities|strategic)/i,
   ];
-  
+
   for (const pattern of patterns) {
     const match = message.match(pattern);
     if (match && match[1]) {
@@ -1510,7 +1510,7 @@ function extractCompanyFromMessage(message: string): string | null {
       }
     }
   }
-  
+
   return null;
 }
 
@@ -1525,7 +1525,7 @@ async function handleGeneralAssistanceIntent(
   _dlContractChain?: AnswerContract[]  // Reserved for future chain support
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
-  
+
   // Check if user is asking about capabilities - use focused prompt for natural response
   if (isCapabilityQuestion(userMessage)) {
     console.log(`[OpenAssistant] Capability question detected - generating conversational capabilities response`);
@@ -1546,13 +1546,13 @@ async function handleGeneralAssistanceIntent(
       streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
     };
   }
-  
+
   // USE CONTROL PLANE CONTRACT when provided
   const actualContract = contract || AnswerContract.GENERAL_RESPONSE;
-  
+
   // For drafting emails, we allow thread context to inform the draft
   const isDraftingContract = actualContract === AnswerContract.DRAFT_EMAIL || actualContract === AnswerContract.DRAFT_RESPONSE;
-  
+
   // Skip evidence check for drafting - we'll use thread context instead
   if (!isDraftingContract) {
     const evidenceCheck = wouldBenefitFromEvidence(userMessage);
@@ -1569,25 +1569,25 @@ async function handleGeneralAssistanceIntent(
       };
     }
   }
-  
+
   const startTime = Date.now();
-  
+
   // Build thread context for conversation continuity
   const threadContextSection = buildThreadContextSection(context);
-  
+
   // Additional instructions for drafting contracts
   let draftingInstructions = "";
   if (isDraftingContract && threadContextSection) {
     draftingInstructions = "\n\nIMPORTANT: Use the specific details from the conversation above (customer names, action items, topics discussed) in your draft. Do NOT use generic placeholders.";
   }
-  
+
   // Add meeting context if available
   let meetingContextStr = "";
   if (context.resolvedMeeting) {
     const meeting = context.resolvedMeeting;
     meetingContextStr = `\n\nMeeting Context: ${meeting.companyName}${meeting.meetingDate ? ` (${meeting.meetingDate.toLocaleDateString()})` : ''}`;
   }
-  
+
   // Check if request would benefit from product knowledge enrichment
   // Include product KB for PitCrew-related creative/drafting tasks (naming, presentations, value props, etc.)
   let productKnowledgeSection = "";
@@ -1606,7 +1606,7 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       console.log(`[OpenAssistant] Could not fetch product knowledge for GENERAL_HELP: ${err}`);
     }
   }
-  
+
   const systemPrompt = `${AMBIENT_PRODUCT_CONTEXT}${productKnowledgeSection}
 
 You are a helpful business assistant for the PitCrew team. Provide clear, professional help with the user's request.
@@ -1625,7 +1625,7 @@ You are a helpful business assistant for the PitCrew team. Provide clear, profes
 - Implying you have access to specific meeting data
 
 If you're unsure whether something requires evidence, err on the side of asking the user to be more specific.${meetingContextStr}${threadContextSection}${draftingInstructions}`;
-  
+
   console.log(`[OpenAssistant] Calling ${getModelDescription(MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE)} for general assistance (streaming: ${!!context.slackStreaming})...`);
   const answer = await streamOpenAIResponse(
     MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,

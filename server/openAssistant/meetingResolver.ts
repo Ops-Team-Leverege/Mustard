@@ -6,7 +6,7 @@
  * finding and resolving meetings from user queries.
  */
 
-import { 
+import {
   type SingleMeetingContext,
   type MeetingSearchResult as SharedMeetingSearchResult,
   wantsAllCustomers
@@ -47,54 +47,54 @@ export function parseTimeRange(message: string): { startDate: Date | null; endDa
   const lower = message.toLowerCase();
   const now = new Date();
   const endDate = now;
-  
+
   // Last month
   if (/last\s+month|past\s+month/.test(lower)) {
     const startDate = new Date(now);
     startDate.setMonth(startDate.getMonth() - 1);
     return { startDate, endDate };
   }
-  
+
   // Last quarter (3 months)
   if (/last\s+quarter|past\s+quarter|past\s+3\s+months|last\s+3\s+months/.test(lower)) {
     const startDate = new Date(now);
     startDate.setMonth(startDate.getMonth() - 3);
     return { startDate, endDate };
   }
-  
+
   // Last week
   if (/last\s+week|past\s+week/.test(lower)) {
     const startDate = new Date(now);
     startDate.setDate(startDate.getDate() - 7);
     return { startDate, endDate };
   }
-  
+
   // Last 2 weeks
   if (/last\s+2\s+weeks|past\s+2\s+weeks|past\s+two\s+weeks/.test(lower)) {
     const startDate = new Date(now);
     startDate.setDate(startDate.getDate() - 14);
     return { startDate, endDate };
   }
-  
+
   // Last 6 months
   if (/last\s+6\s+months|past\s+6\s+months|past\s+six\s+months/.test(lower)) {
     const startDate = new Date(now);
     startDate.setMonth(startDate.getMonth() - 6);
     return { startDate, endDate };
   }
-  
+
   // Last year
   if (/last\s+year|past\s+year/.test(lower)) {
     const startDate = new Date(now);
     startDate.setFullYear(startDate.getFullYear() - 1);
     return { startDate, endDate };
   }
-  
+
   // All time - no start date filter
   if (/all\s+time/.test(lower)) {
     return { startDate: null, endDate };
   }
-  
+
   // Default: no time range detected
   return { startDate: null, endDate };
 }
@@ -109,27 +109,38 @@ export function parseTimeRange(message: string): { startDate: Date | null; endDa
 export async function findRelevantMeetings(
   userMessage: string,
   classification: IntentClassification,
-  scopeOverride?: ScopeOverride
+  scopeOverride?: ScopeOverride,
+  conversationContext?: string
 ): Promise<MeetingSearchResult> {
   const { storage } = await import("../storage");
-  
+
+  // Extract company from conversation context if available
+  let contextCompany: string | null = null;
+  if (conversationContext) {
+    const companyMatch = conversationContext.match(/Company:\s*(.+)/);
+    if (companyMatch) {
+      contextCompany = companyMatch[1].trim();
+      console.log(`[MeetingResolver] Company from conversation context: "${contextCompany}"`);
+    }
+  }
+
   // Check for "all customers" scope - prefer LLM-determined scope over regex
   const isAllCustomers = scopeOverride?.allCustomers ?? wantsAllCustomers(userMessage);
-  
+
   if (isAllCustomers) {
     const source = scopeOverride?.allCustomers ? "LLM scope detection" : "regex pattern";
     const meetingLimit = scopeOverride?.meetingLimit ?? null;
-    
+
     // Parse time range - prefer LLM's timeRangeExplanation over re-parsing user message
     // The LLM already did semantic understanding in checkAggregateSpecificity()
     const timeRangeSource = scopeOverride?.timeRangeExplanation || userMessage;
     const timeRange = parseTimeRange(timeRangeSource);
     const startDate = scopeOverride?.startDate ?? timeRange.startDate;
-    
+
     console.log(`[MeetingResolver] "All customers" detected via ${source} - fetching ${meetingLimit ?? 'all'} transcripts`);
     console.log(`[MeetingResolver] Scope override received:`, JSON.stringify(scopeOverride));
     console.log(`[MeetingResolver] Time range source: "${timeRangeSource}", filter: ${startDate ? startDate.toISOString() : 'none'}`);
-    
+
     const allMeetings = await fetchAllRecentTranscripts(meetingLimit, startDate);
     const topic = extractTopic(userMessage);
     return {
@@ -138,23 +149,66 @@ export async function findRelevantMeetings(
       topic,
     };
   }
-  
+
+  // If we have a company from conversation context, prioritize it
+  if (contextCompany) {
+    console.log(`[MeetingResolver] Prioritizing context company: "${contextCompany}"`);
+    const contextCompanyMatches = await searchCompanies([contextCompany]);
+    if (contextCompanyMatches.length > 0) {
+      console.log(`[MeetingResolver] Found context company match: ${contextCompany}`);
+
+      // Fetch meetings for the context company
+      const { MEETING_LIMITS } = await import("../config/constants");
+      const MAX_MEETINGS_PER_COMPANY = MEETING_LIMITS.MAX_MEETINGS_PER_COMPANY;
+
+      const meetings: SingleMeetingContext[] = [];
+      for (const company of contextCompanyMatches) {
+        const transcriptRows = await storage.rawQuery(`
+          SELECT t.id, t.meeting_date, c.name as company_name, c.id as company_id
+          FROM transcripts t
+          JOIN companies c ON t.company_id = c.id
+          WHERE t.company_id = $1
+          ORDER BY COALESCE(t.meeting_date, t.created_at) DESC
+          LIMIT $2
+        `, [company.id, MAX_MEETINGS_PER_COMPANY]);
+
+        if (transcriptRows && transcriptRows.length > 0) {
+          for (const row of transcriptRows) {
+            meetings.push({
+              meetingId: row.id as string,
+              companyId: row.company_id as string,
+              companyName: row.company_name as string,
+              meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+            });
+          }
+        }
+      }
+
+      console.log(`[MeetingResolver] Found ${meetings.length} meetings for context company: ${contextCompany}`);
+      return {
+        meetings,
+        searchedFor: contextCompany,
+        topic: extractTopic(userMessage),
+      };
+    }
+  }
+
   const searchTerms = extractSearchTerms(userMessage);
   const topic = extractTopic(userMessage);
   console.log(`[MeetingResolver] Searching for meetings with terms: ${searchTerms.join(", ")}${topic ? `, topic: "${topic}"` : ''}`);
-  
+
   if (searchTerms.length === 0) {
     console.log(`[MeetingResolver] No search terms extracted, trying fallback word search`);
     const fallbackMeetings = await fallbackMeetingSearch(userMessage);
-    return { 
-      meetings: fallbackMeetings, 
+    return {
+      meetings: fallbackMeetings,
       searchedFor: "(fallback search)",
       topic,
     };
   }
 
   const companyMatches = await searchCompanies(searchTerms);
-  
+
   if (companyMatches.length === 0) {
     const contactMatches = await searchContacts(searchTerms);
     if (contactMatches.length > 0) {
@@ -164,11 +218,11 @@ export async function findRelevantMeetings(
         topic,
       };
     }
-    
+
     console.log(`[MeetingResolver] No company/contact matches, trying fallback search`);
     const fallbackMeetings = await fallbackMeetingSearch(userMessage);
-    return { 
-      meetings: fallbackMeetings, 
+    return {
+      meetings: fallbackMeetings,
       searchedFor: searchTerms.join(", ") + " (+ fallback)",
       topic,
     };
@@ -178,7 +232,7 @@ export async function findRelevantMeetings(
   // Downstream processing (e.g., searchAcrossMeetings) may further reduce this
   const { MEETING_LIMITS } = await import("../config/constants");
   const MAX_MEETINGS_PER_COMPANY = MEETING_LIMITS.MAX_MEETINGS_PER_COMPANY;
-  
+
   const meetings: SingleMeetingContext[] = [];
   for (const company of companyMatches) {
     // Fetch recent transcripts for the company (bounded to prevent perf issues)
@@ -202,7 +256,7 @@ export async function findRelevantMeetings(
       }
     }
   }
-  
+
   console.log(`[MeetingResolver] Found ${meetings.length} total meetings for ${companyMatches.length} companies`);
 
   return {
@@ -222,11 +276,11 @@ export async function findRelevantMeetings(
 async function fetchAllRecentTranscripts(limit?: number | null, startDate?: Date | null): Promise<SingleMeetingContext[]> {
   const { storage } = await import("../storage");
   const { MEETING_LIMITS } = await import("../config/constants");
-  
+
   // Use user-specified limit if provided, otherwise use default max
   const effectiveLimit = (limit && limit > 0) ? limit : MEETING_LIMITS.MAX_TOTAL_TRANSCRIPTS;
   console.log(`[MeetingResolver] Fetching up to ${effectiveLimit} transcripts (user limit: ${limit ?? 'none'}, startDate: ${startDate?.toISOString() ?? 'none'})`);
-  
+
   let rows;
   if (startDate) {
     // Apply time range filter
@@ -252,19 +306,19 @@ async function fetchAllRecentTranscripts(limit?: number | null, startDate?: Date
       LIMIT $1
     `, [effectiveLimit]);
   }
-  
+
   if (!rows || rows.length === 0) {
     console.log(`[MeetingResolver] No transcripts found in database`);
     return [];
   }
-  
+
   const meetings: SingleMeetingContext[] = rows.map((row: any) => ({
     meetingId: row.meeting_id as string,
     companyId: row.company_id as string,
     companyName: row.company_name as string,
     meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
   }));
-  
+
   console.log(`[MeetingResolver] Fetched ${meetings.length} transcripts for "all customers" scope${startDate ? ` (since ${startDate.toISOString()})` : ''}`);
   return meetings;
 }
@@ -275,26 +329,26 @@ async function fetchAllRecentTranscripts(limit?: number | null, startDate?: Date
  */
 async function fallbackMeetingSearch(message: string): Promise<SingleMeetingContext[]> {
   const { storage } = await import("../storage");
-  
+
   const stopWords = new Set([
-    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", 
+    "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
     "her", "was", "one", "our", "out", "day", "get", "has", "him", "his",
     "how", "its", "let", "may", "new", "now", "old", "see", "way", "who",
     "did", "does", "what", "when", "where", "which", "while", "with", "about",
     "said", "they", "this", "that", "from", "have", "been", "some", "could",
     "would", "should", "their", "there", "these", "those", "being", "other",
   ]);
-  
+
   const words = message
     .replace(/[^\w\s]/g, " ")
     .split(/\s+/)
     .filter(w => w.length >= 3 && !stopWords.has(w.toLowerCase()));
-  
+
   console.log(`[MeetingResolver] Fallback search words: ${words.join(", ")}`);
-  
+
   const meetings: SingleMeetingContext[] = [];
   const seenCompanyIds = new Set<string>();
-  
+
   for (const word of words.slice(0, 5)) {
     const rows = await storage.rawQuery(`
       SELECT DISTINCT t.id as meeting_id, t.meeting_date, t.created_at, c.id as company_id, c.name as company_name,
@@ -305,7 +359,7 @@ async function fallbackMeetingSearch(message: string): Promise<SingleMeetingCont
       ORDER BY sort_date DESC
       LIMIT 2
     `, [`%${word}%`]);
-    
+
     if (rows) {
       for (const row of rows) {
         if (!seenCompanyIds.has(row.company_id as string)) {
@@ -320,7 +374,7 @@ async function fallbackMeetingSearch(message: string): Promise<SingleMeetingCont
       }
     }
   }
-  
+
   return meetings;
 }
 
@@ -334,12 +388,12 @@ async function fallbackMeetingSearch(message: string): Promise<SingleMeetingCont
  */
 export function extractSearchTerms(message: string): string[] {
   const terms: string[] = [];
-  
+
   const commonWords = new Set([
-    "what", "who", "where", "when", "why", "how", "the", "this", "that", 
-    "can", "could", "would", "should", "did", "does", "do", "is", "are", 
-    "was", "were", "has", "have", "had", "will", "shall", "may", "might", 
-    "must", "find", "show", "tell", "give", "help", "get", "let", "make", 
+    "what", "who", "where", "when", "why", "how", "the", "this", "that",
+    "can", "could", "would", "should", "did", "does", "do", "is", "are",
+    "was", "were", "has", "have", "had", "will", "shall", "may", "might",
+    "must", "find", "show", "tell", "give", "help", "get", "let", "make",
     "want", "need", "like", "think", "know", "say", "said", "about", "from",
     "with", "for", "and", "or", "but", "not", "all", "any", "some", "their",
     "they", "them", "our", "we", "you", "your", "its", "his", "her", "him",
@@ -347,7 +401,7 @@ export function extractSearchTerms(message: string): string[] {
     "in", "on", "at", "by", "up", "out", "if", "so", "no", "yes", "my",
     "roi", "tv", "api", "it",
   ]);
-  
+
   const properNounPattern = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/g;
   let match;
   while ((match = properNounPattern.exec(message)) !== null) {
@@ -391,7 +445,7 @@ export function extractSearchTerms(message: string): string[] {
  */
 export function extractTopic(message: string): string | undefined {
   const msg = message.toLowerCase();
-  
+
   // Patterns to extract topic after specific phrases
   const topicPatterns = [
     /\babout\s+([a-z]+(?:\s+[a-z]+)?)/i,
@@ -404,15 +458,15 @@ export function extractTopic(message: string): string | undefined {
     /\bmentioned\s+([a-z]+(?:\s+[a-z]+)?)/i,
     /\bask(?:ed|ing)?\s+about\s+([a-z]+(?:\s+[a-z]+)?)/i,
   ];
-  
+
   // Words to filter out - common non-topic words
   const nonTopicWords = new Set([
-    "the", "this", "that", "them", "they", "their", "it", "its", 
+    "the", "this", "that", "them", "they", "their", "it", "its",
     "any", "all", "some", "many", "few", "what", "which", "who",
     "meetings", "meeting", "calls", "call", "conversation", "conversations",
     "recent", "latest", "last", "previous", "answer", "response",
   ]);
-  
+
   for (const pattern of topicPatterns) {
     const match = msg.match(pattern);
     if (match && match[1]) {
@@ -424,7 +478,7 @@ export function extractTopic(message: string): string | undefined {
       }
     }
   }
-  
+
   return undefined;
 }
 
@@ -500,14 +554,14 @@ async function searchChunksForTopic(
   topic: string
 ): Promise<Map<string, ChunkSearchResult[]>> {
   const { storage } = await import("../storage");
-  
+
   const meetingIds = meetings.map(m => m.meetingId);
   if (meetingIds.length === 0) return new Map();
-  
+
   // Use parameterized query for safety
   const placeholders = meetingIds.map((_, i) => `$${i + 1}`).join(", ");
   const topicParam = `$${meetingIds.length + 1}`;
-  
+
   const query = `
     SELECT 
       tc.transcript_id,
@@ -522,9 +576,9 @@ async function searchChunksForTopic(
     ORDER BY tc.transcript_id, tc.chunk_index
     LIMIT 20
   `;
-  
+
   const rows = await storage.rawQuery(query, [...meetingIds, topic]);
-  
+
   const results = new Map<string, ChunkSearchResult[]>();
   if (rows) {
     for (const row of rows) {
@@ -541,7 +595,7 @@ async function searchChunksForTopic(
       });
     }
   }
-  
+
   console.log(`[MeetingResolver] Chunk search for "${topic}": found ${rows?.length || 0} chunks across ${results.size} meetings`);
   return results;
 }
@@ -556,47 +610,47 @@ export async function searchAcrossMeetings(
   topic?: string
 ): Promise<string> {
   const { handleSingleMeetingQuestion } = await import("./singleMeetingOrchestrator");
-  
+
   console.log(`[MeetingResolver] Searching across ${meetings.length} meetings${topic ? ` for topic: "${topic}"` : ''}`);
-  
+
   // FAST PATH: When topic is provided, use chunk-based keyword search (no LLM calls)
   if (topic) {
     const chunkResults = await searchChunksForTopic(meetings, topic);
-    
+
     if (chunkResults.size === 0) {
       const companyNames = Array.from(new Set(meetings.map(m => m.companyName))).join(", ");
       return `I searched across ${meetings.length} ${companyNames} meeting(s) but couldn't find any discussion about "${topic}".`;
     }
-    
+
     // Format chunk results grouped by meeting
     const formattedResults: string[] = [];
     const entries = Array.from(chunkResults.entries());
     for (const [transcriptId, chunks] of entries) {
       const firstChunk = chunks[0];
       const meetingDate = firstChunk.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date";
-      
+
       // Format each chunk with speaker attribution
       const excerpts = chunks.slice(0, 3).map((chunk: ChunkSearchResult) => {
         const speaker = chunk.speakerName ? `**${chunk.speakerName}**: ` : '';
         // Trim content to reasonable length and highlight topic
-        const content = chunk.content.length > 300 
+        const content = chunk.content.length > 300
           ? chunk.content.substring(0, 300) + "..."
           : chunk.content;
         return `${speaker}_"${content}"_`;
       }).join("\n\n");
-      
+
       formattedResults.push(`**${firstChunk.companyName}** (${meetingDate}):\n${excerpts}`);
     }
-    
+
     return `Here's what I found about "${topic}" across ${chunkResults.size} meeting(s):\n\n${formattedResults.join("\n\n---\n\n")}`;
   }
-  
+
   // SLOW PATH: No topic - use standard handler (may involve LLM)
   // OPTIMIZATION: Process meetings in parallel for faster response
   const meetingsToSearch = meetings.slice(0, 5);
   console.log(`[MeetingResolver] Processing ${meetingsToSearch.length} meetings in parallel...`);
   const startTime = Date.now();
-  
+
   const results = await Promise.all(
     meetingsToSearch.map(async (meeting) => {
       try {
@@ -616,7 +670,7 @@ export async function searchAcrossMeetings(
       }
     })
   );
-  
+
   const allResults = results.filter((r): r is NonNullable<typeof r> => r !== null);
   console.log(`[MeetingResolver] Parallel search completed in ${Date.now() - startTime}ms (${allResults.length}/${meetingsToSearch.length} had results)`);
 
@@ -624,7 +678,7 @@ export async function searchAcrossMeetings(
     return `I searched across ${meetings.length} meeting(s) with ${meetings.map(m => m.companyName).join(", ")}, but couldn't find information related to your question.`;
   }
 
-  const formattedResults = allResults.map(r => 
+  const formattedResults = allResults.map(r =>
     `**${r.companyName}** (${r.meetingDate}):\n${r.answer}`
   ).join("\n\n---\n\n");
 
