@@ -127,14 +127,21 @@ When you see conversation history, understand that short messages may be FOLLOW-
 CRITICAL - ANSWERING CLARIFICATION QUESTIONS:
 If the bot's LAST message asked for clarification (time range, customer scope, etc.) and the user responds with that information, this is an ANSWER not CLARIFY:
 - Bot asked "what time range?" → User says "last month is fine" → MULTI_MEETING (not CLARIFY!)
-- Bot asked "which customer?" → User says "all customers" or "across pilots" → MULTI_MEETING (not CLARIFY!)
+- Bot asked "which customer?" → User says "all customers" or "across pilots" or "across all pilots" → MULTI_MEETING (not CLARIFY!)
 - Bot asked for clarification → User provides answer → Use the ORIGINAL intent the bot was trying to help with
 
 Examples of answers to clarification:
-- "last month" / "last month is fine" / "past quarter" → Time range answer → MULTI_MEETING
-- "all customers" / "everyone" / "across all pilots" → Scope answer → MULTI_MEETING
+- "last month" / "last month is fine" / "past quarter" / "that's fine" → Time range answer → MULTI_MEETING
+- "all customers" / "everyone" / "across all pilots" / "across pilots" / "all of them" → Scope answer → MULTI_MEETING
 - "just Costco" / "for Jiffy Lube" → Specific customer answer → MULTI_MEETING or SINGLE_MEETING
 - "the most recent one" / "last call" → Meeting selection answer → SINGLE_MEETING
+
+CLARIFICATION RESPONSE PATTERNS:
+When the conversation shows the bot asked for clarification and user responds with:
+- Short confirmations: "yes", "that's fine", "sounds good", "ok" → Continue with original intent
+- Time answers: "last month", "past quarter", "all time" → MULTI_MEETING
+- Scope answers: "all customers", "everyone", "across pilots", "all of them" → MULTI_MEETING
+- Specific entities: "Costco", "Les Schwab" → SINGLE_MEETING or MULTI_MEETING based on context
 
 The conversation history shows previous exchanges. Use it to understand what the user is refining or continuing.
 If user's short message clearly refines a previous bot response about meetings → keep the meeting intent.
@@ -353,11 +360,12 @@ IMPORTANT: Look at ALL messages in the conversation - the original question may 
 RULES:
 - "X most recent meetings" or "last X meetings" = TIME RANGE is specified (they want the N most recent)
 - "we've had" or "our meetings" or "our calls" = SCOPE is "all" (implies all customers/all our data)
-- "all customers" or "across all" or "everyone" = SCOPE is "all"
+- "all customers" or "across all" or "everyone" or "across pilots" or "all pilots" = SCOPE is "all"
 - Specific company names (e.g., "Ivy Lane", "Les Schwab", "ACE") = SCOPE is "specific" + extract the company name
 - "last month/quarter/year" or "since [date]" = TIME RANGE is specified
 - "recent" alone without a number is NOT specific enough for time range
 - If the question clearly implies "look at everything" that's fine - no clarification needed
+- "pilots" or "pilot customers" or "pilot companies" = SCOPE is "all" (refers to all pilot customers)
 
 MEETING LIMIT EXTRACTION:
 - If user says "3 most recent" or "last 5 meetings" or "top 10", extract that number
@@ -365,7 +373,7 @@ MEETING LIMIT EXTRACTION:
 - Examples: "3 most recent meetings" → meetingLimit: 3, "meetings from last month" → meetingLimit: null
 
 SCOPE TYPE:
-- "all" = user wants all customers / all data (includes "we've had", "our meetings", "across all")
+- "all" = user wants all customers / all data (includes "we've had", "our meetings", "across all", "across pilots", "all pilots")
 - "specific" = user mentioned one or more specific company names (e.g., "Ivy Lane", "Les Schwab and ACE")
 - "none" = no customer scope specified
 
