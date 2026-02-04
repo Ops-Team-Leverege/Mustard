@@ -772,22 +772,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] No content to update streaming message: ${botReply.ts}`);
         }
         
-        // Generate document AFTER streaming if handler requested it
-        // Document will only be created if response exceeds 300 words (checked in sendResponseWithDocumentSupport)
-        if (openAssistantResultData?.shouldGenerateDoc && responseText && responseText.length > 200) {
-          console.log(`[Slack] Handler requested doc generation - will generate if >300 words`);
+        // Generate document AFTER streaming for ANY response above word threshold
+        // Word count check happens in sendResponseWithDocumentSupport
+        if (responseText && responseText.length > 200) {
+          console.log(`[Slack] Checking if response needs document generation (word count check)`);
           try {
             const { AnswerContract } = await import("../decisionLayer/answerContracts");
             await sendResponseWithDocumentSupport({
               channel,
               threadTs,
               content: responseText,
-              contract: openAssistantResultData?.answerContract ?? AnswerContract.SALES_DOCS_PREP,
+              contract: openAssistantResultData?.answerContract ?? AnswerContract.GENERAL_RESPONSE,
               customerName: resolvedMeeting?.companyName,
               userQuery: text,
               documentOnly: true, // Message already updated - only generate document
             });
-            console.log(`[Slack] Document generated and uploaded`);
+            console.log(`[Slack] Document check complete`);
           } catch (docErr) {
             console.error(`[Slack] Failed to generate document:`, docErr);
           }
