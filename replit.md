@@ -35,6 +35,13 @@ The system employs **true LLM-FIRST classification** for intent routing, primari
 **Routing Flow:**
 The Intent Router classifies intent, the Orchestrator computes context layers and selects an answer contract, and the Execution Layer executes the contract chain. LLM-determined scope (e.g., "all customers") is propagated downstream to avoid redundant detection. Contract chains are dynamically built based on user messages.
 
+**Data Source vs Processing Type (Important Distinction):**
+Contracts define WHERE to get data (data source), not HOW to process it:
+-   **Data Source Type** (contract level): meeting evidence only (`ssotMode: "none"`) vs Product SSOT (`ssotMode: "authoritative"`)
+-   **Processing Type** (question analysis): artifact return (simple extraction) vs LLM semantic (judgment/filtering)
+
+Example: `NEXT_STEPS` contract is extractive (meeting evidence only), but questions like "what should we mention" require LLM judgment even with available artifacts. The `isSemanticQuestion()` function detects judgment patterns independently of contract type.
+
 **Contract Selection Strategy (LLM-First):**
 1. **LLM-proposed contracts (primary)**: Utilizes `proposedInterpretation.contracts` (single source of truth) proposed by the LLM during intent classification.
 2. **Keyword fallback**: Used when the LLM does not propose contracts.

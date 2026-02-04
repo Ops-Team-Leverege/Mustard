@@ -1,0 +1,121 @@
+The Real Issue: Contract Classification Confusion
+Looking at the Architecture
+From answerContracts.ts, NEXT_STEPS is defined as:
+
+[AnswerContract.NEXT_STEPS]: {
+  ssotMode: "none",           // ← Meeting evidence only
+  requiresEvidence: true,
+  allowsSummary: false,
+  requiresCitation: true,
+  responseFormat: "list",
+  emptyResultBehavior: "return_empty",
+}
+Key Point: ssotMode: "none" means it's extractive from meeting evidence only - no Product SSOT, no external knowledge.
+
+But Look at the Handler Mapping
+The log shows:
+
+[SingleMeetingOrchestrator] Using Decision Layer contract: NEXT_STEPS → handler: extractive
+The Confusion:
+
+NEXT_STEPS contract says: "Extract action items from meeting"
+Handler type: extractive
+But the orchestrator is treating "extractive" as "just return artifacts, no LLM needed"
+The Architectural Mismatch
+What "Extractive" Should Mean:
+
+Extract information FROM meeting evidence
+May require LLM to extract/synthesize
+Grounded in meeting content (not Product SSOT)
+What the Code Thinks "Extractive" Means:
+
+Return pre-extracted artifacts from database
+No LLM needed
+Just format and return
+The Evidence from Logs
+[SingleMeetingOrchestrator] Reading action items for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f from database (READ-ONLY, no LLM)
+This is the problem! The system is saying:
+
+Contract is NEXT_STEPS
+Handler is extractive
+Therefore: "READ-ONLY, no LLM"
+Just return the artifacts from the database
+But the user's question requires LLM judgment:
+
+"what actions items should we make sure to mention"
+This needs filtering/prioritization
+This needs semantic understanding
+This needs LLM, even though it's "extractive" from meeting evidence
+The Two Meanings of "Extractive"
+Meaning 1 (Contract Level):
+
+Data source = meeting evidence only
+vs. "Descriptive" (Product SSOT) or "Authoritative" (Product SSOT required)
+Meaning 2 (Handler Level):
+
+Processing type = no LLM needed, just return artifacts
+vs. "Semantic" (LLM needed for understanding/judgment)
+The Confusion: The code is conflating these two meanings!
+
+What's Actually Happening
+Contract: NEXT_STEPS (extractive data source)
+    ↓
+Handler: extractive (no LLM processing) ← WRONG ASSUMPTION
+    ↓
+isSemantic: false ← WRONG CONCLUSION
+    ↓
+Skip semantic fallback ← WRONG BEHAVIOR
+    ↓
+Return raw artifacts ← WRONG OUTPUT
+What Should Happen
+Contract: NEXT_STEPS (extractive data source)
+    ↓
+Question Analysis: "what should we mention" (requires judgment)
+    ↓
+isSemantic: true ← CORRECT
+    ↓
+Handler: semantic with extractive data source ← CORRECT
+    ↓
+Fetch artifacts + Apply LLM judgment ← CORRECT
+    ↓
+Return filtered/prioritized list ← CORRECT
+The Root Cause
+The system is confusing:
+
+Data source type (where the data comes from: meeting vs. Product SSOT)
+Processing type (how to process it: artifact return vs. LLM semantic)
+NEXT_STEPS is:
+
+✅ Extractive data source (meeting evidence only)
+❌ NOT necessarily extractive processing (may need LLM for judgment)
+The Fix Needed
+The semantic detection should be independent of contract type:
+
+// WRONG (current):
+if (contract === NEXT_STEPS) {
+  handlerType = "extractive";  // Assumes no LLM needed
+  isSemantic = false;
+}
+
+// RIGHT (needed):
+const isSemantic = detectSemanticQuestion(question);  // Check question first
+const dataSource = getContractDataSource(contract);   // meeting vs. Product SSOT
+const needsLLM = isSemantic || !hasArtifacts;        // LLM if semantic OR no artifacts
+
+if (needsLLM) {
+  // Use LLM with appropriate data source
+  return semanticAnswer(question, dataSource);
+} else {
+  // Return artifacts directly
+  return formatArtifacts(artifacts);
+}
+Why This Matters
+Current behavior:
+
+"list action items" → returns artifacts ✅
+"what action items should we mention" → returns artifacts ❌ (should filter)
+Both use NEXT_STEPS contract, but need different processing!
+
+The contract tells you where to get the data (meeting evidence), but the question tells you how to process it (return all vs. filter/prioritize).
+
+Summary

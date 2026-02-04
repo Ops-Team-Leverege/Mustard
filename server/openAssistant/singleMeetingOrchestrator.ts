@@ -1336,6 +1336,19 @@ function isSemanticQuestion(question: string): boolean {
     /\bwhat\s+\w+\s+(?:were\s+)?(?:they|we|you)\s+(?:talking|discussing|mentioning)\b/,
     // "the thing/stuff they mentioned/discussed"
     /\b(?:the\s+)?(?:thing|stuff|item)\s+(?:they|we|you)\s+(?:mentioned|discussed|talked)\b/,
+    // JUDGMENT/PRIORITIZATION questions - require LLM filtering even with extractive data
+    // "should we mention/bring up/discuss/highlight"
+    /\bshould\s+(?:we|i|you)\s+(?:mention|bring\s+up|discuss|highlight|note|include|cover)\b/,
+    // "make sure to mention/bring up"
+    /\bmake\s+sure\s+(?:to\s+)?(?:mention|bring\s+up|discuss|note|include|cover)\b/,
+    // "important to discuss/mention/note"
+    /\b(?:important|key|critical|essential)\s+(?:to\s+)?(?:discuss|mention|note|bring\s+up|cover)\b/,
+    // "prioritize/focus on"
+    /\b(?:prioritize|focus\s+on|emphasize|highlight)\b/,
+    // "key/main/important points/items/things"
+    /\b(?:key|main|important|critical|top)\s+(?:points|items|things|topics|issues)\b/,
+    // "what to mention/discuss/bring up"
+    /\bwhat\s+(?:to\s+)?(?:mention|discuss|bring\s+up|highlight|note)\b/,
   ];
   return semanticPatterns.some(p => p.test(q));
 }
@@ -1567,10 +1580,16 @@ export async function handleSingleMeetingQuestion(
     case "extractive": {
       const result = await handleExtractiveIntent(ctx, question, contract);
       
-      // STEP 6: If artifacts fail AND question is semantic → use LLM semantic answer
+      // STEP 6: Semantic questions need LLM judgment
+      // Two cases where we use LLM:
+      // 1. Artifacts not found AND question is semantic → LLM fallback
+      // 2. Artifacts found BUT question requires judgment (e.g., "what should we mention") → LLM filtering
       let semanticError: string | undefined;
-      if (result.dataSource === "not_found" && isSemantic) {
-        console.log(`[SingleMeetingOrchestrator] Semantic fallback: artifacts not found, trying LLM answer`);
+      const needsLLMJudgment = isSemantic; // All semantic questions use LLM (for filtering/judgment even with artifacts)
+      
+      if (needsLLMJudgment) {
+        const reason = result.dataSource === "not_found" ? "artifacts not found" : "judgment question requires filtering";
+        console.log(`[SingleMeetingOrchestrator] Semantic processing: ${reason}, using LLM answer`);
         try {
           const semanticResult = await semanticAnswerSingleMeeting(
             ctx.meetingId,
@@ -1578,7 +1597,7 @@ export async function handleSingleMeetingQuestion(
             question,
             ctx.meetingDate
           );
-          console.log(`[SingleMeetingOrchestrator] STEP6-SUCCESS: Got semantic result with confidence=${semanticResult.confidence}`);
+          console.log(`[SingleMeetingOrchestrator] Semantic success: confidence=${semanticResult.confidence}`);
           return {
             answer: semanticResult.answer,
             intent: "extractive",
@@ -1589,13 +1608,12 @@ export async function handleSingleMeetingQuestion(
           };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
-          console.error(`[SingleMeetingOrchestrator] STEP6-ERROR: Semantic answer failed: ${errorMsg}`);
-          console.error(`[SingleMeetingOrchestrator] STEP6-ERROR-STACK:`, err);
+          console.error(`[SingleMeetingOrchestrator] Semantic error: ${errorMsg}`);
           semanticError = errorMsg;
-          // Fall through to uncertainty response
+          // Fall through to return artifacts if available, or uncertainty response
         }
-      } else {
-        console.log(`[SingleMeetingOrchestrator] STEP6-SKIP: Not triggering because dataSource=${result.dataSource} or isSemantic=${isSemantic}`);
+      } else if (!isSemantic) {
+        console.log(`[SingleMeetingOrchestrator] Non-semantic question: returning artifacts directly`);
       }
       
       // If still not found, offer summary
@@ -1609,9 +1627,10 @@ export async function handleSingleMeetingQuestion(
       const result = await handleAggregativeIntent(ctx, question);
       let aggSemanticError: string | undefined;
       
-      // STEP 6: If artifacts fail AND question is semantic → use LLM semantic answer
-      if (result.dataSource === "not_found" && isSemantic) {
-        console.log(`[SingleMeetingOrchestrator] Step 6: Semantic answer layer (aggregative, artifacts failed)`);
+      // STEP 6: Semantic questions need LLM judgment (same logic as extractive)
+      if (isSemantic) {
+        const reason = result.dataSource === "not_found" ? "artifacts not found" : "judgment question requires filtering";
+        console.log(`[SingleMeetingOrchestrator] Semantic processing (aggregative): ${reason}`);
         try {
           const semanticResult = await semanticAnswerSingleMeeting(
             ctx.meetingId,
