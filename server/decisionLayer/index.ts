@@ -103,6 +103,7 @@ export type DecisionLayerResult = {
     timeRangeExplanation?: string; // e.g., "3 most recent meetings"
     customerScopeExplanation?: string; // e.g., "we've had implies all customers"
     meetingLimit?: number | null; // e.g., "3 most recent" → 3
+    threadMessages?: Array<{ text: string; isBot: boolean }>; // Thread context for topic extraction
   };
 };
 
@@ -250,6 +251,8 @@ export async function runDecisionLayer(
       timeRangeExplanation: specificity.timeRangeExplanation,
       customerScopeExplanation: specificity.customerScopeExplanation,
       meetingLimit: specificity.meetingLimit ?? null,
+      // Pass thread messages for topic extraction in meeting resolver
+      threadMessages: threadContext?.messages,
     };
     
     console.log(`[DecisionLayer] LLM scope detection: scopeType=${scopeInfo.scopeType}, allCustomers=${scopeInfo.allCustomers}, specificCompanies=${JSON.stringify(scopeInfo.specificCompanies)}, hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
