@@ -129,17 +129,18 @@ const BOT_CAPABILITIES: Array<{ capability: string; useCase: string }> = [
  */
 function getRandomCapabilityTip(): string {
   const capability = pickRandom(BOT_CAPABILITIES);
-  const prefixes = [
-    "I can help you",
-    "I can also",
-    "I'm able to",
-    "Need to",
-    "Want to",
-  ];
-  const prefix = pickRandom(prefixes);
   // Make the use case lowercase for grammatical flow
   const useCase = capability.useCase.charAt(0).toLowerCase() + capability.useCase.slice(1);
-  return `${prefix} ${useCase}`;
+  
+  const templates = [
+    `I can help you ${useCase}`,
+    `I can also ${useCase}`,
+    `I'm able to ${useCase}`,
+    `Need to ${useCase}? I can help with that`,
+    `Want to ${useCase}? Just ask`,
+  ];
+  
+  return pickRandom(templates);
 }
 
 /**
