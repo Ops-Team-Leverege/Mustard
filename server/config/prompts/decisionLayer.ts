@@ -100,7 +100,7 @@ Respond with JSON: {
   "keyTopics": ["topic1", "topic2"],
   "shouldProceed": true/false,
   "clarificationSuggestion": "specific clarification if ambiguous"
-}`
+}
 
 BOT vs PITCREW DISAMBIGUATION:
 When user says "you" - determine if they mean the bot(PitCrew Sauce) or PitCrew the product:
