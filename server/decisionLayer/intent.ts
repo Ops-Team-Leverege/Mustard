@@ -107,6 +107,7 @@ export type IntentClassificationResult = {
   // Semantic context extraction from conversation
   extractedCompany?: string;                        // Single company name extracted from context
   extractedCompanies?: string[];                    // Multiple companies if ambiguous
+  proposedContracts?: string[];                    // LLM-proposed contracts for answer selection
   isAmbiguous?: boolean;                           // True if multiple companies mentioned
   conversationContext?: string;                     // What is this conversation about?
   keyTopics?: string[];                            // Key topics being discussed
@@ -497,6 +498,7 @@ async function classifyByLLM(
       console.log(`  Intent: ${intentStr}`);
       console.log(`  Company: ${parsed.extractedCompany || 'none'}`);
       console.log(`  Companies: ${parsed.extractedCompanies ? parsed.extractedCompanies.join(', ') : 'none'}`);
+      console.log(`  Contracts: ${parsed.proposedContracts ? parsed.proposedContracts.join(', ') : 'none'}`);
       console.log(`  Ambiguous: ${parsed.isAmbiguous ? 'yes' : 'no'}`);
       console.log(`  Context: ${parsed.conversationContext || 'none'}`);
       console.log(`  Topics: ${parsed.keyTopics ? parsed.keyTopics.join(', ') : 'none'}`);
@@ -510,6 +512,7 @@ async function classifyByLLM(
         reason: parsed.reason,
         extractedCompany: parsed.extractedCompany || undefined,
         extractedCompanies: parsed.extractedCompanies || undefined,
+        proposedContracts: parsed.proposedContracts || undefined,  // LLM-proposed contracts for answer selection
         isAmbiguous: parsed.isAmbiguous || false,
         conversationContext: parsed.conversationContext || undefined,
         keyTopics: parsed.keyTopics || undefined,

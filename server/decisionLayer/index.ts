@@ -244,11 +244,14 @@ export async function runDecisionLayer(
 
   console.log(`[DecisionLayer] Context Layers: ${JSON.stringify(layersMeta.layers)}`);
 
+  // LLM-first: Use proposedContracts from LLM classification, fallback to proposedInterpretation contracts
+  const llmProposedContracts = intentResult.proposedContracts || intentResult.proposedInterpretation?.contracts;
+  
   const contractResult = await selectAnswerContract(
     question,
     intentResult.intent,
     layersMeta.layers,
-    intentResult.proposedInterpretation?.contracts
+    llmProposedContracts
   );
 
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
