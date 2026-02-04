@@ -445,19 +445,48 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log(`  Scope: ${JSON.stringify(decisionLayerResult.scope)}`);
       console.log(`  Clarify Message: ${decisionLayerResult.clarifyMessage ? 'yes' : 'none'}`);
       console.log(`  Context Layers: ${JSON.stringify(decisionLayerResult.contextLayers)}`);
+      console.log(`  Semantic Context:`);
+      console.log(`    - Extracted Company: ${decisionLayerResult.extractedCompany || 'none'}`);
+      console.log(`    - Extracted Companies: ${decisionLayerResult.extractedCompanies ? decisionLayerResult.extractedCompanies.join(', ') : 'none'}`);
+      console.log(`    - Is Ambiguous: ${decisionLayerResult.isAmbiguous ? 'yes' : 'no'}`);
+      console.log(`    - Conversation Context: ${decisionLayerResult.conversationContext || 'none'}`);
+      console.log(`    - Key Topics: ${decisionLayerResult.keyTopics ? decisionLayerResult.keyTopics.join(', ') : 'none'}`);
+      console.log(`    - Should Proceed: ${decisionLayerResult.shouldProceed !== false ? 'yes' : 'no'}`);
+      console.log(`    - Clarification Suggestion: ${decisionLayerResult.clarificationSuggestion || 'none'}`);
 
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
 
-      // Extract company from message BEFORE meeting resolution - preserves context for CLARIFY flows
-      // Only extract if not already available from thread context
+      // Use LLM-extracted company from Decision Layer (semantic understanding)
+      // This replaces regex-based extraction with conversation-aware context extraction
       if (!threadContext?.companyId) {
-        // First try current message
-        companyMentioned = await extractCompanyFromMessage(text);
-        if (companyMentioned) {
-          console.log(`[Slack] Company extracted from current message: ${companyMentioned.companyName}`);
+        // Check if LLM extracted a company from conversation context
+        if (decisionLayerResult.extractedCompany) {
+          // Look up company ID from extracted name
+          const companyRows = await storage.rawQuery(
+            `SELECT id, name FROM companies WHERE LOWER(name) = LOWER($1)`,
+            [decisionLayerResult.extractedCompany]
+          );
+          if (companyRows && companyRows.length > 0) {
+            companyMentioned = {
+              companyId: companyRows[0].id as string,
+              companyName: companyRows[0].name as string,
+            };
+            console.log(`[Slack] ✅ Company extracted by LLM from conversation: ${companyMentioned.companyName}`);
+          } else {
+            console.log(`[Slack] ⚠️ LLM extracted company "${decisionLayerResult.extractedCompany}" but not found in database`);
+          }
         }
 
-        // If not found, scan thread history for company mentions (for threads where bot was mentioned mid-conversation)
+        // Fallback: If LLM didn't extract company, try regex-based extraction
+        // This handles edge cases where LLM might miss obvious company mentions
+        if (!companyMentioned) {
+          companyMentioned = await extractCompanyFromMessage(text);
+          if (companyMentioned) {
+            console.log(`[Slack] Company extracted from current message (regex fallback): ${companyMentioned.companyName}`);
+          }
+        }
+
+        // If still not found, scan thread history for company mentions (for threads where bot was mentioned mid-conversation)
         if (!companyMentioned && threadContextForCP?.messages && threadContextForCP.messages.length > 1) {
           console.log(`[Slack] No company in current message, scanning ${threadContextForCP.messages.length} thread messages`);
           for (const msg of threadContextForCP.messages) {

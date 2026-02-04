@@ -105,6 +105,14 @@ export type DecisionLayerResult = {
     meetingLimit?: number | null; // e.g., "3 most recent" → 3
     threadMessages?: Array<{ text: string; isBot: boolean }>; // Thread context for topic extraction
   };
+  // Semantic context extraction from conversation (NEW)
+  extractedCompany?: string;                        // Single company name extracted from context
+  extractedCompanies?: string[];                    // Multiple companies if ambiguous
+  isAmbiguous?: boolean;                           // True if multiple companies mentioned
+  conversationContext?: string;                     // What is this conversation about?
+  keyTopics?: string[];                            // Key topics being discussed
+  shouldProceed?: boolean;                         // Should we proceed without clarification?
+  clarificationSuggestion?: string;               // Specific clarification message if ambiguous
 };
 
 // Backward compatibility alias
@@ -292,6 +300,14 @@ export async function runDecisionLayer(
             summary: "Aggregate analysis - awaiting scope",
           },
           scope: scopeInfo,
+          // Semantic context extraction from conversation
+          extractedCompany: intentResult.extractedCompany,
+          extractedCompanies: intentResult.extractedCompanies,
+          isAmbiguous: intentResult.isAmbiguous,
+          conversationContext: intentResult.conversationContext,
+          keyTopics: intentResult.keyTopics,
+          shouldProceed: intentResult.shouldProceed,
+          clarificationSuggestion: intentResult.clarificationSuggestion,
         };
       }
     }
@@ -312,6 +328,14 @@ export async function runDecisionLayer(
     clarifyMessage: intentResult.clarifyMessage,
     proposedInterpretation: intentResult.proposedInterpretation,
     scope: scopeInfo,
+    // Semantic context extraction from conversation
+    extractedCompany: intentResult.extractedCompany,
+    extractedCompanies: intentResult.extractedCompanies,
+    isAmbiguous: intentResult.isAmbiguous,
+    conversationContext: intentResult.conversationContext,
+    keyTopics: intentResult.keyTopics,
+    shouldProceed: intentResult.shouldProceed,
+    clarificationSuggestion: intentResult.clarificationSuggestion,
   };
 
   console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);

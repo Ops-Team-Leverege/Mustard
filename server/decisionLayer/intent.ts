@@ -654,9 +654,9 @@ export async function classifyIntent(
     return keywordResult;
   }
 
-  // No keyword match - use LLM interpretation for intelligent clarification
-  console.log(`[IntentClassifier] No keyword match, using LLM interpretation for clarification`);
-  return classifyWithInterpretation(question, "no_intent_match", null, threadContext);
+  // No keyword match - use LLM classification with semantic context extraction
+  console.log(`[IntentClassifier] No keyword match, using LLM classification with semantic context extraction`);
+  return classifyByLLM(question, threadContext);
 }
 
 /**
