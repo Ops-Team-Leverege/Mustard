@@ -124,6 +124,18 @@ When you see conversation history, understand that short messages may be FOLLOW-
 - "no, I meant X" → Correction, re-classify based on X
 - "what about for Costco?" → Applying previous task type to a new entity
 
+CRITICAL - ANSWERING CLARIFICATION QUESTIONS:
+If the bot's LAST message asked for clarification (time range, customer scope, etc.) and the user responds with that information, this is an ANSWER not CLARIFY:
+- Bot asked "what time range?" → User says "last month is fine" → MULTI_MEETING (not CLARIFY!)
+- Bot asked "which customer?" → User says "all customers" or "across pilots" → MULTI_MEETING (not CLARIFY!)
+- Bot asked for clarification → User provides answer → Use the ORIGINAL intent the bot was trying to help with
+
+Examples of answers to clarification:
+- "last month" / "last month is fine" / "past quarter" → Time range answer → MULTI_MEETING
+- "all customers" / "everyone" / "across all pilots" → Scope answer → MULTI_MEETING
+- "just Costco" / "for Jiffy Lube" → Specific customer answer → MULTI_MEETING or SINGLE_MEETING
+- "the most recent one" / "last call" → Meeting selection answer → SINGLE_MEETING
+
 The conversation history shows previous exchanges. Use it to understand what the user is refining or continuing.
 If user's short message clearly refines a previous bot response about meetings → keep the meeting intent.
 If user's short message clearly refines a previous bot response about product knowledge → PRODUCT_KNOWLEDGE.
