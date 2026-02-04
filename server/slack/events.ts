@@ -775,14 +775,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // Generate document AFTER streaming only when handler explicitly requested it
         // (i.e., when LLM contract chain includes SALES_DOCS_PREP)
         if (openAssistantResultData?.shouldGenerateDoc && responseText && responseText.length > 200) {
-          console.log(`[Slack] Handler requested doc generation - generating .docx`);
           const { AnswerContract } = await import("../decisionLayer/answerContracts");
+          // Use SALES_DOCS_PREP as contract since shouldGenerateDoc means it was in the chain
+          // This ensures document is always generated (bypasses word count threshold)
+          console.log(`[Slack] Handler requested doc generation - using SALES_DOCS_PREP contract`);
           try {
             await sendResponseWithDocumentSupport({
               channel,
               threadTs,
               content: responseText,
-              contract: openAssistantResultData?.answerContract ?? AnswerContract.SALES_DOCS_PREP,
+              contract: AnswerContract.SALES_DOCS_PREP,
               customerName: resolvedMeeting?.companyName,
               userQuery: text,
               documentOnly: true, // Message already updated - only generate document
