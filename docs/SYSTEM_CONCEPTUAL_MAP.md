@@ -82,7 +82,7 @@ Data Storage & Retrieval
 
 **Intent Classification** (`server/decisionLayer/intent.ts`):
 - **SINGLE_MEETING**: Questions about specific meetings
-- **MULTI_MEETING**: Cross-meeting analysis and patterns
+- **MULTI_MEETING**: Cross-meeting analysis and patterns  
 - **PRODUCT_KNOWLEDGE**: Product features and capabilities
 - **DOCUMENT_SEARCH**: Find specific documents
 - **EXTERNAL_RESEARCH**: Web research on companies/prospects
