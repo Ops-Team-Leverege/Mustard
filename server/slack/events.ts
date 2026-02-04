@@ -434,9 +434,24 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Extract company from message BEFORE meeting resolution - preserves context for CLARIFY flows
       // Only extract if not already available from thread context
       if (!threadContext?.companyId) {
+        // First try current message
         companyMentioned = await extractCompanyFromMessage(text);
         if (companyMentioned) {
-          console.log(`[Slack] Company extracted from message: ${companyMentioned.companyName}`);
+          console.log(`[Slack] Company extracted from current message: ${companyMentioned.companyName}`);
+        }
+        
+        // If not found, scan thread history for company mentions (for threads where bot was mentioned mid-conversation)
+        if (!companyMentioned && threadContextForCP?.messages && threadContextForCP.messages.length > 1) {
+          console.log(`[Slack] No company in current message, scanning ${threadContextForCP.messages.length} thread messages`);
+          for (const msg of threadContextForCP.messages) {
+            if (msg.isBot) continue; // Skip bot messages
+            const extracted = await extractCompanyFromMessage(msg.text);
+            if (extracted) {
+              companyMentioned = extracted;
+              console.log(`[Slack] Company extracted from thread history: ${companyMentioned.companyName}`);
+              break; // Use first found company
+            }
+          }
         }
       }
       
