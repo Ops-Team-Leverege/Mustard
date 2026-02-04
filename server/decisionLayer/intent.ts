@@ -493,16 +493,8 @@ async function classifyByLLM(
     const intentStr = parsed.intent as string;
 
     if (intentStr in Intent) {
-      console.log(`[IntentClassifier] ✅ SEMANTIC CONTEXT EXTRACTED:`);
-      console.log(`  Intent: ${intentStr}`);
-      console.log(`  Company: ${parsed.extractedCompany || 'none'}`);
-      console.log(`  Companies: ${parsed.extractedCompanies ? parsed.extractedCompanies.join(', ') : 'none'}`);
-      console.log(`  Contracts: ${parsed.proposedContracts ? parsed.proposedContracts.join(', ') : 'none'}`);
-      console.log(`  Ambiguous: ${parsed.isAmbiguous ? 'yes' : 'no'}`);
-      console.log(`  Context: ${parsed.conversationContext || 'none'}`);
-      console.log(`  Topics: ${parsed.keyTopics ? parsed.keyTopics.join(', ') : 'none'}`);
-      console.log(`  Should Proceed: ${parsed.shouldProceed !== false ? 'yes' : 'no'}`);
-      console.log(`  Clarification: ${parsed.clarificationSuggestion || 'none'}`);
+      const contracts = parsed.proposedContracts?.join(',') || 'none';
+      console.log(`[IntentClassifier] LLM: intent=${intentStr}, company=${parsed.extractedCompany || 'none'}, contracts=${contracts}`);
 
       // Build proposedInterpretation from LLM-proposed contracts (single source of truth)
       const proposedInterpretation = parsed.proposedContracts?.length 

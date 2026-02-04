@@ -458,7 +458,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Use LLM-extracted company from Decision Layer (semantic understanding)
       // This replaces regex-based extraction with conversation-aware context extraction
-      console.log(`[Slack] Thread context check: companyId=${threadContext?.companyId || 'none'}, extractedCompany=${decisionLayerResult.extractedCompany || 'none'}`);
       if (!threadContext?.companyId) {
         // Check if LLM extracted a company from conversation context
         if (decisionLayerResult.extractedCompany) {
@@ -477,11 +476,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
             );
           }
 
-          // If still no match, try contains match (extracted name anywhere in company name)
-          if (!companyRows || companyRows.length === 0) {
+          // If still no match, try word boundary match (extracted name as complete word in company name)
+          // Only if extracted name is 4+ chars to avoid false positives like "ACE" matching "Palace"
+          const extractedName = decisionLayerResult.extractedCompany;
+          if ((!companyRows || companyRows.length === 0) && extractedName.length >= 4) {
+            // Match as word boundary: start of string, after space, or in parentheses
             companyRows = await storage.rawQuery(
-              `SELECT id, name FROM companies WHERE LOWER(name) LIKE '%' || LOWER($1) || '%'`,
-              [decisionLayerResult.extractedCompany]
+              `SELECT id, name FROM companies WHERE 
+                LOWER(name) LIKE LOWER($1) || ' %' OR 
+                LOWER(name) LIKE '% ' || LOWER($1) || '%' OR
+                LOWER(name) LIKE '%(' || LOWER($1) || ')%' OR
+                LOWER(name) LIKE '%(' || LOWER($1) || ' %'`,
+              [extractedName]
             );
           }
 
@@ -490,31 +496,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
               companyId: companyRows[0].id as string,
               companyName: companyRows[0].name as string,
             };
-            console.log(`[Slack] ✅ Company extracted by LLM from conversation: ${companyMentioned.companyName}`);
+            console.log(`[Slack] Company resolved: ${companyMentioned.companyName}`);
           } else {
-            console.log(`[Slack] ⚠️ LLM extracted company "${decisionLayerResult.extractedCompany}" but not found in database`);
+            console.warn(`[Slack] Company "${decisionLayerResult.extractedCompany}" not found in database`);
           }
         }
 
         // Fallback: If LLM didn't extract company, try regex-based extraction
-        // This handles edge cases where LLM might miss obvious company mentions
         if (!companyMentioned) {
           companyMentioned = await extractCompanyFromMessage(text);
-          if (companyMentioned) {
-            console.log(`[Slack] Company extracted from current message (regex fallback): ${companyMentioned.companyName}`);
-          }
         }
 
-        // If still not found, scan thread history for company mentions (for threads where bot was mentioned mid-conversation)
+        // If still not found, scan thread history for company mentions
         if (!companyMentioned && threadContextForCP?.messages && threadContextForCP.messages.length > 1) {
-          console.log(`[Slack] No company in current message, scanning ${threadContextForCP.messages.length} thread messages`);
           for (const msg of threadContextForCP.messages) {
             if (msg.isBot) continue; // Skip bot messages
             const extracted = await extractCompanyFromMessage(msg.text);
             if (extracted) {
               companyMentioned = extracted;
-              console.log(`[Slack] Company extracted from thread history: ${companyMentioned.companyName}`);
-              break; // Use first found company
+              break;
             }
           }
         }
@@ -525,7 +525,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const needsMeetingResolution = decisionLayerResult.intent === 'SINGLE_MEETING' || decisionLayerResult.intent === 'MULTI_MEETING';
 
       if (needsMeetingResolution) {
-        console.log(`[Slack] Intent requires meeting - running meeting resolution`);
 
         // Check if thread already has meeting context (highest priority)
         if (threadContext?.meetingId && threadContext?.companyId) {
@@ -656,7 +655,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
         isClarificationRequest = true;
         // Preserve company context from message for follow-up clarifications
         resolvedCompanyId = companyMentioned?.companyId || threadContext?.companyId || null;
-        console.log(`[Slack] Clarification requested: ${clarifyMessage}, preserving company: ${resolvedCompanyId || 'none'}`);
       }
       // STEP 3: Handle SINGLE_MEETING without resolved meeting - ask for clarification
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {
@@ -667,7 +665,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
         isClarificationRequest = true;
         // Preserve company context from message for follow-up clarifications
         resolvedCompanyId = companyMentioned?.companyId || threadContext?.companyId || null;
-        console.log(`[Slack] SINGLE_MEETING intent but no resolved meeting - asking for clarification, preserving company: ${resolvedCompanyId || 'none'}`);
       }
       // STEP 4: Route based on classified intent
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
