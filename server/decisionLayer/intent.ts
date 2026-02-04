@@ -63,7 +63,7 @@ export type IntentDecisionMetadata = {
   singleIntentViolation?: boolean;     // True if multiple intents matched
   llmInterpretation?: {                // LLM interpretation for clarification
     proposedIntent: IntentString;
-    proposedContracts: ContractString[];  // Ordered array for contract chain
+    // Note: contracts are in proposedInterpretation.contracts (single source of truth)
     confidence: number;
     failureReason: string;
     interpretationSource: "llm_fallback" | "ambiguity_resolution";

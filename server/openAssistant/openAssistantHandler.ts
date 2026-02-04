@@ -1085,8 +1085,7 @@ async function handleExternalResearchIntent(
   contract?: AnswerContract,
   dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
-  console.log(`[OpenAssistant] === EXTERNAL RESEARCH START ===`);
-  console.log(`[OpenAssistant] Routing to external research path${contract ? ` (CP contract: ${contract})` : ''}${dlContractChain ? ` (chain: [${dlContractChain.join(" → ")}])` : ''}`);
+  console.log(`[OpenAssistant] External research: contract=${contract || 'EXTERNAL_RESEARCH'}${dlContractChain ? `, chain=[${dlContractChain.join(" → ")}]` : ''}`);
   const startTime = Date.now();
 
   const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
@@ -1354,7 +1353,6 @@ async function chainProductStyleWriting(
   context: OpenAssistantContext,
   fromResearchChain: boolean = false
 ): Promise<string> {
-  console.log(`[OpenAssistant] === STYLE MATCHING START ===`);
   const startTime = Date.now();
 
   const { getProductKnowledgePrompt } = await import("../airtable/productData");

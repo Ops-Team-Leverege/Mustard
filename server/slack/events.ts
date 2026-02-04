@@ -856,15 +856,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const hasContract = !!openAssistantResultData?.answerContract;
       const willGenerateDoc = hasContract && !usedSingleMeetingMode;
       const usedStreaming = !!streamingContext;
-      console.log(`[Slack] === DOCUMENT DECISION ===`);
-      console.log(`[Slack] testRun: ${testRun}`);
-      console.log(`[Slack] contract: ${openAssistantResultData?.answerContract || 'NONE'}`);
-      console.log(`[Slack] usedSingleMeetingMode: ${usedSingleMeetingMode}`);
-      console.log(`[Slack] usedStreaming: ${usedStreaming}`);
-      console.log(`[Slack] hasOpenAssistantData: ${!!openAssistantResultData}`);
-      console.log(`[Slack] hasContract: ${hasContract}`);
-      console.log(`[Slack] willGenerateDoc: ${willGenerateDoc}`);
-      console.log(`[Slack] === END DOCUMENT DECISION ===`);
+      console.log(`[Slack] Document decision: testRun=${testRun}, contract=${openAssistantResultData?.answerContract || 'NONE'}, streaming=${usedStreaming}, willGenerateDoc=${willGenerateDoc}`);
       if (testRun) {
         botReply = { ts: `test-${Date.now()}` };
       } else if (usedStreaming) {

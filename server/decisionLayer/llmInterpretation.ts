@@ -54,7 +54,7 @@ export type ContractString =
 
 export type LLMInterpretation = {
   proposedIntent: IntentString;
-  proposedContracts: ContractString[];  // Ordered array for contract chain
+  // Note: contracts are in proposedInterpretation.contracts (single source of truth)
   confidence: number; // 0.0 – 1.0
   interpretation: string; // human-readable summary
   alternatives?: LLMInterpretationAlternative[];
@@ -91,7 +91,7 @@ export type LLMInterpretationAlternative = {
 
 export type InterpretationMetadata = {
   proposedIntent: IntentString;
-  proposedContracts: ContractString[];  // Ordered array for contract chain
+  // Note: contracts are in proposedInterpretation.contracts (single source of truth)
   confidence: number;
   failureReason: string;
   interpretationSource: "llm_fallback" | "ambiguity_resolution";
@@ -364,7 +364,6 @@ export async function interpretAmbiguousQuery(
 
     const llmInterpretation: LLMInterpretation = {
       proposedIntent,
-      proposedContracts,  // Full contract chain
       confidence,
       interpretation,
       alternatives: alternatives.length > 0 ? alternatives : undefined,
@@ -388,7 +387,6 @@ export async function interpretAmbiguousQuery(
       message,
       metadata: {
         proposedIntent,
-        proposedContracts,
         confidence,
         failureReason,
         interpretationSource: "llm_fallback",
@@ -411,7 +409,6 @@ function createFallbackClarify(_question: string, failureReason: string): Clarif
     message: generateFallbackClarifyMessage(),
     metadata: {
       proposedIntent: "GENERAL_HELP",
-      proposedContracts: ["GENERAL_RESPONSE"],
       confidence: 0,
       failureReason,
       interpretationSource: "llm_fallback",

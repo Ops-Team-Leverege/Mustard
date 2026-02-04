@@ -1568,12 +1568,10 @@ export async function handleSingleMeetingQuestion(
       const result = await handleExtractiveIntent(ctx, question, contract);
       
       // STEP 6: If artifacts fail AND question is semantic → use LLM semantic answer
-      console.log(`[SingleMeetingOrchestrator] STEP6-CHECK: dataSource=${result.dataSource}, isSemantic=${isSemantic}, shouldTrigger=${result.dataSource === "not_found" && isSemantic}`);
       let semanticError: string | undefined;
       if (result.dataSource === "not_found" && isSemantic) {
-        console.log(`[SingleMeetingOrchestrator] STEP6-TRIGGER: Entering semantic answer layer`);
+        console.log(`[SingleMeetingOrchestrator] Semantic fallback: artifacts not found, trying LLM answer`);
         try {
-          console.log(`[SingleMeetingOrchestrator] STEP6-CALL: About to call semanticAnswerSingleMeeting...`);
           const semanticResult = await semanticAnswerSingleMeeting(
             ctx.meetingId,
             ctx.companyName,

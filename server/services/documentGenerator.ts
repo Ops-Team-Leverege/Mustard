@@ -94,13 +94,10 @@ export function shouldGenerateDocument(contract: string, wordCount: number): boo
   clearConfigCache();
   const config = getDocumentConfig();
   
-  console.log(`[DocumentGenerator] Checking contract="${contract}" (type: ${typeof contract}) against list=${JSON.stringify(config.generateDocForContracts)}, wordCount=${wordCount}, threshold=${config.wordThreshold}`);
-  
   const isInList = config.generateDocForContracts.includes(contract);
-  console.log(`[DocumentGenerator] Contract "${contract}" in list: ${isInList}, exact match test: ${config.generateDocForContracts.some(c => c === contract)}`);
   
   if (isInList) {
-    console.log(`[DocumentGenerator] Contract "${contract}" is in doc list - will generate document`);
+    console.log(`[DocumentGenerator] Contract "${contract}" → generate document (wordCount=${wordCount})`);
     return true;
   }
   
