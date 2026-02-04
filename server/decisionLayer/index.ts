@@ -138,12 +138,12 @@ interface SpecificityCheckResult {
 async function checkAggregateSpecificity(question: string, threadContext?: ThreadContext): Promise<SpecificityCheckResult> {
   try {
     const openai = new OpenAI();
-    
+
     // Build messages array with thread history for context
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: AGGREGATE_SPECIFICITY_CHECK_PROMPT },
     ];
-    
+
     // Include thread history so LLM can see company/scope from earlier messages
     if (threadContext?.messages && threadContext.messages.length > 1) {
       const historyMessages = threadContext.messages.slice(0, -1); // Exclude current message
@@ -154,10 +154,10 @@ async function checkAggregateSpecificity(question: string, threadContext?: Threa
         });
       }
     }
-    
+
     // Add current question
     messages.push({ role: "user", content: question });
-    
+
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.AGGREGATE_SPECIFICITY_CHECK,
       messages,
@@ -165,13 +165,13 @@ async function checkAggregateSpecificity(question: string, threadContext?: Threa
       max_tokens: 200,
       response_format: { type: "json_object" },
     });
-    
+
     const content = response.choices[0]?.message?.content;
     if (!content) {
       console.log("[DecisionLayer] No content from specificity check, defaulting to needs clarification");
       return { hasTimeRange: false, hasCustomerScope: false, scopeType: "none", specificCompanies: null, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
     }
-    
+
     const result = JSON.parse(content) as SpecificityCheckResult;
     console.log(`[DecisionLayer] Specificity check: hasTimeRange=${result.hasTimeRange} (${result.timeRangeExplanation}), hasCustomerScope=${result.hasCustomerScope} (${result.customerScopeExplanation}), scopeType=${result.scopeType}, specificCompanies=${JSON.stringify(result.specificCompanies)}, meetingLimit=${result.meetingLimit}`);
     return result;
@@ -190,7 +190,7 @@ function generateAggregateClarifyMessage(hasTime: boolean, hasScope: boolean): s
 
 For example: "Show me customer concerns from the last quarter across all customers"`;
   }
-  
+
   if (!hasTime) {
     return `What time range would you like me to analyze?
 
@@ -200,7 +200,7 @@ For example: "Show me customer concerns from the last quarter across all custome
 
 For example: "...from the last quarter"`;
   }
-  
+
   if (!hasScope) {
     return `Would you like me to look at:
 
@@ -209,7 +209,7 @@ For example: "...from the last quarter"`;
 
 For example: "...across all customers" or "...for Costco"`;
   }
-  
+
   return "";
 }
 
@@ -217,30 +217,41 @@ export async function runDecisionLayer(
   question: string,
   threadContext?: ThreadContext
 ): Promise<DecisionLayerResult> {
+  console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:`);
+  console.log(`  Question: "${question}"`);
+  console.log(`  Thread Context: ${threadContext ? `${threadContext.messages.length} messages` : 'none'}`);
+  if (threadContext?.messages) {
+    console.log(`  Thread Messages Preview:`);
+    threadContext.messages.slice(-2).forEach((msg, i) => {
+      const preview = msg.text.length > 80 ? msg.text.substring(0, 80) + '...' : msg.text;
+      console.log(`    ${msg.isBot ? 'Bot' : 'User'}: "${preview}"`);
+    });
+  }
+
   const intentResult = await classifyIntent(question, threadContext);
-  
+
   console.log(`[DecisionLayer] Intent: ${intentResult.intent} (${intentResult.intentDetectionMethod})`);
-  
+
   const layersMeta = computeContextLayers(intentResult.intent);
-  
+
   console.log(`[DecisionLayer] Context Layers: ${JSON.stringify(layersMeta.layers)}`);
-  
+
   const contractResult = await selectAnswerContract(
     question,
     intentResult.intent,
     layersMeta.layers,
     intentResult.proposedInterpretation?.contracts
   );
-  
+
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
 
   // For MULTI_MEETING intent, always run specificity check to get LLM-determined scope
   // This scope is passed downstream to avoid regex re-detection in meeting resolver
   let scopeInfo: DecisionLayerResult["scope"];
-  
+
   if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question, threadContext);
-    
+
     // allCustomers is true ONLY when scopeType is "all" (user explicitly wants all customers)
     // NOT when scopeType is "specific" (user mentioned specific company names)
     scopeInfo = {
@@ -254,15 +265,20 @@ export async function runDecisionLayer(
       // Pass thread messages for topic extraction in meeting resolver
       threadMessages: threadContext?.messages,
     };
-    
+
     console.log(`[DecisionLayer] LLM scope detection: scopeType=${scopeInfo.scopeType}, allCustomers=${scopeInfo.allCustomers}, specificCompanies=${JSON.stringify(scopeInfo.specificCompanies)}, hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
-    
+
     // For aggregate contracts, check if we need clarification
     if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
       const clarifyMessage = generateAggregateClarifyMessage(specificity.hasTimeRange, specificity.hasCustomerScope);
-      
+
       if (clarifyMessage) {
-        console.log(`[DecisionLayer] Aggregate contract detected, requesting scope clarification`);
+        console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Requesting Clarification:`);
+        console.log(`  Reason: Aggregate contract needs scope clarification`);
+        console.log(`  Has Time Range: ${specificity.hasTimeRange}`);
+        console.log(`  Has Customer Scope: ${specificity.hasCustomerScope}`);
+        console.log(`  Clarify Message: "${clarifyMessage.substring(0, 100)}..."`);
+
         return {
           intent: Intent.CLARIFY,
           intentDetectionMethod: "aggregate_scope_check",
@@ -286,7 +302,7 @@ export async function runDecisionLayer(
     ?.map(c => AnswerContract[c as keyof typeof AnswerContract])
     .filter((c): c is AnswerContract => c !== undefined);
 
-  return {
+  const finalResult = {
     intent: intentResult.intent,
     intentDetectionMethod: intentResult.intentDetectionMethod,
     contextLayers: layersMeta.layers,
@@ -297,6 +313,14 @@ export async function runDecisionLayer(
     proposedInterpretation: intentResult.proposedInterpretation,
     scope: scopeInfo,
   };
+
+  console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);
+  console.log(`  Final Intent: ${finalResult.intent}`);
+  console.log(`  Final Contract: ${finalResult.answerContract}`);
+  console.log(`  Will Clarify: ${!!finalResult.clarifyMessage}`);
+  console.log(`  Scope Info: ${scopeInfo ? 'present' : 'none'}`);
+
+  return finalResult;
 }
 
 // Backward compatibility alias

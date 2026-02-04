@@ -32,7 +32,7 @@ export function shouldReuseThreadContext(messageText: string): boolean {
   if (wordCount < 5) {
     return true;
   }
-  
+
   // Only check override patterns for longer messages that might be new questions
   const overridePatterns = [
     /\b(different|another|other)\s+(meeting|call|customer|company)\b/i,
@@ -42,7 +42,7 @@ export function shouldReuseThreadContext(messageText: string): boolean {
     /\bfor\s+[A-Z][a-z]+\b/i, // "for CompanyName"
     /\b(switch|change)\s+to\b/i,
   ];
-  
+
   return !overridePatterns.some(pattern => pattern.test(messageText));
 }
 
@@ -63,43 +63,51 @@ export async function resolveThreadContext(
     originalQuestion: null,
     lastResponseType: null,
   };
-  
+
   if (!isReply) {
+    console.log(`[ThreadResolver] Not a reply - returning empty context`);
     return emptyResult;
   }
-  
+
   if (!shouldReuseThreadContext(text)) {
-    console.log("[Slack] User explicitly overriding context - resolving fresh");
+    console.log("[ThreadResolver] User explicitly overriding context - resolving fresh");
     return emptyResult;
   }
-  
+
   try {
     const priorInteraction = await storage.getLastInteractionByThread(threadTs);
     if (!priorInteraction) {
+      console.log(`[ThreadResolver] No prior interaction found for thread ${threadTs}`);
       return emptyResult;
     }
-    
+
     // Use new schema fields directly, with fallback to resolution JSON
     const resolution = priorInteraction.resolution as Record<string, unknown> | null;
     const threadContext: ThreadContext = {
       meetingId: priorInteraction.meetingId || (resolution?.meeting_id as string | null) || null,
       companyId: priorInteraction.companyId || (resolution?.company_id as string | null) || null,
     };
-    
+
     // Check awaiting clarification from resolution metadata
     const contextLayers = priorInteraction.contextLayers as Record<string, unknown> | null;
     const awaitingClarification = (contextLayers?.awaitingClarification as string) || null;
     const companyNameFromContext = (resolution?.company_name as string) || null;
-    
+
     // Check for stored proposed interpretation (for "yes" or numbered responses)
     const storedProposedInterpretation = (contextLayers?.proposedInterpretation as { intent: string; contract: string; summary: string }) || null;
     const originalQuestion = priorInteraction.questionText || null;
-    
+
     // Track what the last response was about (for follow-up context)
     const lastResponseType = (contextLayers?.lastResponseType as string) || null;
-    
-    console.log(`[Slack] Reusing thread context: meetingId=${threadContext.meetingId}, companyId=${threadContext.companyId}, awaitingClarification=${awaitingClarification}, hasProposedInterpretation=${!!storedProposedInterpretation}, lastResponseType=${lastResponseType}`);
-    
+
+    console.log(`[ThreadResolver] ✅ CONTEXT CHECKPOINT 1 - Thread Resolution:`);
+    console.log(`  Thread: ${threadTs}`);
+    console.log(`  Meeting: ${threadContext.meetingId || 'none'}`);
+    console.log(`  Company: ${threadContext.companyId || 'none'} (${companyNameFromContext || 'no name'})`);
+    console.log(`  Awaiting Clarification: ${awaitingClarification || 'none'}`);
+    console.log(`  Proposed Interpretation: ${storedProposedInterpretation ? 'yes' : 'none'}`);
+    console.log(`  Last Response Type: ${lastResponseType || 'none'}`);
+
     return {
       threadContext,
       awaitingClarification,
@@ -110,7 +118,7 @@ export async function resolveThreadContext(
     };
   } catch (err) {
     // Non-fatal - just proceed without context
-    console.error("[Slack] Failed to lookup prior interaction:", err);
+    console.error("[ThreadResolver] Failed to lookup prior interaction:", err);
     return emptyResult;
   }
 }

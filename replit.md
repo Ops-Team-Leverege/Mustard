@@ -108,3 +108,109 @@ LLM can propose multiple contracts for multi-step requests (e.g., "research X th
 -   **Authentication**: Header `X-Airtable-Secret`
 -   **Behavior**: Waits for sync, auto-discovers new tables, and auto-adds new columns.
 -   **Trigger**: Zapier automation on Airtable record changes.
+
+## Context Flow Architecture Analysis
+
+### Current Context Sources (The Problem)
+
+We have **4 separate context systems** that don't integrate properly:
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Thread        │    │   Slack Thread  │    │   LLM           │    │   Database      │
+│   Resolver      │    │   History       │    │   Interpretation│    │   Prior         │
+│                 │    │                 │    │                 │    │   Interactions  │
+│ threadResolver  │    │ fetchThread     │    │ classifyIntent  │    │ getLastInter    │
+│ .ts             │    │ History()       │    │ ()              │    │ actionByThread  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │                       │
+         │                       │                       │                       │
+         ▼                       ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           Decision Layer                                            │
+│                     (Tries to merge contexts)                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Context Flow Issues
+
+#### 1. Thread Context Resolution (`server/slack/context/threadResolver.ts`)
+- **Purpose**: Get company/meeting from previous bot interaction
+- **Data**: `{ meetingId, companyId }` from database
+- **Problem**: Only looks at last interaction, not full thread history
+
+#### 2. Slack Thread History (`server/slack/slackApi.ts`)
+- **Purpose**: Get actual Slack messages for LLM context
+- **Data**: `{ messages: [{ text, isBot }] }` from Slack API
+- **Problem**: Raw messages, no semantic understanding
+
+#### 3. LLM Intent Classification (`server/decisionLayer/intent.ts`)
+- **Purpose**: Understand what user wants semantically
+- **Data**: Intent + confidence + interpretation
+- **Problem**: Can't see database context, makes decisions in isolation
+
+#### 4. Database Prior Interactions (`server/storage.ts`)
+- **Purpose**: Remember what bot said before
+- **Data**: Previous answers, clarification states
+- **Problem**: Disconnected from current thread analysis
+
+### Failure Modes We've Seen
+
+1. **"last month is fine"** - LLM doesn't know this answers a clarification question
+2. **"across pilots"** - Scope detection doesn't recognize this pattern
+3. **Bot joining mid-conversation** - No context about what was discussed before
+4. **Company context loss** - Thread resolver finds company, but LLM doesn't see it
+
+### Current Bandaid Solutions
+
+- More regex patterns in prompts
+- Better LLM instructions
+- Fallback logic in multiple places
+- Manual context passing between systems
+
+### What We Need: Unified Context Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           Unified Context Resolver                                  │
+│                                                                                     │
+│  1. Fetch all context sources in parallel                                          │
+│  2. Apply precedence rules (Thread > Database > LLM > Fallback)                    │
+│  3. Create single merged context object                                            │
+│  4. Pass to Decision Layer with full visibility                                    │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           Decision Layer                                            │
+│                     (Makes decisions with full context)                            │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Immediate Logging Checkpoints Needed
+
+Add these logs to trace context flow:
+
+1. **Thread Resolution**: What context was found in database?
+2. **Slack History**: How many messages fetched? Any company mentions?
+3. **LLM Classification**: What context was passed to LLM?
+4. **Final Merge**: What was the final merged context?
+5. **Decision Point**: What context influenced the final decision?
+
+### Test Scenarios to Build
+
+- [ ] New thread, no context
+- [ ] Reply in thread with prior company context
+- [ ] Reply in thread with prior clarification request
+- [ ] Bot mentioned mid-conversation
+- [ ] User switches companies mid-thread
+- [ ] Multiple clarification rounds
+- [ ] Thread with mixed intents
+
+### Next Steps
+
+1. ✅ **Immediate fixes** (committed)
+2. 🔄 **Add logging checkpoints** (next)
+3. 📋 **Build test scenarios** (after logging)
+4. 🏗️ **Design unified context architecture** (future sprint)

@@ -423,12 +423,29 @@ export async function slackEventsHandler(req: Request, res: Response) {
           threadContextForCP = {
             messages: threadHistory.map(m => ({ text: m.text, isBot: m.isBot })),
           };
-          console.log(`[Slack] Fetched ${threadHistory.length} messages from thread for context`);
+          console.log(`[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:`);
+          console.log(`  Thread: ${threadTs}`);
+          console.log(`  Messages: ${threadHistory.length}`);
+          console.log(`  Last 3 messages:`);
+          threadHistory.slice(-3).forEach((msg, i) => {
+            const preview = msg.text.length > 100 ? msg.text.substring(0, 100) + '...' : msg.text;
+            console.log(`    ${i + 1}. ${msg.isBot ? 'Bot' : 'User'}: "${preview}"`);
+          });
+        } else {
+          console.log(`[Slack] ✅ CONTEXT CHECKPOINT 2 - No thread history found for ${threadTs}`);
         }
       }
 
       decisionLayerResult = await runDecisionLayer(text, threadContextForCP);
       cpDuration = logger.endStage('decision_layer');
+
+      console.log(`[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:`);
+      console.log(`  Intent: ${decisionLayerResult.intent} (${decisionLayerResult.intentDetectionMethod})`);
+      console.log(`  Contract: ${decisionLayerResult.answerContract}`);
+      console.log(`  Scope: ${JSON.stringify(decisionLayerResult.scope)}`);
+      console.log(`  Clarify Message: ${decisionLayerResult.clarifyMessage ? 'yes' : 'none'}`);
+      console.log(`  Context Layers: ${JSON.stringify(decisionLayerResult.contextLayers)}`);
+
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
 
       // Extract company from message BEFORE meeting resolution - preserves context for CLARIFY flows
@@ -439,7 +456,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         if (companyMentioned) {
           console.log(`[Slack] Company extracted from current message: ${companyMentioned.companyName}`);
         }
-        
+
         // If not found, scan thread history for company mentions (for threads where bot was mentioned mid-conversation)
         if (!companyMentioned && threadContextForCP?.messages && threadContextForCP.messages.length > 1) {
           console.log(`[Slack] No company in current message, scanning ${threadContextForCP.messages.length} thread messages`);
