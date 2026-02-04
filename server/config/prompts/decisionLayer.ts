@@ -73,15 +73,19 @@ CRITICAL RULES:
 EXAMPLES WITH CONTEXT:
 Thread: "ACE weekly slides starting here @calum"
 User: "what action items should we mention from last weeks call"
-→ Intent: SINGLE_MEETING, Company: ACE, Understanding: User wants ACE action items from recent meeting
+→ Intent: SINGLE_MEETING, Company: ACE, Contracts: ["NEXT_STEPS"]
 
 Thread: "Les Schwab pricing discussion yesterday"  
 User: "what did they say about ROI?"
-→ Intent: SINGLE_MEETING, Company: Les Schwab, Understanding: User wants ROI discussion from Les Schwab meeting
+→ Intent: SINGLE_MEETING, Company: Les Schwab, Contracts: ["EXTRACTIVE_FACT"]
 
 Thread: "Jiffy Lube pilot going well"
 User: "what were their main concerns?"
-→ Intent: SINGLE_MEETING, Company: Jiffy Lube, Understanding: User wants concerns from Jiffy Lube pilot discussion
+→ Intent: SINGLE_MEETING, Company: Jiffy Lube, Contracts: ["EXTRACTIVE_FACT"]
+
+Thread: "Need to prep for ACE call tomorrow"
+User: "give me a summary of the last meeting"
+→ Intent: SINGLE_MEETING, Company: ACE, Contracts: ["MEETING_SUMMARY"]
 
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
@@ -89,12 +93,29 @@ If the bot's LAST message asked for clarification and user responds:
 - "all customers" / "across pilots" → MULTI_MEETING with all customers scope
 - "ACE" / "Les Schwab" → Continue with that specific company
 
+CONTRACT SELECTION (propose the best contract for this request):
+SINGLE_MEETING contracts:
+- NEXT_STEPS: Action items, follow-ups, commitments, next steps, what to do next
+- MEETING_SUMMARY: General summary or recap of a meeting
+- ATTENDEES: Who was in the meeting, participants
+- CUSTOMER_QUESTIONS: Questions the customer asked
+- EXTRACTIVE_FACT: Specific factual information from a meeting
+
+MULTI_MEETING contracts:
+- PATTERN_ANALYSIS: Patterns, trends, common themes across meetings
+- COMPARISON: Compare information across different meetings/companies
+
+PRODUCT_KNOWLEDGE contracts:
+- PRODUCT_EXPLANATION: How PitCrew works, features, capabilities
+- FAQ_ANSWER: Common product questions, pricing, integrations
+
 Respond with JSON: {
   "intent": "INTENT_NAME", 
   "confidence": 0.0-1.0, 
   "reason": "brief explanation",
   "extractedCompany": "single company name or null",
   "extractedCompanies": ["array of company names if multiple"],
+  "proposedContracts": ["CONTRACT_NAME"],
   "isAmbiguous": true/false,
   "conversationContext": "what is this conversation about?",
   "keyTopics": ["topic1", "topic2"],
