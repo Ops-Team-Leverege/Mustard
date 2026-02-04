@@ -335,13 +335,14 @@ For aggregate/multi-meeting questions, we need to know:
 1. TIME RANGE: When should we look? (e.g., "last month", "past quarter", "all time", "3 most recent", "since January")
 2. CUSTOMER SCOPE: Which customers? (e.g., "all customers", "Costco", "our meetings", "we've had")
 
-Analyze the question and determine what information is present.
+Analyze the FULL conversation (if multiple messages provided) and determine what information is present.
+IMPORTANT: Look at ALL messages in the conversation - the original question may contain company names or scope that a follow-up message references.
 
 RULES:
 - "X most recent meetings" or "last X meetings" = TIME RANGE is specified (they want the N most recent)
-- "we've had" or "our meetings" or "our calls" = SCOPE is specified (implies all customers/all our data)
-- "all customers" or "across all" or "everyone" = SCOPE is specified
-- Specific company names = SCOPE is specified
+- "we've had" or "our meetings" or "our calls" = SCOPE is "all" (implies all customers/all our data)
+- "all customers" or "across all" or "everyone" = SCOPE is "all"
+- Specific company names (e.g., "Ivy Lane", "Les Schwab", "ACE") = SCOPE is "specific" + extract the company name
 - "last month/quarter/year" or "since [date]" = TIME RANGE is specified
 - "recent" alone without a number is NOT specific enough for time range
 - If the question clearly implies "look at everything" that's fine - no clarification needed
@@ -351,10 +352,17 @@ MEETING LIMIT EXTRACTION:
 - If no explicit count is mentioned, set meetingLimit to null
 - Examples: "3 most recent meetings" → meetingLimit: 3, "meetings from last month" → meetingLimit: null
 
+SCOPE TYPE:
+- "all" = user wants all customers / all data (includes "we've had", "our meetings", "across all")
+- "specific" = user mentioned one or more specific company names (e.g., "Ivy Lane", "Les Schwab and ACE")
+- "none" = no customer scope specified
+
 Return JSON:
 {
   "hasTimeRange": boolean,
   "hasCustomerScope": boolean,
+  "scopeType": "all" | "specific" | "none",
+  "specificCompanies": string[] | null,
   "timeRangeExplanation": "brief explanation",
   "customerScopeExplanation": "brief explanation",
   "meetingLimit": number | null

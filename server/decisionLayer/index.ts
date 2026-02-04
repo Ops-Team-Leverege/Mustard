@@ -96,7 +96,9 @@ export type DecisionLayerResult = {
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
   // LLM-determined scope (passed downstream to avoid regex re-detection)
   scope?: {
-    allCustomers: boolean; // True if LLM detected "all customers" scope
+    allCustomers: boolean; // True if LLM detected "all customers" scope (scopeType="all")
+    scopeType: "all" | "specific" | "none"; // What kind of scope was detected
+    specificCompanies: string[] | null; // Company names if scopeType="specific"
     hasTimeRange: boolean; // True if LLM detected time range
     timeRangeExplanation?: string; // e.g., "3 most recent meetings"
     customerScopeExplanation?: string; // e.g., "we've had implies all customers"
@@ -118,6 +120,8 @@ const AGGREGATE_CONTRACTS = [
 interface SpecificityCheckResult {
   hasTimeRange: boolean;
   hasCustomerScope: boolean;
+  scopeType: "all" | "specific" | "none";
+  specificCompanies: string[] | null;
   timeRangeExplanation: string;
   customerScopeExplanation: string;
   meetingLimit?: number | null; // e.g., "3 most recent" → 3
@@ -164,15 +168,15 @@ async function checkAggregateSpecificity(question: string, threadContext?: Threa
     const content = response.choices[0]?.message?.content;
     if (!content) {
       console.log("[DecisionLayer] No content from specificity check, defaulting to needs clarification");
-      return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
+      return { hasTimeRange: false, hasCustomerScope: false, scopeType: "none", specificCompanies: null, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
     }
     
     const result = JSON.parse(content) as SpecificityCheckResult;
-    console.log(`[DecisionLayer] Specificity check: hasTimeRange=${result.hasTimeRange} (${result.timeRangeExplanation}), hasCustomerScope=${result.hasCustomerScope} (${result.customerScopeExplanation}), meetingLimit=${result.meetingLimit}`);
+    console.log(`[DecisionLayer] Specificity check: hasTimeRange=${result.hasTimeRange} (${result.timeRangeExplanation}), hasCustomerScope=${result.hasCustomerScope} (${result.customerScopeExplanation}), scopeType=${result.scopeType}, specificCompanies=${JSON.stringify(result.specificCompanies)}, meetingLimit=${result.meetingLimit}`);
     return result;
   } catch (error) {
     console.error("[DecisionLayer] Specificity check failed, defaulting to needs clarification:", error);
-    return { hasTimeRange: false, hasCustomerScope: false, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
+    return { hasTimeRange: false, hasCustomerScope: false, scopeType: "none", specificCompanies: null, timeRangeExplanation: "", customerScopeExplanation: "", meetingLimit: null };
   }
 }
 
@@ -236,15 +240,19 @@ export async function runDecisionLayer(
   if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question, threadContext);
     
+    // allCustomers is true ONLY when scopeType is "all" (user explicitly wants all customers)
+    // NOT when scopeType is "specific" (user mentioned specific company names)
     scopeInfo = {
-      allCustomers: specificity.hasCustomerScope,
+      allCustomers: specificity.scopeType === "all",
+      scopeType: specificity.scopeType,
+      specificCompanies: specificity.specificCompanies,
       hasTimeRange: specificity.hasTimeRange,
       timeRangeExplanation: specificity.timeRangeExplanation,
       customerScopeExplanation: specificity.customerScopeExplanation,
       meetingLimit: specificity.meetingLimit ?? null,
     };
     
-    console.log(`[DecisionLayer] LLM scope detection: allCustomers=${scopeInfo.allCustomers} (${scopeInfo.customerScopeExplanation}), hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
+    console.log(`[DecisionLayer] LLM scope detection: scopeType=${scopeInfo.scopeType}, allCustomers=${scopeInfo.allCustomers}, specificCompanies=${JSON.stringify(scopeInfo.specificCompanies)}, hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
     
     // For aggregate contracts, check if we need clarification
     if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {

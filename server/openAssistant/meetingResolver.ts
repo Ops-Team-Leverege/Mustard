@@ -30,7 +30,9 @@ export type ChunkSearchResult = {
  * Used to avoid regex re-detection of "all customers" scope.
  */
 export type ScopeOverride = {
-  allCustomers?: boolean; // LLM detected "all customers" scope
+  allCustomers?: boolean; // LLM detected "all customers" scope (scopeType="all")
+  scopeType?: "all" | "specific" | "none"; // What kind of scope was detected
+  specificCompanies?: string[] | null; // Company names if scopeType="specific"
   hasTimeRange?: boolean;
   timeRangeExplanation?: string;
   customerScopeExplanation?: string;
@@ -113,6 +115,71 @@ export async function findRelevantMeetings(
 ): Promise<MeetingSearchResult> {
   const { storage } = await import("../storage");
   
+  // Check for scope type from Decision Layer
+  // Priority: 1) LLM-detected specific companies, 2) LLM-detected "all customers", 3) regex fallback
+  const topic = extractTopic(userMessage);
+  
+  // Handle specific companies detected by LLM (from thread context)
+  if (scopeOverride?.scopeType === "specific" && scopeOverride.specificCompanies?.length) {
+    console.log(`[MeetingResolver] Specific companies detected via LLM: ${scopeOverride.specificCompanies.join(", ")}`);
+    console.log(`[MeetingResolver] Scope override received:`, JSON.stringify(scopeOverride));
+    
+    // Parse time range
+    const timeRangeSource = scopeOverride?.timeRangeExplanation || userMessage;
+    const timeRange = parseTimeRange(timeRangeSource);
+    const startDate = scopeOverride?.startDate ?? timeRange.startDate;
+    
+    // Search for meetings from these specific companies
+    const companyMatches = await searchCompanies(scopeOverride.specificCompanies);
+    
+    if (companyMatches.length > 0) {
+      const { MEETING_LIMITS } = await import("../config/constants");
+      const MAX_MEETINGS_PER_COMPANY = MEETING_LIMITS.MAX_MEETINGS_PER_COMPANY;
+      
+      const meetings: SingleMeetingContext[] = [];
+      for (const company of companyMatches) {
+        // Build query with optional date filter
+        let query = `
+          SELECT t.id, t.meeting_date, c.name as company_name, c.id as company_id
+          FROM transcripts t
+          JOIN companies c ON t.company_id = c.id
+          WHERE t.company_id = $1
+        `;
+        const params: (string | Date | number)[] = [company.id];
+        
+        if (startDate) {
+          query += ` AND COALESCE(t.meeting_date, t.created_at) >= $2`;
+          params.push(startDate);
+        }
+        
+        query += ` ORDER BY COALESCE(t.meeting_date, t.created_at) DESC LIMIT $${params.length + 1}`;
+        params.push(MAX_MEETINGS_PER_COMPANY);
+        
+        const transcriptRows = await storage.rawQuery(query, params);
+        
+        if (transcriptRows && transcriptRows.length > 0) {
+          for (const row of transcriptRows) {
+            meetings.push({
+              meetingId: row.id as string,
+              companyId: row.company_id as string,
+              companyName: row.company_name as string,
+              meetingDate: row.meeting_date as Date | null,
+            });
+          }
+        }
+      }
+      
+      console.log(`[MeetingResolver] Found ${meetings.length} meetings for specific companies: ${scopeOverride.specificCompanies.join(", ")}`);
+      return {
+        meetings,
+        searchedFor: scopeOverride.specificCompanies.join(", "),
+        topic,
+      };
+    } else {
+      console.log(`[MeetingResolver] No company matches found for: ${scopeOverride.specificCompanies.join(", ")}`);
+    }
+  }
+  
   // Check for "all customers" scope - prefer LLM-determined scope over regex
   const isAllCustomers = scopeOverride?.allCustomers ?? wantsAllCustomers(userMessage);
   
@@ -131,7 +198,6 @@ export async function findRelevantMeetings(
     console.log(`[MeetingResolver] Time range source: "${timeRangeSource}", filter: ${startDate ? startDate.toISOString() : 'none'}`);
     
     const allMeetings = await fetchAllRecentTranscripts(meetingLimit, startDate);
-    const topic = extractTopic(userMessage);
     return {
       meetings: allMeetings,
       searchedFor: "all customers",
@@ -140,7 +206,6 @@ export async function findRelevantMeetings(
   }
   
   const searchTerms = extractSearchTerms(userMessage);
-  const topic = extractTopic(userMessage);
   console.log(`[MeetingResolver] Searching for meetings with terms: ${searchTerms.join(", ")}${topic ? `, topic: "${topic}"` : ''}`);
   
   if (searchTerms.length === 0) {
