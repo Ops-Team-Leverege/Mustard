@@ -4,3 +4,8 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Documentation (work in progress, not for production)
+docs/
+context-flow-test-scenarios.md
+.kiro/
