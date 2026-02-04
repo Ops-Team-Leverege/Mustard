@@ -468,10 +468,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
             [decisionLayerResult.extractedCompany]
           );
 
-          // If no exact match, try partial match (company name starts with extracted name)
+          // If no exact match, try prefix match (company name starts with extracted name)
           if (!companyRows || companyRows.length === 0) {
             companyRows = await storage.rawQuery(
               `SELECT id, name FROM companies WHERE LOWER(name) LIKE LOWER($1) || '%'`,
+              [decisionLayerResult.extractedCompany]
+            );
+          }
+
+          // If still no match, try contains match (extracted name anywhere in company name)
+          if (!companyRows || companyRows.length === 0) {
+            companyRows = await storage.rawQuery(
+              `SELECT id, name FROM companies WHERE LOWER(name) LIKE '%' || LOWER($1) || '%'`,
               [decisionLayerResult.extractedCompany]
             );
           }
