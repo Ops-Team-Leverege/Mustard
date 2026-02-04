@@ -149,8 +149,9 @@ export async function sendResponseWithDocumentSupport(
     console.log(`[DocumentResponse] Generated document buffer: ${docBuffer.length} bytes`);
     
     const fileName = generateFileName(contract, customerName);
-    const slackMessage = generateSlackMessage(userQuery, contract);
-    console.log(`[DocumentResponse] Uploading to Slack: ${fileName}`);
+    // In document-only mode, skip the message since streaming already updated it
+    const slackMessage = documentOnly ? undefined : generateSlackMessage(userQuery, contract);
+    console.log(`[DocumentResponse] Uploading to Slack: ${fileName}${documentOnly ? ' (document only, no message)' : ''}`);
     
     await uploadSlackFile({
       channel,
