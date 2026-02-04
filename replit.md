@@ -62,6 +62,7 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 -   **Thread Context Preservation**: Company names extracted from messages are preserved when CLARIFY intent is returned, preventing redundant clarification.
 -   **Aggregate Specificity Check with Thread Context**: `checkAggregateSpecificity` now uses full thread context to prevent redundant clarification requests.
 -   **Specific Company Scope Resolution**: Improved scope detection to accurately distinguish and filter meeting searches based on `scopeType` (`"all"`, `"specific"`, `"none"`).
+-   **Contract-Aware Semantic Processing**: Artifact-complete contracts (NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS) return formatted artifacts directly, even if the question uses "should mention" phrasing. LLM semantic processing is only used when: (1) artifacts not found, or (2) question requires true filtering (e.g., "which action items about cameras"). This ensures consistent output format between new threads and follow-ups asking for the same data.
 
 ## External Dependencies
 

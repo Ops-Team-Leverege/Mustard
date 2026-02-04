@@ -1580,12 +1580,27 @@ export async function handleSingleMeetingQuestion(
     case "extractive": {
       const result = await handleExtractiveIntent(ctx, question, contract);
       
-      // STEP 6: Semantic questions need LLM judgment
-      // Two cases where we use LLM:
-      // 1. Artifacts not found AND question is semantic → LLM fallback
-      // 2. Artifacts found BUT question requires judgment (e.g., "what should we mention") → LLM filtering
+      // STEP 6: Determine if LLM judgment is needed
+      // Contract-aware semantic processing:
+      // - NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS with artifacts → return artifacts directly
+      //   (even if question uses "should mention" phrasing - it's just asking for the data)
+      // - Other semantic questions without artifacts → LLM fallback
+      // - True filtering questions (e.g., "which action items about cameras") → LLM filtering
       let semanticError: string | undefined;
-      const needsLLMJudgment = isSemantic; // All semantic questions use LLM (for filtering/judgment even with artifacts)
+      
+      // Contracts where artifacts are the complete answer (no LLM filtering needed)
+      const artifactCompleteContracts = [
+        AnswerContract.NEXT_STEPS,
+        AnswerContract.ATTENDEES,
+        AnswerContract.CUSTOMER_QUESTIONS,
+      ];
+      const hasArtifacts = result.dataSource !== "not_found";
+      const isArtifactComplete = contract && artifactCompleteContracts.includes(contract);
+      
+      // Skip LLM if contract provides complete answer with artifacts
+      // Only use LLM when: (1) no artifacts found, OR (2) semantic + not an artifact-complete contract
+      const needsLLMJudgment = isSemantic && !(isArtifactComplete && hasArtifacts);
+      console.log(`[SingleMeetingOrchestrator] LLM judgment decision: isSemantic=${isSemantic}, isArtifactComplete=${isArtifactComplete}, hasArtifacts=${hasArtifacts}, needsLLMJudgment=${needsLLMJudgment}`);
       
       if (needsLLMJudgment) {
         const reason = result.dataSource === "not_found" ? "artifacts not found" : "judgment question requires filtering";
