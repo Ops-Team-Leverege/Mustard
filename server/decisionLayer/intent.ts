@@ -372,18 +372,6 @@ async function classifyByKeyword(
   // The LLM is better at understanding semantic intent than brittle regex patterns
   // ============================================================================
 
-<<<<<<< HEAD
-  // PRODUCT_KNOWLEDGE override: Strategic advice requests should return PRODUCT_KNOWLEDGE immediately
-  // These phrases indicate the user wants strategic advice, not meeting analysis
-  const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how)\b/i;
-  if (productKnowledgeSignals.test(question)) {
-    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - returning PRODUCT_KNOWLEDGE intent`);
-    return {
-      intent: Intent.PRODUCT_KNOWLEDGE,
-      intentDetectionMethod: "pattern",
-      confidence: 0.9,
-      reason: "Strategic advice request using PitCrew value propositions",
-=======
   // PRODUCT_KNOWLEDGE fast-path: Strategic advice requests should go directly to PRODUCT_KNOWLEDGE
   // These phrases indicate the user wants strategic advice using PitCrew's products
   // Also catches "our roadmap" (internal product roadmap) vs "their roadmap" (external)
@@ -395,26 +383,12 @@ async function classifyByKeyword(
       intentDetectionMethod: "product_signal",
       confidence: 0.92,
       reason: "Strategic advice request detected (based on PitCrew / help me think through)",
->>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
     };
   }
 
   // Entity detection: Only triggers if no action-based pattern matched first
   const companyMatch = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
-<<<<<<< HEAD
-
-  if (company || contact) {
-    const entityName = company || contact;
-
-    // Don't trigger multi-meeting for strategic advice requests
-    // "across all their stores" is about customer behavior, not "search across all meetings"
-    // Be more specific about multi-meeting signals to avoid false positives
-    const hasMultiMeetingSignal = /\b(all|every|across)\s+(meetings?|calls?|customers?|companies)\b|find\s+(all|every|across)|search\s+(all|every|across)|which\s+(meetings?|calls?|customers?)/i.test(question);
-    const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want|pilot)\b/i.test(question);
-
-    // If describing a situation (not asking to search meetings), let LLM handle it
-=======
   
   if (companyMatch || contact) {
     const entityName = companyMatch?.company || contact;
@@ -429,7 +403,6 @@ async function classifyByKeyword(
     const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want)\b/i.test(question);
     
     // If describing a situation with a strategic advice request, go to PRODUCT_KNOWLEDGE
->>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
     if (isDescribingSituation) {
       // Check if it's asking for strategic advice (how to approach, what to do)
       const wantsAdvice = /\b(how\s+(can|should|do)\s+we|help\s+me|what\s+should|approach\s+this)\b/i.test(question);
@@ -555,38 +528,24 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
   if (result.intentDetectionMethod === "pattern" && result.confidence >= 0.9) {
     return false;
   }
-<<<<<<< HEAD
-
-  // Entity detection (known customers from database) doesn't need validation
-=======
   
   // Full entity detection (known customers from database) doesn't need validation
->>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   // When someone mentions a known customer like "Les Schwab", trust it's about meetings
   if (result.intentDetectionMethod === "entity") {
     return false;
   }
-<<<<<<< HEAD
-
-=======
   
   // Product signal and situation_advice are high-confidence fast-paths
   if (result.intentDetectionMethod === "product_signal" || result.intentDetectionMethod === "situation_advice") {
     return false;
   }
   
->>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   // CLARIFY and REFUSE intents don't need validation
   if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
     return false;
   }
-<<<<<<< HEAD
-
-  // Weak detection methods need validation
-=======
   
   // Weak detection methods need validation (includes entity_acronym matches)
->>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
     console.log(`[IntentClassifier] Weak detection method "${result.intentDetectionMethod}" - will validate with LLM`);
     return true;
