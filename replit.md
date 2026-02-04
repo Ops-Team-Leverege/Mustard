@@ -36,9 +36,11 @@ The system employs **true LLM-FIRST classification** for intent routing, primari
 The Intent Router classifies intent, the Orchestrator computes context layers and selects an answer contract, and the Execution Layer executes the contract chain. LLM-determined scope (e.g., "all customers") is propagated downstream to avoid redundant detection. Contract chains are dynamically built based on user messages.
 
 **Contract Selection Strategy (LLM-First):**
-1. **LLM-proposed contracts (primary)**: Utilizes contracts proposed by the LLM during intent classification.
+1. **LLM-proposed contracts (primary)**: Utilizes `proposedInterpretation.contracts` (single source of truth) proposed by the LLM during intent classification.
 2. **Keyword fallback**: Used when the LLM does not propose contracts.
 3. **LLM classification fallback**: Engaged if neither LLM proposal nor keyword matching yields a result.
+
+**Single Source of Truth**: All LLM-proposed contracts flow through `proposedInterpretation.contracts` in `IntentClassificationResult`. This consolidates contract selection and avoids redundant fields.
 
 **Contract Chains (Multi-Step Requests):**
 The LLM can propose multiple contracts for multi-step requests, executed sequentially (e.g., `["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]`).

@@ -107,7 +107,6 @@ export type IntentClassificationResult = {
   // Semantic context extraction from conversation
   extractedCompany?: string;                        // Single company name extracted from context
   extractedCompanies?: string[];                    // Multiple companies if ambiguous
-  proposedContracts?: string[];                    // LLM-proposed contracts for answer selection
   isAmbiguous?: boolean;                           // True if multiple companies mentioned
   conversationContext?: string;                     // What is this conversation about?
   keyTopics?: string[];                            // Key topics being discussed
@@ -505,6 +504,15 @@ async function classifyByLLM(
       console.log(`  Should Proceed: ${parsed.shouldProceed !== false ? 'yes' : 'no'}`);
       console.log(`  Clarification: ${parsed.clarificationSuggestion || 'none'}`);
 
+      // Build proposedInterpretation from LLM-proposed contracts (single source of truth)
+      const proposedInterpretation = parsed.proposedContracts?.length 
+        ? {
+            intent: intentStr as IntentString,
+            contracts: parsed.proposedContracts as ContractString[],
+            summary: parsed.reason || "LLM-proposed interpretation",
+          }
+        : undefined;
+
       return {
         intent: Intent[intentStr as keyof typeof Intent],
         intentDetectionMethod: "llm",
@@ -512,7 +520,7 @@ async function classifyByLLM(
         reason: parsed.reason,
         extractedCompany: parsed.extractedCompany || undefined,
         extractedCompanies: parsed.extractedCompanies || undefined,
-        proposedContracts: parsed.proposedContracts || undefined,  // LLM-proposed contracts for answer selection
+        proposedInterpretation,  // LLM-proposed contracts in single source of truth
         isAmbiguous: parsed.isAmbiguous || false,
         conversationContext: parsed.conversationContext || undefined,
         keyTopics: parsed.keyTopics || undefined,

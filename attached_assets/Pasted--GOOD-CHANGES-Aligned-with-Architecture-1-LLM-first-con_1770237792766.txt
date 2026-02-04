@@ -1,0 +1,55 @@
+✅ GOOD CHANGES (Aligned with Architecture)
+1. LLM-first contract selection (43c392a)
+
+What: Added proposedContracts field to IntentClassificationResult and prioritizes LLM-proposed contracts over keyword matching
+Why it's good: Aligns with the "LLM-first architecture" principle. The LLM understands semantic intent better than regex patterns
+Architecture fit: ✅ Extends semantic extraction to include contract selection, not just intent classification
+Concern: ⚠️ There's already proposedInterpretation.contracts - now we have TWO places for contracts (proposedContracts and proposedInterpretation.contracts). This creates redundancy.
+2. Action item keyword expansion (c13f56b)
+
+What: Added typo variations ("actions items", "action item", "followup", etc.)
+Why it's good: Improves user experience by handling common typos
+Architecture fit: ✅ Enhances existing keyword fast-path without changing architecture
+Concern: None - this is a reasonable enhancement
+⚠️ QUESTIONABLE CHANGES (Potential Hot Fixes)
+3. Fuzzy company matching - CONTAINS variant (ae1d374)
+
+What: Added LIKE '%' || LOWER($1) || '%' (contains match) after prefix match
+Why it's questionable:
+This is very broad - "ACE" would match "Palace Hardware" or "Surface Pro"
+Could cause false positives
+Feels like a hot fix to compensate for LLM extraction issues
+Architecture fit: ⚠️ Adds complexity to compensate for upstream issues
+Better solution: Fix the LLM prompt to extract full company names, or use a proper fuzzy matching library
+4. Debug logging spam (937f14c, 021afdf, 242b436)
+
+What: Added multiple debug logs for company extraction
+Why it's questionable:
+Debugging logs should be temporary, not committed
+Adds noise to production logs
+Indicates they were debugging the company extraction issue
+Architecture fit: ❌ Debug code shouldn't be in production
+Better solution: Use proper logging levels (DEBUG vs INFO) and remove after debugging
+🔴 ARCHITECTURAL CONCERNS
+Duplicate contract fields:
+
+export type IntentClassificationResult = {
+  proposedInterpretation?: ProposedInterpretation;  // Has .contracts field
+  proposedContracts?: string[];                     // NEW - duplicate!
+}
+This violates Single Source of Truth principle. Now we have:
+
+intentResult.proposedContracts (new)
+intentResult.proposedInterpretation?.contracts (existing)
+The Decision Layer tries to use both:
+
+const llmProposedContracts = intentResult.proposedContracts || intentResult.proposedInterpretation?.contracts;
+Recommendation: Remove proposedContracts and always use proposedInterpretation.contracts for consistency.
+
+Summary
+Change	Type	Verdict
+LLM-first contract selection	Architecture	✅ Good intent, ⚠️ creates redundancy
+Action item keywords	Enhancement	✅ Good
+CONTAINS fuzzy match	Hot fix	⚠️ Too broad, potential false positives
+Debug logging	Debug code	❌ Should be removed
+Overall Assessment: Mix of good architectural improvements and hot fixes. The main concern is the duplicate contract fields and overly broad
