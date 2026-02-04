@@ -236,19 +236,28 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log("[Slack] Test mode - skipping acknowledgment message");
     }
 
-    // 7.1 Start pipeline timing and progress message timer (recurring, max 4 messages)
+    // 7.1 Start pipeline timing and progress message coordination
     const pipelineStartTime = Date.now();
     let progressMessageCount = 0;
     const MAX_PROGRESS_MESSAGES = 4;
     let progressInterval: ReturnType<typeof setInterval> | null = null;
+    
+    // Response coordination: prevents progress messages after response is sent
+    // This is critical to avoid race conditions where async progress posts after final answer
+    let responseSent = false;
+    const markResponseSent = () => { responseSent = true; };
+    const canPostProgress = () => !responseSent && progressMessageCount < MAX_PROGRESS_MESSAGES;
 
     if (!testRun) {
       progressInterval = setInterval(async () => {
-        if (progressMessageCount >= MAX_PROGRESS_MESSAGES) {
-          return; // Stop sending after max reached
+        // Check coordination flag before posting
+        if (!canPostProgress()) {
+          return;
         }
         try {
           const progressMsg = getProgressMessage();
+          // Double-check after await to prevent race
+          if (responseSent) return;
           await postSlackMessage({
             channel,
             text: progressMsg,
@@ -262,8 +271,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }, getProgressDelayMs());
     }
 
-    // Helper to clear progress interval
+    // Helper to clear progress interval and mark response as sent
     const clearProgressTimer = () => {
+      markResponseSent(); // Prevent any in-flight progress from posting
       if (progressInterval) {
         clearInterval(progressInterval);
         progressInterval = null;
@@ -619,9 +629,30 @@ export async function slackEventsHandler(req: Request, res: Response) {
         duration_ms: cpDuration,
       });
 
-      // NOTE: Progress messages for SINGLE_MEETING removed to avoid race conditions
-      // The semantic answer path is fast enough (~2-4s) that progress messages often post AFTER the response
-      // Streaming paths use "..." placeholder which updates in real-time, so they don't need extra progress
+      // EARLY PROGRESS MESSAGE: Send personalized progress after intent classification
+      // Uses response coordination to prevent posting after response is sent
+      if (!testRun && decisionLayerResult.intent === 'SINGLE_MEETING' && resolvedMeeting) {
+        generatePersonalizedProgressMessage(text, 'single_meeting').then(async (personalizedProgress) => {
+          // Check coordination flag before posting (prevents race condition)
+          if (!canPostProgress()) {
+            console.log(`[Slack] Progress skipped - response already sent`);
+            return;
+          }
+          try {
+            await postSlackMessage({
+              channel,
+              text: personalizedProgress,
+              thread_ts: threadTs,
+            });
+            progressMessageCount++;
+            console.log(`[Slack] Personalized progress sent: "${personalizedProgress.substring(0, 50)}..."`);
+          } catch (err) {
+            console.error(`[Slack] Failed to send progress:`, err);
+          }
+        }).catch(err => {
+          console.log(`[Slack] Personalized progress generation failed:`, err);
+        });
+      }
 
       // STEP 2: Handle CLARIFY intent - ask user for clarification
       if (decisionLayerResult.intent === "CLARIFY") {
@@ -727,6 +758,27 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Streaming placeholder posted: ts=${placeholderMsg.ts}`);
         } else if (mightGenerateDoc) {
           console.log(`[Slack] Skipping streaming for doc-generating contract: ${decisionLayerResult.answerContract}`);
+          // For doc-generating contracts, send personalized progress (with coordination)
+          const intentType = decisionLayerResult.intent === 'MULTI_MEETING' ? 'multi_meeting' :
+            decisionLayerResult.intent === 'PRODUCT_KNOWLEDGE' ? 'product_knowledge' :
+            decisionLayerResult.intent === 'EXTERNAL_RESEARCH' ? 'external_research' : 'single_meeting';
+          generatePersonalizedProgressMessage(text, intentType as ProgressIntentType).then(async (personalizedProgress) => {
+            if (!canPostProgress()) {
+              console.log(`[Slack] Doc progress skipped - response already sent`);
+              return;
+            }
+            try {
+              await postSlackMessage({
+                channel,
+                text: personalizedProgress,
+                thread_ts: threadTs,
+              });
+              progressMessageCount++;
+              console.log(`[Slack] Doc personalized progress sent`);
+            } catch (err) {
+              console.error(`[Slack] Failed to send doc progress:`, err);
+            }
+          }).catch(() => {});
         }
 
         logger.startStage('open_assistant');
@@ -766,17 +818,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] Skipping operation-specific progress (streaming was used)`);
         } else {
           // Only send progress for non-streaming paths (document generation, etc.)
+          // Use canPostProgress() coordination to prevent race conditions
           const progressMessage = openAssistantResultData.progressMessage ||
             openAssistantResultData.singleMeetingResult?.progressMessage;
-          if (progressMessage && !testRun && progressMessageCount === 0) {
+          if (progressMessage && !testRun && canPostProgress()) {
             console.log(`[Slack] Sending operation-specific progress message: "${progressMessage.substring(0, 50)}..."`);
             await postSlackMessage({
               channel,
               text: progressMessage,
               thread_ts: threadTs,
             });
-          } else if (progressMessage && progressMessageCount > 0) {
-            console.log(`[Slack] Skipping operation-specific progress (${progressMessageCount} generic messages already sent)`);
+            progressMessageCount++;
+          } else if (progressMessage && !canPostProgress()) {
+            console.log(`[Slack] Skipping operation-specific progress (response already sent)`);
           }
         }
 
