@@ -1,0 +1,140 @@
+2026-02-04 14:14:42.87
+fd37db55
+User
+[Slack] Meeting from thread context: 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 14:14:42.96
+fd37db55
+User
+[INFO] [b6960d7c] Decision Layer completed {"correlationId":"b6960d7c","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":16000,"intent":"SINGLE_MEETING","contract":"NEXT_STEPS","method":"llm","resolvedMeetingId":"74b2a4e4-c560-476f-9a9c-3f727637a55f","duration_ms":8599}
+2026-02-04 14:14:43.16
+fd37db55
+User
+[Slack] Single-meeting mode activated for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f (Atlantic Coast Enterprise (ACE - Jiffy Lube))
+2026-02-04 14:14:45.26
+fd37db55
+User
+[SingleMeetingOrchestrator] Question: "what actions items should we make sure to mention from last weeks call..." | pendingOffer: false
+2026-02-04 14:14:45.26
+fd37db55
+User
+[SingleMeetingOrchestrator] Processing question for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 14:14:45.26
+fd37db55
+User
+[Slack] Thread has pending offer: false
+2026-02-04 14:14:45.56
+fd37db55
+User
+[SingleMeetingOrchestrator] Using Decision Layer contract: NEXT_STEPS → handler: extractive
+2026-02-04 14:14:45.86
+fd37db55
+User
+[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "what actions items should we make sure to mention from last weeks call"
+2026-02-04 14:14:45.86
+fd37db55
+User
+[SingleMeetingOrchestrator] VERSION=2026-01-27-v2 | handlerType: extractive | isSemantic: true | isBinary: false | hasContract: true
+2026-02-04 14:14:46.47
+fd37db55
+User
+[SingleMeetingOrchestrator] General path: parallel fetch
+2026-02-04 14:14:46.76
+fd37db55
+User
+[SingleMeetingOrchestrator] Reading action items for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f from database (READ-ONLY, no LLM)
+2026-02-04 14:14:52.46
+fd37db55
+User
+[SingleMeetingOrchestrator] Keywords: actions, items, make, sure, mention, weeks | Proper nouns:
+2026-02-04 14:14:52.46
+fd37db55
+User
+[SingleMeetingOrchestrator] Fallback: transcript search
+2026-02-04 14:14:52.46
+fd37db55
+User
+[SingleMeetingOrchestrator] Parallel fetch complete: 6500ms
+2026-02-04 14:14:54.37
+fd37db55
+User
+[SearchTranscript] Found 5 chunks matching keywords only
+2026-02-04 14:14:54.66
+fd37db55
+User
+[SingleMeetingOrchestrator] Transcript fetch: 8500ms
+2026-02-04 14:14:54.97
+fd37db55
+User
+[SingleMeetingOrchestrator] Semantic processing: judgment question requires filtering, using LLM answer
+2026-02-04 14:14:55.76
+fd37db55
+User
+[SemanticAnswer] Starting for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 14:15:00.76
+fd37db55
+User
+[Slack] Personalized progress sent: "Reviewing the action items from last week's call n..."
+2026-02-04 14:15:02.37
+fd37db55
+User
+[SemanticAnswer] Data fetch: 6601ms
+2026-02-04 14:15:02.57
+fd37db55
+User
+[SemanticAnswer] Context window: 1953 chars
+2026-02-04 14:15:03.07
+fd37db55
+User
+[SemanticAnswer] Detected answer shape: single_value
+2026-02-04 14:15:16.96
+fd37db55
+User
+[SemanticAnswer] Response finish_reason: length
+2026-02-04 14:15:16.96
+fd37db55
+User
+[SemanticAnswer] Response choices: 1
+2026-02-04 14:15:16.96
+fd37db55
+User
+[SemanticAnswer] LLM call: 21200ms
+2026-02-04 14:15:16.97
+fd37db55
+User
+[INFO] [b6960d7c] Single meeting response generated {"correlationId":"b6960d7c","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":50100,"intent":"extractive","dataSource":"semantic","duration_ms":31701}
+2026-02-04 14:15:16.97
+fd37db55
+User
+[SemanticAnswer] Response message role: assistant
+2026-02-04 14:15:16.97
+fd37db55
+User
+[SemanticAnswer] Response refusal: none
+2026-02-04 14:15:16.97
+fd37db55
+User
+[Slack] Single-meeting response: intent=extractive, source=semantic, pendingOffer=undefined, semantic=low
+2026-02-04 14:15:16.97
+fd37db55
+User
+[SemanticAnswer] Empty content - full response: {"index":0,"message":{"role":"assistant","content":"","refusal":null,"annotations":[]},"finish_reason":"length"}
+2026-02-04 14:15:16.97
+fd37db55
+User
+[SingleMeetingOrchestrator] Semantic success: confidence=low
+2026-02-04 14:15:16.97
+fd37db55
+User
+[SemanticAnswer] Response content length: 0
+2026-02-04 14:15:17.16
+fd37db55
+User
+[Slack] Document decision: testRun=false, contract=NONE, streaming=false, willGenerateDoc=false
+2026-02-04 14:15:17.16
+fd37db55
+User
+[Slack] Pipeline completed in 47702ms, progressMessages=1
+2026-02-04 14:15:18.67
+fd37db55
+User
+[INFO] [b6960d7c] Request completed successfully {"correlationId":"b6960d7c","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":51799,"intent":"SINGLE_MEETING","contract":"NEXT_STEPS","responseLength":53,"totalTimeMs":47702,"stages":{"meeting_resolution":0,"decision_layer":8599,"handler":31701}}

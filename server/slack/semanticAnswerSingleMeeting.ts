@@ -380,7 +380,7 @@ export async function semanticAnswerSingleMeeting(
   try {
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.SEMANTIC_ANSWER_SYNTHESIS,
-      max_completion_tokens: 500,
+      max_completion_tokens: 2000, // Increased from 500 to handle list-based answers with citations
       messages: [
         {
           role: "system",
