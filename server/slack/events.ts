@@ -530,7 +530,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
             console.log(`[Slack] Meeting resolution: hasMeetingRef=${hasMeetingRef}, company=${companyMentioned?.companyName || 'none'}`);
 
             logger.startStage('meeting_resolution');
-            const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { llmMeetingRefDetected: llmResult === true });
+            const resolution = await resolveMeetingFromSlackMessage(text, threadContext, { 
+              llmMeetingRefDetected: llmResult === true,
+              extractedCompanyContext: companyMentioned || undefined
+            });
             mrDuration = logger.endStage('meeting_resolution');
 
             if (resolution.resolved) {

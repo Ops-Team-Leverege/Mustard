@@ -296,7 +296,7 @@ function formatDate(date: Date): string {
 export async function resolveMeetingFromSlackMessage(
   message: string,
   threadContext?: MeetingResolverThreadContext,
-  options?: { llmMeetingRefDetected?: boolean }
+  options?: { llmMeetingRefDetected?: boolean; extractedCompanyContext?: { companyId: string; companyName: string } }
 ): Promise<MeetingResolutionResult> {
   console.log(`[MeetingResolver] Resolving meeting from message: "${message.substring(0, 50)}..." (llmDetected=${options?.llmMeetingRefDetected})`);
   
@@ -351,7 +351,12 @@ export async function resolveMeetingFromSlackMessage(
   }
   
   // 3. Temporal language resolution (requires company context)
-  const companyContext = await extractCompanyFromMessage(message);
+  // Use LLM-extracted company if provided, otherwise fall back to regex extraction from current message
+  const companyContext = options?.extractedCompanyContext || await extractCompanyFromMessage(message);
+  
+  if (options?.extractedCompanyContext) {
+    console.log(`[MeetingResolver] Using LLM-extracted company context: ${options.extractedCompanyContext.companyName}`);
+  }
   
   if (!companyContext) {
     // Check if any temporal language is present
