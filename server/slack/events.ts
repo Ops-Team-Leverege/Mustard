@@ -772,16 +772,21 @@ export async function slackEventsHandler(req: Request, res: Response) {
           console.log(`[Slack] No content to update streaming message: ${botReply.ts}`);
         }
         
-        // Generate document AFTER streaming if handler requested it
-        if (openAssistantResultData?.shouldGenerateDoc && responseText && responseText.length > 200) {
-          console.log(`[Slack] Handler requested doc generation - generating .docx`);
+        // Generate document AFTER streaming if:
+        // 1. Handler explicitly requested it (SALES_DOCS_PREP in chain), OR
+        // 2. Contract is EXTERNAL_RESEARCH and response is long enough (>300 words checked in sendResponseWithDocumentSupport)
+        const { AnswerContract } = await import("../decisionLayer/answerContracts");
+        const isExternalResearch = openAssistantResultData?.answerContract === AnswerContract.EXTERNAL_RESEARCH;
+        const shouldAttemptDocGeneration = openAssistantResultData?.shouldGenerateDoc || isExternalResearch;
+        
+        if (shouldAttemptDocGeneration && responseText && responseText.length > 200) {
+          console.log(`[Slack] Attempting doc generation - explicit: ${openAssistantResultData?.shouldGenerateDoc}, research: ${isExternalResearch}`);
           try {
-            const { AnswerContract } = await import("../decisionLayer/answerContracts");
             await sendResponseWithDocumentSupport({
               channel,
               threadTs,
               content: responseText,
-              contract: openAssistantResultData.answerContract ?? AnswerContract.SALES_DOCS_PREP,
+              contract: openAssistantResultData?.answerContract ?? AnswerContract.SALES_DOCS_PREP,
               customerName: resolvedMeeting?.companyName,
               userQuery: text,
               documentOnly: true, // Message already updated - only generate document

@@ -6,8 +6,7 @@
     "DRAFT_EMAIL",
     "PATTERN_ANALYSIS",
     "PRODUCT_EXPLANATION",
-    "SALES_DOCS_PREP",
-    "EXTERNAL_RESEARCH"
+    "SALES_DOCS_PREP"
   ],
   "wordThreshold": 300,
   "fileNamePattern": "{customer}_{type}_{date}.docx",
