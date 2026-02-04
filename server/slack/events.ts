@@ -633,12 +633,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Uses response coordination to prevent posting after response is sent
       if (!testRun && decisionLayerResult.intent === 'SINGLE_MEETING' && resolvedMeeting) {
         generatePersonalizedProgressMessage(text, 'single_meeting').then(async (personalizedProgress) => {
-          // Check coordination flag before posting (prevents race condition)
+          // Double-check coordination flag to prevent race condition
+          // Must check BOTH before and after any async gap
           if (!canPostProgress()) {
             console.log(`[Slack] Progress skipped - response already sent`);
             return;
           }
           try {
+            // Double-check after await to prevent race (response may have been sent during LLM generation)
+            if (responseSent) {
+              console.log(`[Slack] Progress skipped - response sent during generation`);
+              return;
+            }
             await postSlackMessage({
               channel,
               text: personalizedProgress,
@@ -763,11 +769,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
             decisionLayerResult.intent === 'PRODUCT_KNOWLEDGE' ? 'product_knowledge' :
             decisionLayerResult.intent === 'EXTERNAL_RESEARCH' ? 'external_research' : 'single_meeting';
           generatePersonalizedProgressMessage(text, intentType as ProgressIntentType).then(async (personalizedProgress) => {
+            // Double-check coordination flag to prevent race condition
             if (!canPostProgress()) {
               console.log(`[Slack] Doc progress skipped - response already sent`);
               return;
             }
             try {
+              // Double-check after await to prevent race (response may have been sent during LLM generation)
+              if (responseSent) {
+                console.log(`[Slack] Doc progress skipped - response sent during generation`);
+                return;
+              }
               await postSlackMessage({
                 channel,
                 text: personalizedProgress,

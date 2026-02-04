@@ -1,0 +1,184 @@
+2026-02-04 13:44:38.95
+015d3ad8
+User
+[DecisionLayer] Contract: NEXT_STEPS (llm_proposed)
+2026-02-04 13:44:38.95
+015d3ad8
+User
+[DecisionLayer] Intent: SINGLE_MEETING (llm)
+2026-02-04 13:44:38.95
+015d3ad8
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 13:44:38.95
+015d3ad8
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-04 13:44:39.15
+015d3ad8
+User
+[Slack] Control plane: intent=SINGLE_MEETING, contract=NEXT_STEPS, method=llm, layers={"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Scope: undefined
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Will Clarify: false
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Final Intent: SINGLE_MEETING
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Is Ambiguous: no
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Clarification Suggestion: none
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Clarify Message: none
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Conversation Context: User is looking for action items from the last week's call related to ACE.
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Scope Info: none
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Key Topics: action items, last week's call, ACE
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Extracted Companies: none
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Should Proceed: yes
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Intent: SINGLE_MEETING (llm)
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Contract: NEXT_STEPS
+2026-02-04 13:44:39.15
+015d3ad8
+User
+- Extracted Company: ACE
+2026-02-04 13:44:39.15
+015d3ad8
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Semantic Context:
+2026-02-04 13:44:39.15
+015d3ad8
+User
+Final Contract: NEXT_STEPS
+2026-02-04 13:44:40.35
+015d3ad8
+User
+[INFO] [c588679d] Decision Layer completed {"correlationId":"c588679d","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":10600,"intent":"SINGLE_MEETING","contract":"NEXT_STEPS","method":"llm","resolvedMeetingId":"74b2a4e4-c560-476f-9a9c-3f727637a55f","duration_ms":6700}
+2026-02-04 13:44:40.35
+015d3ad8
+User
+[Slack] Meeting from thread context: 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 13:44:40.35
+015d3ad8
+User
+[Slack] Single-meeting mode activated for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f (Atlantic Coast Enterprise (ACE - Jiffy Lube))
+2026-02-04 13:44:41.65
+015d3ad8
+User
+[Slack] Thread has pending offer: false
+2026-02-04 13:44:41.85
+015d3ad8
+User
+[SingleMeetingOrchestrator] Using Decision Layer contract: NEXT_STEPS → handler: extractive
+2026-02-04 13:44:41.85
+015d3ad8
+User
+[SingleMeetingOrchestrator] Question: "what actions items should we make sure to mention from last weeks call..." | pendingOffer: false
+2026-02-04 13:44:41.85
+015d3ad8
+User
+[SingleMeetingOrchestrator] Processing question for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 13:44:42.05
+015d3ad8
+User
+[SingleMeetingOrchestrator] DEBUG: Question for semantic check: "what actions items should we make sure to mention from last weeks call"
+2026-02-04 13:44:42.05
+015d3ad8
+User
+[SingleMeetingOrchestrator] VERSION=2026-01-27-v2 | handlerType: extractive | isSemantic: false | isBinary: false | hasContract: true
+2026-02-04 13:44:42.25
+015d3ad8
+User
+[SingleMeetingOrchestrator] General path: parallel fetch
+2026-02-04 13:44:42.45
+015d3ad8
+User
+[SingleMeetingOrchestrator] Reading action items for meeting 74b2a4e4-c560-476f-9a9c-3f727637a55f from database (READ-ONLY, no LLM)
+2026-02-04 13:44:45.95
+015d3ad8
+User
+[SingleMeetingOrchestrator] Keywords: actions, items, make, sure, mention, weeks | Proper nouns:
+2026-02-04 13:44:45.95
+015d3ad8
+User
+[SingleMeetingOrchestrator] Parallel fetch complete: 3800ms
+2026-02-04 13:44:45.95
+015d3ad8
+User
+[SingleMeetingOrchestrator] Fallback: transcript search
+2026-02-04 13:44:47.15
+015d3ad8
+User
+[SearchTranscript] Found 5 chunks matching keywords only
+2026-02-04 13:44:47.25
+015d3ad8
+User
+[SingleMeetingOrchestrator] Transcript fetch: 5000ms
+2026-02-04 13:44:47.35
+015d3ad8
+User
+[SingleMeetingOrchestrator] STEP6-SKIP: Not triggering because dataSource=transcript or isSemantic=false
+2026-02-04 13:44:47.55
+015d3ad8
+User
+[INFO] [c588679d] Single meeting response generated {"correlationId":"c588679d","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":17600,"intent":"extractive","dataSource":"transcript","duration_ms":5699}
+2026-02-04 13:44:47.55
+015d3ad8
+User
+[Slack] Pipeline completed in 16300ms, progressMessages=0
+2026-02-04 13:44:47.55
+015d3ad8
+User
+[Slack] Document decision: testRun=false, contract=NONE, streaming=false, willGenerateDoc=false
+2026-02-04 13:44:47.55
+015d3ad8
+User
+[Slack] Single-meeting response: intent=extractive, source=transcript, pendingOffer=undefined, semantic=N/A
+2026-02-04 13:44:49.85
+015d3ad8
+User
+[Slack] Personalized progress sent: "Reviewing the action items from last week's call n..."
+2026-02-04 13:44:50.25
+015d3ad8
+User
+[INFO] [c588679d] Request completed successfully {"correlationId":"c588679d","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":20500,"intent":"SINGLE_MEETING","contract":"NEXT_STEPS","responseLength":214,"totalTimeMs":16300,"stages":{"meeting_resolution":0,"decision_layer":6700,"handler":5699}}
