@@ -5,7 +5,9 @@
     "COMPARISON",
     "DRAFT_EMAIL",
     "PATTERN_ANALYSIS",
-    "PRODUCT_EXPLANATION"
+    "PRODUCT_EXPLANATION",
+    "SALES_DOCS_PREP",
+    "EXTERNAL_RESEARCH"
   ],
   "wordThreshold": 300,
   "fileNamePattern": "{customer}_{type}_{date}.docx",
@@ -16,6 +18,8 @@
     "DRAFT_EMAIL": "Here's your email draft — ready to copy and personalize.",
     "PATTERN_ANALYSIS": "Here's your pattern analysis — ready to review and share.",
     "PRODUCT_EXPLANATION": "Here's your product explainer — ready to use in your pitch.",
+    "SALES_DOCS_PREP": "Here's your document — ready to edit and share.",
+    "EXTERNAL_RESEARCH": "Here's your research report — ready to review and share.",
     "default": "Here's your document — ready to edit and share."
   },
   "closing": "Can I help with anything else?"

@@ -138,58 +138,12 @@ When answering:
  */
 async function generatePersonalizedProgress(
   userMessage: string,
-  intentType: 'product' | 'research' | 'draft_email' | 'draft_response' | 'multi_meeting' | 'general'
+  intentType: 'product' | 'research' | 'draft_email' | 'draft_response' | 'multi_meeting' | 'general',
+  includeCapabilityTip: boolean = true
 ): Promise<string> {
-  const defaultMessages: Record<typeof intentType, string> = {
-    product: "I'm checking our product database now.",
-    research: "I'm researching that for you now.",
-    draft_email: "I'm drafting your email now.",
-    draft_response: "I'm drafting your response now.",
-    multi_meeting: "I'm analyzing the relevant meetings now.",
-    general: "I'm working on that for you now.",
-  };
-  
-  try {
-    const response = await Promise.race([
-      openai.chat.completions.create({
-        model: MODEL_ASSIGNMENTS.PROGRESS_MESSAGES,
-        messages: [
-          {
-            role: "system",
-            content: `Generate a brief, friendly progress message (15-25 words max) for a user who just asked a question. 
-The message should:
-- Be warm and conversational (not robotic)
-- Reference what they're asking about specifically
-- End with a brief reassurance you're working on it
-- NOT use emojis
-- NOT start with "I'm" (vary the opener)
-
-Examples:
-- "Let me dig into our camera integration specs for you - pulling that info now."
-- "Good question about pricing! Gathering the latest details from our database."
-- "Checking what we know about network requirements - one moment."
-- "Looking into how that feature works - I'll have an answer shortly."`
-          },
-          {
-            role: "user",
-            content: `Question type: ${intentType}\nUser's question: "${userMessage.substring(0, 150)}"`
-          }
-        ],
-        max_tokens: 50,
-        temperature: 0.7,
-      }),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Progress message timeout')), 10000))
-    ]);
-    
-    const generated = response.choices[0]?.message?.content?.trim();
-    if (generated && generated.length > 10 && generated.length < 150) {
-      return generated;
-    }
-    return defaultMessages[intentType];
-  } catch (error) {
-    console.log(`[OpenAssistant] Progress message generation failed, using default`);
-    return defaultMessages[intentType];
-  }
+  // Use the centralized progress message generator from progressMessages.ts
+  const { generatePersonalizedProgressMessage } = await import("../slack/progressMessages");
+  return generatePersonalizedProgressMessage(userMessage, intentType, includeCapabilityTip);
 }
 
 /**
@@ -1155,6 +1109,21 @@ async function handleExternalResearchIntent(
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
   console.log(`[OpenAssistant] Progress message ready (${Date.now() - startTime}ms)`);
   
+  // Update streaming placeholder with progress message BEFORE starting research
+  if (context.slackStreaming && progressMessage) {
+    try {
+      const { updateSlackMessage } = await import("../slack/slackApi");
+      await updateSlackMessage({
+        channel: context.slackStreaming.channel,
+        ts: context.slackStreaming.messageTs,
+        text: progressMessage,
+      });
+      console.log(`[OpenAssistant] Updated streaming placeholder with progress message`);
+    } catch (updateError) {
+      console.error(`[OpenAssistant] Failed to update streaming placeholder with progress:`, updateError);
+    }
+  }
+  
   // Perform the research
   console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
@@ -1203,6 +1172,7 @@ async function handleExternalResearchIntent(
         delegatedToSingleMeeting: false,
         evidenceSources: researchResult.citations.map(c => c.source),
         progressMessage,
+        shouldGenerateDoc: chainIncludesSalesDocsPrep, // Generate doc when research + writing requested
       };
     } catch (styleError) {
       console.error(`[OpenAssistant] Style chaining failed, returning raw research:`, styleError);
