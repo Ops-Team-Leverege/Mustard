@@ -104,6 +104,14 @@ export type IntentClassificationResult = {
   proposedInterpretation?: ProposedInterpretation;  // For CLARIFY: what we think they want
   alternatives?: LLMInterpretationAlternative[];    // For CLARIFY: other possible interpretations
   clarifyMessage?: string;                          // Natural language clarification message
+  // Semantic context extraction from conversation
+  extractedCompany?: string;                        // Single company name extracted from context
+  extractedCompanies?: string[];                    // Multiple companies if ambiguous
+  isAmbiguous?: boolean;                           // True if multiple companies mentioned
+  conversationContext?: string;                     // What is this conversation about?
+  keyTopics?: string[];                            // Key topics being discussed
+  shouldProceed?: boolean;                         // Should we proceed without clarification?
+  clarificationSuggestion?: string;               // Specific clarification message if ambiguous
 };
 
 // ============================================================================
@@ -223,21 +231,21 @@ type CompanyMatchResult = {
 async function containsKnownCompany(text: string): Promise<CompanyMatchResult | null> {
   const lower = text.toLowerCase();
   const companies = await getKnownCompanies();
-  
+
   // First pass: check for full company name match (AUTHORITATIVE - no validation needed)
   for (const company of companies) {
     if (lower.includes(company)) {
       return { company, matchType: "full" };
     }
   }
-  
+
   // Second pass: check for first word match ONLY for acronyms (e.g., "TPI" matches "TPI Composites")
   // Acronym detection: all uppercase, 2-5 characters (covers TPI, ACE, CJ, OK, etc.)
   // These matches NEED LLM validation to confirm semantic intent
   for (const company of companies) {
     const firstWord = company.split(/\s+/)[0];
     const isAcronym = /^[A-Z]{2,5}$/.test(firstWord) || /^[A-Z][A-Za-z]'?s?$/.test(firstWord);
-    
+
     if (isAcronym) {
       // Use word boundary to avoid partial matches
       const wordBoundaryRegex = new RegExp(`\\b${firstWord}\\b`, 'i');
@@ -246,7 +254,7 @@ async function containsKnownCompany(text: string): Promise<CompanyMatchResult | 
       }
     }
   }
-  
+
   return null;
 }
 
@@ -415,19 +423,19 @@ async function classifyByKeyword(
 
     // If describing a situation (not asking to search meetings), let LLM handle it
 =======
-  
+
   if (companyMatch || contact) {
     const entityName = companyMatch?.company || contact;
     // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
     const detectionMethod: IntentDetectionMethod = companyMatch?.matchType === "acronym" ? "entity_acronym" : "entity";
     // Lower confidence for acronym matches since they need validation
     const confidence = companyMatch?.matchType === "acronym" ? 0.70 : 0.85;
-    
+
     // Don't trigger multi-meeting for strategic advice requests
     // "across all their stores" is about customer behavior, not "search across all meetings"
     const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
     const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want)\b/i.test(question);
-    
+
     // If describing a situation with a strategic advice request, go to PRODUCT_KNOWLEDGE
 >>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
     if (isDescribingSituation) {
@@ -473,7 +481,7 @@ async function classifyByLLM(
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: INTENT_CLASSIFICATION_PROMPT },
     ];
-    
+
     // Include thread history so LLM can understand follow-ups semantically
     if (threadContext?.messages && threadContext.messages.length > 1) {
       const historyMessages = threadContext.messages.slice(0, -1); // Exclude current message
@@ -485,10 +493,10 @@ async function classifyByLLM(
       }
       console.log(`[IntentClassifier] LLM classification with ${historyMessages.length} messages of thread context`);
     }
-    
+
     // Add current question
     messages.push({ role: "user", content: question });
-    
+
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.INTENT_CLASSIFICATION,
       messages,
@@ -512,11 +520,28 @@ async function classifyByLLM(
     const intentStr = parsed.intent as string;
 
     if (intentStr in Intent) {
+      console.log(`[IntentClassifier] ✅ SEMANTIC CONTEXT EXTRACTED:`);
+      console.log(`  Intent: ${intentStr}`);
+      console.log(`  Company: ${parsed.extractedCompany || 'none'}`);
+      console.log(`  Companies: ${parsed.extractedCompanies ? parsed.extractedCompanies.join(', ') : 'none'}`);
+      console.log(`  Ambiguous: ${parsed.isAmbiguous ? 'yes' : 'no'}`);
+      console.log(`  Context: ${parsed.conversationContext || 'none'}`);
+      console.log(`  Topics: ${parsed.keyTopics ? parsed.keyTopics.join(', ') : 'none'}`);
+      console.log(`  Should Proceed: ${parsed.shouldProceed !== false ? 'yes' : 'no'}`);
+      console.log(`  Clarification: ${parsed.clarificationSuggestion || 'none'}`);
+
       return {
         intent: Intent[intentStr as keyof typeof Intent],
         intentDetectionMethod: "llm",
         confidence: parsed.confidence || 0.8,
         reason: parsed.reason,
+        extractedCompany: parsed.extractedCompany || undefined,
+        extractedCompanies: parsed.extractedCompanies || undefined,
+        isAmbiguous: parsed.isAmbiguous || false,
+        conversationContext: parsed.conversationContext || undefined,
+        keyTopics: parsed.keyTopics || undefined,
+        shouldProceed: parsed.shouldProceed !== false, // Default to true unless explicitly false
+        clarificationSuggestion: parsed.clarificationSuggestion || undefined,
       };
     }
 
@@ -559,7 +584,7 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
 
   // Entity detection (known customers from database) doesn't need validation
 =======
-  
+
   // Full entity detection (known customers from database) doesn't need validation
 >>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   // When someone mentions a known customer like "Les Schwab", trust it's about meetings
@@ -569,12 +594,12 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
 <<<<<<< HEAD
 
 =======
-  
+
   // Product signal and situation_advice are high-confidence fast-paths
   if (result.intentDetectionMethod === "product_signal" || result.intentDetectionMethod === "situation_advice") {
     return false;
   }
-  
+
 >>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   // CLARIFY and REFUSE intents don't need validation
   if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
@@ -584,7 +609,7 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
 
   // Weak detection methods need validation
 =======
-  
+
   // Weak detection methods need validation (includes entity_acronym matches)
 >>>>>>> ee58014c95367a2afa8c8ed380667c4cae40a774
   if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
