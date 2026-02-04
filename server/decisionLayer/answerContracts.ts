@@ -456,12 +456,19 @@ const SINGLE_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "summarize": AnswerContract.MEETING_SUMMARY,
   "overview": AnswerContract.MEETING_SUMMARY,
   
-  // Action item patterns
+  // Action item patterns (including common typos/variations)
   "action items": AnswerContract.NEXT_STEPS,
+  "actions items": AnswerContract.NEXT_STEPS,  // Common typo
+  "action item": AnswerContract.NEXT_STEPS,    // Singular
   "next steps": AnswerContract.NEXT_STEPS,
+  "next step": AnswerContract.NEXT_STEPS,      // Singular
   "commitments": AnswerContract.NEXT_STEPS,
-  "follow up": AnswerContract.NEXT_STEPS,  // Generic "follow up" - lower priority
+  "commitment": AnswerContract.NEXT_STEPS,     // Singular
+  "follow up": AnswerContract.NEXT_STEPS,      // Generic "follow up" - lower priority
+  "follow-up": AnswerContract.NEXT_STEPS,      // Hyphenated variant
+  "followup": AnswerContract.NEXT_STEPS,       // Combined variant  
   "to-do": AnswerContract.NEXT_STEPS,
+  "todo": AnswerContract.NEXT_STEPS,           // No hyphen variant
   
   // Attendee patterns
   "attendees": AnswerContract.ATTENDEES,
