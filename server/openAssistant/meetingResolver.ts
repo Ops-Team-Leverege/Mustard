@@ -21,6 +21,7 @@ export type ChunkSearchResult = {
   transcriptId: string;
   companyName: string;
   meetingDate: Date | null;
+  createdAt: Date | null;
   speakerName: string | null;
   content: string;
 };
@@ -30,13 +31,16 @@ export type ChunkSearchResult = {
  * Used to avoid regex re-detection of "all customers" scope.
  */
 export type ScopeOverride = {
-  allCustomers?: boolean; // LLM detected "all customers" scope
+  allCustomers?: boolean; // LLM detected "all customers" scope (scopeType="all")
+  scopeType?: "all" | "specific" | "none"; // What kind of scope was detected
+  specificCompanies?: string[] | null; // Company names if scopeType="specific"
   hasTimeRange?: boolean;
   timeRangeExplanation?: string;
   customerScopeExplanation?: string;
   meetingLimit?: number | null; // e.g., "3 most recent" → 3
   startDate?: Date; // Parsed from time range (e.g., "last month" → 30 days ago)
   endDate?: Date;   // Defaults to now
+  threadMessages?: Array<{ text: string; isBot: boolean }>; // Thread context for topic extraction
 };
 
 /**
@@ -114,6 +118,23 @@ export async function findRelevantMeetings(
 ): Promise<MeetingSearchResult> {
   const { storage } = await import("../storage");
 
+  // Extract topic from current message first, then fall back to thread context if not found
+  let topic = extractTopic(userMessage);
+
+  // If no topic in current message but we have thread history, search earlier messages for topic
+  if (!topic && scopeOverride?.threadMessages?.length) {
+    for (const msg of scopeOverride.threadMessages) {
+      if (!msg.isBot) {
+        const threadTopic = extractTopic(msg.text);
+        if (threadTopic) {
+          console.log(`[MeetingResolver] Topic "${threadTopic}" extracted from thread context`);
+          topic = threadTopic;
+          break;
+        }
+      }
+    }
+  }
+
   // Extract company from conversation context if available
   let contextCompany: string | null = null;
   if (conversationContext) {
@@ -124,6 +145,67 @@ export async function findRelevantMeetings(
     }
   }
 
+  // Handle specific companies detected by LLM (from thread context)
+  if (scopeOverride?.scopeType === "specific" && scopeOverride.specificCompanies?.length) {
+    console.log(`[MeetingResolver] Specific companies detected via LLM: ${scopeOverride.specificCompanies.join(", ")}`);
+    console.log(`[MeetingResolver] Scope override received:`, JSON.stringify(scopeOverride));
+
+    // Parse time range
+    const timeRangeSource = scopeOverride?.timeRangeExplanation || userMessage;
+    const timeRange = parseTimeRange(timeRangeSource);
+    const startDate = scopeOverride?.startDate ?? timeRange.startDate;
+
+    // Search for meetings from these specific companies
+    const companyMatches = await searchCompanies(scopeOverride.specificCompanies);
+
+    if (companyMatches.length > 0) {
+      const { MEETING_LIMITS } = await import("../config/constants");
+      const MAX_MEETINGS_PER_COMPANY = MEETING_LIMITS.MAX_MEETINGS_PER_COMPANY;
+
+      const meetings: SingleMeetingContext[] = [];
+      for (const company of companyMatches) {
+        // Build query with optional date filter
+        let query = `
+          SELECT t.id, t.meeting_date, COALESCE(t.meeting_date, t.created_at) as sort_date, 
+                 c.name as company_name, c.id as company_id
+          FROM transcripts t
+          JOIN companies c ON t.company_id = c.id
+          WHERE t.company_id = $1
+        `;
+        const params: (string | Date | number)[] = [company.id];
+
+        if (startDate) {
+          query += ` AND COALESCE(t.meeting_date, t.created_at) >= $2`;
+          params.push(startDate);
+        }
+
+        query += ` ORDER BY COALESCE(t.meeting_date, t.created_at) DESC LIMIT $${params.length + 1}`;
+        params.push(MAX_MEETINGS_PER_COMPANY);
+
+        const transcriptRows = await storage.rawQuery(query, params);
+
+        if (transcriptRows && transcriptRows.length > 0) {
+          for (const row of transcriptRows) {
+            meetings.push({
+              meetingId: row.id as string,
+              companyId: row.company_id as string,
+              companyName: row.company_name as string,
+              meetingDate: row.sort_date ? new Date(row.sort_date as string) : null,
+            });
+          }
+        }
+      }
+
+      console.log(`[MeetingResolver] Found ${meetings.length} meetings for specific companies: ${scopeOverride.specificCompanies.join(", ")}`);
+      return {
+        meetings,
+        searchedFor: scopeOverride.specificCompanies.join(", "),
+        topic,
+      };
+    } else {
+      console.log(`[MeetingResolver] No company matches found for: ${scopeOverride.specificCompanies.join(", ")}`);
+    }
+  }
   // Check for "all customers" scope - prefer LLM-determined scope over regex
   const isAllCustomers = scopeOverride?.allCustomers ?? wantsAllCustomers(userMessage);
 
@@ -142,7 +224,6 @@ export async function findRelevantMeetings(
     console.log(`[MeetingResolver] Time range source: "${timeRangeSource}", filter: ${startDate ? startDate.toISOString() : 'none'}`);
 
     const allMeetings = await fetchAllRecentTranscripts(meetingLimit, startDate);
-    const topic = extractTopic(userMessage);
     return {
       meetings: allMeetings,
       searchedFor: "all customers",
@@ -194,7 +275,6 @@ export async function findRelevantMeetings(
   }
 
   const searchTerms = extractSearchTerms(userMessage);
-  const topic = extractTopic(userMessage);
   console.log(`[MeetingResolver] Searching for meetings with terms: ${searchTerms.join(", ")}${topic ? `, topic: "${topic}"` : ''}`);
 
   if (searchTerms.length === 0) {
@@ -237,7 +317,8 @@ export async function findRelevantMeetings(
   for (const company of companyMatches) {
     // Fetch recent transcripts for the company (bounded to prevent perf issues)
     const transcriptRows = await storage.rawQuery(`
-      SELECT t.id, t.meeting_date, c.name as company_name, c.id as company_id
+      SELECT t.id, t.meeting_date, COALESCE(t.meeting_date, t.created_at) as sort_date,
+             c.name as company_name, c.id as company_id
       FROM transcripts t
       JOIN companies c ON t.company_id = c.id
       WHERE t.company_id = $1
@@ -251,7 +332,7 @@ export async function findRelevantMeetings(
           meetingId: row.id as string,
           companyId: row.company_id as string,
           companyName: row.company_name as string,
-          meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+          meetingDate: row.sort_date ? new Date(row.sort_date as string) : (row.meeting_date ? new Date(row.meeting_date as string) : null),
         });
       }
     }
@@ -316,7 +397,7 @@ async function fetchAllRecentTranscripts(limit?: number | null, startDate?: Date
     meetingId: row.meeting_id as string,
     companyId: row.company_id as string,
     companyName: row.company_name as string,
-    meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+    meetingDate: row.sort_date ? new Date(row.sort_date as string) : (row.meeting_date ? new Date(row.meeting_date as string) : null),
   }));
 
   console.log(`[MeetingResolver] Fetched ${meetings.length} transcripts for "all customers" scope${startDate ? ` (since ${startDate.toISOString()})` : ''}`);
@@ -368,7 +449,7 @@ async function fallbackMeetingSearch(message: string): Promise<SingleMeetingCont
             meetingId: row.meeting_id as string,
             companyId: row.company_id as string,
             companyName: row.company_name as string,
-            meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+            meetingDate: row.sort_date ? new Date(row.sort_date as string) : (row.meeting_date ? new Date(row.meeting_date as string) : null),
           });
         }
       }
@@ -534,7 +615,7 @@ async function searchContacts(searchTerms: string[]): Promise<SingleMeetingConte
             meetingId: row.meeting_id as string,
             companyId: row.company_id as string,
             companyName: row.company_name as string,
-            meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+            meetingDate: row.sort_date ? new Date(row.sort_date as string) : (row.meeting_date ? new Date(row.meeting_date as string) : null),
           });
         }
       }
@@ -567,6 +648,7 @@ async function searchChunksForTopic(
       tc.transcript_id,
       c.name as company_name,
       tc.meeting_date,
+      tc.created_at,
       tc.speaker_name,
       tc.content
     FROM transcript_chunks tc
@@ -589,7 +671,8 @@ async function searchChunksForTopic(
       results.get(transcriptId)!.push({
         transcriptId,
         companyName: row.company_name as string,
-        meetingDate: row.meeting_date ? new Date(row.meeting_date as string) : null,
+        meetingDate: row.sort_date ? new Date(row.sort_date as string) : (row.meeting_date ? new Date(row.meeting_date as string) : null),
+        createdAt: row.created_at ? new Date(row.created_at as string) : null,
         speakerName: row.speaker_name as string | null,
         content: row.content as string,
       });
@@ -627,7 +710,8 @@ export async function searchAcrossMeetings(
     const entries = Array.from(chunkResults.entries());
     for (const [transcriptId, chunks] of entries) {
       const firstChunk = chunks[0];
-      const meetingDate = firstChunk.meetingDate?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date";
+      const dateToUse = firstChunk.meetingDate || firstChunk.createdAt;
+      const meetingDate = dateToUse?.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) || "Unknown date";
 
       // Format each chunk with speaker attribution
       const excerpts = chunks.slice(0, 3).map((chunk: ChunkSearchResult) => {
