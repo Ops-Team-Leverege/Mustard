@@ -104,7 +104,7 @@ export enum AnswerContract {
   CUSTOMER_QUESTIONS = "CUSTOMER_QUESTIONS",
   EXTRACTIVE_FACT = "EXTRACTIVE_FACT",
   AGGREGATIVE_LIST = "AGGREGATIVE_LIST",
-  
+
   // ============================================================================
   // MULTI_MEETING Contracts (SSOT mode: none)
   // Identical structure to SINGLE_MEETING, different scope size
@@ -113,7 +113,7 @@ export enum AnswerContract {
   COMPARISON = "COMPARISON",                   // Differences across meetings
   TREND_SUMMARY = "TREND_SUMMARY",             // Changes over time
   CROSS_MEETING_QUESTIONS = "CROSS_MEETING_QUESTIONS", // Questions across meetings
-  
+
   // ============================================================================
   // Descriptive contracts (SSOT mode: descriptive)
   // ============================================================================
@@ -121,37 +121,43 @@ export enum AnswerContract {
   VALUE_PROPOSITION = "VALUE_PROPOSITION",
   DRAFT_RESPONSE = "DRAFT_RESPONSE",
   DRAFT_EMAIL = "DRAFT_EMAIL",
-  
+
   // ============================================================================
   // Product Knowledge contracts (chainable - can be used in contract chains)
   // ============================================================================
   PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE",     // Fetch product data for chain context
-  
+
   // ============================================================================
   // Authoritative contracts (SSOT mode: authoritative)
   // ============================================================================
   FEATURE_VERIFICATION = "FEATURE_VERIFICATION",
   FAQ_ANSWER = "FAQ_ANSWER",
-  
+
   // ============================================================================
   // External Research contracts (uses web search via Gemini)
   // ============================================================================
   EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH",   // Web research on companies/prospects
   SALES_DOCS_PREP = "SALES_DOCS_PREP",       // Research + value prop matching for sales
-  
+
+  // ============================================================================
+  // Slack Search contracts (searches Slack as a data source)
+  // ============================================================================
+  SLACK_MESSAGE_SEARCH = "SLACK_MESSAGE_SEARCH",  // Search Slack messages
+  SLACK_CHANNEL_INFO = "SLACK_CHANNEL_INFO",      // Get channel information
+
   // ============================================================================
   // General contracts
   // ============================================================================
   DOCUMENT_ANSWER = "DOCUMENT_ANSWER",
   GENERAL_RESPONSE = "GENERAL_RESPONSE",
   NOT_FOUND = "NOT_FOUND",
-  
+
   // ============================================================================
   // Terminal contracts
   // ============================================================================
   REFUSE = "REFUSE",
   CLARIFY = "CLARIFY",
-  
+
   // Legacy (kept for backward compatibility)
   PRODUCT_INFO = "PRODUCT_INFO",
 }
@@ -260,7 +266,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "list",
     emptyResultBehavior: "return_empty",
   },
-  
+
   // MULTI_MEETING contracts (identical structure to SINGLE_MEETING, different scope)
   [AnswerContract.PATTERN_ANALYSIS]: {
     ssotMode: "none",
@@ -297,7 +303,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "list",
     emptyResultBehavior: "return_empty",
   },
-  
+
   // Descriptive contracts (grounded, non-authoritative)
   [AnswerContract.PRODUCT_EXPLANATION]: {
     ssotMode: "descriptive",
@@ -331,7 +337,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "text",
     emptyResultBehavior: "return_empty",
   },
-  
+
   // Authoritative contracts (requires Product SSOT)
   [AnswerContract.FEATURE_VERIFICATION]: {
     ssotMode: "authoritative",
@@ -350,7 +356,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "text",
     emptyResultBehavior: "clarify",  // Can ask for clarification
   },
-  
+
   // Product Knowledge contract (chainable)
   [AnswerContract.PRODUCT_KNOWLEDGE]: {
     ssotMode: "authoritative",
@@ -360,7 +366,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "text",
     emptyResultBehavior: "return_empty",  // Can return empty if no matching data
   },
-  
+
   // General/Legacy contracts
   [AnswerContract.PRODUCT_INFO]: {
     ssotMode: "descriptive",
@@ -387,7 +393,7 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "structured",
     emptyResultBehavior: "clarify",
   },
-  
+
   [AnswerContract.DOCUMENT_ANSWER]: {
     ssotMode: "none",
     requiresEvidence: true,
@@ -413,7 +419,26 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     responseFormat: "text",
     emptyResultBehavior: "return_empty",
   },
-  
+
+  // Slack Search contracts (extractive from Slack)
+  [AnswerContract.SLACK_MESSAGE_SEARCH]: {
+    ssotMode: "none",
+    requiresEvidence: true,
+    allowsSummary: false,
+    requiresCitation: true,  // Link to Slack messages
+    responseFormat: "list",
+    emptyResultBehavior: "return_empty",
+    minEvidenceThreshold: 1,
+  },
+  [AnswerContract.SLACK_CHANNEL_INFO]: {
+    ssotMode: "none",
+    requiresEvidence: false,
+    allowsSummary: false,
+    requiresCitation: false,
+    responseFormat: "list",
+    emptyResultBehavior: "return_empty",
+  },
+
   // Terminal contracts (no execution, just terminal responses)
   [AnswerContract.REFUSE]: {
     ssotMode: "none",
@@ -450,12 +475,12 @@ const SINGLE_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "help me answer": AnswerContract.DRAFT_RESPONSE,
   "draft a response": AnswerContract.DRAFT_RESPONSE,
   "respond to": AnswerContract.DRAFT_RESPONSE,
-  
+
   // Summary patterns
   "summary": AnswerContract.MEETING_SUMMARY,
   "summarize": AnswerContract.MEETING_SUMMARY,
   "overview": AnswerContract.MEETING_SUMMARY,
-  
+
   // Action item patterns (including common typos/variations)
   "action items": AnswerContract.NEXT_STEPS,
   "actions items": AnswerContract.NEXT_STEPS,  // Common typo
@@ -469,13 +494,13 @@ const SINGLE_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "followup": AnswerContract.NEXT_STEPS,       // Combined variant  
   "to-do": AnswerContract.NEXT_STEPS,
   "todo": AnswerContract.NEXT_STEPS,           // No hyphen variant
-  
+
   // Attendee patterns
   "attendees": AnswerContract.ATTENDEES,
   "who was on": AnswerContract.ATTENDEES,
   "who attended": AnswerContract.ATTENDEES,
   "participants": AnswerContract.ATTENDEES,
-  
+
   // Customer questions patterns
   "customer questions": AnswerContract.CUSTOMER_QUESTIONS,
   "what did they ask": AnswerContract.CUSTOMER_QUESTIONS,
@@ -540,7 +565,7 @@ const MULTI_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "often": AnswerContract.PATTERN_ANALYSIS,
   "always come up": AnswerContract.PATTERN_ANALYSIS,
   "keeps coming up": AnswerContract.PATTERN_ANALYSIS,
-  
+
   // Comparison (differences across meetings)
   "compare": AnswerContract.COMPARISON,
   "difference": AnswerContract.COMPARISON,
@@ -550,7 +575,7 @@ const MULTI_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "versus": AnswerContract.COMPARISON,
   "vs": AnswerContract.COMPARISON,
   "between meetings": AnswerContract.COMPARISON,
-  
+
   // Trend summary (changes over time)
   "trend": AnswerContract.TREND_SUMMARY,
   "trends": AnswerContract.TREND_SUMMARY,
@@ -560,7 +585,7 @@ const MULTI_MEETING_CONTRACT_KEYWORDS: Record<string, AnswerContract> = {
   "growing": AnswerContract.TREND_SUMMARY,
   "declining": AnswerContract.TREND_SUMMARY,
   "progression": AnswerContract.TREND_SUMMARY,
-  
+
   // Cross-meeting questions
   "questions across": AnswerContract.CROSS_MEETING_QUESTIONS,
   "common questions": AnswerContract.CROSS_MEETING_QUESTIONS,
@@ -619,16 +644,16 @@ const CONTRACT_PHASES: Record<AnswerContract, TaskPhase> = {
   [AnswerContract.AGGREGATIVE_LIST]: "extraction",
   [AnswerContract.CROSS_MEETING_QUESTIONS]: "extraction",
   [AnswerContract.PRODUCT_KNOWLEDGE]: "extraction",  // Fetches product data for chain context
-  
+
   // Analysis phase
   [AnswerContract.PATTERN_ANALYSIS]: "analysis",
   [AnswerContract.COMPARISON]: "analysis",
   [AnswerContract.TREND_SUMMARY]: "analysis",
-  
+
   // Research phase (external web research)
   [AnswerContract.EXTERNAL_RESEARCH]: "analysis",
   [AnswerContract.SALES_DOCS_PREP]: "analysis",
-  
+
   // Drafting phase
   [AnswerContract.PRODUCT_EXPLANATION]: "drafting",
   [AnswerContract.VALUE_PROPOSITION]: "drafting",
@@ -660,63 +685,87 @@ const TASK_KEYWORDS: Array<{
   contracts: AnswerContract[];
   intent: Intent[];
 }> = [
-  // Extraction tasks
-  { pattern: /questions?|asked|concerns|objections/i, task: "extract_questions", 
-    contracts: [AnswerContract.CUSTOMER_QUESTIONS, AnswerContract.CROSS_MEETING_QUESTIONS],
-    intent: [Intent.SINGLE_MEETING, Intent.MULTI_MEETING] },
-  { pattern: /summarize|summary|overview/i, task: "summarize", 
-    contracts: [AnswerContract.MEETING_SUMMARY],
-    intent: [Intent.SINGLE_MEETING] },
-  { pattern: /action items?|next steps?|to-?do/i, task: "extract_actions", 
-    contracts: [AnswerContract.NEXT_STEPS],
-    intent: [Intent.SINGLE_MEETING] },
-  { pattern: /who\s+(was|attended|joined)|attendees?|participants?/i, task: "extract_attendees", 
-    contracts: [AnswerContract.ATTENDEES],
-    intent: [Intent.SINGLE_MEETING] },
-  
-  // Analysis tasks
-  { pattern: /pattern|recurring|theme|common\s+theme/i, task: "analyze_patterns", 
-    contracts: [AnswerContract.PATTERN_ANALYSIS],
-    intent: [Intent.MULTI_MEETING] },
-  { pattern: /compare|difference|differ|contrast|versus|vs\b/i, task: "compare", 
-    contracts: [AnswerContract.COMPARISON],
-    intent: [Intent.MULTI_MEETING] },
-  { pattern: /trend|over time|changing|evolving|progression/i, task: "analyze_trends", 
-    contracts: [AnswerContract.TREND_SUMMARY],
-    intent: [Intent.MULTI_MEETING] },
-  
-  // Drafting tasks
-  { pattern: /help\s+(me\s+)?(answer|respond|reply)|draft\s+(a\s+)?response/i, task: "draft_response", 
-    contracts: [AnswerContract.DRAFT_RESPONSE],
-    intent: [Intent.SINGLE_MEETING, Intent.MULTI_MEETING, Intent.GENERAL_HELP] },
-  { pattern: /draft\s+(an?\s+)?email|write\s+(an?\s+)?email|email\s+template/i, task: "draft_email", 
-    contracts: [AnswerContract.DRAFT_EMAIL],
-    intent: [Intent.GENERAL_HELP] },
-  
-  // External research tasks
-  { pattern: /research|earnings\s+call|public\s+statement|their\s+priorit/i, task: "external_research", 
-    contracts: [AnswerContract.EXTERNAL_RESEARCH],
-    intent: [Intent.EXTERNAL_RESEARCH] },
-  { pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for|draft.*slides?|create.*slides?/i, task: "sales_docs_prep", 
-    contracts: [AnswerContract.SALES_DOCS_PREP],
-    intent: [Intent.EXTERNAL_RESEARCH] },
-  { pattern: /value\s*prop|pitcrew['']?s?\s+value|our\s+value|connect.*pitcrew|align.*offering|match.*product|our\s+offer|pitcrew\s+offer|based\s+on\s+pitcrew|pitcrew['']?s?\s+(?:features?|capabilities?|approach)/i, task: "product_connection", 
-    contracts: [AnswerContract.PRODUCT_KNOWLEDGE],
-    intent: [Intent.EXTERNAL_RESEARCH, Intent.GENERAL_HELP, Intent.SINGLE_MEETING, Intent.MULTI_MEETING, Intent.PRODUCT_KNOWLEDGE] },
-];
+    // Extraction tasks
+    {
+      pattern: /questions?|asked|concerns|objections/i, task: "extract_questions",
+      contracts: [AnswerContract.CUSTOMER_QUESTIONS, AnswerContract.CROSS_MEETING_QUESTIONS],
+      intent: [Intent.SINGLE_MEETING, Intent.MULTI_MEETING]
+    },
+    {
+      pattern: /summarize|summary|overview/i, task: "summarize",
+      contracts: [AnswerContract.MEETING_SUMMARY],
+      intent: [Intent.SINGLE_MEETING]
+    },
+    {
+      pattern: /action items?|next steps?|to-?do/i, task: "extract_actions",
+      contracts: [AnswerContract.NEXT_STEPS],
+      intent: [Intent.SINGLE_MEETING]
+    },
+    {
+      pattern: /who\s+(was|attended|joined)|attendees?|participants?/i, task: "extract_attendees",
+      contracts: [AnswerContract.ATTENDEES],
+      intent: [Intent.SINGLE_MEETING]
+    },
+
+    // Analysis tasks
+    {
+      pattern: /pattern|recurring|theme|common\s+theme/i, task: "analyze_patterns",
+      contracts: [AnswerContract.PATTERN_ANALYSIS],
+      intent: [Intent.MULTI_MEETING]
+    },
+    {
+      pattern: /compare|difference|differ|contrast|versus|vs\b/i, task: "compare",
+      contracts: [AnswerContract.COMPARISON],
+      intent: [Intent.MULTI_MEETING]
+    },
+    {
+      pattern: /trend|over time|changing|evolving|progression/i, task: "analyze_trends",
+      contracts: [AnswerContract.TREND_SUMMARY],
+      intent: [Intent.MULTI_MEETING]
+    },
+
+    // Drafting tasks
+    {
+      pattern: /help\s+(me\s+)?(answer|respond|reply)|draft\s+(a\s+)?response/i, task: "draft_response",
+      contracts: [AnswerContract.DRAFT_RESPONSE],
+      intent: [Intent.SINGLE_MEETING, Intent.MULTI_MEETING, Intent.GENERAL_HELP]
+    },
+    {
+      pattern: /draft\s+(an?\s+)?email|write\s+(an?\s+)?email|email\s+template/i, task: "draft_email",
+      contracts: [AnswerContract.DRAFT_EMAIL],
+      intent: [Intent.GENERAL_HELP]
+    },
+
+    // External research tasks
+    {
+      pattern: /research|earnings\s+call|public\s+statement|their\s+priorit/i, task: "external_research",
+      contracts: [AnswerContract.EXTERNAL_RESEARCH],
+      intent: [Intent.EXTERNAL_RESEARCH]
+    },
+    {
+      pattern: /slide\s+deck|sales\s+deck|pitch\s+deck|presentation\s+for|draft.*slides?|create.*slides?/i, task: "sales_docs_prep",
+      contracts: [AnswerContract.SALES_DOCS_PREP],
+      intent: [Intent.EXTERNAL_RESEARCH]
+    },
+    {
+      pattern: /value\s*prop|pitcrew['']?s?\s+value|our\s+value|connect.*pitcrew|align.*offering|match.*product|our\s+offer|pitcrew\s+offer|based\s+on\s+pitcrew|pitcrew['']?s?\s+(?:features?|capabilities?|approach)/i, task: "product_connection",
+      contracts: [AnswerContract.PRODUCT_KNOWLEDGE],
+      intent: [Intent.EXTERNAL_RESEARCH, Intent.GENERAL_HELP, Intent.SINGLE_MEETING, Intent.MULTI_MEETING, Intent.PRODUCT_KNOWLEDGE]
+    },
+  ];
 
 /**
  * Identify required tasks from user message.
  */
 function identifyTasks(userMessage: string, intent: Intent): string[] {
   const tasks: string[] = [];
-  
+
   for (const taskDef of TASK_KEYWORDS) {
     if (taskDef.pattern.test(userMessage) && taskDef.intent.includes(intent)) {
       tasks.push(taskDef.task);
     }
   }
-  
+
   return tasks;
 }
 
@@ -731,16 +780,16 @@ function identifyTasks(userMessage: string, intent: Intent): string[] {
 function getContractForTask(task: string, intent: Intent, scope: ChainBuildScope): AnswerContract | null {
   const taskDef = TASK_KEYWORDS.find(t => t.task === task && t.intent.includes(intent));
   if (!taskDef) return null;
-  
+
   // Scope type enforcement: don't allow cross-scope contracts
   if (scope.type === "single_meeting" && task === "extract_questions") {
     return AnswerContract.CUSTOMER_QUESTIONS;
   }
-  
+
   if (scope.type === "multi_meeting" && task === "extract_questions") {
     return AnswerContract.CROSS_MEETING_QUESTIONS;
   }
-  
+
   // Scope filters influence analysis contract selection
   if (scope.type === "multi_meeting" && scope.filters?.topic) {
     // When topic filter exists, prefer aggregative over pattern analysis
@@ -748,7 +797,7 @@ function getContractForTask(task: string, intent: Intent, scope: ChainBuildScope
       return AnswerContract.AGGREGATIVE_LIST;
     }
   }
-  
+
   // When we have specific meeting IDs, analysis is more focused
   if (scope.type === "multi_meeting" && scope.meetingIds && scope.meetingIds.length <= 3) {
     // Few meetings → comparison is more appropriate than pattern analysis
@@ -756,7 +805,7 @@ function getContractForTask(task: string, intent: Intent, scope: ChainBuildScope
       return AnswerContract.COMPARISON;
     }
   }
-  
+
   return taskDef.contracts[0];
 }
 
@@ -808,16 +857,16 @@ export type ChainBuildScope = {
  * CONTROL PLANE decides the chain - LLM executes it.
  */
 export function buildContractChain(
-  userMessage: string, 
+  userMessage: string,
   intent: Intent,
   scope: ChainBuildScope
 ): ContractChain {
   console.log(`[ContractChain] Building chain for intent=${intent}, scope.type=${scope.type}`);
-  
+
   // Step 1: Identify required tasks from user message
   const tasks = identifyTasks(userMessage, intent);
   console.log(`[ContractChain] Identified tasks: [${tasks.join(", ")}]`);
-  
+
   // Step 2: Map tasks to contracts (respecting intent and scope)
   const contracts: AnswerContract[] = [];
   for (const task of tasks) {
@@ -826,24 +875,24 @@ export function buildContractChain(
       contracts.push(contract);
     }
   }
-  
+
   // Step 3: If no contracts identified, use defaults based on intent and scope
   if (contracts.length === 0) {
     const defaultContract = getDefaultContract(intent, scope);
     contracts.push(defaultContract);
     console.log(`[ContractChain] No tasks identified, using default: ${defaultContract}`);
   }
-  
+
   // Step 4: Order contracts by phase (extraction → analysis → drafting)
   contracts.sort((a, b) => {
     const phaseA = CONTRACT_PHASES[a] || "drafting";
     const phaseB = CONTRACT_PHASES[b] || "drafting";
     return PHASE_ORDER[phaseA] - PHASE_ORDER[phaseB];
   });
-  
+
   // Step 5: Validate chain follows restriction rules
   const validation = validateChain(contracts, intent);
-  
+
   // If validation fails, return CLARIFY contract instead
   if (!validation.valid && validation.shouldClarify) {
     console.log(`[ContractChain] Validation failed, returning CLARIFY: ${validation.reason}`);
@@ -854,9 +903,9 @@ export function buildContractChain(
       clarifyReason: validation.reason,
     };
   }
-  
+
   console.log(`[ContractChain] Built chain: [${contracts.join(" → ")}]`);
-  
+
   return {
     contracts,
     selectionMethod: "keyword",
@@ -916,18 +965,18 @@ function validateChain(contracts: AnswerContract[], intent: Intent): ChainValida
       shouldClarify: true,
     };
   }
-  
+
   // Rule 2: Authority should not escalate from extractive to authoritative
   const authorityLevels: Record<SSOTMode, number> = { none: 0, descriptive: 1, authoritative: 2 };
   let hasExtractiveContract = false;
   let hasAuthoritativeContract = false;
-  
+
   for (const contract of contracts) {
     const constraints = CONTRACT_CONSTRAINTS[contract];
     if (constraints.ssotMode === "none") hasExtractiveContract = true;
     if (constraints.ssotMode === "authoritative") hasAuthoritativeContract = true;
   }
-  
+
   // Extractive → Authoritative is usually wrong (mixing meeting data with product claims)
   if (hasExtractiveContract && hasAuthoritativeContract) {
     console.warn(`[ContractChain] Authority escalation: mixing extractive and authoritative contracts → CLARIFY`);
@@ -937,7 +986,7 @@ function validateChain(contracts: AnswerContract[], intent: Intent): ChainValida
       shouldClarify: true,
     };
   }
-  
+
   // Rule 3: Contracts must be orderable (check phase order after sorting)
   let lastPhase = 0;
   for (const contract of contracts) {
@@ -948,7 +997,7 @@ function validateChain(contracts: AnswerContract[], intent: Intent): ChainValida
     }
     lastPhase = phase;
   }
-  
+
   return { valid: true, shouldClarify: false };
 }
 
@@ -957,7 +1006,7 @@ function validateChain(contracts: AnswerContract[], intent: Intent): ChainValida
  * Dynamically builds chain based on intent, scope, and inferred tasks.
  */
 export function selectSingleMeetingContractChain(
-  userMessage: string, 
+  userMessage: string,
   scope?: Partial<ChainBuildScope>
 ): ContractChain {
   const fullScope: ChainBuildScope = {
@@ -1111,7 +1160,7 @@ async function selectContractByLLM(
   _layers: ContextLayers
 ): Promise<AnswerContractResult> {
   const validContracts = Object.keys(AnswerContract).join(", ");
-  
+
   const systemPrompt = `You are selecting an answer contract for a question.
 
 Intent: ${intent}
@@ -1149,7 +1198,7 @@ Respond with JSON: {"contract": "CONTRACT_NAME", "reason": "brief explanation"}`
 
     const parsed = JSON.parse(content);
     const contractStr = parsed.contract as string;
-    
+
     if (contractStr in AnswerContract) {
       const contract = AnswerContract[contractStr as keyof typeof AnswerContract];
       return {
@@ -1183,7 +1232,7 @@ export async function selectAnswerContract(
   // LLM-FIRST: If LLM interpretation proposed valid contracts, use them (primary selection method)
   // This respects the semantic understanding from intent classification
   if (llmProposedContracts && llmProposedContracts.length > 0) {
-    const validContracts = llmProposedContracts.filter(c => 
+    const validContracts = llmProposedContracts.filter(c =>
       Object.values(AnswerContract).includes(c as AnswerContract)
     );
     if (validContracts.length > 0) {
@@ -1199,7 +1248,7 @@ export async function selectAnswerContract(
 
   // Keyword fallback: Only used when LLM didn't propose contracts (e.g., legacy paths or absolute certainties)
   const keywordResult = selectContractByKeyword(question, intent, layers);
-  
+
   if (keywordResult) {
     console.log(`[AnswerContract] Selected: ${keywordResult.contract} (${keywordResult.contractSelectionMethod})`);
     return keywordResult;

@@ -59,9 +59,26 @@ INTENT CLASSIFICATION:
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - DOCUMENT_SEARCH: Questions about documentation, contracts, specs
 - EXTERNAL_RESEARCH: Requests requiring PUBLIC/WEB information
+- SLACK_SEARCH: User explicitly wants to search Slack messages or channels (not meeting transcripts)
 - GENERAL_HELP: Greetings, meta questions, general assistance requests
 - REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
 - CLARIFY: Request is genuinely ambiguous about what the user wants
+
+SLACK vs MEETING DISAMBIGUATION:
+When a query could refer to EITHER Slack messages OR meeting transcripts:
+- "What did we discuss about X?" → Default to SINGLE_MEETING (formal customer discussions)
+- "Check Slack for X" → SLACK_SEARCH (explicit)
+- "Search #channel for X" → SLACK_SEARCH (explicit)
+- "What did the team say about X?" → Could be ambiguous - check context:
+  - If thread has meeting context (company name, meeting reference) → SINGLE_MEETING
+  - If no meeting context → CLARIFY with both options
+
+CLARIFICATION FOR AMBIGUOUS SOURCE:
+When truly ambiguous between Slack and meetings, provide specific options:
+"I can check two places for information about [topic]:
+• Meeting transcripts (formal customer calls)
+• Slack messages (internal team discussions)
+Which would you like me to search?"
 
 CRITICAL RULES:
 1. **Use conversation context** - Don't just look at the current message, understand the full thread
@@ -86,6 +103,10 @@ User: "what were their main concerns?"
 Thread: "Need to prep for ACE call tomorrow"
 User: "give me a summary of the last meeting"
 → Intent: SINGLE_MEETING, Company: ACE, Contracts: ["MEETING_SUMMARY"]
+
+Thread: "Check Slack for pilot feedback"
+User: "search #pitcrew_collaboration for Pomps pilot"
+→ Intent: SLACK_SEARCH, Contracts: ["SLACK_MESSAGE_SEARCH"]
 
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
@@ -231,9 +252,9 @@ export function buildIntentValidationPrompt(
   CONTEXT: PitCrew sells vision AI to automotive service businesses.Users ask about customer meetings, product features, and need help with tasks.
 
 THE DETERMINISTIC CLASSIFIER CHOSE:
-Intent: ${ deterministicIntent }
-Reason: ${ deterministicReason }
-Signals: ${ matchedSignals.join(", ") }
+Intent: ${deterministicIntent}
+Reason: ${deterministicReason}
+Signals: ${matchedSignals.join(", ")}
 
 YOUR JOB: Determine if this classification is semantically correct.
 

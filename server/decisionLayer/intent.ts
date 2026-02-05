@@ -42,6 +42,7 @@ export enum Intent {
   PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE",
   DOCUMENT_SEARCH = "DOCUMENT_SEARCH",
   EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH",
+  SLACK_SEARCH = "SLACK_SEARCH",
   GENERAL_HELP = "GENERAL_HELP",
   REFUSE = "REFUSE",
   CLARIFY = "CLARIFY",
@@ -397,7 +398,7 @@ async function classifyByKeyword(
   // Entity detection: Only triggers if no action-based pattern matched first
   const companyMatch = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
-  
+
   if (companyMatch || contact) {
     const entityName = companyMatch?.company || contact;
     // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
@@ -497,12 +498,12 @@ async function classifyByLLM(
       console.log(`[IntentClassifier] LLM: intent=${intentStr}, company=${parsed.extractedCompany || 'none'}, contracts=${contracts}`);
 
       // Build proposedInterpretation from LLM-proposed contracts (single source of truth)
-      const proposedInterpretation = parsed.proposedContracts?.length 
+      const proposedInterpretation = parsed.proposedContracts?.length
         ? {
-            intent: intentStr as IntentString,
-            contracts: parsed.proposedContracts as ContractString[],
-            summary: parsed.reason || "LLM-proposed interpretation",
-          }
+          intent: intentStr as IntentString,
+          contracts: parsed.proposedContracts as ContractString[],
+          summary: parsed.reason || "LLM-proposed interpretation",
+        }
         : undefined;
 
       return {
@@ -556,23 +557,23 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
   if (result.intentDetectionMethod === "pattern" && result.confidence >= 0.9) {
     return false;
   }
-  
+
   // Full entity detection (known customers from database) doesn't need validation
   // When someone mentions a known customer like "Les Schwab", trust it's about meetings
   if (result.intentDetectionMethod === "entity") {
     return false;
   }
-  
+
   // Product signal and situation_advice are high-confidence fast-paths
   if (result.intentDetectionMethod === "product_signal" || result.intentDetectionMethod === "situation_advice") {
     return false;
   }
-  
+
   // CLARIFY and REFUSE intents don't need validation
   if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
     return false;
   }
-  
+
   // Weak detection methods need validation (includes entity_acronym matches)
   if (WEAK_DETECTION_METHODS.includes(result.intentDetectionMethod)) {
     console.log(`[IntentClassifier] Weak detection method "${result.intentDetectionMethod}" - will validate with LLM`);

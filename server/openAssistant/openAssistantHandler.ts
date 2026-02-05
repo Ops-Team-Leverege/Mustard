@@ -17,6 +17,7 @@
 import { OpenAI } from "openai";
 import { performExternalResearch, formatCitationsForDisplay, type ResearchResult } from "./externalResearch";
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "./singleMeetingOrchestrator";
+import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
@@ -184,6 +185,8 @@ function generateContractChainProgress(
     [AnswerContract.PRODUCT_INFO]: "retrieving info",
     [AnswerContract.EXTERNAL_RESEARCH]: "researching",
     [AnswerContract.SALES_DOCS_PREP]: "preparing materials",
+    [AnswerContract.SLACK_MESSAGE_SEARCH]: "searching Slack",
+    [AnswerContract.SLACK_CHANNEL_INFO]: "checking channels",
     [AnswerContract.DOCUMENT_ANSWER]: "searching docs",
     [AnswerContract.GENERAL_RESPONSE]: "preparing response",
     [AnswerContract.NOT_FOUND]: "searching",
@@ -675,6 +678,10 @@ Give me a hint and I'll get you sorted!`;
 
     if (cpResult.intent === Intent.EXTERNAL_RESEARCH) {
       return handleExternalResearchIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
+    }
+
+    if (cpResult.intent === Intent.SLACK_SEARCH) {
+      return handleSlackSearchIntent(userMessage, context, classification, cpResult.answerContract);
     }
 
     return handleGeneralAssistanceIntent(userMessage, context, classification, cpResult.answerContract, cpResult.contractChain);
@@ -1652,6 +1659,50 @@ If you're unsure whether something requires evidence, err on the side of asking 
     progressMessage,
     streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
   };
+}
+
+/**
+ * Handle SLACK_SEARCH intent.
+ * Searches Slack messages and channels as a data source.
+ */
+async function handleSlackSearchIntent(
+  userMessage: string,
+  context: OpenAssistantContext,
+  classification: IntentClassification,
+  contract: AnswerContract
+): Promise<OpenAssistantResult> {
+  console.log(`[OpenAssistant] Slack search: contract=${contract}`);
+
+  try {
+    const result = await SlackSearchHandler.handleSlackSearch({
+      question: userMessage,
+      contract: contract,
+    });
+
+    // Map to OpenAssistantResult format
+    return {
+      answer: result.answer,
+      intent: "slack_search",
+      intentClassification: classification,
+      controlPlaneIntent: Intent.SLACK_SEARCH,
+      answerContract: contract,
+      dataSource: "slack",
+      delegatedToSingleMeeting: false,
+      coverage: result.coverage,
+    };
+  } catch (error) {
+    console.error('[OpenAssistant] Slack search error:', error);
+
+    return {
+      answer: `I encountered an error searching Slack: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again or rephrase your request.`,
+      intent: "slack_search",
+      intentClassification: classification,
+      controlPlaneIntent: Intent.SLACK_SEARCH,
+      answerContract: AnswerContract.CLARIFY,
+      dataSource: "slack",
+      delegatedToSingleMeeting: false,
+    };
+  }
 }
 
 /**

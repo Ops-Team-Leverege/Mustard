@@ -20,6 +20,7 @@ export type ContextLayers = {
   single_meeting: boolean;
   multi_meeting: boolean;
   document_context: boolean;
+  slack_search: boolean;
 };
 
 export type ContextLayerMetadata = {
@@ -69,6 +70,7 @@ export function computeContextLayers(intent: Intent): ContextLayerMetadata {
     single_meeting: false,
     multi_meeting: false,
     document_context: false,
+    slack_search: false,
   };
 
   let reason = "product_identity always enabled. ";
@@ -98,6 +100,11 @@ export function computeContextLayers(intent: Intent): ContextLayerMetadata {
       // External research can chain with product knowledge
       layers.product_ssot = true;
       reason += "product_ssot enabled for EXTERNAL_RESEARCH (for value prop chaining).";
+      break;
+
+    case Intent.SLACK_SEARCH:
+      layers.slack_search = true;
+      reason += "slack_search enabled for SLACK_SEARCH intent.";
       break;
 
     case Intent.GENERAL_HELP:
@@ -135,5 +142,6 @@ export function getEnabledLayerNames(layers: ContextLayers): string[] {
   if (layers.single_meeting) enabled.push("single_meeting");
   if (layers.multi_meeting) enabled.push("multi_meeting");
   if (layers.document_context) enabled.push("document_context");
+  if (layers.slack_search) enabled.push("slack_search");
   return enabled;
 }
