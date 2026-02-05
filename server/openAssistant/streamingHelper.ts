@@ -97,21 +97,34 @@ export async function streamOpenAIResponse(
         // If preview mode and we've exceeded the limit, show preview + message
         if (previewMode && accumulatedContent.length > previewMode.maxVisibleChars) {
           if (!previewLimitReached) {
-            // First time hitting limit - extract preview at sentence boundary
-            let preview = accumulatedContent.substring(0, previewMode.maxVisibleChars);
-            const lastPeriod = preview.lastIndexOf('. ');
-            const lastNewline = preview.lastIndexOf('\n');
-            const cutPoint = Math.max(lastPeriod, lastNewline);
-            if (cutPoint > 100) {
-              preview = preview.substring(0, cutPoint + 1);
+            // First time hitting limit - extract first paragraph only
+            // Look for double newline (paragraph break) or list start (numbered/bulleted)
+            const paragraphEnd = accumulatedContent.indexOf('\n\n');
+            const listStart = accumulatedContent.search(/\n[•\-\*\d]/);
+            
+            let preview: string;
+            if (paragraphEnd > 50 && paragraphEnd < previewMode.maxVisibleChars) {
+              // Use first paragraph
+              preview = accumulatedContent.substring(0, paragraphEnd);
+            } else if (listStart > 50 && listStart < previewMode.maxVisibleChars) {
+              // Cut before list starts
+              preview = accumulatedContent.substring(0, listStart);
+            } else {
+              // Fallback: truncate at last sentence
+              preview = accumulatedContent.substring(0, previewMode.maxVisibleChars);
+              const lastPeriod = preview.lastIndexOf('. ');
+              if (lastPeriod > 100) {
+                preview = preview.substring(0, lastPeriod + 1);
+              }
             }
+            
             await updateSlackMessage({
               channel: streamingContext.channel,
               ts: streamingContext.messageTs,
               text: `${preview.trim()}\n\n_${previewMode.message}_`,
             });
             previewLimitReached = true;
-            console.log(`[StreamingHelper] Preview limit reached, showing ${preview.length} chars + message`);
+            console.log(`[StreamingHelper] Preview: first paragraph (${preview.length} chars)`);
           }
           // Don't update further - keep showing the preview message
         } else {
