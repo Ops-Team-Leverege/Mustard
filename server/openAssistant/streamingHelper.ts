@@ -16,6 +16,11 @@ export type StreamingContext = {
   channel: string;
   messageTs: string;
   threadTs: string;
+  /** If set, streaming will show only this many chars before switching to "preparing document..." */
+  previewMode?: {
+    maxVisibleChars: number;
+    message: string;
+  };
 };
 
 export type StreamingResult = {
@@ -74,6 +79,10 @@ export async function streamOpenAIResponse(
   const UPDATE_INTERVAL_MS = STREAMING.UPDATE_INTERVAL_MS;
   const MIN_CONTENT_FOR_UPDATE = STREAMING.MIN_CONTENT_FOR_UPDATE;
   
+  // Preview mode: track if we've hit the limit and switched to "preparing document" message
+  const previewMode = streamingContext.previewMode;
+  let previewLimitReached = false;
+  
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content || "";
     accumulatedContent += delta;
@@ -85,11 +94,34 @@ export async function streamOpenAIResponse(
       now - lastUpdateTime >= UPDATE_INTERVAL_MS
     ) {
       try {
-        await updateSlackMessage({
-          channel: streamingContext.channel,
-          ts: streamingContext.messageTs,
-          text: accumulatedContent + " ...",
-        });
+        // If preview mode and we've exceeded the limit, show preview + message
+        if (previewMode && accumulatedContent.length > previewMode.maxVisibleChars) {
+          if (!previewLimitReached) {
+            // First time hitting limit - extract preview at sentence boundary
+            let preview = accumulatedContent.substring(0, previewMode.maxVisibleChars);
+            const lastPeriod = preview.lastIndexOf('. ');
+            const lastNewline = preview.lastIndexOf('\n');
+            const cutPoint = Math.max(lastPeriod, lastNewline);
+            if (cutPoint > 100) {
+              preview = preview.substring(0, cutPoint + 1);
+            }
+            await updateSlackMessage({
+              channel: streamingContext.channel,
+              ts: streamingContext.messageTs,
+              text: `${preview.trim()}\n\n_${previewMode.message}_`,
+            });
+            previewLimitReached = true;
+            console.log(`[StreamingHelper] Preview limit reached, showing ${preview.length} chars + message`);
+          }
+          // Don't update further - keep showing the preview message
+        } else {
+          // Normal streaming - show all content
+          await updateSlackMessage({
+            channel: streamingContext.channel,
+            ts: streamingContext.messageTs,
+            text: accumulatedContent + " ...",
+          });
+        }
         lastUpdateTime = now;
         console.log(`[StreamingHelper] Updated message with ${accumulatedContent.length} chars`);
       } catch (err) {
@@ -102,13 +134,20 @@ export async function streamOpenAIResponse(
   let finalUpdateSucceeded = false;
   if (streamingContext && accumulatedContent) {
     try {
-      await updateSlackMessage({
-        channel: streamingContext.channel,
-        ts: streamingContext.messageTs,
-        text: accumulatedContent,
-      });
-      finalUpdateSucceeded = true;
-      console.log(`[StreamingHelper] Final update sent successfully`);
+      // If preview mode was used and limit was reached, keep the preview message
+      // (document generation will update it later)
+      if (previewLimitReached) {
+        console.log(`[StreamingHelper] Preview mode - skipping final full-content update`);
+        finalUpdateSucceeded = true;
+      } else {
+        await updateSlackMessage({
+          channel: streamingContext.channel,
+          ts: streamingContext.messageTs,
+          text: accumulatedContent,
+        });
+        finalUpdateSucceeded = true;
+        console.log(`[StreamingHelper] Final update sent successfully`);
+      }
     } catch (err) {
       console.error(`[StreamingHelper] Failed final update:`, err);
       // Caller should handle fallback posting

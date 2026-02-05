@@ -760,8 +760,14 @@ export async function slackEventsHandler(req: Request, res: Response) {
             channel,
             messageTs: placeholderMsg.ts,
             threadTs,
+            // Enable preview mode - if response is long enough to generate a doc,
+            // only show first ~350 chars instead of full content while streaming
+            previewMode: {
+              maxVisibleChars: 350,
+              message: "Putting together a document with full details...",
+            },
           };
-          console.log(`[Slack] Streaming placeholder posted: ts=${placeholderMsg.ts}`);
+          console.log(`[Slack] Streaming placeholder posted with preview mode: ts=${placeholderMsg.ts}`);
         } else if (mightGenerateDoc) {
           console.log(`[Slack] Skipping streaming for doc-generating contract: ${decisionLayerResult.answerContract}`);
           // For doc-generating contracts, send personalized progress (with coordination)

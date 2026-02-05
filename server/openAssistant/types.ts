@@ -53,6 +53,11 @@ export type SlackStreamingContext = {
   channel: string;
   messageTs: string;
   threadTs: string;
+  /** If set, streaming will show only this many chars before switching to a "preparing document..." message */
+  previewMode?: {
+    maxVisibleChars: number;
+    message: string;
+  };
 };
 
 export type ThreadMessage = {
