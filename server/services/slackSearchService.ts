@@ -14,7 +14,9 @@
 
 import { WebClient } from '@slack/web-api';
 
-const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+// Search API requires a User Token (xoxp-), not a Bot Token (xoxb-)
+// SLACK_USER_TOKEN is used for search, SLACK_BOT_TOKEN is used for posting
+const slackClient = new WebClient(process.env.SLACK_USER_TOKEN || process.env.SLACK_BOT_TOKEN);
 
 export interface SlackSearchResult {
     channelName: string;
