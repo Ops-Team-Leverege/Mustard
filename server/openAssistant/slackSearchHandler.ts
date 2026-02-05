@@ -126,6 +126,7 @@ export class SlackSearchHandler {
             intent: 'slack_search',
             intentClassification: slackClassification(),
             delegatedToSingleMeeting: false,
+            shouldGenerateDoc: false, // Don't generate docs for Slack - links won't be clickable
             coverage: {
                 messagesSearched: searchResponse.results.length,
                 channelsSearched: uniqueChannels.size,
@@ -198,9 +199,9 @@ export class SlackSearchHandler {
             channelGroups.set(msg.channelName, existing);
         });
 
-        // Prepare context from Slack messages
+        // Prepare context from Slack messages with proper attribution
         const messagesContext = results.map((msg, idx) => {
-            return `[Message ${idx + 1} from #${msg.channelName}]
+            return `[Message ${idx + 1} from #${msg.channelName} by ${msg.username}]
 ${msg.text}
 Link: ${msg.permalink || 'N/A'}`;
         }).join('\n\n');
@@ -209,33 +210,66 @@ Link: ${msg.permalink || 'N/A'}`;
             .map(([channel, msgs]) => `#${channel} (${msgs.length} messages)`)
             .join(', ');
 
+        // Extract company/entity from the original question for context-aware synthesis
+        const companyMatch = originalQuestion.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/);
+        const mentionedEntity = companyMatch ? companyMatch[1] : null;
+
         const prompt = `You are analyzing Slack messages to answer a user's question.
 
 User's Question: "${originalQuestion}"
+${mentionedEntity ? `\n⚠️ IMPORTANT: User asked specifically about "${mentionedEntity}" - prioritize information about this entity!` : ''}
 
 Search Metadata:
 - Found ${results.length} messages (${totalCount} total available)
 - Searched ${channelsSearched} channels: ${channelSummary}
 ${hasMore ? '- More results available (showing top 20)' : ''}
 
-Slack Messages:
+Slack Messages (with proper attribution):
 ${messagesContext}
 
-Instructions:
-1. Start with a brief summary of what you found (e.g., "Based on ${results.length} messages across ${channelsSearched} channels...")
-2. Synthesize the key information that answers the user's question
-3. Quote specific relevant excerpts when helpful (use quotes: "...")
-4. List the most relevant sources at the end with their Slack links
-5. If there are many messages, focus on the most relevant ones
-6. End with a coverage note: "📊 Searched ${channelsSearched} channels, found ${results.length} messages${hasMore ? ` (${totalCount} total available)` : ''}"
+CRITICAL INSTRUCTIONS:
 
-Keep the answer focused and actionable.`;
+1. **ATTRIBUTION ACCURACY**:
+   - Use the actual message author (shown as "by [username]")
+   - If someone @mentions another person, that's NOT the author
+   - Example: If "Calum" writes "@eric on sales calls...", say "Calum mentioned to Eric..." NOT "Eric mentioned..."
+
+2. **COMPANY-SPECIFIC CONTEXT** (HIGHEST PRIORITY):
+   ${mentionedEntity ? `- The user asked about "${mentionedEntity}" specifically
+   - Look for messages that mention "${mentionedEntity}" by name
+   - If "${mentionedEntity}" has different rules/exceptions, HIGHLIGHT THIS FIRST
+   - Don't give generic answers if company-specific info exists` : '- Check if the question is about a specific company/entity'}
+
+3. **START WITH DIRECT ANSWER**:
+   - Put the key finding first in bold
+   - If there's a company-specific exception, state it immediately
+   - Example: "✅ **For Pomps specifically: 90-day pilot recommended** (exception to standard 45-day policy)"
+
+4. **STRUCTURED FORMAT**:
+   📊 Key Details:
+   • [Most important point first]
+   • [Company-specific details if applicable]
+   • [General context]
+
+5. **TEMPORAL CONTEXT**:
+   - Note if policies have changed over time
+   - Indicate which is current vs. historical
+
+6. **SOURCE RANKING**:
+   - List most authoritative/recent sources first
+   - Prefer official channels (#contracts, #announcements) over casual discussion
+
+7. **SEARCH TRANSPARENCY**:
+   🔍 Searched ${channelsSearched} channels, found ${results.length} messages
+   Confidence: [High/Medium/Low based on source quality and consistency]
+
+Keep the answer scannable with short paragraphs, bullet points, and clear structure.`;
 
         try {
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages.' },
+                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy and company-specific context awareness.' },
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3,
@@ -260,6 +294,7 @@ Keep the answer focused and actionable.`;
     /**
      * Extract the actual search query from the user's question.
      * Removes common prefixes and Slack-specific language.
+     * Preserves company/entity names for better search results.
      */
     private static extractSearchQuery(question: string): string {
         let query = question
@@ -269,6 +304,9 @@ Keep the answer focused and actionable.`;
             .replace(/\s+(in|from|on)\s+slack$/i, '')
             .replace(/\s+in\s+#[\w-]+$/i, '')  // Remove "in #channel" at end
             .replace(/^slack\s+for\s+/i, '')
+            // Remove filler words but keep company names
+            .replace(/\b(someone|anyone)\s+(mentioned|said)\s+/i, '')
+            .replace(/\ba\s+recommended\s+/i, 'recommended ')
             // Clean up
             .trim();
 
