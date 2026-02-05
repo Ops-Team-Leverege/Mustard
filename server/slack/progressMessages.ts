@@ -4,7 +4,7 @@
  * Sends a friendly progress message after a delay if the response
  * is taking longer than expected. Only ONE progress message is sent.
  * 
- * Config-driven via config/progress.json
+ * Config-driven via config/progressMessages.json
  * 
  * Also provides personalized progress messages using gpt-4o-mini for
  * a more conversational feel based on the user's actual question.
@@ -27,7 +27,7 @@ let configCache: ProgressConfig | null = null;
 function getProgressConfig(): ProgressConfig {
   if (configCache) return configCache;
   
-  const configPath = path.join(process.cwd(), 'config', 'progress.json');
+  const configPath = path.join(process.cwd(), 'config', 'progressMessages.json');
   const configContent = fs.readFileSync(configPath, 'utf-8');
   configCache = JSON.parse(configContent) as ProgressConfig;
   return configCache;

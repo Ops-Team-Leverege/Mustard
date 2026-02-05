@@ -4,7 +4,7 @@
  * Provides streaming OpenAI responses with Slack message updates.
  * Posts an initial message and updates it as content streams in.
  * 
- * Configuration: config/streaming.json
+ * Configuration: config/streamingMessages.json
  */
 
 import { OpenAI } from "openai";
@@ -30,7 +30,7 @@ let configCache: StreamingConfig | null = null;
 export function getStreamingConfig(): StreamingConfig {
   if (configCache) return configCache;
   
-  const configPath = path.join(process.cwd(), 'config', 'streaming.json');
+  const configPath = path.join(process.cwd(), 'config', 'streamingMessages.json');
   try {
     const configContent = fs.readFileSync(configPath, 'utf-8');
     configCache = JSON.parse(configContent) as StreamingConfig;
