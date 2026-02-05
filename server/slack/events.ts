@@ -921,15 +921,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
               documentOnly: true, // Only generate document, no message
             });
 
-            // If document was generated, update streaming message to remove duplicate content
+            // If document was generated, update streaming message to show preview + document notice
             if (docResult.type === "document" && docResult.success && botReply.ts) {
-              console.log(`[Slack] Document generated - updating streaming message to summary`);
+              console.log(`[Slack] Document generated - updating streaming message to preview`);
               try {
                 const { updateSlackMessage: updateMsg } = await import("./slackApi");
+                // Extract first ~300 chars as preview, cutting at sentence/paragraph boundary
+                const previewLength = 300;
+                let preview = responseText.substring(0, previewLength);
+                // Try to cut at a sentence boundary
+                const lastPeriod = preview.lastIndexOf('. ');
+                const lastNewline = preview.lastIndexOf('\n');
+                const cutPoint = Math.max(lastPeriod, lastNewline);
+                if (cutPoint > 100) {
+                  preview = preview.substring(0, cutPoint + 1);
+                }
                 await updateMsg({
                   channel,
                   ts: botReply.ts,
-                  text: "_See the attached document for full details._",
+                  text: `${preview.trim()}\n\n_Full details in the attached document below._`,
                 });
               } catch (updateErr) {
                 console.error(`[Slack] Failed to update streaming message after doc:`, updateErr);
