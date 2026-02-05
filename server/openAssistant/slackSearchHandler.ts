@@ -228,6 +228,15 @@ ${hasMore ? '- More results available (showing top 20)' : ''}
 Slack Messages (with dates and proper attribution):
 ${messagesContext}
 
+ANSWER CONSTRUCTION GUIDELINES:
+
+When answering, structure your response in THIS ORDER:
+a) **Direct Answer First** - State the specific answer immediately
+b) **Why/Context** - Explain WHY this answer is true (rationale, business context)
+c) **Key Details** - Supporting specifics and mechanics
+d) **General Context** - How this compares to standard practice (if relevant)
+e) **References** - Source links
+
 CRITICAL INSTRUCTIONS:
 
 1. **ATTRIBUTION ACCURACY**:
@@ -239,7 +248,19 @@ CRITICAL INSTRUCTIONS:
    ${mentionedEntity ? `- The user asked about "${mentionedEntity}" specifically
    - Look for messages that mention "${mentionedEntity}" by name
    - If "${mentionedEntity}" has different rules/exceptions, HIGHLIGHT THIS FIRST
-   - Don't give generic answers if company-specific info exists` : '- Check if the question is about a specific company/entity'}
+   - Don't give generic answers if company-specific info exists
+   - FIND THE "WHY": Look for messages explaining WHY "${mentionedEntity}" gets different treatment
+   - Search for: "due to", "because", "reason", "challenge", "different from", "exception"` : '- Check if the question is about a specific company/entity'}
+
+2a. **CONTEXT IS CRITICAL - FIND THE "WHY"**:
+   - If the answer is an EXCEPTION to standard practice, explain WHY the exception exists
+   - Look for messages that discuss:
+     * "Why are we doing X?"
+     * Business justifications
+     * Customer-specific challenges or needs
+     * Decision rationale
+   - Check for phrases like: "due to", "because", "the reason", "this is different because", "challenge", "complexity"
+   - Example: If Pomps gets 90 days instead of 45, find messages explaining it's due to "commercial truck complexity" or "new use cases"
 
 3. **DISTINGUISH GENERAL POLICY vs COMPANY-SPECIFIC EXCEPTIONS** (CRITICAL):
    - When you see messages about "standard" or "general policy", that applies to ALL companies
@@ -267,26 +288,45 @@ CRITICAL INSTRUCTIONS:
    - If there's a company-specific exception, state it immediately
    - Example: "✅ **For Pomps specifically: 90-day pilot recommended** (exception to standard 45-day policy)"
 
-6. **STRUCTURED FORMAT**:
+6. **EXPLAIN THE "WHY" (CRITICAL)**:
+   - After the direct answer, immediately explain WHY
+   - Don't use vague filler like "to ensure adequate time" or "discussed in context of"
+   - Use specific business reasons from the messages
+   - Example: "Why 90 days? Pomps operates commercial tire centers servicing 18-wheelers and fleets, which requires testing new technical capabilities beyond standard retail auto service."
+
+7. **STRUCTURED FORMAT**:
+   
+   ✅ **[Direct Answer]**
+   
+   🎯 **Why This Answer:**
+   [Explain the rationale/context - specific business reasons, not generic filler]
+   
    📊 Key Details:
    • [Most important point first]
    • [Company-specific details if applicable]
-   • [General context]
+   • [Mechanics and structure]
+   
+   🔄 **General Context** (if relevant):
+   [How this compares to standard practice]
 
-7. **TEMPORAL CONTEXT** (CRITICAL):
+8. **AVOID VAGUE FILLER**:
+   ❌ BAD: "This was discussed in the context of ensuring customers have adequate time"
+   ✅ GOOD: "The 90-day timeline allows testing on commercial trucks, which require different AI models than passenger vehicles"
+
+9. **TEMPORAL CONTEXT** (CRITICAL):
    - ALWAYS mention dates when referencing information
    - Note if information is recent or old
    - Example: "According to a message from December 12, 2025..."
    - Flag if information might be outdated
 
-8. **REFERENCE ONLY ACTUAL MESSAGES**:
+10. **REFERENCE ONLY ACTUAL MESSAGES**:
    - ONLY cite messages from the list above
    - Use the exact message numbers [Message 1], [Message 2], etc.
    - Include the date and channel for each reference
    - DO NOT make up or infer sources that aren't in the list
    - DO NOT claim a message says something it doesn't say
 
-9. **END WITH REFERENCES SECTION**:
+11. **END WITH REFERENCES SECTION**:
    
    References:
    [List ONLY the messages you actually used, with dates and links]
@@ -296,9 +336,17 @@ CRITICAL INSTRUCTIONS:
      [Brief description of EXACTLY what this message contains - don't exaggerate or misrepresent]
      [Actual Slack link]
 
-10. **SEARCH TRANSPARENCY**:
+12. **SEARCH TRANSPARENCY**:
    🔍 Searched ${channelsSearched} channels, found ${results.length} messages
    Confidence: [High/Medium/Low based on source quality and consistency]
+
+13. **QUALITY CHECK BEFORE RESPONDING**:
+   Before finalizing, verify:
+   - [ ] Does the reader understand WHY, not just WHAT?
+   - [ ] Are my sources accurately cited?
+   - [ ] Is company-specific info clearly separated from general info?
+   - [ ] Have I avoided vague filler phrases?
+   - [ ] Would someone unfamiliar with the context understand this answer?
 
 Keep the answer scannable with short paragraphs, bullet points, and clear structure.`;
 
@@ -306,7 +354,7 @@ Keep the answer scannable with short paragraphs, bullet points, and clear struct
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy, temporal awareness, and company-specific context awareness. You ONLY reference actual messages provided, never make up sources. CRITICAL: Distinguish between general company policies and company-specific exceptions. Never say "the standard for [Company X]" - standards apply to all companies. If a specific company gets different terms, call it an exception.' },
+                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy, temporal awareness, and company-specific context awareness. You ONLY reference actual messages provided, never make up sources. CRITICAL: (1) Distinguish between general company policies and company-specific exceptions - never say "the standard for [Company X]", (2) Always explain WHY, not just WHAT - find business rationale and context in the messages, avoid vague filler phrases, (3) Structure answers: Direct Answer → Why/Rationale → Key Details → General Context → References.' },
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3,
