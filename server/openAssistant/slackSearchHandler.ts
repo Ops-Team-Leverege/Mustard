@@ -126,7 +126,7 @@ export class SlackSearchHandler {
             intent: 'slack_search',
             intentClassification: slackClassification(),
             delegatedToSingleMeeting: false,
-            shouldGenerateDoc: false, // Don't generate docs for Slack - links won't be clickable
+            shouldGenerateDoc: true, // Generate doc with clickable links for references
             coverage: {
                 messagesSearched: searchResponse.results.length,
                 channelsSearched: uniqueChannels.size,
@@ -178,7 +178,7 @@ export class SlackSearchHandler {
 
     /**
      * Synthesize Slack search results into a coherent answer using LLM.
-     * Similar to how Claude synthesizes information from multiple sources.
+     * Returns both the synthesized answer AND structured evidence for document generation.
      */
     private static async synthesizeSlackFindings(
         originalQuestion: string,
@@ -199,9 +199,10 @@ export class SlackSearchHandler {
             channelGroups.set(msg.channelName, existing);
         });
 
-        // Prepare context from Slack messages with proper attribution
+        // Format messages with dates for temporal context
         const messagesContext = results.map((msg, idx) => {
-            return `[Message ${idx + 1} from #${msg.channelName} by ${msg.username}]
+            const date = this.formatSlackTimestamp(msg.timestamp);
+            return `[Message ${idx + 1} from #${msg.channelName} by ${msg.username} on ${date}]
 ${msg.text}
 Link: ${msg.permalink || 'N/A'}`;
         }).join('\n\n');
@@ -224,7 +225,7 @@ Search Metadata:
 - Searched ${channelsSearched} channels: ${channelSummary}
 ${hasMore ? '- More results available (showing top 20)' : ''}
 
-Slack Messages (with proper attribution):
+Slack Messages (with dates and proper attribution):
 ${messagesContext}
 
 CRITICAL INSTRUCTIONS:
@@ -251,15 +252,29 @@ CRITICAL INSTRUCTIONS:
    • [Company-specific details if applicable]
    • [General context]
 
-5. **TEMPORAL CONTEXT**:
-   - Note if policies have changed over time
-   - Indicate which is current vs. historical
+5. **TEMPORAL CONTEXT** (CRITICAL):
+   - ALWAYS mention dates when referencing information
+   - Note if information is recent or old
+   - Example: "According to a message from December 12, 2025..."
+   - Flag if information might be outdated
 
-6. **SOURCE RANKING**:
-   - List most authoritative/recent sources first
-   - Prefer official channels (#contracts, #announcements) over casual discussion
+6. **REFERENCE ONLY ACTUAL MESSAGES**:
+   - ONLY cite messages from the list above
+   - Use the exact message numbers [Message 1], [Message 2], etc.
+   - Include the date and channel for each reference
+   - DO NOT make up or infer sources that aren't in the list
 
-7. **SEARCH TRANSPARENCY**:
+7. **END WITH REFERENCES SECTION**:
+   
+   References:
+   [List ONLY the messages you actually used, with dates and links]
+   
+   Format:
+   • Message [#] from #[channel] by [author] ([date])
+     [Brief description of what this message contains]
+     [Actual Slack link]
+
+8. **SEARCH TRANSPARENCY**:
    🔍 Searched ${channelsSearched} channels, found ${results.length} messages
    Confidence: [High/Medium/Low based on source quality and consistency]
 
@@ -269,7 +284,7 @@ Keep the answer scannable with short paragraphs, bullet points, and clear struct
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy and company-specific context awareness.' },
+                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy, temporal awareness, and company-specific context awareness. You ONLY reference actual messages provided, never make up sources.' },
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3,
@@ -288,6 +303,26 @@ Keep the answer scannable with short paragraphs, bullet points, and clear struct
             console.error('[SlackSearchHandler] Synthesis error:', error);
             // Fallback to simple formatting
             return this.formatMessageResults(results, searchQuery);
+        }
+    }
+
+    /**
+     * Format Slack timestamp to readable date.
+     */
+    private static formatSlackTimestamp(ts: string): string {
+        try {
+            // Slack timestamps are in format "1234567890.123456"
+            const timestamp = parseFloat(ts) * 1000;
+            const date = new Date(timestamp);
+
+            // Format as "Dec 12, 2025"
+            return date.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+        } catch (error) {
+            return 'Unknown date';
         }
     }
 
