@@ -69,6 +69,9 @@ When a query could refer to EITHER Slack messages OR meeting transcripts:
 - "What did we discuss about X?" → Default to SINGLE_MEETING (formal customer discussions)
 - "Check Slack for X" → SLACK_SEARCH (explicit)
 - "Search #channel for X" → SLACK_SEARCH (explicit)
+- "In Slack, someone mentioned X" → SLACK_SEARCH (explicit reference to Slack)
+- "I saw in Slack that X" → SLACK_SEARCH (explicit reference to Slack)
+- "Someone said in Slack X" → SLACK_SEARCH (explicit reference to Slack)
 - "What did the team say about X?" → Could be ambiguous - check context:
   - If thread has meeting context (company name, meeting reference) → SINGLE_MEETING
   - If no meeting context → CLARIFY with both options
@@ -107,6 +110,11 @@ User: "give me a summary of the last meeting"
 Thread: "Check Slack for pilot feedback"
 User: "search #pitcrew_collaboration for Pomps pilot"
 → Intent: SLACK_SEARCH, Contracts: ["SLACK_MESSAGE_SEARCH"]
+
+Thread: (new conversation)
+User: "In slack, someone mentioned a recommended time length for a pilot at Pomps"
+→ Intent: SLACK_SEARCH, Company: Pomps, Contracts: ["SLACK_MESSAGE_SEARCH"]
+(User explicitly said "in Slack" - search Slack messages, not meeting transcripts)
 
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
