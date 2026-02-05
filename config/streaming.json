@@ -1,0 +1,12 @@
+{
+  "preview": {
+    "enabled": true,
+    "maxVisibleChars": 350,
+    "minParagraphLength": 50,
+    "message": "Full details in the attached document below."
+  },
+  "updates": {
+    "intervalMs": 1500,
+    "minContentForUpdate": 100
+  }
+}

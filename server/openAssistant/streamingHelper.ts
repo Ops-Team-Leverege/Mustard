@@ -3,10 +3,58 @@
  * 
  * Provides streaming OpenAI responses with Slack message updates.
  * Posts an initial message and updates it as content streams in.
+ * 
+ * Configuration: config/streaming.json
  */
 
 import { OpenAI } from "openai";
 import { updateSlackMessage } from "../slack/slackApi";
+import * as fs from "fs";
+import * as path from "path";
+
+interface StreamingConfig {
+  preview: {
+    enabled: boolean;
+    maxVisibleChars: number;
+    minParagraphLength: number;
+    message: string;
+  };
+  updates: {
+    intervalMs: number;
+    minContentForUpdate: number;
+  };
+}
+
+let configCache: StreamingConfig | null = null;
+
+export function getStreamingConfig(): StreamingConfig {
+  if (configCache) return configCache;
+  
+  const configPath = path.join(process.cwd(), 'config', 'streaming.json');
+  try {
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    configCache = JSON.parse(configContent) as StreamingConfig;
+  } catch (error) {
+    console.warn(`[StreamingHelper] Config not found, using defaults`);
+    configCache = {
+      preview: {
+        enabled: true,
+        maxVisibleChars: 350,
+        minParagraphLength: 50,
+        message: "Full details in the attached document below."
+      },
+      updates: {
+        intervalMs: 1500,
+        minContentForUpdate: 100
+      }
+    };
+  }
+  return configCache;
+}
+
+export function clearStreamingConfigCache(): void {
+  configCache = null;
+}
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -83,6 +131,11 @@ export async function streamOpenAIResponse(
   const previewMode = streamingContext.previewMode;
   let previewLimitReached = false;
   
+  // Load config for preview settings
+  clearStreamingConfigCache();
+  const streamingConfig = getStreamingConfig();
+  const minParagraphLength = streamingConfig.preview.minParagraphLength;
+  
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content || "";
     accumulatedContent += delta;
@@ -103,17 +156,17 @@ export async function streamOpenAIResponse(
             const listStart = accumulatedContent.search(/\n[•\-\*\d]/);
             
             let preview: string;
-            if (paragraphEnd > 50 && paragraphEnd < previewMode.maxVisibleChars) {
+            if (paragraphEnd > minParagraphLength && paragraphEnd < previewMode.maxVisibleChars) {
               // Use first paragraph
               preview = accumulatedContent.substring(0, paragraphEnd);
-            } else if (listStart > 50 && listStart < previewMode.maxVisibleChars) {
+            } else if (listStart > minParagraphLength && listStart < previewMode.maxVisibleChars) {
               // Cut before list starts
               preview = accumulatedContent.substring(0, listStart);
             } else {
               // Fallback: truncate at last sentence
               preview = accumulatedContent.substring(0, previewMode.maxVisibleChars);
               const lastPeriod = preview.lastIndexOf('. ');
-              if (lastPeriod > 100) {
+              if (lastPeriod > minParagraphLength) {
                 preview = preview.substring(0, lastPeriod + 1);
               }
             }
