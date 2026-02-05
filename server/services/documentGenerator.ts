@@ -53,6 +53,7 @@ function getLeveregeLogo(): Buffer | null {
 
 interface DocumentConfig {
   generateDocForContracts: string[];
+  neverGenerateDocForContracts?: string[];
   wordThreshold: number;
   fileNamePattern: string;
   messages: Record<string, string>;
@@ -94,6 +95,13 @@ export function shouldGenerateDocument(contract: string, wordCount: number): boo
   // Force reload config to avoid stale cache
   clearConfigCache();
   const config = getDocumentConfig();
+  
+  // Check if contract is in the never-generate list (e.g., Slack search - links don't work in Word)
+  const neverList = config.neverGenerateDocForContracts || [];
+  if (neverList.includes(contract)) {
+    console.log(`[DocumentGenerator] Contract "${contract}" → never generate document (in exclusion list)`);
+    return false;
+  }
   
   const isInList = config.generateDocForContracts.includes(contract);
   

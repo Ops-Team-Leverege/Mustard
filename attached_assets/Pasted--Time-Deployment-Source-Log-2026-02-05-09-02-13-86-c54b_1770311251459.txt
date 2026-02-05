@@ -1,0 +1,195 @@
+
+/
+
+Time
+Deployment
+Source
+Log
+2026-02-05 09:02:13.86
+c54b737c
+System
+starting up user application
+2026-02-05 09:02:13.86
+c54b737c
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-05 09:02:13.86
+c54b737c
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-05 09:02:15.76
+c54b737c
+User
+> rest-express@1.0.0 start
+2026-02-05 09:02:15.76
+c54b737c
+User
+> NODE_ENV=production node dist/index.js
+2026-02-05 09:02:18.71
+c54b737c
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-05 09:02:18.73
+c54b737c
+User
+Slack routes registered at /api/slack/events
+2026-02-05 09:02:19.22
+c54b737c
+User
+5:02:19 PM [express] serving on port 5000
+2026-02-05 09:02:46.43
+c54b737c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-05T17:02:46.437Z ==========
+2026-02-05 09:02:46.44
+c54b737c
+User
+Event type: app_mention
+2026-02-05 09:02:46.44
+c54b737c
+User
+[Slack] Event details: eventId=Ev0AD5CUC0PP, clientMsgId=d3cb4c04-774d-46c3-b238-ab785147b187, messageTs=1770310964.444299, threadTs=1770310964.444299, channel=C0A80S3HJNL
+2026-02-05 09:02:47.98
+c54b737c
+User
+[Dedupe] Cleaned up 3 old entries
+2026-02-05 09:02:50.18
+c54b737c
+User
+Processing: "In slack, someone mentioned a recommended time length for a pilot at Pomps" in channel C0A80S3HJNL (isReply=false)
+2026-02-05 09:02:50.18
+c54b737c
+User
+[INFO] [f68a2bac] Slack event received {"correlationId":"f68a2bac","channel":"C0A80S3HJNL","threadTs":"1770310964.444299","userId":"U082TV42FM0","duration":0,"text":"In slack, someone mentioned a recommended time length for a pilot at Pomps","isReply":false,"testRun":false}
+2026-02-05 09:02:53.28
+c54b737c
+User
+[ThreadResolver] Not a reply - returning empty context
+2026-02-05 09:02:53.48
+c54b737c
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-05 09:02:54.88
+c54b737c
+User
+Thread Context: 2 messages
+2026-02-05 09:02:54.88
+c54b737c
+User
+Thread Messages Preview:
+2026-02-05 09:02:54.88
+c54b737c
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-05 09:02:54.88
+c54b737c
+User
+User: "<@U0A704T7THR> In slack, someone mentioned a recommended time length for a pilot..."
+2026-02-05 09:02:54.88
+c54b737c
+User
+2. Bot: ":raised_hands: On it, <@U082TV42FM0>..."
+2026-02-05 09:02:54.88
+c54b737c
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-05 09:02:54.88
+c54b737c
+User
+Thread: 1770310964.444299
+2026-02-05 09:02:54.88
+c54b737c
+User
+Bot: ":raised_hands: On it, <@U082TV42FM0>..."
+2026-02-05 09:02:54.88
+c54b737c
+User
+Question: "In slack, someone mentioned a recommended time length for a pilot at Pomps"
+2026-02-05 09:02:54.88
+c54b737c
+User
+Messages: 2
+2026-02-05 09:02:54.88
+c54b737c
+User
+1. User: "<@U0A704T7THR> In slack, someone mentioned a recommended time length for a pilot at Pomps"
+2026-02-05 09:02:54.88
+c54b737c
+User
+Last 3 messages:
+2026-02-05 09:02:57.58
+c54b737c
+User
+[Intent] Loaded 36 companies from database
+2026-02-05 09:02:57.58
+c54b737c
+User
+[IntentClassifier] No keyword match, using LLM classification with semantic context extraction
+2026-02-05 09:02:57.88
+c54b737c
+User
+[IntentClassifier] LLM classification with 1 messages of thread context
+2026-02-05 09:03:04.58
+c54b737c
+User
+[DecisionLayer] Intent: SLACK_SEARCH (llm)
+2026-02-05 09:03:04.58
+c54b737c
+User
+[IntentClassifier] LLM: intent=SLACK_SEARCH, company=Pomps, contracts=SLACK_MESSAGE_SEARCH
+2026-02-05 09:03:04.58
+c54b737c
+User
+[AnswerContract] Selected: SLACK_MESSAGE_SEARCH (llm_proposed) - chain: [SLACK_MESSAGE_SEARCH]
+2026-02-05 09:03:04.58
+c54b737c
+User
+Final Intent: SLACK_SEARCH
+2026-02-05 09:03:04.58
+c54b737c
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":false,"multi_meeting":false,"document_context":false,"slack_search":true}
+2026-02-05 09:03:04.58
+c54b737c
+User
+Scope Info: none
+2026-02-05 09:03:04.58
+c54b737c
+User
+Final Contract: SLACK_MESSAGE_SEARCH
+2026-02-05 09:03:04.58
+c54b737c
+User
+Will Clarify: false
+2026-02-05 09:03:04.58
+c54b737c
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-05 09:03:04.58
+c54b737c
+User
+[DecisionLayer] Contract: SLACK_MESSAGE_SEARCH (llm_proposed)
+2026-02-05 09:03:04.58
+c54b737c
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-05 09:03:04.78
+c54b737c
+User
+- Conversation Context: User is looking for information about a recommended time length for a pilot program at Pomps as mentioned in Slack.
+2026-02-05 09:03:04.78
+c54b737c
+User
+- Key Topics: pilot duration, Pomps
+2026-02-05 09:03:04.78
+c54b737c
+User
+Scope: undefined
+2026-02-05 09:03:04.78
+c54b737c
+User
+- Is Ambiguous: no
+2026-02-05 09:03:04.78
+c54b737c
+User
+Contract: SLACK_MESSAGE_SEARCH

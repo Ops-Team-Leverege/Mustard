@@ -7,6 +7,10 @@
     "PATTERN_ANALYSIS",
     "PRODUCT_EXPLANATION"
   ],
+  "neverGenerateDocForContracts": [
+    "SLACK_MESSAGE_SEARCH",
+    "SLACK_CHANNEL_INFO"
+  ],
   "wordThreshold": 200,
   "fileNamePattern": "{customer}_{type}_{date}.docx",
   "messages": {
