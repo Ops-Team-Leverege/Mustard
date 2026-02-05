@@ -13,11 +13,30 @@
 
 import { SlackSearchService, type SlackSearchResult, type SlackChannel } from '../services/slackSearchService';
 import { AnswerContract } from '../decisionLayer/answerContracts';
-import type { OpenAssistantResult } from './types';
+import type { OpenAssistantResult, IntentClassification } from './types';
 
 export interface SlackSearchContext {
     question: string;
     contract: AnswerContract;
+}
+
+// Default classification for Slack search results
+function slackClassification(): IntentClassification {
+    return {
+        intent: "slack_search",
+        confidence: "high",
+        rationale: "Searching Slack messages",
+        meetingRelevance: {
+            referencesSpecificInteraction: false,
+            asksWhatWasSaidOrAgreed: false,
+            asksAboutCustomerQuestions: false,
+        },
+        researchRelevance: {
+            needsPublicInfo: false,
+            companyOrEntityMentioned: null,
+            topicForResearch: null,
+        },
+    };
 }
 
 export class SlackSearchHandler {
@@ -48,6 +67,8 @@ export class SlackSearchHandler {
                 answer: `I encountered an error searching Slack: ${error instanceof Error ? error.message : 'Unknown error'}`,
                 dataSource: 'slack',
                 intent: 'slack_search',
+                intentClassification: slackClassification(),
+                delegatedToSingleMeeting: false,
                 coverage: {
                     messagesSearched: 0,
                     channelsSearched: 0,
@@ -77,6 +98,8 @@ export class SlackSearchHandler {
                 answer: `No messages found in Slack matching "${searchQuery}".`,
                 dataSource: 'slack',
                 intent: 'slack_search',
+                intentClassification: slackClassification(),
+                delegatedToSingleMeeting: false,
                 coverage: {
                     messagesSearched: 0,
                     channelsSearched: 0,
@@ -101,6 +124,8 @@ export class SlackSearchHandler {
             answer: synthesizedAnswer,
             dataSource: 'slack',
             intent: 'slack_search',
+            intentClassification: slackClassification(),
+            delegatedToSingleMeeting: false,
             coverage: {
                 messagesSearched: searchResponse.results.length,
                 channelsSearched: uniqueChannels.size,
@@ -128,6 +153,8 @@ export class SlackSearchHandler {
                 answer: `No channels found matching "${searchQuery}".`,
                 dataSource: 'slack',
                 intent: 'slack_search',
+                intentClassification: slackClassification(),
+                delegatedToSingleMeeting: false,
                 coverage: {
                     channelsSearched: 0,
                 },
@@ -140,6 +167,8 @@ export class SlackSearchHandler {
             answer: formattedAnswer,
             dataSource: 'slack',
             intent: 'slack_search',
+            intentClassification: slackClassification(),
+            delegatedToSingleMeeting: false,
             coverage: {
                 channelsSearched: channels.length,
             },

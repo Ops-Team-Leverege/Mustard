@@ -23,7 +23,8 @@ export type EvidenceSource =
   | "meeting_data"
   | "external_research" 
   | "general_assistance"
-  | "hybrid";
+  | "hybrid"
+  | "slack_search";
 
 /**
  * Intent Classification Result (Decision Layer derived)
@@ -77,7 +78,7 @@ export type OpenAssistantResult = {
   answerContract?: AnswerContract;
   answerContractChain?: AnswerContract[];
   ssotMode?: SSOTMode;
-  dataSource: "meeting_artifacts" | "external_research" | "general_knowledge" | "hybrid" | "clarification" | "product_ssot";
+  dataSource: "meeting_artifacts" | "external_research" | "general_knowledge" | "hybrid" | "clarification" | "product_ssot" | "slack";
   researchCitations?: ResearchResult["citations"];
   artifactMatches?: ArtifactSearchResult;
   singleMeetingResult?: SingleMeetingResult;
@@ -86,6 +87,13 @@ export type OpenAssistantResult = {
   progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for long operations)
   streamingCompleted?: boolean; // True if handler already updated the streaming message with final content
   shouldGenerateDoc?: boolean; // True when response should be delivered as a .docx document (e.g., research + writing)
+  coverage?: {
+    messagesSearched?: number;
+    channelsSearched?: number;
+    totalAvailable?: number;
+    hasMore?: boolean;
+    note?: string;
+  };
 };
 
 /**
@@ -132,6 +140,8 @@ export function deriveEvidenceSource(dlIntent: Intent): EvidenceSource {
     case Intent.SINGLE_MEETING:
     case Intent.MULTI_MEETING:
       return "meeting_data";
+    case Intent.SLACK_SEARCH:
+      return "slack_search";
     case Intent.PRODUCT_KNOWLEDGE:
       return "general_assistance";
     case Intent.EXTERNAL_RESEARCH:
