@@ -1,0 +1,184 @@
+2026-02-04 16:29:02.34
+b70e064b
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-04 16:29:02.34
+b70e064b
+System
+starting up user application
+2026-02-04 16:29:02.34
+b70e064b
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-04 16:29:03.84
+b70e064b
+User
+> NODE_ENV=production node dist/index.js
+2026-02-04 16:29:03.84
+b70e064b
+User
+> rest-express@1.0.0 start
+2026-02-04 16:29:05.74
+b70e064b
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-04 16:29:05.76
+b70e064b
+User
+Slack routes registered at /api/slack/events
+2026-02-04 16:29:06.17
+b70e064b
+User
+12:29:06 AM [express] serving on port 5000
+2026-02-04 16:29:07.32
+b70e064b
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-05T00:29:07.325Z ==========
+2026-02-04 16:29:07.32
+b70e064b
+User
+[Slack] Received event request
+2026-02-04 16:29:07.33
+b70e064b
+User
+Event type: app_mention
+2026-02-04 16:29:07.33
+b70e064b
+User
+[Slack] Processing app_mention
+2026-02-04 16:29:07.33
+b70e064b
+User
+Slack payload type: event_callback
+2026-02-04 16:29:07.33
+b70e064b
+User
+[Slack] Event details: eventId=Ev0ADFR1TKH7, clientMsgId=09d66433-e47b-4e4a-b25f-9990a8a98dca, messageTs=1770251336.786069, threadTs=1770229282.259239, channel=C0A80S3HJNL
+2026-02-04 16:29:07.33
+b70e064b
+User
+12:29:07 AM [express] POST /api/slack/events 200 in 17ms
+2026-02-04 16:29:07.34
+b70e064b
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-05T00:29:07.347Z ==========
+2026-02-04 16:29:07.34
+b70e064b
+User
+[Slack] Retry #1 received (reason: http_timeout)
+2026-02-04 16:29:07.34
+b70e064b
+User
+[Slack] Ignoring http_timeout retry - already processed
+2026-02-04 16:29:07.34
+b70e064b
+User
+12:29:07 AM [express] POST /api/slack/events 200 in 2ms
+2026-02-04 16:29:08.66
+b70e064b
+User
+[Dedupe] Cleaned up 12 old entries
+2026-02-04 16:29:10.56
+b70e064b
+User
+[INFO] [1c6df3fd] Slack event received {"correlationId":"1c6df3fd","channel":"C0A80S3HJNL","threadTs":"1770229282.259239","userId":"U082TV42FM0","duration":0,"text":"what actions items should we make sure to mention from last weeks call","isReply":true,"testRun":false}
+2026-02-04 16:29:10.56
+b70e064b
+User
+Processing: "what actions items should we make sure to mention from last weeks call" in channel C0A80S3HJNL (isReply=true)
+2026-02-04 16:29:22.06
+b70e064b
+User
+Meeting: 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 16:29:22.06
+b70e064b
+User
+Thread: 1770229282.259239
+2026-02-04 16:29:22.06
+b70e064b
+User
+[ThreadResolver] ✅ CONTEXT CHECKPOINT 1 - Thread Resolution:
+2026-02-04 16:29:22.26
+b70e064b
+User
+Last Response Type: semantic
+2026-02-04 16:29:22.26
+b70e064b
+User
+Company: cc803926-327f-453a-baa6-8933b0197dce (no name)
+2026-02-04 16:29:22.26
+b70e064b
+User
+Proposed Interpretation: none
+2026-02-04 16:29:22.26
+b70e064b
+User
+Awaiting Clarification: none
+2026-02-04 16:29:22.26
+b70e064b
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-04 16:29:23.26
+b70e064b
+User
+Thread: 1770229282.259239
+2026-02-04 16:29:23.26
+b70e064b
+User
+Messages: 7
+2026-02-04 16:29:23.26
+b70e064b
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-04 16:29:23.26
+b70e064b
+User
+Last 3 messages:
+2026-02-04 16:29:23.36
+b70e064b
+User
+1. User: "*calum* [6:59 AM]
+2026-02-04 16:29:23.36
+b70e064b
+User
+3. Bot: ":sparkles: Got it, <@U082TV42FM0> — working on it..."
+2026-02-04 16:29:23.36
+b70e064b
+User
+2. User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks call"
+2026-02-04 16:29:23.36
+b70e064b
+User
+Ya one of the reasons I want to really lean on the UI/reports for insights, is as..."
+2026-02-04 16:29:23.56
+b70e064b
+User
+Question: "what actions items should we make sure to mention from last weeks call"
+2026-02-04 16:29:23.56
+b70e064b
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-04 16:29:23.66
+b70e064b
+User
+Thread Context: 7 messages
+2026-02-04 16:29:23.66
+b70e064b
+User
+User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks..."
+2026-02-04 16:29:23.66
+b70e064b
+User
+Thread Messages Preview:
+2026-02-04 16:29:23.66
+b70e064b
+User
+Bot: ":sparkles: Got it, <@U082TV42FM0> — working on it..."
+2026-02-04 16:29:24.96
+b70e064b
+User
+[Intent] Loaded 36 companies from database
+2026-02-04 16:29:25.26
+b70e064b
+User
+[IntentClassifier] No keyword match, using LLM classification with semantic context extraction
