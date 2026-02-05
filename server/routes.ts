@@ -37,7 +37,6 @@ import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { randomUUID } from "crypto";
 import { handleRouteError, NotFoundError, ValidationError, AuthenticationError } from "./utils/errorHandler";
-import { searchHelpArticles, getAnswerFromHelpArticles } from "./services/vertexAISearchService";
 import { validate, commonSchemas, updateSchemas } from "./middleware/validation";
 // From Replit Auth integration (blueprint:javascript_log_in_with_replit)
 import { setupAuth, isAuthenticated } from "./replitAuth";
@@ -1980,33 +1979,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       handleRouteError(res, error, "GET /api/airtable/search-all", { includeSuccessField: true });
-    }
-  });
-
-  // Vertex AI Help Center Search
-  app.get("/api/help/search", isAuthenticated, async (req, res) => {
-    try {
-      const query = req.query.q as string;
-      if (!query) {
-        return res.status(400).json({ error: "Query parameter 'q' is required" });
-      }
-      const results = await searchHelpArticles(query);
-      res.json(results);
-    } catch (error) {
-      handleRouteError(res, error, "GET /api/help/search");
-    }
-  });
-
-  app.get("/api/help/answer", isAuthenticated, async (req, res) => {
-    try {
-      const query = req.query.q as string;
-      if (!query) {
-        return res.status(400).json({ error: "Query parameter 'q' is required" });
-      }
-      const results = await getAnswerFromHelpArticles(query);
-      res.json(results);
-    } catch (error) {
-      handleRouteError(res, error, "GET /api/help/answer");
     }
   });
   
