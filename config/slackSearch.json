@@ -1,0 +1,12 @@
+{
+  "channelFilter": {
+    "enabled": true,
+    "mustContain": ["pitcrew"],
+    "exclude": []
+  },
+  "search": {
+    "defaultLimit": 20,
+    "sortBy": "score",
+    "sortDirection": "desc"
+  }
+}
