@@ -11,6 +11,7 @@ import {
   TableRow,
   TableCell,
   WidthType,
+  ExternalHyperlink,
 } from 'docx';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -132,34 +133,58 @@ export function generateFileName(type: string, customer?: string): string {
 }
 
 /**
- * Parse inline markdown (bold) and return TextRun array.
- * Handles **word** patterns within text.
+ * Parse inline markdown (bold and links) and return array of TextRun/ExternalHyperlink.
+ * Handles **word** patterns and [text](url) links within text.
  */
-function parseInlineMarkdown(text: string): TextRun[] {
-  const children: TextRun[] = [];
-  const boldRegex = /\*\*(.+?)\*\*/g;
+function parseInlineMarkdown(text: string): (TextRun | ExternalHyperlink)[] {
+  const children: (TextRun | ExternalHyperlink)[] = [];
+  
+  // Combined regex for bold and markdown links
+  // Matches: **bold text** or [link text](url)
+  const inlineRegex = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
   let lastIndex = 0;
   let match;
   
-  while ((match = boldRegex.exec(text)) !== null) {
+  while ((match = inlineRegex.exec(text)) !== null) {
+    // Add text before this match
     if (match.index > lastIndex) {
       children.push(new TextRun({
         text: text.substring(lastIndex, match.index),
       }));
     }
-    children.push(new TextRun({
-      text: match[1],
-      bold: true,
-    }));
+    
+    if (match[1]) {
+      // Bold text: **text**
+      children.push(new TextRun({
+        text: match[1],
+        bold: true,
+      }));
+    } else if (match[2] && match[3]) {
+      // Markdown link: [text](url)
+      children.push(new ExternalHyperlink({
+        children: [
+          new TextRun({
+            text: match[2],
+            style: "Hyperlink",
+            color: "0563C1",
+            underline: { type: "single" },
+          }),
+        ],
+        link: match[3],
+      }));
+    }
+    
     lastIndex = match.index + match[0].length;
   }
   
+  // Add remaining text after last match
   if (lastIndex < text.length) {
     children.push(new TextRun({
       text: text.substring(lastIndex),
     }));
   }
   
+  // If no matches, return original text
   if (children.length === 0) {
     children.push(new TextRun({ text }));
   }
