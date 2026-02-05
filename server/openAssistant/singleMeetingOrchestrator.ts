@@ -1421,9 +1421,9 @@ ${productKnowledge}
 
 YOUR TASK:
 1. For ANSWERED questions: Assess the answer given in the meeting against the product knowledge.
-   - If the answer is correct: Mark as ✅ Correct
-   - If the answer is partially correct or needs clarification: Mark as ⚠️ Needs Clarification and explain
-   - If the answer is incorrect: Mark as ❌ Incorrect and provide the correct answer
+   - If the answer is correct: Mark as [Correct]
+   - If the answer is partially correct or needs clarification: Mark as [Needs Clarification] and explain
+   - If the answer is incorrect: Mark as [Incorrect] and provide the correct answer
    
 2. For OPEN questions: Provide a suggested answer based on the product knowledge.
    - If you can answer from the product data: Provide a clear, accurate answer
@@ -1435,11 +1435,11 @@ For each question, use this structure:
 **Answered Questions Assessment:**
 1. Q: [question]
    A (from meeting): [their answer]
-   📋 Assessment: [✅/⚠️/❌] [your assessment and any corrections]
+   Assessment: [Correct/Needs Clarification/Incorrect] [your assessment and any corrections]
 
 **Suggested Answers for Open Questions:**
 1. Q: [question]
-   💡 Suggested Answer: [your answer based on product knowledge]
+   Suggested Answer: [your answer based on product knowledge]
 
 Be concise but thorough. Prioritize accuracy over completeness.`;
 

@@ -218,7 +218,7 @@ Link: ${msg.permalink || 'N/A'}`;
         const prompt = `You are analyzing Slack messages to answer a user's question.
 
 User's Question: "${originalQuestion}"
-${mentionedEntity ? `\n⚠️ IMPORTANT: User asked specifically about "${mentionedEntity}" - prioritize information about this entity!` : ''}
+${mentionedEntity ? `\nIMPORTANT: User asked specifically about "${mentionedEntity}" - prioritize information about this entity!` : ''}
 
 Search Metadata:
 - Found ${results.length} messages (${totalCount} total available)
@@ -286,7 +286,7 @@ CRITICAL INSTRUCTIONS:
 5. **START WITH DIRECT ANSWER**:
    - Put the key finding first in bold
    - If there's a company-specific exception, state it immediately
-   - Example: "✅ **For Pomps specifically: 90-day pilot recommended** (exception to standard 45-day policy)"
+   - Example: "**For Pomps specifically: 90-day pilot recommended** (exception to standard 45-day policy)"
 
 6. **EXPLAIN THE "WHY" (CRITICAL)**:
    - After the direct answer, immediately explain WHY
@@ -296,22 +296,22 @@ CRITICAL INSTRUCTIONS:
 
 7. **STRUCTURED FORMAT**:
    
-   ✅ **[Direct Answer]**
+   **[Direct Answer]**
    
-   🎯 **Why This Answer:**
+   **Why This Answer:**
    [Explain the rationale/context - specific business reasons, not generic filler]
    
-   📊 Key Details:
-   • [Most important point first]
-   • [Company-specific details if applicable]
-   • [Mechanics and structure]
+   **Key Details:**
+   - [Most important point first]
+   - [Company-specific details if applicable]
+   - [Mechanics and structure]
    
-   🔄 **General Context** (if relevant):
+   **General Context** (if relevant):
    [How this compares to standard practice]
 
 8. **AVOID VAGUE FILLER**:
-   ❌ BAD: "This was discussed in the context of ensuring customers have adequate time"
-   ✅ GOOD: "The 90-day timeline allows testing on commercial trucks, which require different AI models than passenger vehicles"
+   BAD: "This was discussed in the context of ensuring customers have adequate time"
+   GOOD: "The 90-day timeline allows testing on commercial trucks, which require different AI models than passenger vehicles"
 
 9. **TEMPORAL CONTEXT** (CRITICAL):
    - ALWAYS mention dates when referencing information
@@ -337,7 +337,7 @@ CRITICAL INSTRUCTIONS:
      [Actual Slack link]
 
 12. **SEARCH TRANSPARENCY**:
-   🔍 Searched ${channelsSearched} channels, found ${results.length} messages
+   Searched ${channelsSearched} channels, found ${results.length} messages
    Confidence: [High/Medium/Low based on source quality and consistency]
 
 13. **QUALITY CHECK BEFORE RESPONDING**:
