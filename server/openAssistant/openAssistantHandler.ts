@@ -22,7 +22,7 @@ import { Intent, type IntentClassificationResult } from "../decisionLayer/intent
 import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
-import { isCapabilityQuestion, CAPABILITIES_PROMPT, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
+import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
 
 import {
   type EvidenceSource,
@@ -1536,7 +1536,7 @@ async function handleGeneralAssistanceIntent(
     console.log(`[OpenAssistant] Capability question detected - generating conversational capabilities response`);
     const capabilitiesAnswer = await streamOpenAIResponse(
       MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
-      CAPABILITIES_PROMPT,
+      getCapabilitiesPrompt(),
       userMessage,
       context.slackStreaming
     );

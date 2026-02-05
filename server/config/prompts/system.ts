@@ -3,7 +3,57 @@
  * 
  * Base personas, shared context fragments, and universal guidelines
  * that are composed into other prompts.
+ * 
+ * Capabilities are loaded dynamically from config/capabilities.json
  */
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+interface CapabilityEntry {
+  label: string;
+  description: string;
+  examples: string[];
+  contracts: string[];
+}
+
+interface CapabilitiesConfig {
+  botName: string;
+  intro: string;
+  closing: string;
+  dataSources: Record<string, {
+    name: string;
+    description: string;
+    intents: string[];
+  }>;
+  capabilities: Record<string, CapabilityEntry>;
+}
+
+let capabilitiesCache: CapabilitiesConfig | null = null;
+
+function getCapabilitiesConfig(): CapabilitiesConfig {
+  if (capabilitiesCache) return capabilitiesCache;
+  
+  const configPath = path.join(process.cwd(), 'config', 'capabilities.json');
+  try {
+    const configContent = fs.readFileSync(configPath, 'utf-8');
+    capabilitiesCache = JSON.parse(configContent) as CapabilitiesConfig;
+  } catch (error) {
+    console.warn(`[System] capabilities.json not found, using empty config`);
+    capabilitiesCache = {
+      botName: "PitCrew Sauce",
+      intro: "I'm your AI sales assistant.",
+      closing: "Just tag me and ask away.",
+      dataSources: {},
+      capabilities: {}
+    };
+  }
+  return capabilitiesCache;
+}
+
+export function clearCapabilitiesCache(): void {
+  capabilitiesCache = null;
+}
 
 /**
  * Ambient product context included in product-aware prompts.
@@ -67,24 +117,45 @@ export function isCapabilityQuestion(message: string): boolean {
 }
 
 /**
- * Prompt for when users ask what the bot can do.
- * Guides the LLM to explain capabilities conversationally.
+ * Dynamically builds the capabilities prompt from config/capabilities.json.
+ * Adding a new capability to the config file automatically updates the bot's response.
  */
-export const CAPABILITIES_PROMPT = `The user is asking what you can help with or what you're connected to. Give a SHORT, friendly response (3-4 sentences max).
+export function getCapabilitiesPrompt(): string {
+  clearCapabilitiesCache();
+  const config = getCapabilitiesConfig();
+  
+  const dataSourceLines = Object.values(config.dataSources)
+    .map(ds => `- ${ds.name} - ${ds.description}`)
+    .join('\n');
+  
+  const capabilityLines = Object.values(config.capabilities)
+    .map(cap => `- ${cap.label}: ${cap.description}`)
+    .join('\n');
+  
+  const exampleLines = Object.values(config.capabilities)
+    .flatMap(cap => cap.examples.slice(0, 1))
+    .map(ex => `- "${ex}"`)
+    .join('\n');
+  
+  return `The user is asking what you can help with or what you're connected to. Give a SHORT, friendly response (3-4 sentences max).
+
+${config.intro}
 
 MY DATA SOURCES & INTEGRATIONS:
-- Meeting transcripts database (PostgreSQL) - all customer call transcripts and insights
-- Airtable Product Knowledge Base - PitCrew product info, features, roadmap
-- External research capability - can search the web for company info, industry trends
+${dataSourceLines}
 
 CAPABILITIES:
-- Answer questions about customer meetings and extract insights
-- PitCrew product knowledge, value props, and competitive positioning  
-- Draft emails and responses
-- Research external companies and topics
+${capabilityLines}
+
+EXAMPLE QUESTIONS:
+${exampleLines}
 
 If they're asking about data sources specifically, mention those. If asking about capabilities generally, mention what you can do.
-Keep it conversational and brief. End with an invitation to ask more.`;
+Keep it conversational and brief. ${config.closing}`;
+}
+
+/** @deprecated Use getCapabilitiesPrompt() instead */
+export const CAPABILITIES_PROMPT = getCapabilitiesPrompt();
 
 /**
  * Base sales assistant persona used across multiple handlers.

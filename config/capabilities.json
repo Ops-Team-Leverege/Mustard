@@ -1,0 +1,89 @@
+{
+  "botName": "PitCrew Sauce",
+  "intro": "I'm PitCrew Sauce, your AI sales assistant.",
+  "closing": "Just tag me and ask away.",
+  "dataSources": {
+    "meeting_transcripts": {
+      "name": "Meeting Transcripts Database",
+      "description": "Customer call transcripts and insights",
+      "intents": ["SINGLE_MEETING", "MULTI_MEETING"]
+    },
+    "product_knowledge": {
+      "name": "PitCrew Product Knowledge Base",
+      "description": "Product info, features, and roadmap from Airtable",
+      "intents": ["PRODUCT_KNOWLEDGE"]
+    },
+    "external_research": {
+      "name": "External Research",
+      "description": "Web search for company info and industry trends",
+      "intents": ["EXTERNAL_RESEARCH"]
+    },
+    "slack_search": {
+      "name": "Slack Workspace",
+      "description": "Search messages across PitCrew Slack channels",
+      "intents": ["SLACK_SEARCH"]
+    }
+  },
+  "capabilities": {
+    "SINGLE_MEETING": {
+      "label": "Meeting Analysis",
+      "description": "Analyze individual customer meetings",
+      "examples": [
+        "Summarize the last Les Schwab meeting",
+        "What were the next steps from the ACE meeting?",
+        "What questions did the customer ask?"
+      ],
+      "contracts": ["MEETING_SUMMARY", "NEXT_STEPS", "ATTENDEES", "CUSTOMER_QUESTIONS", "EXTRACTIVE_FACT"]
+    },
+    "MULTI_MEETING": {
+      "label": "Cross-Meeting Insights",
+      "description": "Find patterns and trends across multiple meetings",
+      "examples": [
+        "What are common customer concerns?",
+        "Compare feedback from tire shops vs quick lube centers",
+        "Find all meetings that mention integration challenges"
+      ],
+      "contracts": ["PATTERN_ANALYSIS", "COMPARISON", "TREND_SUMMARY", "CROSS_MEETING_QUESTIONS"]
+    },
+    "PRODUCT_KNOWLEDGE": {
+      "label": "Product Information",
+      "description": "PitCrew features, pricing, integrations, and value props",
+      "examples": [
+        "What is PitCrew pricing?",
+        "Does PitCrew integrate with POS systems?",
+        "Explain PitCrew's safety features"
+      ],
+      "contracts": ["PRODUCT_EXPLANATION", "FEATURE_VERIFICATION", "FAQ_ANSWER"]
+    },
+    "EXTERNAL_RESEARCH": {
+      "label": "Company & Market Research",
+      "description": "Research companies, industries, and market trends",
+      "examples": [
+        "Research Costco's recent priorities",
+        "What are quick lube industry trends?",
+        "Prepare sales docs for Valvoline"
+      ],
+      "contracts": ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+    },
+    "SLACK_SEARCH": {
+      "label": "Slack Search",
+      "description": "Find information shared in PitCrew Slack channels",
+      "examples": [
+        "In Slack, someone mentioned a recommended pilot length for Pomps",
+        "Search Slack for pricing discussions",
+        "Find what was shared about the new integration"
+      ],
+      "contracts": ["SLACK_MESSAGE_SEARCH", "SLACK_CHANNEL_INFO"]
+    },
+    "GENERAL_HELP": {
+      "label": "Sales Support & Drafting",
+      "description": "Draft emails, responses, and provide general assistance",
+      "examples": [
+        "Draft a follow-up email to the customer",
+        "Help me prepare for the Costco meeting",
+        "Create value props for tire shops"
+      ],
+      "contracts": ["DRAFT_EMAIL", "DRAFT_RESPONSE", "VALUE_PROPOSITION", "GENERAL_RESPONSE"]
+    }
+  }
+}
