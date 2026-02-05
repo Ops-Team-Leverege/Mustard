@@ -269,7 +269,7 @@ function isActionItemQuestion(question: string): boolean {
   const q = question.toLowerCase();
   const patterns = [
     /\bnext\s*steps?\b/,
-    /\baction\s*items?\b/,
+    /\bactions?\s*items?\b/,  // Handles "action items", "actions items" (typo), "action item"
     /\bto-?dos?\b/,
     /\bfollow[\s-]*ups?\b/,
     /\bcommitments?\b/,
@@ -278,6 +278,8 @@ function isActionItemQuestion(question: string): boolean {
     /\bwho'?s responsible/,
     /\bwhat needs to happen/,
     /\bwhat'?s next\b/,
+    /\bshould\s+(?:we|i)\s+(?:mention|bring|discuss)\b/,  // Judgment phrasing for action items
+    /\bmake\s+sure\s+to\s+(?:mention|bring|discuss)\b/,
   ];
   return patterns.some(p => p.test(q));
 }
@@ -599,8 +601,9 @@ async function handleExtractiveIntent(
   const startTime = Date.now();
   
   // Detect question type FIRST to minimize unnecessary DB calls
-  const isAttendee = isAttendeeQuestion(question);
-  const isAction = isActionItemQuestion(question);
+  // Use contract OR pattern matching (contract takes precedence from Decision Layer)
+  const isAttendee = contract === AnswerContract.ATTENDEES || isAttendeeQuestion(question);
+  const isAction = contract === AnswerContract.NEXT_STEPS || isActionItemQuestion(question);
   
   // FAST PATH: Customer questions - when contract explicitly requests OR question pattern matches
   const isCustomerQuestionsRequest = contract === AnswerContract.CUSTOMER_QUESTIONS || 

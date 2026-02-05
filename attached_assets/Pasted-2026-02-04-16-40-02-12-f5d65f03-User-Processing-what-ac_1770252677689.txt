@@ -1,0 +1,184 @@
+2026-02-04 16:40:02.12
+f5d65f03
+User
+Processing: "what actions items should we make sure to mention from last weeks call" in channel C0A80S3HJNL (isReply=true)
+2026-02-04 16:40:04.82
+f5d65f03
+User
+[ThreadResolver] ✅ CONTEXT CHECKPOINT 1 - Thread Resolution:
+2026-02-04 16:40:04.92
+f5d65f03
+User
+Company: cc803926-327f-453a-baa6-8933b0197dce (no name)
+2026-02-04 16:40:04.92
+f5d65f03
+User
+Awaiting Clarification: none
+2026-02-04 16:40:04.92
+f5d65f03
+User
+Thread: 1770229282.259239
+2026-02-04 16:40:04.92
+f5d65f03
+User
+Proposed Interpretation: none
+2026-02-04 16:40:04.92
+f5d65f03
+User
+Meeting: 74b2a4e4-c560-476f-9a9c-3f727637a55f
+2026-02-04 16:40:04.92
+f5d65f03
+User
+Last Response Type: transcript
+2026-02-04 16:40:05.02
+f5d65f03
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-04 16:40:05.92
+f5d65f03
+User
+3. Bot: ":bulb: Happy to help, <@U082TV42FM0> — one moment..."
+2026-02-04 16:40:05.92
+f5d65f03
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-04 16:40:05.92
+f5d65f03
+User
+1. User: "*calum* [6:59 AM]
+2026-02-04 16:40:05.92
+f5d65f03
+User
+Ya one of the reasons I want to really lean on the UI/reports for insights, is as..."
+2026-02-04 16:40:05.92
+f5d65f03
+User
+2. User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks call"
+2026-02-04 16:40:05.92
+f5d65f03
+User
+Messages: 7
+2026-02-04 16:40:05.92
+f5d65f03
+User
+Thread: 1770229282.259239
+2026-02-04 16:40:05.92
+f5d65f03
+User
+Last 3 messages:
+2026-02-04 16:40:06.02
+f5d65f03
+User
+Question: "what actions items should we make sure to mention from last weeks call"
+2026-02-04 16:40:06.02
+f5d65f03
+User
+Thread Messages Preview:
+2026-02-04 16:40:06.02
+f5d65f03
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-04 16:40:06.02
+f5d65f03
+User
+Thread Context: 7 messages
+2026-02-04 16:40:06.12
+f5d65f03
+User
+User: "<@U0A704T7THR> what actions items should we make sure to mention from last weeks..."
+2026-02-04 16:40:06.12
+f5d65f03
+User
+Bot: ":bulb: Happy to help, <@U082TV42FM0> — one moment..."
+2026-02-04 16:40:07.02
+f5d65f03
+User
+[Intent] Loaded 36 companies from database
+2026-02-04 16:40:07.12
+f5d65f03
+User
+[IntentClassifier] No keyword match, using LLM classification with semantic context extraction
+2026-02-04 16:40:07.22
+f5d65f03
+User
+[IntentClassifier] LLM classification with 6 messages of thread context
+2026-02-04 16:40:12.52
+f5d65f03
+User
+[DecisionLayer] Intent: SINGLE_MEETING (llm)
+2026-02-04 16:40:12.52
+f5d65f03
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 16:40:12.52
+f5d65f03
+User
+[IntentClassifier] LLM: intent=SINGLE_MEETING, company=ACE, contracts=NEXT_STEPS
+2026-02-04 16:40:12.52
+f5d65f03
+User
+[DecisionLayer] Contract: NEXT_STEPS (llm_proposed)
+2026-02-04 16:40:12.52
+f5d65f03
+User
+Final Intent: SINGLE_MEETING
+2026-02-04 16:40:12.52
+f5d65f03
+User
+[AnswerContract] Selected: NEXT_STEPS (llm_proposed) - chain: [NEXT_STEPS]
+2026-02-04 16:40:12.52
+f5d65f03
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-04 16:40:12.62
+f5d65f03
+User
+- Extracted Companies: none
+2026-02-04 16:40:12.62
+f5d65f03
+User
+- Should Proceed: yes
+2026-02-04 16:40:12.62
+f5d65f03
+User
+Clarify Message: none
+2026-02-04 16:40:12.62
+f5d65f03
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-04 16:40:12.62
+f5d65f03
+User
+- Conversation Context: User is looking for action items from the last week's call related to ACE.
+2026-02-04 16:40:12.62
+f5d65f03
+User
+Contract: NEXT_STEPS
+2026-02-04 16:40:12.62
+f5d65f03
+User
+Scope Info: none
+2026-02-04 16:40:12.62
+f5d65f03
+User
+- Key Topics: action items, last week's call, ACE
+2026-02-04 16:40:12.62
+f5d65f03
+User
+- Extracted Company: ACE
+2026-02-04 16:40:12.62
+f5d65f03
+User
+Semantic Context:
+2026-02-04 16:40:12.62
+f5d65f03
+User
+Will Clarify: false
+2026-02-04 16:40:12.62
+f5d65f03
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false}
+2026-02-04 16:40:12.62
+f5d65f03
+User
+- Is Ambiguous: no
