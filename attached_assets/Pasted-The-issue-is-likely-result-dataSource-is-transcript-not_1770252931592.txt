@@ -1,0 +1,61 @@
+The issue is likely:
+
+result.dataSource is "transcript" (not "artifacts")
+
+This means hasArtifacts = false (because dataSource !== "not_found" but it's "transcript")
+So the system thinks there are no artifacts
+Returns transcript search results instead
+Or the artifacts fetch is failing
+
+Action items exist in DB but aren't being retrieved
+Falls back to transcript search
+Returns raw transcript chunks
+The Logic Flaw
+const hasArtifacts = result.dataSource !== "not_found";
+This is too broad. It should be:
+
+const hasArtifacts = result.dataSource === "artifacts" || result.dataSource === "action_items";
+Because dataSource can be:
+
+"artifacts" - found structured data
+"transcript" - fell back to transcript search
+"not_found" - nothing found
+"semantic" - used LLM
+Currently, the code treats "transcript" as "has artifacts" which is wrong.
+
+What Needs to be Fixed
+Without seeing the full code, the likely issues are:
+
+Fix hasArtifacts check:
+
+// WRONG:
+const hasArtifacts = result.dataSource !== "not_found";
+
+// RIGHT:
+const hasArtifacts = result.dataSource === "artifacts" || 
+                     result.dataSource === "action_items" ||
+                     result.dataSource === "customer_questions";
+Or check why artifacts aren't being found:
+
+Are action items actually in the database for this meeting?
+Is the query failing silently?
+Is there a timing issue?
+Or the extractive handler is returning wrong dataSource:
+
+When it finds action items, it should return dataSource: "artifacts"
+Not dataSource: "transcript"
+Evidence
+The screenshot shows the system is returning transcript search results with:
+
+"In this meeting (Jan 30, 2026), the transcript mentions:"
+Raw quotes from transcript
+Not the structured action items format
+This confirms the system is using transcript fallback instead of structured artifacts.
+
+Recommendation
+Check the handleExtractiveIntent function to see:
+
+What dataSource value it returns when action items are found
+Why it's falling back to transcript search
+Fix the hasArtifacts check to properly distinguish between artifacts and transcript
+The contract-aware logic is correct in principle, but the hasArtifacts check is too permissive.

@@ -1597,7 +1597,9 @@ export async function handleSingleMeetingQuestion(
         AnswerContract.ATTENDEES,
         AnswerContract.CUSTOMER_QUESTIONS,
       ];
-      const hasArtifacts = result.dataSource !== "not_found";
+      // Check for actual structured artifacts, not transcript fallback
+      const artifactDataSources = ["action_items", "attendees", "customer_questions"];
+      const hasArtifacts = artifactDataSources.includes(result.dataSource);
       const isArtifactComplete = contract && artifactCompleteContracts.includes(contract);
       
       // Skip LLM if contract provides complete answer with artifacts
