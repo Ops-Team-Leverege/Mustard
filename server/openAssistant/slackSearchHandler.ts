@@ -241,40 +241,62 @@ CRITICAL INSTRUCTIONS:
    - If "${mentionedEntity}" has different rules/exceptions, HIGHLIGHT THIS FIRST
    - Don't give generic answers if company-specific info exists` : '- Check if the question is about a specific company/entity'}
 
-3. **START WITH DIRECT ANSWER**:
+3. **DISTINGUISH GENERAL POLICY vs COMPANY-SPECIFIC EXCEPTIONS** (CRITICAL):
+   - When you see messages about "standard" or "general policy", that applies to ALL companies
+   - When you see messages about a SPECIFIC company, that's an exception or special case
+   - NEVER say "the standard for [Company X] is..." - standards are company-wide, not per-company
+   - DO say: "[Company X] is getting [Y] as an exception to the standard [Z]"
+   - Example: If standard is 45 days but Pomps gets 90 days, say "Pomps: 90-day pilot (exception to standard 45-day policy)" NOT "standard for Pomps is 90 days"
+   
+   EXAMPLE OF CORRECT INTERPRETATION:
+   - Message 1: "Our standard pilot length is 45 days"
+   - Message 2: "Recommending 90 days for Pomps due to commercial tire complexity"
+   - CORRECT: "Pomps is being offered a 90-day pilot, which is an exception to the standard 45-day policy"
+   - WRONG: "The standard for Pomps is 90 days"
+   - WRONG: "The pilot agreement has evolved and the standard for Pomps is now 90 days"
+
+4. **CITE SOURCES ACCURATELY** (CRITICAL):
+   - ONLY cite what a message ACTUALLY says
+   - If Message 8 says "standard changed from 60 to 45 days", DO NOT claim it says anything about a specific company
+   - If Message 3 says "recommending 90 days for Pomps", DO NOT claim it says this is "the standard"
+   - Each source should be cited for EXACTLY what it contains, nothing more
+   - If you need to combine information from multiple sources, cite each source separately for its specific contribution
+
+5. **START WITH DIRECT ANSWER**:
    - Put the key finding first in bold
    - If there's a company-specific exception, state it immediately
    - Example: "✅ **For Pomps specifically: 90-day pilot recommended** (exception to standard 45-day policy)"
 
-4. **STRUCTURED FORMAT**:
+6. **STRUCTURED FORMAT**:
    📊 Key Details:
    • [Most important point first]
    • [Company-specific details if applicable]
    • [General context]
 
-5. **TEMPORAL CONTEXT** (CRITICAL):
+7. **TEMPORAL CONTEXT** (CRITICAL):
    - ALWAYS mention dates when referencing information
    - Note if information is recent or old
    - Example: "According to a message from December 12, 2025..."
    - Flag if information might be outdated
 
-6. **REFERENCE ONLY ACTUAL MESSAGES**:
+8. **REFERENCE ONLY ACTUAL MESSAGES**:
    - ONLY cite messages from the list above
    - Use the exact message numbers [Message 1], [Message 2], etc.
    - Include the date and channel for each reference
    - DO NOT make up or infer sources that aren't in the list
+   - DO NOT claim a message says something it doesn't say
 
-7. **END WITH REFERENCES SECTION**:
+9. **END WITH REFERENCES SECTION**:
    
    References:
    [List ONLY the messages you actually used, with dates and links]
    
    Format:
    • Message [#] from #[channel] by [author] ([date])
-     [Brief description of what this message contains]
+     [Brief description of EXACTLY what this message contains - don't exaggerate or misrepresent]
      [Actual Slack link]
 
-8. **SEARCH TRANSPARENCY**:
+10. **SEARCH TRANSPARENCY**:
    🔍 Searched ${channelsSearched} channels, found ${results.length} messages
    Confidence: [High/Medium/Low based on source quality and consistency]
 
@@ -284,7 +306,7 @@ Keep the answer scannable with short paragraphs, bullet points, and clear struct
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy, temporal awareness, and company-specific context awareness. You ONLY reference actual messages provided, never make up sources.' },
+                    { role: 'system', content: 'You are a helpful assistant that synthesizes information from Slack messages with perfect attribution accuracy, temporal awareness, and company-specific context awareness. You ONLY reference actual messages provided, never make up sources. CRITICAL: Distinguish between general company policies and company-specific exceptions. Never say "the standard for [Company X]" - standards apply to all companies. If a specific company gets different terms, call it an exception.' },
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3,
