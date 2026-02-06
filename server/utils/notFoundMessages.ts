@@ -21,15 +21,15 @@ export function getMeetingNotFoundMessage(ctx: NotFoundContext): string {
   const { extractedCompany, searchedFor, scope = "single" } = ctx;
 
   if (extractedCompany) {
-    return `I couldn't find "${extractedCompany}" in our records. This could mean:\n- No transcripts have been uploaded for this company yet\n- The name might be spelled differently in our system\n\nYou can try a different spelling, the full company name, or check the Transcripts page to see what's available.`;
+    return `I couldn't find "${extractedCompany}" in our records. This could mean:\n- No transcripts have been uploaded for this company yet\n- The name might be spelled differently in our system\n\nYou can try a different spelling or the full company name.`;
   }
 
   if (scope === "multi") {
-    return `I looked across all available transcripts${searchedFor ? ` (searched for: "${searchedFor}")` : ''} but didn't find any matching data for this analysis.\n\nThis could mean:\n- There are no transcripts uploaded yet that match your criteria\n- The topic you're asking about hasn't come up in recorded calls\n\nYou can check the Transcripts page to see what call data is available, or try a different question about specific customers or topics that have been discussed.`;
+    return `I looked across all available transcripts${searchedFor ? ` (searched for: "${searchedFor}")` : ''} but didn't find any matching data for this analysis.\n\nThis could mean:\n- There are no transcripts uploaded yet that match your criteria\n- The topic you're asking about hasn't come up in recorded calls\n\nYou can try a different question about specific customers or topics that have been discussed.`;
   }
 
   if (searchedFor) {
-    return `I searched for "${searchedFor}" but didn't find any matching call transcripts in the system.\n\nThis could mean:\n- No transcripts have been uploaded yet for that customer or topic\n- The meeting you're looking for uses a different name or spelling\n\nYou can check the Transcripts page to see what's available, or try asking about a specific customer by name.`;
+    return `I searched for "${searchedFor}" but didn't find any matching call transcripts in the system.\n\nThis could mean:\n- No transcripts have been uploaded yet for that customer or topic\n- The meeting you're looking for uses a different name or spelling\n\nYou can try asking about a specific customer by name.`;
   }
 
   return "Which meeting are you asking about? Please mention the company name or a specific meeting date.";
