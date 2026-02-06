@@ -37,6 +37,7 @@ import { streamOpenAIResponse } from "./streamingHelper";
 import { findRelevantMeetings, searchAcrossMeetings, type ScopeOverride } from "./meetingResolver";
 import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
+import { getMeetingNotFoundMessage } from "../utils/notFoundMessages";
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "../storage";
 
@@ -777,10 +778,11 @@ async function handleMeetingDataIntent(
   const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride, context.conversationContext);
 
   if (meetingSearch.meetings.length === 0) {
-    console.log(`[OpenAssistant] Scope resolution failed: SINGLE_MEETING intent, searched for: "${meetingSearch.searchedFor || 'nothing specific'}", candidates found: 0`);
+    const extractedCompany = context.decisionLayerResult?.extractedCompany || null;
+    console.log(`[OpenAssistant] Scope resolution failed: SINGLE_MEETING intent, searched for: "${meetingSearch.searchedFor || 'nothing specific'}", extractedCompany: "${extractedCompany || 'none'}", candidates found: 0`);
     console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria)`);
     return {
-      answer: `I searched${meetingSearch.searchedFor ? ` for "${meetingSearch.searchedFor}"` : ''} but didn't find any matching call transcripts in the system.\n\nThis could mean:\n- No transcripts have been uploaded yet for that customer or topic\n- The meeting you're looking for uses a different name or spelling\n\nYou can check the Transcripts page to see what's available, or try asking about a specific customer by name.`,
+      answer: getMeetingNotFoundMessage({ extractedCompany, searchedFor: meetingSearch.searchedFor, scope: "single" }),
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.CLARIFY,
@@ -901,10 +903,11 @@ async function handleMultiMeetingIntent(
   const meetingSearch = await findRelevantMeetings(userMessage, classification, scopeOverride, context.conversationContext);
 
   if (meetingSearch.meetings.length === 0) {
-    console.log(`[OpenAssistant] Scope resolution failed: MULTI_MEETING intent, searched for: "${meetingSearch.searchedFor || 'all meetings'}", candidates found: 0`);
+    const extractedCompany = context.decisionLayerResult?.extractedCompany || null;
+    console.log(`[OpenAssistant] Scope resolution failed: MULTI_MEETING intent, searched for: "${meetingSearch.searchedFor || 'all meetings'}", extractedCompany: "${extractedCompany || 'none'}", candidates found: 0`);
     console.log(`[OpenAssistant] Scope resolution decision: CLARIFY (reason: no meetings matched search criteria for cross-meeting analysis)`);
     return {
-      answer: `I looked across all available transcripts${meetingSearch.searchedFor ? ` (searched for: "${meetingSearch.searchedFor}")` : ''} but didn't find any matching data for this analysis.\n\nThis could mean:\n- There are no transcripts uploaded yet that match your criteria\n- The topic you're asking about hasn't come up in recorded calls\n\nYou can check the Transcripts page to see what call data is available, or try a different question about specific customers or topics that have been discussed.`,
+      answer: getMeetingNotFoundMessage({ extractedCompany, searchedFor: meetingSearch.searchedFor, scope: "multi" }),
       intent: "meeting_data",
       intentClassification: classification,
       controlPlaneIntent: Intent.CLARIFY,
