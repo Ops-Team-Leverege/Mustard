@@ -1,0 +1,184 @@
+2026-02-06 09:17:54.06
+8edc1fb5
+User
+[Slack] Received event request
+2026-02-06 09:17:54.06
+8edc1fb5
+User
+[Slack] Processing direct message
+2026-02-06 09:17:54.06
+8edc1fb5
+User
+Slack payload type: event_callback
+2026-02-06 09:17:54.06
+8edc1fb5
+User
+[Slack] Event details: eventId=Ev0ADFD9GW30, clientMsgId=fff0b5f1-6588-4fbb-a8be-23ee1438ce79, messageTs=1770398273.183609, threadTs=1770398273.183609, channel=D0ADVTG9S73
+2026-02-06 09:17:54.06
+8edc1fb5
+User
+Event type: message
+2026-02-06 09:17:54.06
+8edc1fb5
+User
+5:17:54 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-06 09:17:58.59
+8edc1fb5
+User
+Processing: "Summarize all our calls with Mavis" in channel D0ADVTG9S73 (isReply=false)
+2026-02-06 09:17:58.59
+8edc1fb5
+User
+[INFO] [2337fb8e] Slack event received {"correlationId":"2337fb8e","channel":"D0ADVTG9S73","threadTs":"1770398273.183609","userId":"U18F1ETH8","duration":0,"text":"Summarize all our calls with Mavis","isReply":false,"testRun":false}
+2026-02-06 09:17:59.29
+8edc1fb5
+User
+[ThreadResolver] Not a reply - returning empty context
+2026-02-06 09:17:59.99
+8edc1fb5
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Messages: 2
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Thread Context: 2 messages
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+1. User: "Summarize all our calls with Mavis"
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Thread Messages Preview:
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Last 3 messages:
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+2. Bot: ":mag: Got it, <@U18F1ETH8> — looking into that..."
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Bot: ":mag: Got it, <@U18F1ETH8> — looking into that..."
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+User: "Summarize all our calls with Mavis"
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Question: "Summarize all our calls with Mavis"
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Thread: 1770398273.183609
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+[Slack] Received event request
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Slack payload type: event_callback
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-06T17:18:00.056Z ==========
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+Event type: message
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+[Slack] Ignoring bot message (preventing loop)
+2026-02-06 09:18:00.05
+8edc1fb5
+User
+5:18:00 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-06 09:18:00.12
+8edc1fb5
+User
+[IntentClassifier] LLM classification with 1 messages of thread context
+2026-02-06 09:18:00.12
+8edc1fb5
+User
+[IntentClassifier] No keyword match, using LLM classification with semantic context extraction
+2026-02-06 09:18:00.12
+8edc1fb5
+User
+[Intent] Loaded 36 companies from database
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+[AnswerContract] Selected: MEETING_SUMMARY (llm_proposed) - chain: [MEETING_SUMMARY]
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false,"slack_search":false}
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"document_context":false,"slack_search":false}
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+[DecisionLayer] Contract: MEETING_SUMMARY (llm_proposed)
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+- Should Proceed: yes
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+[DecisionLayer] Intent: SINGLE_MEETING (llm)
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+- Key Topics:
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+Final Contract: MEETING_SUMMARY
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+Semantic Context:
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+Scope Info: none
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+- Extracted Company: none
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+- Extracted Companies:
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+Scope: undefined
+2026-02-06 09:18:03.39
+8edc1fb5
+User
+- Is Ambiguous: no

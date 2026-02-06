@@ -138,11 +138,18 @@ PRODUCT_KNOWLEDGE contracts:
 - PRODUCT_EXPLANATION: How PitCrew works, features, capabilities
 - FAQ_ANSWER: Common product questions, pricing, integrations
 
+COMPANY NAME EXTRACTION (CRITICAL):
+Always extract ANY company or entity name the user mentions, even if it is NOT in the known companies list.
+- "Summarize all our calls with Mavis" → extractedCompany: "Mavis" (even if Mavis is unknown)
+- "What did we discuss with AutoZone?" → extractedCompany: "AutoZone" (even if not in list)
+- "Tell me about the Pep Boys meeting" → extractedCompany: "Pep Boys" (even if not in list)
+This is essential so downstream logic can tell the user "I couldn't find X in our records" instead of asking them to repeat information they already provided.
+
 Respond with JSON: {
   "intent": "INTENT_NAME", 
   "confidence": 0.0-1.0, 
   "reason": "brief explanation",
-  "extractedCompany": "single company name or null",
+  "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
   "extractedCompanies": ["array of company names if multiple"],
   "proposedContracts": ["CONTRACT_NAME"],
   "isAmbiguous": true/false,

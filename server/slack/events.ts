@@ -674,9 +674,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
       // STEP 3: Handle SINGLE_MEETING without resolved meeting - ask for clarification
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && !resolvedMeeting) {
-        responseText = "Which meeting are you asking about? Please mention the company name or a specific meeting date.";
-        capabilityName = "clarify_meeting";
-        intentClassification = "single_meeting_clarify";
+        // Check if the user mentioned a company/entity name that wasn't found in our records
+        const mentionedButNotFound = !companyMentioned && decisionLayerResult.extractedCompany;
+        
+        if (mentionedButNotFound) {
+          responseText = `I couldn't find "${decisionLayerResult.extractedCompany}" in our records. Could you double-check the company or contact name? You can also try a different spelling or the full company name.`;
+          capabilityName = "company_not_found";
+          intentClassification = "single_meeting_not_found";
+        } else {
+          responseText = "Which meeting are you asking about? Please mention the company name or a specific meeting date.";
+          capabilityName = "clarify_meeting";
+          intentClassification = "single_meeting_clarify";
+        }
         dataSource = "none";
         isClarificationRequest = true;
         // Preserve company context from message for follow-up clarifications
