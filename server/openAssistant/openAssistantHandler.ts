@@ -852,12 +852,9 @@ async function handleMeetingDataIntent(
     },
   };
 
-  // Use Decision Layer contract if provided, otherwise this is a legacy code path that should not execute
+  // Use Decision Layer contract (Decision Layer is sole authority)
   let primaryContract: AnswerContract;
   let contractChain: AnswerContract[];
-
-  const contract = context.decisionLayerResult?.answerContract;
-  const dlContractChain = context.decisionLayerResult?.contractChain;
 
   if (dlContractChain && dlContractChain.length > 0) {
     primaryContract = dlContractChain[0];
@@ -868,7 +865,6 @@ async function handleMeetingDataIntent(
     contractChain = [contract];
     console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
   } else {
-    // This should never happen - Decision Layer always provides a contract
     throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
   }
 

@@ -43,6 +43,9 @@ Contracts define WHERE to get data (data source), not HOW to process it:
 Example: `NEXT_STEPS` contract is extractive (meeting evidence only), but questions like "what should we mention" require LLM judgment even with available artifacts. The `isSemanticQuestion()` function detects judgment patterns independently of contract type.
 
 **Contract Selection Strategy (LLM-First):**
+The Decision Layer is the **sole authority** for contract selection. The execution layer (OpenAssistant) does not have its own fallback contract selection — it throws an error if no contract is provided.
+
+Within the Decision Layer's `selectAnswerContract()`:
 1. **LLM-proposed contracts (primary)**: Utilizes `proposedInterpretation.contracts` (single source of truth) proposed by the LLM during intent classification.
 2. **Keyword fallback**: Used when the LLM does not propose contracts.
 3. **LLM classification fallback**: Engaged if neither LLM proposal nor keyword matching yields a result.

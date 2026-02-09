@@ -147,7 +147,7 @@ SINGLE_MEETING      // "What did we discuss in the Acme meeting?"
 MULTI_MEETING       // "What have all customers said about pricing?"
 PRODUCT_KNOWLEDGE   // "What features does PitCrew offer?"
 EXTERNAL_RESEARCH   // "Research this company's recent news"
-DOCUMENT_SEARCH     // "Find the proposal we sent"
+SLACK_SEARCH        // "Search Slack for discussions about pricing"
 GENERAL_HELP        // "What can you help me with?"
 CLARIFY             // "I don't understand, can you clarify?"
 REFUSE              // "I can't help with that"
@@ -155,7 +155,7 @@ REFUSE              // "I can't help with that"
 
 **How it's decided**:
 1. **Fast path**: Pattern matching (e.g., "last meeting" → SINGLE_MEETING)
-2. **Smart path**: AI analyzes the question (GPT-4o)
+2. **Smart path**: AI analyzes the question (GPT-4o-mini)
 3. **Context aware**: Looks at previous messages in thread
 
 ### What Are Contracts?
@@ -324,10 +324,10 @@ Open `server/decisionLayer/contextLayers.ts` and find the `computeContextLayers`
 ```typescript
 export function computeContextLayers(intent: Intent): ContextLayersMetadata {
   const layers: ContextLayers = {
+    product_identity: true,
     product_ssot: false,
     single_meeting: false,
     multi_meeting: false,
-    document_repository: false,
     slack_search: false,
   };
 

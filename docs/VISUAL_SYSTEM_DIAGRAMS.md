@@ -130,7 +130,7 @@ graph TD
     H -->|MULTI_MEETING| J[Open Assistant Handler]
     H -->|PRODUCT_KNOWLEDGE| J
     H -->|EXTERNAL_RESEARCH| J
-    H -->|DOCUMENT_SEARCH| J
+    H -->|SLACK_SEARCH| J
     H -->|GENERAL_HELP| J
     H -->|REFUSE| K[Post Refusal Message]
     H -->|CLARIFY| L[Post Clarification Request]
@@ -295,7 +295,7 @@ graph TD
     G -->|MULTI_MEETING| I[Multi-Meeting Context]
     G -->|PRODUCT_KNOWLEDGE| J[Product SSOT Context]
     G -->|EXTERNAL_RESEARCH| K[External Research Context]
-    G -->|DOCUMENT_SEARCH| L[Document Repository Context]
+    G -->|SLACK_SEARCH| L[Slack Search Context]
     G -->|GENERAL_HELP| M[General Assistance Context]
     G -->|REFUSE| N[Out-of-Scope Response]
     G -->|CLARIFY| O[Clarification Required]
@@ -304,7 +304,7 @@ graph TD
     I --> Q[Scope Clarification Check]
     J --> P
     K --> P
-    L --> P
+    L --> P[Answer Contract Selection]
     M --> P
     N --> R[Generate Refusal Message]
     O --> S[Generate Clarification Message]

@@ -139,7 +139,7 @@ enum Intent {
   MULTI_MEETING,       // "What have customers said about pricing?"
   PRODUCT_KNOWLEDGE,   // "What features does PitCrew offer?"
   EXTERNAL_RESEARCH,   // "Research this company's recent news"
-  DOCUMENT_SEARCH,     // "Find the proposal we sent to Costco"
+  SLACK_SEARCH,        // "Search Slack for discussions about pricing"
   GENERAL_HELP,        // "How can you help me?"
   REFUSE,              // Out of scope requests
   CLARIFY              // Ambiguous queries
@@ -161,10 +161,10 @@ enum Intent {
 **Context Layers**:
 ```typescript
 type ContextLayers = {
+  product_identity: boolean;    // PitCrew context (always true)
   product_ssot: boolean;        // Access product knowledge
   single_meeting: boolean;      // Access specific meeting
   multi_meeting: boolean;       // Search across meetings
-  document_repository: boolean; // Access documents
   slack_search: boolean;        // Search Slack messages
 }
 ```

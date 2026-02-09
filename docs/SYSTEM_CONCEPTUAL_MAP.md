@@ -84,17 +84,18 @@ Data Storage & Retrieval
 - **SINGLE_MEETING**: Questions about specific meetings
 - **MULTI_MEETING**: Cross-meeting analysis and patterns  
 - **PRODUCT_KNOWLEDGE**: Product features and capabilities
-- **DOCUMENT_SEARCH**: Find specific documents
+- **SLACK_SEARCH**: Search Slack channels for relevant discussions
 - **EXTERNAL_RESEARCH**: Web research on companies/prospects
 - **GENERAL_HELP**: General assistance and guidance
 - **REFUSE**: Out-of-scope requests
 - **CLARIFY**: Ambiguous queries requiring clarification
 
 **Context Layers** (`server/decisionLayer/contextLayers.ts`):
+- Product Identity (always enabled)
 - Product SSOT (Single Source of Truth)
 - Single Meeting context
 - Multi-Meeting search scope
-- Document repository access
+- Slack Search
 
 **Answer Contracts** (`server/decisionLayer/answerContracts.ts`):
 
@@ -118,7 +119,7 @@ Data Storage & Retrieval
 - EXTERNAL_RESEARCH, SALES_DOCS_PREP
 
 **General & Terminal Contracts**:
-- DOCUMENT_ANSWER, GENERAL_RESPONSE, NOT_FOUND
+- GENERAL_RESPONSE, NOT_FOUND
 - REFUSE, CLARIFY
 
 ### 3. **AI Processing Pipeline**
