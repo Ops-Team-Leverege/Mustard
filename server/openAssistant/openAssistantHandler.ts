@@ -19,7 +19,7 @@ import { performExternalResearch, formatCitationsForDisplay, type ResearchResult
 import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "./singleMeetingOrchestrator";
 import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
-import { AnswerContract, type SSOTMode, selectMultiMeetingContractChain, selectSingleMeetingContractChain } from "../decisionLayer/answerContracts";
+import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
 import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
@@ -721,8 +721,7 @@ async function handleMeetingDataIntent(
       companyName: context.resolvedMeeting.companyName,
     };
 
-    // USE DECISION LAYER CONTRACT when provided (Decision Layer is sole authority)
-    // Only fall back to internal selection when DL contract not provided (legacy paths)
+    // USE DECISION LAYER CONTRACT (Decision Layer is sole authority)
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
 
@@ -737,11 +736,8 @@ async function handleMeetingDataIntent(
       contractChain = [contract];
       console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
     } else {
-      // Legacy path (no DL context) - use internal selection
-      const chain = selectSingleMeetingContractChain(userMessage, scope);
-      primaryContract = chain.primaryContract;
-      contractChain = chain.contracts;
-      console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
+      // This should never happen - Decision Layer always provides a contract
+      throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
     }
 
     // Generate progress message for multi-step contract chains
@@ -811,10 +807,8 @@ async function handleMeetingDataIntent(
       contractChain = [contract];
       console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
     } else {
-      const chain = selectSingleMeetingContractChain(userMessage, scope);
-      primaryContract = chain.primaryContract;
-      contractChain = chain.contracts;
-      console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
+      // This should never happen - Decision Layer always provides a contract
+      throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
     }
 
     // Generate progress message for multi-step contract chains
@@ -858,25 +852,47 @@ async function handleMeetingDataIntent(
     },
   };
 
-  const chain = selectMultiMeetingContractChain(userMessage, scope);
-  console.log(`[OpenAssistant] Selected MULTI_MEETING chain: [${chain.contracts.join(" → ")}] (coverage: ${scope.coverage.matchingMeetingsCount} meetings)${meetingSearch.topic ? ` topic: "${meetingSearch.topic}"` : ''}`);
+  // Use Decision Layer contract if provided, otherwise this is a legacy code path that should not execute
+  let primaryContract: AnswerContract;
+  let contractChain: AnswerContract[];
+
+  const contract = context.decisionLayerResult?.answerContract;
+  const dlContractChain = context.decisionLayerResult?.contractChain;
+
+  if (dlContractChain && dlContractChain.length > 0) {
+    primaryContract = dlContractChain[0];
+    contractChain = dlContractChain;
+    console.log(`[OpenAssistant] Using DL-provided chain: [${dlContractChain.join(" → ")}]`);
+  } else if (contract) {
+    primaryContract = contract;
+    contractChain = [contract];
+    console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
+  } else {
+    // This should never happen - Decision Layer always provides a contract
+    throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
+  }
 
   // Build progress message: multi-meeting context + contract chain steps (if multiple)
   const meetingProgress = `I found ${meetingSearch.meetings.length} meeting${meetingSearch.meetings.length !== 1 ? 's' : ''} across ${uniqueCompanies.size} ${uniqueCompanies.size !== 1 ? 'companies' : 'company'}${meetingSearch.searchedFor ? ` related to "${meetingSearch.searchedFor}"` : ''}.`;
-  const chainProgress = generateContractChainProgress(chain.contracts);
+  const chainProgress = generateContractChainProgress(contractChain);
   const progressMessage = chainProgress
     ? `${meetingProgress} ${chainProgress}`
     : `${meetingProgress} I'll analyze them and compile the insights.`;
 
-  const chainResult = await executeContractChain(chain, userMessage, meetingSearch.meetings, meetingSearch.topic);
+  const chainResult = await executeContractChain(
+    { contracts: contractChain, primaryContract, selectionMethod: "keyword" },
+    userMessage,
+    meetingSearch.meetings,
+    meetingSearch.topic
+  );
 
   return {
     answer: chainResult.finalOutput,
     intent: "meeting_data",
     intentClassification: classification,
     decisionLayerIntent: Intent.MULTI_MEETING,
-    answerContract: chain.primaryContract,
-    answerContractChain: chain.contracts,
+    answerContract: primaryContract,
+    answerContractChain: contractChain,
     ssotMode: "none" as SSOTMode,
     dataSource: "meeting_artifacts",
     artifactMatches: undefined,
@@ -944,11 +960,8 @@ async function handleMultiMeetingIntent(
     contractChain = [contract];
     console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
   } else {
-    // Legacy path (no DL context) - use internal selection
-    const chain = selectMultiMeetingContractChain(userMessage, scope);
-    primaryContract = chain.primaryContract;
-    contractChain = chain.contracts;
-    console.log(`[OpenAssistant] Legacy path - selected chain: [${chain.contracts.join(" → ")}]`);
+    // This should never happen - Decision Layer always provides a contract
+    throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
   }
 
   // Build progress message: multi-meeting context + contract chain steps (if multiple)

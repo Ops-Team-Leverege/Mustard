@@ -992,36 +992,6 @@ function validateChain(contracts: AnswerContract[], intent: Intent): ChainValida
   return { valid: true, shouldClarify: false };
 }
 
-/**
- * Select a contract chain for SINGLE_MEETING queries.
- * Dynamically builds chain based on intent, scope, and inferred tasks.
- */
-export function selectSingleMeetingContractChain(
-  userMessage: string,
-  scope?: Partial<ChainBuildScope>
-): ContractChain {
-  const fullScope: ChainBuildScope = {
-    type: "single_meeting",
-    ...scope,
-  };
-  return buildContractChain(userMessage, Intent.SINGLE_MEETING, fullScope);
-}
-
-/**
- * Select a contract chain for MULTI_MEETING queries.
- * Dynamically builds chain based on intent, scope, and inferred tasks.
- */
-export function selectMultiMeetingContractChain(
-  userMessage: string,
-  scope?: Partial<ChainBuildScope>
-): ContractChain {
-  const fullScope: ChainBuildScope = {
-    type: "multi_meeting",
-    ...scope,
-  };
-  return buildContractChain(userMessage, Intent.MULTI_MEETING, fullScope);
-}
-
 export function getContractConstraints(contract: AnswerContract): AnswerContractConstraints {
   return CONTRACT_CONSTRAINTS[contract];
 }
