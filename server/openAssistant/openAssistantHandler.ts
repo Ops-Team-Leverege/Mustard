@@ -188,7 +188,6 @@ function generateContractChainProgress(
     [AnswerContract.SALES_DOCS_PREP]: "preparing materials",
     [AnswerContract.SLACK_MESSAGE_SEARCH]: "searching Slack",
     [AnswerContract.SLACK_CHANNEL_INFO]: "checking channels",
-    [AnswerContract.DOCUMENT_ANSWER]: "searching docs",
     [AnswerContract.GENERAL_RESPONSE]: "preparing response",
     [AnswerContract.NOT_FOUND]: "searching",
     [AnswerContract.REFUSE]: "reviewing",

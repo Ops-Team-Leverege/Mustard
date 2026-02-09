@@ -78,8 +78,8 @@ const defaultIntentInferenceRules: IntentInferenceRule[] = [
   },
   {
     markers: ["document", "contract", "spec", "pdf", "file", "attachment", "deck", "presentation"],
-    intentKey: "DOCUMENT_SEARCH",
-    description: "Document search task"
+    intentKey: "GENERAL_HELP",
+    description: "Document/general assistance task"
   },
   {
     markers: ["draft", "email", "write", "compose", "help you", "assist"],

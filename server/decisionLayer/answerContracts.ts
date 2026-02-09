@@ -148,7 +148,6 @@ export enum AnswerContract {
   // ============================================================================
   // General contracts
   // ============================================================================
-  DOCUMENT_ANSWER = "DOCUMENT_ANSWER",
   GENERAL_RESPONSE = "GENERAL_RESPONSE",
   NOT_FOUND = "NOT_FOUND",
 
@@ -394,15 +393,6 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     emptyResultBehavior: "clarify",
   },
 
-  [AnswerContract.DOCUMENT_ANSWER]: {
-    ssotMode: "none",
-    requiresEvidence: true,
-    allowsSummary: false,
-    requiresCitation: true,
-    responseFormat: "text",
-    emptyResultBehavior: "clarify",
-    minEvidenceThreshold: 1,
-  },
   [AnswerContract.GENERAL_RESPONSE]: {
     ssotMode: "none",
     requiresEvidence: false,
@@ -661,7 +651,8 @@ const CONTRACT_PHASES: Record<AnswerContract, TaskPhase> = {
   [AnswerContract.DRAFT_EMAIL]: "drafting",
   [AnswerContract.FEATURE_VERIFICATION]: "drafting",
   [AnswerContract.FAQ_ANSWER]: "drafting",
-  [AnswerContract.DOCUMENT_ANSWER]: "drafting",
+  [AnswerContract.SLACK_MESSAGE_SEARCH]: "extraction",
+  [AnswerContract.SLACK_CHANNEL_INFO]: "extraction",
   [AnswerContract.GENERAL_RESPONSE]: "drafting",
   [AnswerContract.NOT_FOUND]: "drafting",
   [AnswerContract.REFUSE]: "drafting",
@@ -1123,14 +1114,6 @@ function selectContractByKeyword(
       contract: AnswerContract.EXTERNAL_RESEARCH,
       contractSelectionMethod: "default",
       constraints: CONTRACT_CONSTRAINTS[AnswerContract.EXTERNAL_RESEARCH],
-    };
-  }
-
-  if (intent === Intent.DOCUMENT_SEARCH) {
-    return {
-      contract: AnswerContract.DOCUMENT_ANSWER,
-      contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.DOCUMENT_ANSWER],
     };
   }
 

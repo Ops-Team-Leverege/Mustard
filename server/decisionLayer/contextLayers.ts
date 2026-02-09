@@ -19,7 +19,6 @@ export type ContextLayers = {
   product_ssot: boolean;
   single_meeting: boolean;
   multi_meeting: boolean;
-  document_context: boolean;
   slack_search: boolean;
 };
 
@@ -69,7 +68,6 @@ export function computeContextLayers(intent: Intent): ContextLayerMetadata {
     product_ssot: false,
     single_meeting: false,
     multi_meeting: false,
-    document_context: false,
     slack_search: false,
   };
 
@@ -89,11 +87,6 @@ export function computeContextLayers(intent: Intent): ContextLayerMetadata {
     case Intent.PRODUCT_KNOWLEDGE:
       layers.product_ssot = true;
       reason += "product_ssot enabled for PRODUCT_KNOWLEDGE intent.";
-      break;
-
-    case Intent.DOCUMENT_SEARCH:
-      layers.document_context = true;
-      reason += "document_context enabled for DOCUMENT_SEARCH intent.";
       break;
 
     case Intent.EXTERNAL_RESEARCH:
@@ -131,17 +124,12 @@ export function canAccessMultiMeeting(layers: ContextLayers): boolean {
   return layers.multi_meeting;
 }
 
-export function canAccessDocuments(layers: ContextLayers): boolean {
-  return layers.document_context;
-}
-
 export function getEnabledLayerNames(layers: ContextLayers): string[] {
   const enabled: string[] = [];
   if (layers.product_identity) enabled.push("product_identity");
   if (layers.product_ssot) enabled.push("product_ssot");
   if (layers.single_meeting) enabled.push("single_meeting");
   if (layers.multi_meeting) enabled.push("multi_meeting");
-  if (layers.document_context) enabled.push("document_context");
   if (layers.slack_search) enabled.push("slack_search");
   return enabled;
 }

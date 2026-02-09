@@ -482,7 +482,7 @@ export const interactionLogs = pgTable("interaction_logs", {
   
   capabilityName: varchar("capability_name").notNull(), // Legacy field - derives from answer_contract or intent
   
-  intent: varchar("intent"), // SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, GENERAL_HELP
+  intent: varchar("intent"), // SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, GENERAL_HELP
   intentDetectionMethod: varchar("intent_detection_method"), // keyword, llm, default
   
   answerContract: varchar("answer_contract"), // MEETING_SUMMARY, NEXT_STEPS, etc.

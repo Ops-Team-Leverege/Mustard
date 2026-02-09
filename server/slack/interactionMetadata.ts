@@ -228,7 +228,7 @@ export function buildInteractionMetadata(
     product_ssot: false,
     single_meeting: false,
     multi_meeting: false,
-    document_context: false,
+    slack_search: false,
   };
   
   // Build context layers with follow-up tracking

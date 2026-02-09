@@ -741,7 +741,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         });
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
       } else {
-        // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, DOCUMENT_SEARCH, etc.) → Open Assistant
+        // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, etc.) → Open Assistant
         console.log(`[Slack] Open Assistant mode - intent=${decisionLayerResult.intent}, routing to appropriate handler`);
 
         // Contracts that might generate documents - don't use streaming for these
@@ -1045,7 +1045,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
             product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
             single_meeting: actualIntent === "SINGLE_MEETING",
             multi_meeting: actualIntent === "MULTI_MEETING",
-            document_context: actualIntent === "DOCUMENT_SEARCH",
           }) as any;
 
           // Store proposedInterpretation for CLARIFY follow-ups

@@ -167,7 +167,6 @@ export async function handleProposedInterpretationConfirmation(
     "MULTI_MEETING": "MULTI_MEETING", 
     "PRODUCT_KNOWLEDGE": "PRODUCT_KNOWLEDGE",
     "EXTERNAL_RESEARCH": "EXTERNAL_RESEARCH",
-    "DOCUMENT_SEARCH": "DOCUMENT_SEARCH",
     "GENERAL_HELP": "GENERAL_HELP",
   };
   
@@ -184,7 +183,7 @@ export async function handleProposedInterpretationConfirmation(
       product_ssot: false,
       single_meeting: mappedIntent === "SINGLE_MEETING",
       multi_meeting: mappedIntent === "MULTI_MEETING",
-      document_context: mappedIntent === "DOCUMENT_SEARCH",
+      slack_search: false,
     },
   };
   
