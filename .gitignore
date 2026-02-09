@@ -13,5 +13,6 @@ docs/*
 !docs/VISUAL_SYSTEM_DIAGRAMS.md
 !docs/DEVELOPER_GUIDE.md
 !docs/MAINTENANCE_GUIDE.md
+!docs/ERROR_HANDLING.md
 context-flow-test-scenarios.md
 .kiro/
