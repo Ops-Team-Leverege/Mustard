@@ -32,6 +32,7 @@ import type { SlackStreamingContext } from "../openAssistant/types";
 import { runDecisionLayer, type DecisionLayerResult } from "../decisionLayer";
 import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
+import { PROGRESS_MESSAGE_CONSTANTS } from "../config/constants";
 
 // Extracted handler modules
 import { handleAmbiguity } from "./handlers/ambiguityHandler";
@@ -240,7 +241,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // 7.1 Start pipeline timing and progress message coordination
     const pipelineStartTime = Date.now();
     let progressMessageCount = 0;
-    const MAX_PROGRESS_MESSAGES = 4;
+    const MAX_PROGRESS_MESSAGES = PROGRESS_MESSAGE_CONSTANTS.MAX_PROGRESS_MESSAGES;
     let progressInterval: ReturnType<typeof setInterval> | null = null;
 
     // Response coordination: prevents progress messages after response is sent

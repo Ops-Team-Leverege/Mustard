@@ -56,20 +56,20 @@ const defaultPatternRules: PatternRule[] = [
 ];
 
 const defaultIntentInferenceRules: IntentInferenceRule[] = [
-  { 
-    markers: ["feature description", "description:", "**net safety", "research report", "researching"], 
-    intentKey: "EXTERNAL_RESEARCH", 
-    description: "External research / feature description" 
+  {
+    markers: ["feature description", "description:", "**net safety", "research report", "researching"],
+    intentKey: "EXTERNAL_RESEARCH",
+    description: "External research / feature description"
   },
-  { 
-    markers: ["meeting", "they said", "action items", "next steps", "discussed", "mentioned"], 
-    intentKey: "SINGLE_MEETING", 
-    description: "Meeting-related task" 
+  {
+    markers: ["meeting", "they said", "action items", "next steps", "discussed", "mentioned"],
+    intentKey: "SINGLE_MEETING",
+    description: "Meeting-related task"
   },
-  { 
-    markers: ["pitcrew pricing", "pitcrew feature", "integration", "product knowledge", "pitcrew can", "our approach"], 
-    intentKey: "PRODUCT_KNOWLEDGE", 
-    description: "Product knowledge task" 
+  {
+    markers: ["pitcrew pricing", "pitcrew feature", "integration", "product knowledge", "pitcrew can", "our approach"],
+    intentKey: "PRODUCT_KNOWLEDGE",
+    description: "Product knowledge task"
   },
   {
     markers: ["across", "meetings", "companies", "calls", "themes", "pattern analysis", "summary of recent", "customer themes"],
@@ -90,35 +90,6 @@ const defaultIntentInferenceRules: IntentInferenceRule[] = [
 
 let patternRules = [...defaultPatternRules];
 let intentInferenceRules = [...defaultIntentInferenceRules];
-
-/**
- * Register additional follow-up patterns at runtime.
- */
-export function registerFollowUpPatterns(rules: PatternRule[]): void {
-  patternRules.push(...rules);
-}
-
-/**
- * Register additional intent inference rules at runtime.
- */
-export function registerIntentInferenceRules(rules: IntentInferenceRule[]): void {
-  intentInferenceRules.push(...rules);
-}
-
-/**
- * Reset to default rules (useful for testing).
- */
-export function resetToDefaults(): void {
-  patternRules = [...defaultPatternRules];
-  intentInferenceRules = [...defaultIntentInferenceRules];
-}
-
-/**
- * Get currently registered pattern count (for testing/monitoring).
- */
-export function getPatternCount(): number {
-  return patternRules.length;
-}
 
 /**
  * Detect if a message is a follow-up refinement.

@@ -38,9 +38,6 @@ const openai = new OpenAI({
 export type MeetingResolutionResult = SharedMeetingResolutionResult;
 export type MeetingResolverThreadContext = MeetingThreadContext;
 
-// Meeting-like words that users use to refer to meetings (also available from shared module)
-const MEETING_WORDS = "meeting|call|transcript|sync|session|conversation|chat|touchpoint|demo|visit";
-
 /**
  * Extract company name from message if mentioned.
  * Returns null if no company explicitly mentioned.

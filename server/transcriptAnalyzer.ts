@@ -2,10 +2,11 @@ import OpenAI from "openai";
 import type { Category } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "./config/models";
 import { TRANSCRIPT_ANALYZER_SYSTEM_PROMPT, buildTranscriptAnalysisPrompt } from "./config/prompts";
+import { TIMEOUT_CONSTANTS, MEETING_CONSTANTS } from "./config/constants";
 
-const openai = new OpenAI({ 
+const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 180000, // 3 minutes timeout for very long transcripts
+  timeout: TIMEOUT_CONSTANTS.TRANSCRIPT_ANALYSIS_TIMEOUT_MS,
   maxRetries: 0, // No retries to avoid further delays
 });
 
@@ -45,7 +46,7 @@ export interface AnalysisResult {
 }
 
 // Split transcript into chunks at natural boundaries
-function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = 15000): string[] {
+function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = MEETING_CONSTANTS.MAX_CHUNK_SIZE): string[] {
   // If transcript is small enough, return as single chunk
   if (transcript.length <= maxChunkSize) {
     return [transcript];
@@ -62,18 +63,18 @@ function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = 15
 
     // Try to split at a paragraph boundary (double newline)
     let splitIndex = remainingText.lastIndexOf('\n\n', maxChunkSize);
-    
+
     // If no paragraph boundary, try single newline
     if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
       splitIndex = remainingText.lastIndexOf('\n', maxChunkSize);
     }
-    
+
     // If still no good split point, try a period with space
     if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
       splitIndex = remainingText.lastIndexOf('. ', maxChunkSize);
       if (splitIndex !== -1) splitIndex += 1; // Include the period
     }
-    
+
     // If still nothing, just split at maxChunkSize
     if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
       splitIndex = maxChunkSize;
@@ -96,12 +97,12 @@ async function analyzeTranscriptChunk(
   totalChunks: number = 1,
   contentType: "transcript" | "notes" = "transcript"
 ): Promise<AnalysisResult> {
-  const categoryList = categories.map(c => 
+  const categoryList = categories.map(c =>
     `- ${c.name} (ID: ${c.id})${c.description ? `: ${c.description}` : ''}`
   ).join('\n');
-  
+
   const chunkInfo = totalChunks > 1 ? ` (Part ${chunkNumber} of ${totalChunks})` : '';
-  
+
   const prompt = buildTranscriptAnalysisPrompt({
     transcript,
     companyName,
@@ -135,7 +136,7 @@ async function analyzeTranscriptChunk(
     }
 
     const result: AnalysisResult = JSON.parse(content);
-    
+
     // Validate structure
     if (!result.insights || !Array.isArray(result.insights)) {
       result.insights = [];
@@ -159,9 +160,9 @@ export async function analyzeTranscript(
 ): Promise<AnalysisResult> {
   const chunks = splitTranscriptIntoChunks(input.transcript);
   const contentType = input.contentType || "transcript";
-  
+
   console.log(`Analyzing ${contentType} in ${chunks.length} chunk(s)...`);
-  
+
   // If single chunk, process normally
   if (chunks.length === 1) {
     return await analyzeTranscriptChunk(
@@ -175,15 +176,15 @@ export async function analyzeTranscript(
       contentType
     );
   }
-  
+
   // Process multiple chunks and merge results
   const allInsights: ProductInsightResult[] = [];
   const allQAPairs: QAPairResult[] = [];
   let detectedPOSSystem: POSSystemResult | null = null;
-  
+
   for (let i = 0; i < chunks.length; i++) {
     console.log(`Processing chunk ${i + 1} of ${chunks.length}...`);
-    
+
     const chunkResult = await analyzeTranscriptChunk(
       chunks[i],
       input.companyName,
@@ -194,18 +195,18 @@ export async function analyzeTranscript(
       chunks.length,
       contentType
     );
-    
+
     allInsights.push(...chunkResult.insights);
     allQAPairs.push(...chunkResult.qaPairs);
-    
+
     // Take the first non-null POS system detected
     if (chunkResult.posSystem && !detectedPOSSystem) {
       detectedPOSSystem = chunkResult.posSystem;
     }
   }
-  
+
   console.log(`Merged results: ${allInsights.length} insights, ${allQAPairs.length} Q&A pairs${detectedPOSSystem ? ', POS system detected: ' + detectedPOSSystem.name : ''}`);
-  
+
   return {
     insights: allInsights,
     qaPairs: allQAPairs,

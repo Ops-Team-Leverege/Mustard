@@ -6,11 +6,12 @@
  */
 
 import type { SingleMeetingContext } from "./types";
+import { MEETING_CONSTANTS } from "../config/constants";
 
 /**
  * Meeting-like words that users use to refer to meetings.
  */
-const MEETING_WORDS = "meeting|call|transcript|sync|session|conversation|chat|touchpoint|demo|visit";
+const MEETING_WORDS = MEETING_CONSTANTS.MEETING_WORDS;
 
 /**
  * Temporal language patterns for meeting resolution.
@@ -86,11 +87,11 @@ export function extractTopic(message: string): string | undefined {
   if (aboutMatch) {
     return aboutMatch[1].trim();
   }
-  
+
   const regardingMatch = message.match(/\bregarding\s+([^?.,!]+)/i);
   if (regardingMatch) {
     return regardingMatch[1].trim();
   }
-  
+
   return undefined;
 }

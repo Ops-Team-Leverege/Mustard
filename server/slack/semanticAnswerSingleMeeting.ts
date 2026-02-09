@@ -20,6 +20,7 @@ import OpenAI from "openai";
 import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { MEETING_CONSTANTS } from "../config/constants";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -38,7 +39,7 @@ export type SemanticAnswerResult = {
  * Answer shape determines HOW the LLM should format its response.
  * This is computed in code BEFORE prompting - prompts only decide how to say it.
  */
-export type AnswerShape = 
+export type AnswerShape =
   | "single_value"   // which / where / who / when → one short sentence
   | "yes_no"         // is there / did we / do we have → yes/no first, then offer detail
   | "list"           // next steps, attendees → structured list
@@ -53,7 +54,7 @@ export type AnswerShape =
  */
 export function detectAnswerShape(question: string): AnswerShape {
   const q = question.toLowerCase().trim();
-  
+
   // YES/NO: Questions starting with auxiliary verbs asking for confirmation
   // "Was X discussed?" "Did they mention Y?" "Is there a meeting?"
   const yesNoPatterns = [
@@ -66,7 +67,7 @@ export function detectAnswerShape(question: string): AnswerShape {
   if (yesNoPatterns.some(p => p.test(q))) {
     return "yes_no";
   }
-  
+
   // SUMMARY: Only explicit summary requests - must check BEFORE other patterns
   const summaryPatterns = [
     /\bsummar(?:y|ize|ise)\b/,
@@ -81,7 +82,7 @@ export function detectAnswerShape(question: string): AnswerShape {
   if (summaryPatterns.some(p => p.test(q))) {
     return "summary";
   }
-  
+
   // LIST: Questions asking for multiple items
   const listPatterns = [
     /\bnext steps\b/,
@@ -105,7 +106,7 @@ export function detectAnswerShape(question: string): AnswerShape {
   if (listPatterns.some(p => p.test(q))) {
     return "list";
   }
-  
+
   // SINGLE VALUE: Specific factual questions seeking one answer
   // "What did X say about Y?" "What pricing did they quote?" "Who said X?"
   const singleValuePatterns = [
@@ -127,7 +128,7 @@ export function detectAnswerShape(question: string): AnswerShape {
   if (singleValuePatterns.some(p => p.test(q))) {
     return "single_value";
   }
-  
+
   // Default to single_value - we want direct answers, not summaries
   // Summary should NEVER be the default fallback
   return "single_value";
@@ -168,7 +169,7 @@ function buildSystemPrompt(shape: AnswerShape): string {
 Use Slack markdown formatting (*bold* for emphasis, _italics_ for quotes).`;
 
   let shapeInstructions: string;
-  
+
   switch (shape) {
     case "single_value":
       shapeInstructions = `
@@ -186,7 +187,7 @@ RESPOND WITH:
 Example good response: "It was Store 2."
 Example bad response: "Based on the meeting discussion about store locations, it appears that..."`;
       break;
-      
+
     case "yes_no":
       shapeInstructions = `
 ANSWER FORMAT: Yes/No
@@ -205,7 +206,7 @@ Would you like a brief summary?"
 Example bad response:
 "The meeting with Walmart covered several topics including..."`;
       break;
-      
+
     case "list":
       shapeInstructions = `
 ANSWER FORMAT: List (Next Steps / Action Items)
@@ -232,7 +233,7 @@ Example good response:
   _"We're going to set up the text messaging so that way the manager gets alerts today."_
   — Corey Chang`;
       break;
-      
+
     case "summary":
       shapeInstructions = `
 ANSWER FORMAT: Summary
@@ -269,9 +270,9 @@ function formatMeetingDate(date: Date | null | undefined): string {
 function buildContextWindow(ctx: MeetingContext): string {
   const sections: string[] = [];
   const dateSuffix = ctx.meetingDate ? ` (${formatMeetingDate(ctx.meetingDate)})` : "";
-  
+
   sections.push(`# Meeting with ${ctx.companyName}${dateSuffix}`);
-  
+
   if (ctx.leverageTeam.length > 0 || ctx.customerNames.length > 0) {
     sections.push(`\n## Attendees`);
     if (ctx.leverageTeam.length > 0) {
@@ -281,7 +282,7 @@ function buildContextWindow(ctx: MeetingContext): string {
       sections.push(`Customer: ${ctx.customerNames.join(", ")}`);
     }
   }
-  
+
   if (ctx.customerQuestions.length > 0) {
     sections.push(`\n## Customer Questions (Verbatim)`);
     ctx.customerQuestions.forEach((q, i) => {
@@ -300,7 +301,7 @@ function buildContextWindow(ctx: MeetingContext): string {
       }
     });
   }
-  
+
   if (ctx.actionItems.length > 0) {
     sections.push(`\n## Action Items / Next Steps`);
     ctx.actionItems.forEach((item, i) => {
@@ -311,18 +312,18 @@ function buildContextWindow(ctx: MeetingContext): string {
       sections.push(`   Evidence: "${item.evidenceQuote}"`);
     });
   }
-  
+
   if (ctx.transcriptChunks.length > 0) {
     sections.push(`\n## Relevant Transcript Excerpts`);
     ctx.transcriptChunks.slice(0, 5).forEach((chunk, i) => {
       const speaker = chunk.speakerName || "Unknown";
-      const content = chunk.content.length > 500 
-        ? chunk.content.substring(0, 500) + "..." 
+      const content = chunk.content.length > 500
+        ? chunk.content.substring(0, 500) + "..."
         : chunk.content;
       sections.push(`\n[${i + 1}] ${speaker}:\n"${content}"`);
     });
   }
-  
+
   return sections.join("\n");
 }
 
@@ -330,12 +331,12 @@ function parseConfidence(response: string): { answer: string; confidence: "high"
   const confidenceMatch = response.match(/\[CONFIDENCE:\s*(high|medium|low)\]/i);
   let confidence: "high" | "medium" | "low" = "medium";
   let answer = response;
-  
+
   if (confidenceMatch) {
     confidence = confidenceMatch[1].toLowerCase() as "high" | "medium" | "low";
     answer = response.replace(/\[CONFIDENCE:\s*(high|medium|low)\]/i, "").trim();
   }
-  
+
   return { answer, confidence };
 }
 
@@ -347,23 +348,28 @@ export async function semanticAnswerSingleMeeting(
 ): Promise<SemanticAnswerResult> {
   console.log(`[SemanticAnswer] Starting for meeting ${meetingId}`);
   const startTime = Date.now();
-  
+
   const [transcript, customerQuestions, actionItems, chunks] = await Promise.all([
     storage.getTranscriptById(meetingId),
     storage.getCustomerQuestionsByTranscript(meetingId),
     storage.getMeetingActionItemsByTranscript(meetingId),
-    storage.getChunksForTranscript(meetingId, 10),
+    storage.getChunksForTranscript(meetingId, MEETING_CONSTANTS.MAX_CHUNKS_FOR_SEARCH),
   ]);
-  
+
   console.log(`[SemanticAnswer] Data fetch: ${Date.now() - startTime}ms`);
-  
-  const leverageTeam = transcript?.leverageTeam 
+
+  // Validate critical data
+  if (!transcript) {
+    throw new Error(`Transcript not found for meeting ${meetingId}`);
+  }
+
+  const leverageTeam = transcript?.leverageTeam
     ? transcript.leverageTeam.split(",").map(s => s.trim()).filter(Boolean)
     : [];
   const customerNames = transcript?.customerNames
     ? transcript.customerNames.split(",").map(s => s.trim()).filter(Boolean)
     : [];
-  
+
   const context: MeetingContext = {
     meetingId,
     companyName,
@@ -374,23 +380,23 @@ export async function semanticAnswerSingleMeeting(
     actionItems,
     transcriptChunks: chunks,
   };
-  
+
   const contextWindow = buildContextWindow(context);
   console.log(`[SemanticAnswer] Context window: ${contextWindow.length} chars`);
-  
+
   // STEP 1: Detect answer shape BEFORE prompting
   const answerShape = detectAnswerShape(userQuestion);
   console.log(`[SemanticAnswer] Detected answer shape: ${answerShape}`);
-  
+
   const evidenceSources: string[] = [];
   if (customerQuestions.length > 0) evidenceSources.push("customer_questions");
   if (actionItems.length > 0) evidenceSources.push("action_items");
   if (chunks.length > 0) evidenceSources.push("transcript_chunks");
   if (leverageTeam.length > 0 || customerNames.length > 0) evidenceSources.push("attendees");
-  
+
   // STEP 2: Build shape-specific prompt
   const systemPrompt = buildSystemPrompt(answerShape);
-  
+
   try {
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.SEMANTIC_ANSWER_SYNTHESIS,
@@ -406,14 +412,14 @@ export async function semanticAnswerSingleMeeting(
         },
       ],
     });
-    
+
     console.log(`[SemanticAnswer] LLM call: ${Date.now() - startTime}ms`);
     console.log(`[SemanticAnswer] Response choices: ${response.choices?.length || 0}`);
     console.log(`[SemanticAnswer] Response finish_reason: ${response.choices?.[0]?.finish_reason}`);
     console.log(`[SemanticAnswer] Response message role: ${response.choices?.[0]?.message?.role}`);
     console.log(`[SemanticAnswer] Response content length: ${response.choices?.[0]?.message?.content?.length || 0}`);
     console.log(`[SemanticAnswer] Response refusal: ${response.choices?.[0]?.message?.refusal || 'none'}`);
-    
+
     // Check for refusal (GPT-5 safety feature)
     const refusal = response.choices?.[0]?.message?.refusal;
     if (refusal) {
@@ -424,7 +430,7 @@ export async function semanticAnswerSingleMeeting(
         evidenceSources,
       };
     }
-    
+
     const rawAnswer = response.choices[0]?.message?.content;
     if (!rawAnswer) {
       console.log(`[SemanticAnswer] Empty content - full response: ${JSON.stringify(response.choices?.[0])}`);
@@ -435,11 +441,11 @@ export async function semanticAnswerSingleMeeting(
         answerShape,
       };
     }
-    
+
     const { answer, confidence } = parseConfidence(rawAnswer);
-    
+
     console.log(`[SemanticAnswer] Complete | shape=${answerShape} | confidence=${confidence} | sources=${evidenceSources.join(",")}`);
-    
+
     return {
       answer,
       confidence,

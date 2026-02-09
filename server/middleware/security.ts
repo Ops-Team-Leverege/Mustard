@@ -7,13 +7,14 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../utils/errorHandler';
+import { AUTH_CONSTANTS, RATE_LIMIT_CONSTANTS } from '../config/constants';
 
 /**
  * Enhanced cookie configuration with SameSite protection.
  * This prevents cross-site request forgery by restricting cookie sending.
  */
 export function getSecureCookieConfig() {
-    const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+    const sessionTtl = AUTH_CONSTANTS.SESSION_TTL_MS;
 
     return {
         httpOnly: true,
@@ -118,8 +119,8 @@ const authAttempts = new Map<string, { count: number; resetTime: number }>();
 export function authRateLimit(req: Request, res: Response, next: NextFunction) {
     const clientId = req.ip || 'unknown';
     const now = Date.now();
-    const windowMs = 15 * 60 * 1000; // 15 minutes
-    const maxAttempts = 10; // 10 attempts per 15 minutes
+    const windowMs = RATE_LIMIT_CONSTANTS.AUTH_WINDOW_MS;
+    const maxAttempts = RATE_LIMIT_CONSTANTS.AUTH_MAX_ATTEMPTS;
 
     const clientData = authAttempts.get(clientId);
 
