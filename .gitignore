@@ -6,6 +6,12 @@ vite.config.ts.*
 *.tar.gz
 
 # Documentation (work in progress, not for production)
-docs/
+# Exclude all docs except key production files
+docs/*
+!docs/README.md
+!docs/SYSTEM_CONCEPTUAL_MAP.md
+!docs/VISUAL_SYSTEM_DIAGRAMS.md
+!docs/DEVELOPER_GUIDE.md
+!docs/MAINTENANCE_GUIDE.md
 context-flow-test-scenarios.md
 .kiro/
