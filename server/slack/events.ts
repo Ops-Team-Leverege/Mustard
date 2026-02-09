@@ -242,7 +242,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     let progressMessageCount = 0;
     const MAX_PROGRESS_MESSAGES = 4;
     let progressInterval: ReturnType<typeof setInterval> | null = null;
-    
+
     // Response coordination: prevents progress messages after response is sent
     // This is critical to avoid race conditions where async progress posts after final answer
     let responseSent = false;
@@ -776,7 +776,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           // For doc-generating contracts, send personalized progress (with coordination)
           const intentType = decisionLayerResult.intent === 'MULTI_MEETING' ? 'multi_meeting' :
             decisionLayerResult.intent === 'PRODUCT_KNOWLEDGE' ? 'product_knowledge' :
-            decisionLayerResult.intent === 'EXTERNAL_RESEARCH' ? 'external_research' : 'single_meeting';
+              decisionLayerResult.intent === 'EXTERNAL_RESEARCH' ? 'external_research' : 'single_meeting';
           generatePersonalizedProgressMessage(text, intentType as ProgressIntentType).then(async (personalizedProgress) => {
             // Double-check coordination flag to prevent race condition
             if (!canPostProgress()) {
@@ -799,7 +799,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             } catch (err) {
               console.error(`[Slack] Failed to send doc progress:`, err);
             }
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         logger.startStage('open_assistant');
@@ -861,7 +861,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           delegated: openAssistantResultData.delegatedToSingleMeeting,
           duration_ms: oaDuration,
         });
-        console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, controlPlane=${openAssistantResultData.controlPlaneIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
+        console.log(`[Slack] Open Assistant response: intent=${openAssistantResultData.intent}, decisionLayer=${openAssistantResultData.decisionLayerIntent || 'none'}, contract=${openAssistantResultData.answerContract || 'none'}, delegated=${openAssistantResultData.delegatedToSingleMeeting}`);
       }
 
       // Clear progress timer now that we have a response ready
@@ -1034,7 +1034,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
           // Use Decision Layer result directly (full pipeline with intent, contract, layers)
           // OpenAssistant may override contract if it does additional processing
-          const actualIntent = decisionLayerResult?.intent || openAssistantResultData?.controlPlaneIntent || "GENERAL_HELP";
+          const actualIntent = decisionLayerResult?.intent || openAssistantResultData?.decisionLayerIntent || "GENERAL_HELP";
           const actualContract = decisionLayerResult?.answerContract || openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
           const actualContractChain = openAssistantResultData?.answerContractChain;
           const actualSsotMode = openAssistantResultData?.ssotMode || "none";
@@ -1057,7 +1057,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
               entryPoint: "slack",
-              controlPlane: {
+              decisionLayer: {
                 intent: actualIntent as any,
                 intentDetectionMethod: (decisionLayerResult?.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "keyword",
                 contextLayers,

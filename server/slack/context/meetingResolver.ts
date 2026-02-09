@@ -23,7 +23,7 @@
 import { storage } from "../../storage";
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../../config/models";
-import { 
+import {
   type MeetingResolutionResult as SharedMeetingResolutionResult,
   type MeetingThreadContext,
   TEMPORAL_PATTERNS,
@@ -54,13 +54,13 @@ export async function extractCompanyFromMessage(message: string): Promise<{ comp
     `SELECT id, name FROM companies ORDER BY name`,
     []
   );
-  
+
   if (!companies || companies.length === 0) {
     return null;
   }
-  
+
   const messageLower = message.toLowerCase();
-  
+
   // First pass: exact substring match
   for (const company of companies) {
     const companyName = (company.name as string).toLowerCase();
@@ -68,18 +68,18 @@ export async function extractCompanyFromMessage(message: string): Promise<{ comp
       return { companyId: company.id as string, companyName: company.name as string };
     }
   }
-  
+
   // Second pass: partial match (name before parentheses)
   // Handles cases like "Ivy Lane (Valvoline)" matching "Ivy Lane" in message
   for (const company of companies) {
     const fullName = company.name as string;
     const baseName = fullName.replace(/\s*\([^)]*\)\s*/g, '').trim().toLowerCase();
-    
+
     if (baseName.length >= 3 && messageLower.includes(baseName)) {
       return { companyId: company.id as string, companyName: fullName };
     }
   }
-  
+
   // Third pass: match content inside parentheses (e.g., "ACE" from "Atlantic Coast Enterprise (ACE - Jiffy Lube)")
   for (const company of companies) {
     const fullName = company.name as string;
@@ -100,7 +100,7 @@ export async function extractCompanyFromMessage(message: string): Promise<{ comp
       }
     }
   }
-  
+
   return null;
 }
 
@@ -110,7 +110,7 @@ export async function extractCompanyFromMessage(message: string): Promise<{ comp
 function parseDateReference(dateStr: string): Date | null {
   const now = new Date();
   const currentYear = now.getFullYear();
-  
+
   // Try common date formats
   const formats = [
     // "Aug 7" or "August 7"
@@ -122,7 +122,7 @@ function parseDateReference(dateStr: string): Date | null {
     // "8/7/2025" or "8-7-25"
     /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/,
   ];
-  
+
   const monthNames: Record<string, number> = {
     jan: 0, january: 0,
     feb: 1, february: 1,
@@ -137,19 +137,19 @@ function parseDateReference(dateStr: string): Date | null {
     nov: 10, november: 10,
     dec: 11, december: 11,
   };
-  
+
   // Try "Aug 7" format
   const match1 = dateStr.match(/^(\w+)\s+(\d{1,2})(?:,?\s*(\d{4}))?$/i);
   if (match1) {
     const monthStr = match1[1].toLowerCase();
     const day = parseInt(match1[2], 10);
     const year = match1[3] ? parseInt(match1[3], 10) : currentYear;
-    
+
     if (monthNames[monthStr] !== undefined) {
       return new Date(year, monthNames[monthStr], day);
     }
   }
-  
+
   // Try "8/7" or "8/7/2025" format (M/D/Y)
   const match2 = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
   if (match2) {
@@ -157,10 +157,10 @@ function parseDateReference(dateStr: string): Date | null {
     const day = parseInt(match2[2], 10);
     let year = match2[3] ? parseInt(match2[3], 10) : currentYear;
     if (year < 100) year += 2000;
-    
+
     return new Date(year, month, day);
   }
-  
+
   return null;
 }
 
@@ -172,7 +172,7 @@ function getLastWeekRange(): { start: Date; end: Date } {
   const start = new Date(now);
   start.setDate(start.getDate() - 7);
   start.setHours(0, 0, 0, 0);
-  
+
   return { start, end: now };
 }
 
@@ -184,7 +184,7 @@ function getLastMonthRange(): { start: Date; end: Date } {
   const start = new Date(now);
   start.setDate(start.getDate() - 30);
   start.setHours(0, 0, 0, 0);
-  
+
   return { start, end: now };
 }
 
@@ -205,7 +205,7 @@ async function getMeetingsInDateRange(
      ORDER BY COALESCE(meeting_date, created_at) DESC`,
     [companyId, startDate, endDate]
   );
-  
+
   return (results || []).map(r => ({
     id: r.id as string,
     meetingDate: new Date(r.meeting_date as string),
@@ -222,10 +222,10 @@ async function getMeetingsOnDate(
 ): Promise<Array<{ id: string; meetingDate: Date; name: string | null }>> {
   const startOfDay = new Date(targetDate);
   startOfDay.setHours(0, 0, 0, 0);
-  
+
   const endOfDay = new Date(targetDate);
   endOfDay.setHours(23, 59, 59, 999);
-  
+
   return getMeetingsInDateRange(companyId, startOfDay, endOfDay);
 }
 
@@ -243,11 +243,11 @@ async function getMostRecentMeeting(
      LIMIT 1`,
     [companyId]
   );
-  
+
   if (!results || results.length === 0) {
     return null;
   }
-  
+
   const r = results[0];
   return {
     id: r.id as string,
@@ -266,7 +266,7 @@ async function getMeetingsOnMostRecentDate(
   if (!mostRecent) {
     return [];
   }
-  
+
   // Check for other meetings on the same date
   return getMeetingsOnDate(companyId, mostRecent.meetingDate);
 }
@@ -299,25 +299,25 @@ export async function resolveMeetingFromSlackMessage(
   options?: { llmMeetingRefDetected?: boolean; extractedCompanyContext?: { companyId: string; companyName: string } }
 ): Promise<MeetingResolutionResult> {
   console.log(`[MeetingResolver] Resolving meeting from message: "${message.substring(0, 50)}..." (llmDetected=${options?.llmMeetingRefDetected})`);
-  
+
   // 1. Thread context always wins
   if (threadContext?.meetingId && threadContext?.companyId) {
     console.log(`[MeetingResolver] Using thread context: meetingId=${threadContext.meetingId}`);
-    
+
     // Look up company name and meeting date
     const companyRows = await storage.rawQuery(
       `SELECT name FROM companies WHERE id = $1`,
       [threadContext.companyId]
     );
     const companyName = companyRows?.[0]?.name as string || "Unknown Company";
-    
+
     // Get meeting date from transcript
     const transcriptRows = await storage.rawQuery(
       `SELECT COALESCE(meeting_date, created_at) as meeting_date FROM transcripts WHERE id = $1`,
       [threadContext.meetingId]
     );
     const meetingDate = transcriptRows?.[0]?.meeting_date ? new Date(transcriptRows[0].meeting_date as string) : null;
-    
+
     return {
       resolved: true,
       meetingId: threadContext.meetingId,
@@ -326,21 +326,21 @@ export async function resolveMeetingFromSlackMessage(
       meetingDate,
     };
   }
-  
+
   // 2. Check for explicit meeting ID or transcript link
   // Pattern: meeting ID like "abc123" or transcript URL
   const meetingIdMatch = message.match(/\bmeeting[:\s]+([a-f0-9-]{36})\b/i);
   if (meetingIdMatch) {
     const meetingId = meetingIdMatch[1];
     const transcript = await storage.getTranscriptById(meetingId);
-    
+
     if (transcript && transcript.companyId) {
       const companyRows = await storage.rawQuery(
         `SELECT name FROM companies WHERE id = $1`,
         [transcript.companyId]
       );
       const companyName = companyRows?.[0]?.name as string || "Unknown Company";
-      
+
       return {
         resolved: true,
         meetingId,
@@ -349,19 +349,19 @@ export async function resolveMeetingFromSlackMessage(
       };
     }
   }
-  
+
   // 3. Temporal language resolution (requires company context)
   // Use LLM-extracted company if provided, otherwise fall back to regex extraction from current message
   const companyContext = options?.extractedCompanyContext || await extractCompanyFromMessage(message);
-  
+
   if (options?.extractedCompanyContext) {
     console.log(`[MeetingResolver] Using LLM-extracted company context: ${options.extractedCompanyContext.companyName}`);
   }
-  
+
   if (!companyContext) {
     // Check if any temporal language is present
     const hasTemporalRef = Object.values(TEMPORAL_PATTERNS).some(p => p.test(message));
-    
+
     if (hasTemporalRef) {
       return {
         resolved: false,
@@ -369,7 +369,7 @@ export async function resolveMeetingFromSlackMessage(
         message: "Which company are you asking about? Please mention the company name so I can find the right meeting.",
       };
     }
-    
+
     // No temporal language and no context - can't resolve
     return {
       resolved: false,
@@ -377,21 +377,21 @@ export async function resolveMeetingFromSlackMessage(
       reason: "no_meeting_context",
     };
   }
-  
+
   const { companyId, companyName } = companyContext;
-  
+
   // 3a. "Last / Latest / Most Recent meeting" - check all last/latest patterns
-  const hasLastMeetingPattern = 
+  const hasLastMeetingPattern =
     TEMPORAL_PATTERNS.lastMeetingDirect.test(message) ||
     TEMPORAL_PATTERNS.lastMeetingWithCompany.test(message) ||
     TEMPORAL_PATTERNS.lastMeetingWithSuffix.test(message) ||
     TEMPORAL_PATTERNS.inTheLast.test(message);
-  
+
   if (hasLastMeetingPattern) {
     console.log(`[MeetingResolver] Detected "last meeting" pattern for ${companyName}`);
-    
+
     const meetings = await getMeetingsOnMostRecentDate(companyId);
-    
+
     if (meetings.length === 0) {
       return {
         resolved: false,
@@ -399,7 +399,7 @@ export async function resolveMeetingFromSlackMessage(
         message: `I don't see any meetings with ${companyName} on record.`,
       };
     }
-    
+
     if (meetings.length === 1) {
       return {
         resolved: true,
@@ -409,7 +409,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingDate: meetings[0].meetingDate,
       };
     }
-    
+
     // Multiple meetings on same date
     return {
       resolved: false,
@@ -422,13 +422,13 @@ export async function resolveMeetingFromSlackMessage(
       })),
     };
   }
-  
+
   // 3b. "Meeting on <date>"
   const dateMatch = message.match(TEMPORAL_PATTERNS.dateReference);
   if (dateMatch) {
     const dateStr = dateMatch[1];
     const targetDate = parseDateReference(dateStr);
-    
+
     if (!targetDate) {
       return {
         resolved: false,
@@ -436,11 +436,11 @@ export async function resolveMeetingFromSlackMessage(
         message: `I couldn't parse the date "${dateStr}". Could you rephrase it? (e.g., "meeting on Aug 7" or "meeting on 8/7")`,
       };
     }
-    
+
     console.log(`[MeetingResolver] Detected date reference: ${formatDate(targetDate)} for ${companyName}`);
-    
+
     const meetings = await getMeetingsOnDate(companyId, targetDate);
-    
+
     if (meetings.length === 0) {
       return {
         resolved: false,
@@ -448,7 +448,7 @@ export async function resolveMeetingFromSlackMessage(
         message: `I don't see any ${companyName} meetings on ${formatDate(targetDate)}.`,
       };
     }
-    
+
     if (meetings.length === 1) {
       return {
         resolved: true,
@@ -458,7 +458,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingDate: meetings[0].meetingDate,
       };
     }
-    
+
     // Multiple meetings on that date
     return {
       resolved: false,
@@ -471,14 +471,14 @@ export async function resolveMeetingFromSlackMessage(
       })),
     };
   }
-  
+
   // 3c. "Meeting last week"
   if (TEMPORAL_PATTERNS.lastWeek.test(message)) {
     console.log(`[MeetingResolver] Detected "last week" pattern for ${companyName}`);
-    
+
     const { start, end } = getLastWeekRange();
     const meetings = await getMeetingsInDateRange(companyId, start, end);
-    
+
     if (meetings.length === 0) {
       return {
         resolved: false,
@@ -486,7 +486,7 @@ export async function resolveMeetingFromSlackMessage(
         message: `I don't see any ${companyName} meetings from last week.`,
       };
     }
-    
+
     if (meetings.length === 1) {
       return {
         resolved: true,
@@ -496,7 +496,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingDate: meetings[0].meetingDate,
       };
     }
-    
+
     // Multiple meetings last week
     return {
       resolved: false,
@@ -509,14 +509,14 @@ export async function resolveMeetingFromSlackMessage(
       })),
     };
   }
-  
+
   // 3d. "Meeting last month"
   if (TEMPORAL_PATTERNS.lastMonth.test(message)) {
     console.log(`[MeetingResolver] Detected "last month" pattern for ${companyName}`);
-    
+
     const { start, end } = getLastMonthRange();
     const meetings = await getMeetingsInDateRange(companyId, start, end);
-    
+
     if (meetings.length === 0) {
       return {
         resolved: false,
@@ -524,7 +524,7 @@ export async function resolveMeetingFromSlackMessage(
         message: `I don't see any ${companyName} meetings from last month.`,
       };
     }
-    
+
     if (meetings.length === 1) {
       return {
         resolved: true,
@@ -534,7 +534,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingDate: meetings[0].meetingDate,
       };
     }
-    
+
     // Multiple meetings last month
     return {
       resolved: false,
@@ -547,16 +547,16 @@ export async function resolveMeetingFromSlackMessage(
       })),
     };
   }
-  
+
   // 4. LLM-detected meeting reference: default to "last meeting" behavior
   // When the LLM classifier says this is a meeting reference (e.g., "sat down with ACE",
   // "face-to-face with Ivy Lane") but no explicit temporal pattern matched,
   // treat it as asking about the most recent meeting.
   if (options?.llmMeetingRefDetected) {
     console.log(`[MeetingResolver] LLM detected meeting reference - defaulting to most recent meeting for ${companyName}`);
-    
+
     const meetings = await getMeetingsOnMostRecentDate(companyId);
-    
+
     if (meetings.length === 0) {
       return {
         resolved: false,
@@ -564,7 +564,7 @@ export async function resolveMeetingFromSlackMessage(
         message: `I don't see any meetings with ${companyName} on record.`,
       };
     }
-    
+
     if (meetings.length === 1) {
       return {
         resolved: true,
@@ -574,7 +574,7 @@ export async function resolveMeetingFromSlackMessage(
         meetingDate: meetings[0].meetingDate,
       };
     }
-    
+
     // Multiple meetings on same date
     return {
       resolved: false,
@@ -587,14 +587,14 @@ export async function resolveMeetingFromSlackMessage(
       })),
     };
   }
-  
+
   // 5. Company mentioned but no explicit temporal language - auto-select most recent meeting
   // This is the smart fallback: when user says "What action items from the ACE call?"
   // they almost always mean the most recent one
   console.log(`[MeetingResolver] Company mentioned without temporal language - auto-selecting most recent meeting for ${companyName}`);
-  
+
   const meetings = await getMeetingsOnMostRecentDate(companyId);
-  
+
   if (meetings.length === 0) {
     return {
       resolved: false,
@@ -602,7 +602,7 @@ export async function resolveMeetingFromSlackMessage(
       message: `I don't see any meetings with ${companyName} on record.`,
     };
   }
-  
+
   if (meetings.length === 1) {
     return {
       resolved: true,
@@ -613,7 +613,7 @@ export async function resolveMeetingFromSlackMessage(
       wasAutoSelected: true, // Flag to indicate this was auto-selected
     };
   }
-  
+
   // Multiple meetings on same date - need clarification
   return {
     resolved: false,
@@ -642,7 +642,7 @@ export async function resolveMeetingFromSlackMessage(
  */
 async function llmMeetingReferenceClassifier(question: string): Promise<boolean> {
   const startTime = Date.now();
-  
+
   try {
     const response = await openai.chat.completions.create({
       model: MODEL_ASSIGNMENTS.MEETING_RESOLUTION,
@@ -667,12 +667,12 @@ YES or NO`
       temperature: 0,
       max_tokens: 5,
     });
-    
+
     const answer = response.choices[0]?.message?.content?.trim().toUpperCase();
     const result = answer === "YES";
-    
+
     console.log(`[MeetingResolver] LLM classifier: "${question.substring(0, 40)}..." -> ${answer} (${Date.now() - startTime}ms)`);
-    
+
     return result;
   } catch (error) {
     console.error(`[MeetingResolver] LLM classifier error:`, error);
@@ -695,25 +695,17 @@ YES or NO`
  */
 export async function hasTemporalMeetingReference(message: string): Promise<{ hasMeetingRef: boolean; regexResult: boolean; llmCalled: boolean; llmResult: boolean | null; llmLatencyMs: number | null }> {
   const regexResult = Object.values(TEMPORAL_PATTERNS).some(p => p.test(message));
-  
+
   if (regexResult) {
     console.log(`[MeetingResolver] Meeting reference detected via REGEX: "${message.substring(0, 40)}..."`);
     return { hasMeetingRef: true, regexResult: true, llmCalled: false, llmResult: null, llmLatencyMs: null };
   }
-  
+
   const startTime = Date.now();
   const llmResult = await llmMeetingReferenceClassifier(message);
   const llmLatencyMs = Date.now() - startTime;
-  
+
   console.log(`[MeetingResolver] Meeting reference detection: regex=${regexResult}, llm=${llmResult}, final=${llmResult}, latency=${llmLatencyMs}ms`);
-  
+
   return { hasMeetingRef: llmResult, regexResult: false, llmCalled: true, llmResult, llmLatencyMs };
 }
-
-/**
- * Synchronous regex-only check for meeting reference.
- * Uses the shared implementation from server/meeting/utils.ts
- * 
- * @deprecated Use hasTemporalMeetingReference from server/meeting instead
- */
-export const hasTemporalMeetingReferenceSync = hasTemporalMeetingReferenceShared;

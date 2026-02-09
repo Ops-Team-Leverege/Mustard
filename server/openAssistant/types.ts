@@ -19,9 +19,9 @@ import type { ArtifactSearchResult } from "./semanticArtifactSearch";
  * is the SOLE authority for intent classification. This type represents the evidence source
  * that the handler uses for routing, derived directly from the Decision Layer intent.
  */
-export type EvidenceSource = 
+export type EvidenceSource =
   | "meeting_data"
-  | "external_research" 
+  | "external_research"
   | "general_assistance"
   | "hybrid"
   | "slack_search";
@@ -79,7 +79,7 @@ export type OpenAssistantResult = {
   answer: string;
   intent: EvidenceSource;
   intentClassification: IntentClassification;
-  controlPlaneIntent?: Intent;
+  decisionLayerIntent?: Intent;
   answerContract?: AnswerContract;
   answerContractChain?: AnswerContract[];
   ssotMode?: SSOTMode;

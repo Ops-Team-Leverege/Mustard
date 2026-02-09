@@ -106,18 +106,6 @@ export type MeetingActionItem = {
 };
 
 /**
- * DEPRECATED: Legacy type for backward compatibility.
- * @deprecated Use MeetingActionItem instead.
- */
-export type MeetingCommitment = {
-  task: string;
-  owner: string;
-  deadline?: string;
-  evidence: string;
-  confidence: number;
-};
-
-/**
  * Two-tier result from action-state extraction.
  * Primary (≥0.85) are high-confidence explicit actions.
  * Secondary (0.7-0.85) are implied but real actions worth tracking.
@@ -126,15 +114,6 @@ export type MeetingCommitment = {
 export type ActionExtractionResult = {
   primary: MeetingActionItem[];
   secondary: MeetingActionItem[];
-};
-
-/**
- * DEPRECATED: Legacy type for backward compatibility.
- * @deprecated Use ActionExtractionResult instead.
- */
-export type CommitmentExtractionResult = {
-  confirmed: MeetingCommitment[];
-  followUps: MeetingCommitment[];
 };
 
 /**
@@ -186,16 +165,16 @@ function formatTranscript(chunks: TranscriptChunk[]): string {
   const formatted = chunks
     .map(c => {
       // Include speaker name if available for proper attribution
-      const speaker = c.speakerName && c.speakerName !== "Unknown" 
-        ? c.speakerName 
+      const speaker = c.speakerName && c.speakerName !== "Unknown"
+        ? c.speakerName
         : (c.speakerRole === "customer" ? "Customer" : c.speakerRole === "leverege" ? "Leverege" : "Unknown");
       return `[${c.chunkIndex}] ${speaker}: ${c.text}`;
     })
     .join("\n");
-  
+
   // Regression check: ensure speaker names are preserved
   assertSpeakerNamesPreserved(chunks, formatted);
-  
+
   return formatted;
 }
 
@@ -343,7 +322,7 @@ export async function answerMeetingQuestion(
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
   const parsed = JSON.parse(jsonStr) as { answer: string; evidence?: string | null; wasFound: boolean };
-  
+
   return {
     answer: parsed.answer,
     evidence: parsed.evidence ?? undefined,
@@ -381,35 +360,35 @@ function normalizeOwnerName(rawOwner: string, canonicalNames: string[]): string 
   if (!rawOwner || rawOwner.trim() === "" || rawOwner === "Unassigned") {
     return rawOwner || "Unassigned";
   }
-  
+
   const trimmed = rawOwner.trim();
   const lower = trimmed.toLowerCase();
-  
+
   // Multi-owner format: "Person A and Person B" or "Person A, Person B"
   // Check this FIRST to recursively normalize each part
   if (trimmed.includes(" and ") || (trimmed.includes(",") && !trimmed.startsWith(","))) {
     const parts = trimmed.split(/,\s*|\s+and\s+/i)
       .map(p => p.trim())
       .filter(p => p.length > 0); // Filter empty segments
-    
+
     if (parts.length > 1) {
       const normalized = parts.map(p => normalizeOwnerName(p, canonicalNames));
       const filtered = normalized.filter(n => n && n !== "Unassigned" && n.length > 0);
       return filtered.length > 0 ? filtered.join(", ") : "Unassigned";
     }
   }
-  
+
   // Exact match (case-insensitive)
   const exactMatch = canonicalNames.find(n => n.toLowerCase() === lower);
   if (exactMatch) return exactMatch;
-  
+
   // First name match (only if unique)
   const firstNameMatches = canonicalNames.filter(n => {
     const firstName = n.split(" ")[0].toLowerCase();
     return firstName === lower || lower === firstName;
   });
   if (firstNameMatches.length === 1) return firstNameMatches[0];
-  
+
   // No match - return as-is (cleaned)
   return trimmed;
 }
@@ -473,7 +452,7 @@ export async function extractMeetingActionStates(
 
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  
+
   let parsed: MeetingActionItem[];
   try {
     parsed = JSON.parse(jsonStr) as MeetingActionItem[];
@@ -495,7 +474,7 @@ export async function extractMeetingActionStates(
   // ─────────────────────────────────────────────────────────────────
   // GREEN ROOM FILTER: Remove in-call/immediate actions
   // ─────────────────────────────────────────────────────────────────
-  
+
   // Patterns indicating present-tense/in-meeting actions (not next steps)
   const inCallPatterns = [
     /\bintroduce\s+(you|ryan|them|everyone)\b/i,
@@ -518,7 +497,7 @@ export async function extractMeetingActionStates(
     /\bwe('ll| will) discuss\b/i,
     /\bwe('ll| will) cover\b/i,
   ];
-  
+
   // Patterns indicating legitimate future actions (boost these)
   const futurePatterns = [
     /\bafter\s+the\s+call\b/i,
@@ -534,19 +513,19 @@ export async function extractMeetingActionStates(
   const greenRoomFiltered = normalized.filter(item => {
     const evidence = item.evidence.toLowerCase();
     const action = item.action.toLowerCase();
-    
+
     // Check if it's clearly an in-call action
     const isInCallAction = inCallPatterns.some(p => p.test(evidence) || p.test(action));
-    
+
     // Check if it has future-oriented markers (protect from filtering)
     const hasFutureMarkers = futurePatterns.some(p => p.test(evidence) || p.test(action));
-    
+
     // Filter out in-call actions UNLESS they have explicit future markers
     if (isInCallAction && !hasFutureMarkers) {
       console.log(`[GreenRoom] Filtered: "${item.action}" (in-call pattern detected)`);
       return false;
     }
-    
+
     return true;
   });
 
@@ -560,29 +539,4 @@ export async function extractMeetingActionStates(
   const secondary = greenRoomFiltered.filter((a) => a.confidence >= 0.70 && a.confidence < 0.85);
 
   return { primary, secondary };
-}
-
-/**
- * @deprecated Use extractMeetingActionStates instead.
- * Legacy wrapper for backward compatibility.
- */
-export async function extractMeetingCommitments(
-  chunks: TranscriptChunk[],
-  attendees?: { leverageTeam?: string; customerNames?: string },
-): Promise<CommitmentExtractionResult> {
-  const result = await extractMeetingActionStates(chunks, attendees);
-  
-  // Map new format to legacy format
-  const mapToLegacy = (item: MeetingActionItem): MeetingCommitment => ({
-    task: item.action,
-    owner: item.owner,
-    deadline: item.deadline === "Not specified" ? undefined : item.deadline,
-    evidence: item.evidence,
-    confidence: item.confidence,
-  });
-  
-  return {
-    confirmed: result.primary.map(mapToLegacy),
-    followUps: result.secondary.map(mapToLegacy),
-  };
 }

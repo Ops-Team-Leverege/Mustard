@@ -33,7 +33,7 @@ let capabilitiesCache: CapabilitiesConfig | null = null;
 
 function getCapabilitiesConfig(): CapabilitiesConfig {
   if (capabilitiesCache) return capabilitiesCache;
-  
+
   const configPath = path.join(process.cwd(), 'config', 'capabilities.json');
   try {
     const configContent = fs.readFileSync(configPath, 'utf-8');
@@ -123,20 +123,20 @@ export function isCapabilityQuestion(message: string): boolean {
 export function getCapabilitiesPrompt(): string {
   clearCapabilitiesCache();
   const config = getCapabilitiesConfig();
-  
+
   const dataSourceLines = Object.values(config.dataSources)
     .map(ds => `- ${ds.name} - ${ds.description}`)
     .join('\n');
-  
+
   const capabilityLines = Object.values(config.capabilities)
     .map(cap => `- ${cap.label}: ${cap.description}`)
     .join('\n');
-  
+
   const exampleLines = Object.values(config.capabilities)
     .flatMap(cap => cap.examples.slice(0, 1))
     .map(ex => `- "${ex}"`)
     .join('\n');
-  
+
   return `The user is asking what you can help with or what you're connected to. Give a SHORT, friendly response (3-4 sentences max).
 
 ${config.intro}
@@ -153,9 +153,6 @@ ${exampleLines}
 If they're asking about data sources specifically, mention those. If asking about capabilities generally, mention what you can do.
 Keep it conversational and brief. ${config.closing}`;
 }
-
-/** @deprecated Use getCapabilitiesPrompt() instead */
-export const CAPABILITIES_PROMPT = getCapabilitiesPrompt();
 
 /**
  * Base sales assistant persona used across multiple handlers.
@@ -196,16 +193,16 @@ export function buildSystemPrompt(
   options: { includeAmbientContext?: boolean; includeUncertaintyGuidelines?: boolean } = {}
 ): string {
   const parts: string[] = [];
-  
+
   if (options.includeAmbientContext) {
     parts.push(AMBIENT_PRODUCT_CONTEXT);
   }
-  
+
   parts.push(basePrompt);
-  
+
   if (options.includeUncertaintyGuidelines) {
     parts.push(UNCERTAINTY_GUIDELINES);
   }
-  
+
   return parts.join("\n\n");
 }

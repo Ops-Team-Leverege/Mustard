@@ -23,55 +23,55 @@ import type { AnswerContract, SSOTMode } from "../decisionLayer/answerContracts"
 
 export type EntryPoint = "slack" | "api" | "test";
 
-export type LegacyIntent = 
-  | "next_steps" 
-  | "summary" 
-  | "attendees" 
-  | "binary" 
-  | "prep" 
-  | "content" 
+export type LegacyIntent =
+  | "next_steps"
+  | "summary"
+  | "attendees"
+  | "binary"
+  | "prep"
+  | "content"
   | "unknown";
 
-export type AnswerShape = 
-  | "single_value" 
-  | "yes_no" 
-  | "list" 
-  | "summary" 
+export type AnswerShape =
+  | "single_value"
+  | "yes_no"
+  | "list"
+  | "summary"
   | "none";
 
 export type DataSource = "meeting_artifacts" | "semantic" | "product_ssot" | "not_found" | "external";
 
-export type MeetingArtifactType = 
-  | "action_items" 
-  | "attendees" 
-  | "customer_questions" 
+export type MeetingArtifactType =
+  | "action_items"
+  | "attendees"
+  | "customer_questions"
   | null;
 
-export type LlmPurpose = 
+export type LlmPurpose =
   | "intent_classification"
   | "contract_selection"
-  | "semantic_answer" 
-  | "summary" 
+  | "semantic_answer"
+  | "summary"
   | "routing"
   | "external_research"
   | "general_assistance"
   | null;
 
-export type ResolutionSource = 
-  | "thread" 
-  | "extracted" 
-  | "explicit" 
-  | "last_meeting" 
+export type ResolutionSource =
+  | "thread"
+  | "extracted"
+  | "explicit"
+  | "last_meeting"
   | "none";
 
-export type ClarificationType = 
-  | "next_steps_or_summary" 
+export type ClarificationType =
+  | "next_steps_or_summary"
   | "takeaways_or_next_steps"
   | null;
 
-export type ClarificationResolution = 
-  | "next_steps" 
-  | "summary" 
+export type ClarificationResolution =
+  | "next_steps"
+  | "summary"
   | null;
 
 export type ContractChainEntry = {
@@ -82,38 +82,38 @@ export type ContractChainEntry = {
 
 export interface InteractionMetadata {
   entry_point: EntryPoint;
-  
+
   intent: Intent | LegacyIntent;
   intent_detection_method: "keyword" | "pattern" | "entity" | "llm" | "default";
-  
+
   answer_contract: AnswerContract | string;
   contract_selection_method: "keyword" | "llm" | "default";
-  
+
   contract_chain?: ContractChainEntry[];
-  
+
   context_layers: ContextLayers;
-  
+
   answer_shape: AnswerShape;
-  
+
   ambiguity?: {
     detected: boolean;
     clarification_asked: boolean;
     type: ClarificationType;
   };
-  
+
   clarification_state?: {
     awaiting: boolean;
     resolved_with: ClarificationResolution;
   };
-  
+
   data_source: DataSource;
   artifact_type: MeetingArtifactType;
-  
+
   llm_usage: {
     total_calls: number;
     purposes: LlmPurpose[];
   };
-  
+
   resolution: {
     company_id?: string;
     company_name?: string;
@@ -121,13 +121,13 @@ export interface InteractionMetadata {
     company_source: ResolutionSource;
     meeting_source: ResolutionSource;
   };
-  
+
   evidence_sources?: Array<{
     type: string;
     id?: string;
     snippet?: string;
   }>;
-  
+
   meeting_detection?: {
     regex_result: boolean;
     llm_called: boolean;
@@ -145,10 +145,10 @@ export interface InteractionMetadata {
   isBinaryQuestion?: boolean;
   semanticAnswerUsed?: boolean;
   semanticConfidence?: string;
-  
+
   awaitingClarification?: ClarificationType;
   pendingOffer?: string;
-  
+
   test_run?: boolean;
 }
 
@@ -178,8 +178,6 @@ export function buildInteractionMetadata(
   execution: {
     entryPoint: EntryPoint;
     decisionLayer?: DecisionLayerMetadata;
-    /** @deprecated Use decisionLayer instead */
-    controlPlane?: ControlPlaneMetadata;
     legacyIntent?: LegacyIntent;
     answerShape: AnswerShape;
     dataSource: DataSource;
@@ -222,7 +220,7 @@ export function buildInteractionMetadata(
   }
 ): InteractionMetadata {
   const llmPurposes = execution.llmPurposes || [];
-  
+
   const defaultContextLayers: ContextLayers = {
     product_identity: true,
     product_ssot: false,
@@ -230,47 +228,47 @@ export function buildInteractionMetadata(
     multi_meeting: false,
     slack_search: false,
   };
-  
+
   // Build context layers with follow-up tracking
   const contextLayers = {
-    ...(execution.controlPlane?.contextLayers || defaultContextLayers),
+    ...(execution.decisionLayer?.contextLayers || defaultContextLayers),
     ...(execution.lastResponseType && { lastResponseType: execution.lastResponseType }),
   };
-  
+
   return {
     entry_point: execution.entryPoint,
-    
-    intent: execution.controlPlane?.intent || execution.legacyIntent || "unknown",
-    intent_detection_method: execution.controlPlane?.intentDetectionMethod || "default",
-    
-    answer_contract: execution.controlPlane?.answerContract || "GENERAL_RESPONSE",
-    contract_selection_method: execution.controlPlane?.contractSelectionMethod || "default",
-    
-    contract_chain: execution.controlPlane?.contractChain,
-    
+
+    intent: execution.decisionLayer?.intent || execution.legacyIntent || "unknown",
+    intent_detection_method: execution.decisionLayer?.intentDetectionMethod || "default",
+
+    answer_contract: execution.decisionLayer?.answerContract || "GENERAL_RESPONSE",
+    contract_selection_method: execution.decisionLayer?.contractSelectionMethod || "default",
+
+    contract_chain: execution.decisionLayer?.contractChain,
+
     context_layers: contextLayers,
-    
+
     answer_shape: execution.answerShape,
-    
+
     ambiguity: execution.ambiguity ? {
       detected: execution.ambiguity.detected,
       clarification_asked: execution.ambiguity.clarificationAsked,
       type: execution.ambiguity.type,
     } : undefined,
-    
+
     clarification_state: execution.clarificationState ? {
       awaiting: execution.clarificationState.awaiting,
       resolved_with: execution.clarificationState.resolvedWith,
     } : undefined,
-    
+
     data_source: execution.dataSource,
     artifact_type: execution.artifactType || null,
-    
+
     llm_usage: {
       total_calls: llmPurposes.filter(p => p !== null).length,
       purposes: llmPurposes,
     },
-    
+
     resolution: {
       company_id: base.companyId,
       company_name: base.companyName,
@@ -278,35 +276,35 @@ export function buildInteractionMetadata(
       company_source: execution.companySource || "none",
       meeting_source: execution.meetingSource || "none",
     },
-    
+
     evidence_sources: execution.evidenceSources,
-    
+
     meeting_detection: execution.meetingDetection ? {
       regex_result: execution.meetingDetection.regexResult,
       llm_called: execution.meetingDetection.llmCalled,
       llm_result: execution.meetingDetection.llmResult,
       llm_latency_ms: execution.meetingDetection.llmLatencyMs,
     } : undefined,
-    
+
     open_assistant: execution.openAssistant ? {
       intent: execution.openAssistant.intent,
       data_source: execution.openAssistant.dataSource,
       delegated_to_single_meeting: execution.openAssistant.delegatedToSingleMeeting,
     } : undefined,
-    
+
     isSingleMeetingMode: execution.entryPoint === "slack",
     isBinaryQuestion: execution.isBinaryQuestion,
     semanticAnswerUsed: execution.semanticAnswerUsed,
     semanticConfidence: execution.semanticConfidence,
-    
+
     awaitingClarification: execution.awaitingClarification,
     pendingOffer: execution.pendingOffer,
-    
+
     test_run: execution.testRun,
   };
 }
 
-export { 
+export {
   type Intent,
   type AnswerContract,
   type ContextLayers,

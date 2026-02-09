@@ -6,10 +6,9 @@
 
 export { createProgressManager, type ProgressContext, type ProgressManager } from './progressManager';
 export { resolveThreadContext, shouldReuseThreadContext, type ThreadResolutionResult } from './threadResolver';
-export { 
-  resolveMeetingFromSlackMessage, 
-  hasTemporalMeetingReference, 
+export {
+  resolveMeetingFromSlackMessage,
+  hasTemporalMeetingReference,
   extractCompanyFromMessage,
-  hasTemporalMeetingReferenceSync,
   type MeetingResolutionResult,
 } from './meetingResolver';

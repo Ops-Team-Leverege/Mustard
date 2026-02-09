@@ -301,7 +301,7 @@ ${transcript}
  * Transcript analyzer system prompt.
  * Used for analyzing BD call transcripts to extract insights and Q&A.
  */
-export const TRANSCRIPT_ANALYZER_SYSTEM_PROMPT = 
+export const TRANSCRIPT_ANALYZER_SYSTEM_PROMPT =
   "You are an expert at analyzing business development call transcripts to extract product insights and customer questions. Always respond with valid JSON.";
 
 /**
@@ -409,37 +409,4 @@ IMPORTANT:
 - Focus on VALUE and NEW capabilities
 - categoryId must be one of the IDs listed above or null
 - Only include product-specific Q&A, not logistics/scheduling`;
-}
-
-/**
- * Legacy exports for backward compatibility.
- * @deprecated Use the new RAG_* prefixed prompts instead.
- */
-export const MEETING_SUMMARY_PROMPT = RAG_MEETING_SUMMARY_SYSTEM_PROMPT;
-export const QUOTE_SELECTION_PROMPT = RAG_QUOTE_SELECTION_SYSTEM_PROMPT;
-export const EXTRACTIVE_ANSWER_PROMPT = RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT;
-export const ACTION_ITEMS_PROMPT = RAG_ACTION_ITEMS_SYSTEM_PROMPT;
-
-/**
- * Build RAG composer system prompt.
- * @deprecated Use specific prompt exports instead.
- */
-export function buildRAGComposerPrompt(params: {
-  task: "summary" | "quotes" | "extractive" | "action_items";
-  context?: string;
-}): string {
-  const taskPrompts: Record<string, string> = {
-    summary: RAG_MEETING_SUMMARY_SYSTEM_PROMPT,
-    quotes: RAG_QUOTE_SELECTION_SYSTEM_PROMPT,
-    extractive: RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT,
-    action_items: RAG_ACTION_ITEMS_SYSTEM_PROMPT,
-  };
-  
-  let prompt = taskPrompts[params.task] || RAG_MEETING_SUMMARY_SYSTEM_PROMPT;
-  
-  if (params.context) {
-    prompt += `\n\nADDITIONAL CONTEXT:\n${params.context}`;
-  }
-  
-  return prompt;
 }

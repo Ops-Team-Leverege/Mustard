@@ -46,9 +46,9 @@ describe('hasTemporalMeetingReference', () => {
   describe('Regex-only detection (fast path)', () => {
     it('detects "last meeting" pattern without calling LLM', async () => {
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What was discussed in the last meeting with ACE?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
       expect(result.llmCalled).toBe(false);
@@ -59,9 +59,9 @@ describe('hasTemporalMeetingReference', () => {
 
     it('detects "latest call" pattern without calling LLM', async () => {
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What happened in the latest call?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
       expect(result.llmResult).toBeNull();
@@ -70,9 +70,9 @@ describe('hasTemporalMeetingReference', () => {
 
     it('detects "most recent sync" pattern without calling LLM', async () => {
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What was promised in our most recent sync with Discount Tire?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
       expect(result.llmResult).toBeNull();
@@ -81,9 +81,9 @@ describe('hasTemporalMeetingReference', () => {
 
     it('detects "meeting last week" trailing temporal pattern', async () => {
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What did they say in the meeting last week?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
       expect(result.llmResult).toBeNull();
@@ -92,9 +92,9 @@ describe('hasTemporalMeetingReference', () => {
 
     it('detects "in the last meeting" prepositional pattern', async () => {
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What did we promise in the last meeting?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(true);
       expect(result.llmResult).toBeNull();
@@ -109,9 +109,9 @@ describe('hasTemporalMeetingReference', () => {
       });
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What happened in our face-to-face with Ivy Lane?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(false);
       expect(result.llmCalled).toBe(true);
@@ -126,9 +126,9 @@ describe('hasTemporalMeetingReference', () => {
       });
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('How many meetings have we had with ACE?');
-      
+
       expect(result.hasMeetingRef).toBe(false);
       expect(result.regexResult).toBe(false);
       expect(result.llmResult).toBe(false);
@@ -141,9 +141,9 @@ describe('hasTemporalMeetingReference', () => {
       });
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What was discussed when we sat down with ACE?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(false);
       expect(result.llmResult).toBe(true);
@@ -155,9 +155,9 @@ describe('hasTemporalMeetingReference', () => {
       });
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What questions came up during the presentation?');
-      
+
       expect(result.hasMeetingRef).toBe(true);
       expect(result.regexResult).toBe(false);
       expect(result.llmResult).toBe(true);
@@ -171,9 +171,9 @@ describe('hasTemporalMeetingReference', () => {
       });
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What is their current POS system?');
-      
+
       expect(result.hasMeetingRef).toBe(false);
       expect(result.regexResult).toBe(false);
       expect(result.llmResult).toBe(false);
@@ -185,9 +185,9 @@ describe('hasTemporalMeetingReference', () => {
       });
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What POS does ACE Hardware use?');
-      
+
       expect(result.hasMeetingRef).toBe(false);
       expect(result.regexResult).toBe(false);
       expect(result.llmResult).toBe(false);
@@ -199,9 +199,9 @@ describe('hasTemporalMeetingReference', () => {
       mockOpenAICreate.mockRejectedValueOnce(new Error('API timeout'));
 
       const { hasTemporalMeetingReference } = await import('../slack/context/meetingResolver');
-      
+
       const result = await hasTemporalMeetingReference('What happened in our face-to-face?');
-      
+
       expect(result.hasMeetingRef).toBe(false);
       expect(result.regexResult).toBe(false);
       expect(result.llmCalled).toBe(true);
@@ -213,45 +213,45 @@ describe('hasTemporalMeetingReference', () => {
 
 describe('hasTemporalMeetingReferenceSync', () => {
   it('returns true for regex-matched patterns', async () => {
-    const { hasTemporalMeetingReferenceSync } = await import('../slack/context/meetingResolver');
-    
-    expect(hasTemporalMeetingReferenceSync('What was discussed in the last meeting?')).toBe(true);
-    expect(hasTemporalMeetingReferenceSync('What happened in the latest call?')).toBe(true);
-    expect(hasTemporalMeetingReferenceSync('During the meeting last week')).toBe(true);
+    const { hasTemporalMeetingReference } = await import('../meeting/utils');
+
+    expect(hasTemporalMeetingReference('What was discussed in the last meeting?')).toBe(true);
+    expect(hasTemporalMeetingReference('What happened in the latest call?')).toBe(true);
+    expect(hasTemporalMeetingReference('During the meeting last week')).toBe(true);
   });
 
   it('returns false for non-temporal patterns (no LLM fallback)', async () => {
-    const { hasTemporalMeetingReferenceSync } = await import('../slack/context/meetingResolver');
-    
-    expect(hasTemporalMeetingReferenceSync('What happened in our face-to-face?')).toBe(false);
-    expect(hasTemporalMeetingReferenceSync('What is their POS system?')).toBe(false);
+    const { hasTemporalMeetingReference } = await import('../meeting/utils');
+
+    expect(hasTemporalMeetingReference('What happened in our face-to-face?')).toBe(false);
+    expect(hasTemporalMeetingReference('What is their POS system?')).toBe(false);
   });
 });
 
 describe('extractCompanyFromMessage', () => {
   it('matches exact company name', async () => {
     const { extractCompanyFromMessage } = await import('../slack/context/meetingResolver');
-    
+
     const result = await extractCompanyFromMessage('What happened in the last ACE Hardware meeting?');
-    
+
     expect(result).not.toBeNull();
     expect(result?.companyName).toBe('ACE Hardware');
   });
 
   it('matches partial name from parenthetical company', async () => {
     const { extractCompanyFromMessage } = await import('../slack/context/meetingResolver');
-    
+
     const result = await extractCompanyFromMessage('What happened in our face-to-face with Ivy Lane?');
-    
+
     expect(result).not.toBeNull();
     expect(result?.companyName).toBe('Ivy Lane (Valvoline)');
   });
 
   it('returns null when no company matches', async () => {
     const { extractCompanyFromMessage } = await import('../slack/context/meetingResolver');
-    
+
     const result = await extractCompanyFromMessage('What happened in the last meeting?');
-    
+
     expect(result).toBeNull();
   });
 });
