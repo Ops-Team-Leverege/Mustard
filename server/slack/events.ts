@@ -765,6 +765,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
         oaDuration = logger.endStage('open_assistant');
 
         responseText = openAssistantResultData.answer;
+        if (decisionLayerResult.scopeNote) {
+          responseText = `${decisionLayerResult.scopeNote}\n\n${responseText}`;
+        }
         capabilityName = `open_assistant_${openAssistantResultData.intent}`;
         intentClassification = openAssistantResultData.intent;
         dataSource = openAssistantResultData.dataSource;

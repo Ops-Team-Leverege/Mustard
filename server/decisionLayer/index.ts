@@ -42,6 +42,7 @@ import {
 import OpenAI from "openai";
 import { AGGREGATE_SPECIFICITY_CHECK_PROMPT } from "../config/prompts";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { storage } from "../storage";
 
 export {
   Intent,
@@ -92,6 +93,7 @@ export type DecisionLayerResult = {
   contractSelectionMethod: string;
   clarifyMessage?: string; // Smart clarification message when intent is CLARIFY
   proposedInterpretation?: ProposedInterpretation; // For CLARIFY: what the LLM thinks user wants
+  scopeNote?: string; // Non-blocking note about scope defaults (prepended to response)
   // LLM-determined scope (passed downstream to avoid regex re-detection)
   scope?: {
     allCustomers: boolean; // True if LLM detected "all customers" scope (scopeType="all")
@@ -187,18 +189,17 @@ async function checkAggregateSpecificity(question: string, threadContext?: Threa
   }
 }
 
-function generateAggregateClarifyMessage(hasTime: boolean, hasScope: boolean): string {
-  if (!hasTime && !hasScope) {
-    return `To give you the best analysis, could you clarify:
+function generateScopeNote(hasTime: boolean, hasScope: boolean): string {
+  const parts: string[] = [];
+  if (!hasScope) parts.push("all customers");
+  if (!hasTime) parts.push("all time");
+  if (parts.length === 0) return "";
+  return `_Searching across ${parts.join(", ")}._`;
+}
 
-1. **Time range**: Last month, last quarter, or all time?
-2. **Scope**: All customers, or a specific customer?
-
-For example: "Show me customer concerns from the last quarter across all customers"`;
-  }
-
-  if (!hasTime) {
-    return `What time range would you like me to analyze?
+function shouldAskForTimeRange(hasTime: boolean, meetingCount: number): string {
+  if (!hasTime && meetingCount > 100) {
+    return `You have ${meetingCount} meetings on record. To keep the analysis focused, could you narrow the time range?
 
 - Last month
 - Last quarter  
@@ -206,16 +207,6 @@ For example: "Show me customer concerns from the last quarter across all custome
 
 For example: "...from the last quarter"`;
   }
-
-  if (!hasScope) {
-    return `Would you like me to look at:
-
-- **All customers** - patterns across everyone
-- **A specific customer** - just mention their name
-
-For example: "...across all customers" or "...for Costco"`;
-  }
-
   return "";
 }
 
@@ -255,35 +246,36 @@ export async function runDecisionLayer(
   // For MULTI_MEETING intent, always run specificity check to get LLM-determined scope
   // This scope is passed downstream to avoid regex re-detection in meeting resolver
   let scopeInfo: DecisionLayerResult["scope"];
+  let scopeNote: string | undefined;
 
   if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question, threadContext);
 
-    // allCustomers is true ONLY when scopeType is "all" (user explicitly wants all customers)
-    // NOT when scopeType is "specific" (user mentioned specific company names)
+    const effectiveScopeType = specificity.scopeType === "none" ? "all" : specificity.scopeType;
+    const effectiveAllCustomers = effectiveScopeType === "all";
+
     scopeInfo = {
-      allCustomers: specificity.scopeType === "all",
-      scopeType: specificity.scopeType,
+      allCustomers: effectiveAllCustomers,
+      scopeType: effectiveScopeType,
       specificCompanies: specificity.specificCompanies,
       hasTimeRange: specificity.hasTimeRange,
       timeRangeExplanation: specificity.timeRangeExplanation,
       customerScopeExplanation: specificity.customerScopeExplanation,
       meetingLimit: specificity.meetingLimit ?? null,
-      // Pass thread messages for topic extraction in meeting resolver
       threadMessages: threadContext?.messages,
     };
 
     console.log(`[DecisionLayer] LLM scope detection: scopeType=${scopeInfo.scopeType}, allCustomers=${scopeInfo.allCustomers}, specificCompanies=${JSON.stringify(scopeInfo.specificCompanies)}, hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
 
-    // For aggregate contracts, check if we need clarification
     if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
-      const clarifyMessage = generateAggregateClarifyMessage(specificity.hasTimeRange, specificity.hasCustomerScope);
+      const meetingCountRows = await storage.rawQuery(`SELECT COUNT(*) as cnt FROM transcripts`);
+      const meetingCount = parseInt(meetingCountRows?.[0]?.cnt as string, 10) || 0;
+
+      const clarifyMessage = shouldAskForTimeRange(specificity.hasTimeRange, meetingCount);
 
       if (clarifyMessage) {
         console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Requesting Clarification:`);
-        console.log(`  Reason: Aggregate contract needs scope clarification`);
-        console.log(`  Has Time Range: ${specificity.hasTimeRange}`);
-        console.log(`  Has Customer Scope: ${specificity.hasCustomerScope}`);
+        console.log(`  Reason: Too many meetings (${meetingCount}) without time range`);
         console.log(`  Clarify Message: "${clarifyMessage.substring(0, 100)}..."`);
 
         return {
@@ -299,7 +291,6 @@ export async function runDecisionLayer(
             summary: "Aggregate analysis - awaiting scope",
           },
           scope: scopeInfo,
-          // Semantic context extraction from conversation
           extractedCompany: intentResult.extractedCompany,
           extractedCompanies: intentResult.extractedCompanies,
           isAmbiguous: intentResult.isAmbiguous,
@@ -310,6 +301,8 @@ export async function runDecisionLayer(
         };
       }
     }
+
+    scopeNote = generateScopeNote(specificity.hasTimeRange, specificity.hasCustomerScope);
   }
 
   // Build contract chain from LLM-proposed contracts if available
@@ -326,6 +319,7 @@ export async function runDecisionLayer(
     contractSelectionMethod: contractResult.contractSelectionMethod,
     clarifyMessage: intentResult.clarifyMessage,
     proposedInterpretation: intentResult.proposedInterpretation,
+    scopeNote,
     scope: scopeInfo,
     // Semantic context extraction from conversation
     extractedCompany: intentResult.extractedCompany,
@@ -342,6 +336,7 @@ export async function runDecisionLayer(
   console.log(`  Final Contract: ${finalResult.answerContract}`);
   console.log(`  Will Clarify: ${!!finalResult.clarifyMessage}`);
   console.log(`  Scope Info: ${scopeInfo ? 'present' : 'none'}`);
+  if (scopeNote) console.log(`  Scope Note: ${scopeNote}`);
 
   return finalResult;
 }

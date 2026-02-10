@@ -1,0 +1,218 @@
+
+
+
+Mustard
+Files
+Commands
+Packager files
+Config files
+/
+
+Time
+Deployment
+Source
+Log
+2026-02-10 09:58:37.38
+93fe7842
+System
+starting up user application
+2026-02-10 09:58:37.38
+93fe7842
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-10 09:58:37.38
+93fe7842
+System
+starting up user application
+2026-02-10 09:58:37.38
+93fe7842
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-10 09:58:37.38
+93fe7842
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-10 09:58:37.38
+93fe7842
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-10 09:58:38.38
+93fe7842
+User
+> rest-express@1.0.0 start
+2026-02-10 09:58:38.38
+93fe7842
+User
+> NODE_ENV=production node dist/index.js
+2026-02-10 09:58:38.38
+93fe7842
+User
+> rest-express@1.0.0 start
+2026-02-10 09:58:38.38
+93fe7842
+User
+> NODE_ENV=production node dist/index.js
+2026-02-10 09:58:39.88
+93fe7842
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-10 09:58:39.88
+93fe7842
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-10 09:58:39.88
+93fe7842
+User
+Slack routes registered at /api/slack/events
+2026-02-10 09:58:39.88
+93fe7842
+User
+Slack routes registered at /api/slack/events
+2026-02-10 09:58:40.16
+93fe7842
+User
+5:58:40 PM [express] serving on port 5000
+2026-02-10 09:58:40.16
+93fe7842
+User
+5:58:40 PM [express] serving on port 5000
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-10T17:58:54.736Z ==========
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] Received event request
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] Received event request
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-10T17:58:54.736Z ==========
+2026-02-10 09:58:54.73
+93fe7842
+User
+Event type: app_mention
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] Event details: eventId=Ev0AE35T3S69, clientMsgId=01debcfe-4f97-4edb-abd8-01336dac0af4, messageTs=1770746333.472569, threadTs=1770746333.472569, channel=C0A80S3HJNL
+2026-02-10 09:58:54.73
+93fe7842
+User
+Slack payload type: event_callback
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] Processing app_mention
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] Processing app_mention
+2026-02-10 09:58:54.73
+93fe7842
+User
+Event type: app_mention
+2026-02-10 09:58:54.73
+93fe7842
+User
+[Slack] Event details: eventId=Ev0AE35T3S69, clientMsgId=01debcfe-4f97-4edb-abd8-01336dac0af4, messageTs=1770746333.472569, threadTs=1770746333.472569, channel=C0A80S3HJNL
+2026-02-10 09:58:54.73
+93fe7842
+User
+Slack payload type: event_callback
+2026-02-10 09:58:54.74
+93fe7842
+User
+5:58:54 PM [express] POST /api/slack/events 200 in 10ms
+2026-02-10 09:58:54.74
+93fe7842
+User
+5:58:54 PM [express] POST /api/slack/events 200 in 10ms
+2026-02-10 09:59:01.48
+93fe7842
+User
+[Dedupe] Cleaned up 9 old entries
+2026-02-10 09:59:01.48
+93fe7842
+User
+[Dedupe] Cleaned up 9 old entries
+2026-02-10 09:59:09.88
+93fe7842
+User
+[INFO] [5a4eed70] Slack event received {"correlationId":"5a4eed70","channel":"C0A80S3HJNL","threadTs":"1770746333.472569","userId":"U082TV42FM0","duration":0,"text":"did robert from cotsco mentioned any particular paint point that pitcrew could help with?","isReply":false,"testRun":false}
+2026-02-10 09:59:09.88
+93fe7842
+User
+[INFO] [5a4eed70] Slack event received {"correlationId":"5a4eed70","channel":"C0A80S3HJNL","threadTs":"1770746333.472569","userId":"U082TV42FM0","duration":0,"text":"did robert from cotsco mentioned any particular paint point that pitcrew could help with?","isReply":false,"testRun":false}
+2026-02-10 09:59:09.88
+93fe7842
+User
+Processing: "did robert from cotsco mentioned any particular paint point that pitcrew could help with?" in channel C0A80S3HJNL (isReply=false)
+2026-02-10 09:59:09.88
+93fe7842
+User
+Processing: "did robert from cotsco mentioned any particular paint point that pitcrew could help with?" in channel C0A80S3HJNL (isReply=false)
+2026-02-10 09:59:12.08
+93fe7842
+User
+[ThreadResolver] Not a reply - returning empty context
+2026-02-10 09:59:12.08
+93fe7842
+User
+[ThreadResolver] Not a reply - returning empty context
+2026-02-10 09:59:12.18
+93fe7842
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-10 09:59:12.18
+93fe7842
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-10 09:59:12.78
+93fe7842
+User
+Last 3 messages:
+2026-02-10 09:59:12.78
+93fe7842
+User
+2. Bot: "Got it, <@U082TV42FM0> — working on it..."
+2026-02-10 09:59:12.78
+93fe7842
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-10 09:59:12.78
+93fe7842
+User
+Messages: 2
+2026-02-10 09:59:12.78
+93fe7842
+User
+2. Bot: "Got it, <@U082TV42FM0> — working on it..."
+2026-02-10 09:59:12.78
+93fe7842
+User
+Thread: 1770746333.472569
+2026-02-10 09:59:12.78
+93fe7842
+User
+Messages: 2
+2026-02-10 09:59:12.78
+93fe7842
+User
+Thread: 1770746333.472569
+2026-02-10 09:59:12.78
+93fe7842
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-10 09:59:12.78
+93fe7842
+User
+Last 3 messages:
+2026-02-10 09:59:12.78
+93fe7842
+User
+1. User: "<@U0A704T7THR> did robert from cotsco mentioned any particular paint point that pitcrew could help w..."
