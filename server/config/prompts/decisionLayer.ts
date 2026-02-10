@@ -59,9 +59,57 @@ INTENT CLASSIFICATION:
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - EXTERNAL_RESEARCH: Requests requiring PUBLIC/WEB information
 - SLACK_SEARCH: User explicitly wants to search Slack messages or channels (not meeting transcripts)
-- GENERAL_HELP: Greetings, meta questions, general assistance requests
+- GENERAL_HELP: Greetings, meta questions, general assistance requests, document creation/drafting
 - REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
 - CLARIFY: Request is genuinely ambiguous about what the user wants
+
+GENERAL_HELP PROTECTION (CRITICAL):
+Distinguish between "vague but actionable" (GENERAL_HELP) vs "genuinely ambiguous" (CLARIFY).
+
+GENERAL_HELP = User wants you to DO something, even if they don't specify all details
+- Requests for creation/drafting (even without specifics): "draft an email", "create a proposal"
+- Requests for advice/guidance (even without full context): "help me with pricing", "what should I tell them"
+- Requests for explanation/help (even if broad): "explain this concept", "help me understand"
+- Meta questions about capabilities: "what can you do?", "how can you help?"
+- Document formatting requests: "give me 5 bullets", "brief summary", "numbered list"
+
+CLARIFY = User's request is genuinely ambiguous about WHAT they want
+- Multiple conflicting requests in one query: "summarize AND search pricing"
+- Total lack of subject/topic: "tell me about that thing"
+- Unclear which data source to use: "what have customers said?" (which customers? which meetings?)
+- Ambiguous references without context: "check that and update this"
+
+KEY DISTINCTION:
+"Draft an email" → GENERAL_HELP ✅
+  Why: Clear action (draft), clear output (email), just needs content guidance
+  
+"Tell me about that thing" → CLARIFY ⚠️
+  Why: No clear action, no clear subject, genuinely ambiguous
+
+"Help me with pricing" → GENERAL_HELP ✅
+  Why: Clear topic (pricing), clear need (help/advice), just needs direction
+  
+"Summarize AND search pricing" → CLARIFY ⚠️
+  Why: Two different actions, unclear which to prioritize
+
+"Give me 5 bullet points about tire features" → GENERAL_HELP ✅
+  Why: Clear format (5 bullets), clear topic (tire features), clear output needed
+
+SEMANTIC RULE:
+If you can understand WHAT the user wants to accomplish (even if HOW is unclear), 
+route to GENERAL_HELP. Only route to CLARIFY if you genuinely cannot determine 
+what they're asking for.
+
+Examples:
+✅ "Draft an email to the customer" → GENERAL_HELP (wants: email draft)
+✅ "Give me 5 bullet points about tire features" → GENERAL_HELP (wants: 5 bullets)
+✅ "Help me create a proposal" → GENERAL_HELP (wants: proposal help)
+✅ "What should I tell them about pricing?" → GENERAL_HELP (wants: pricing advice)
+✅ "What can you do?" → GENERAL_HELP (wants: capabilities info)
+✅ "Create a document with sections A, B, C" → GENERAL_HELP (wants: structured document)
+⚠️ "Summarize the meeting AND check pricing" → CLARIFY (wants: two things)
+⚠️ "Tell me about that thing" → CLARIFY (wants: unknown)
+⚠️ "What have customers said?" → CLARIFY (wants: unclear scope)
 
 SLACK vs MEETING DISAMBIGUATION:
 When a query could refer to EITHER Slack messages OR meeting transcripts:

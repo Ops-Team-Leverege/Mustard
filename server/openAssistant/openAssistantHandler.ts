@@ -20,10 +20,10 @@ import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeet
 import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
-import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
+import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS, TOKEN_LIMITS } from "../config/models";
 import { TIMEOUT_CONSTANTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
-import { buildGeneralAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
+import { buildGeneralAssistancePrompt, buildGuidedAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
 
 import {
   type EvidenceSource,
@@ -1593,41 +1593,114 @@ Use this context to align suggestions with PitCrew's terminology and value propo
     }
   }
 
-  const systemPrompt = buildGeneralAssistancePrompt({
+  const systemPrompt = buildGuidedAssistancePrompt({
     productKnowledgeSection,
     meetingContext: meetingContextStr,
     threadContext: threadContextSection,
-    isDrafting: isDraftingContract && !!threadContextSection,
   });
 
-  console.log(`[OpenAssistant] Calling ${getModelDescription(MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE)} for general assistance (streaming: ${!!context.slackStreaming})...`);
-  const answer = await streamOpenAIResponse(
-    MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
-    systemPrompt,
-    userMessage,
-    context.slackStreaming
-  );
-  console.log(`[OpenAssistant] ${getModelDescription(MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE)} response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+  // Use Gemini for GENERAL_HELP responses (comprehensive document generation)
+  const gemini = getGeminiClient();
+  const maxTokens = TOKEN_LIMITS[MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE];
 
-  // Build personalized progress message for drafting contracts
-  let progressMessage: string | undefined;
-  if (isDraftingContract) {
-    const intentType = actualContract === AnswerContract.DRAFT_EMAIL ? 'draft_email' : 'draft_response';
-    progressMessage = await generatePersonalizedProgress(userMessage, intentType);
+  if (!gemini) {
+    console.log(`[OpenAssistant] Gemini not configured, falling back to OpenAI for GENERAL_HELP`);
+    // Fallback to OpenAI if Gemini unavailable
+    const answer = await streamOpenAIResponse(
+      MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
+      systemPrompt,
+      userMessage,
+      context.slackStreaming
+    );
+    console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+
+    return {
+      answer,
+      intent: "general_assistance",
+      intentClassification: classification,
+      decisionLayerIntent: Intent.GENERAL_HELP,
+      answerContract: actualContract,
+      ssotMode: "none" as SSOTMode,
+      dataSource: "general_knowledge",
+      delegatedToSingleMeeting: false,
+      progressMessage,
+      streamingCompleted: !!context.slackStreaming,
+      metadata: {
+        model: MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
+        fallbackUsed: true,
+        fallbackReason: "Gemini not configured",
+      },
+    };
   }
 
-  return {
-    answer,
-    intent: "general_assistance",
-    intentClassification: classification,
-    decisionLayerIntent: Intent.GENERAL_HELP,
-    answerContract: actualContract,
-    ssotMode: "none" as SSOTMode,
-    dataSource: "general_knowledge",
-    delegatedToSingleMeeting: false,
-    progressMessage,
-    streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
-  };
+  console.log(`[OpenAssistant] Calling Gemini ${MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE} for GENERAL_HELP (max tokens: ${maxTokens})...`);
+
+  try {
+    const response = await gemini.models.generateContent({
+      model: MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE,
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }],
+        },
+      ],
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        temperature: 0.7,  // Balanced creativity
+      },
+    });
+
+    const answer = response.response?.text() || "I'd be happy to help. Could you provide more details?";
+    console.log(`[OpenAssistant] Gemini response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+
+    return {
+      answer,
+      intent: "general_assistance",
+      intentClassification: classification,
+      decisionLayerIntent: Intent.GENERAL_HELP,
+      answerContract: actualContract,
+      ssotMode: "none" as SSOTMode,
+      dataSource: "general_knowledge",
+      delegatedToSingleMeeting: false,
+      progressMessage,
+      streamingCompleted: false,  // Gemini doesn't stream in this implementation
+      metadata: {
+        model: MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE,
+        maxTokens,
+        responseTime: Date.now() - startTime,
+      },
+    };
+  } catch (error) {
+    console.error(`[OpenAssistant] Gemini error, falling back to OpenAI:`, error);
+
+    // Fallback to OpenAI on error
+    const answer = await streamOpenAIResponse(
+      "gpt-4o",  // Use gpt-4o for fallback (better than gpt-4o-mini)
+      systemPrompt,
+      userMessage,
+      context.slackStreaming
+    );
+    console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+
+    return {
+      answer,
+      intent: "general_assistance",
+      intentClassification: classification,
+      decisionLayerIntent: Intent.GENERAL_HELP,
+      answerContract: actualContract,
+      ssotMode: "none" as SSOTMode,
+      dataSource: "general_knowledge",
+      delegatedToSingleMeeting: false,
+      progressMessage,
+      streamingCompleted: !!context.slackStreaming,
+      metadata: {
+        model: "gpt-4o",
+        fallbackUsed: true,
+        fallbackReason: error instanceof Error ? error.message : "Gemini API error",
+        maxTokens: 4000,  // Lower than Gemini
+      },
+    };
+  }
 }
 
 /**
