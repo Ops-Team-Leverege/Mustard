@@ -5,6 +5,17 @@ server/public
 vite.config.ts.*
 *.tar.gz
 
+# Test files and results (keep test-cache.ts for debugging)
+test-*.js
+functional-test.js
+regression-test.ts
+simple-regression-check.js
+test_results_*.xlsx
+
+# Temporary markdown files (not replit.md - that's important!)
+security-implementation.md
+validation-improvements.md
+
 # Documentation (work in progress, not for production)
 # Exclude all docs except key production files
 docs/*
