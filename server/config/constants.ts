@@ -57,6 +57,11 @@ export const TIMEOUT_CONSTANTS = {
   STANDARD_API_TIMEOUT_MS: 60000, // 1 minute
 
   /**
+   * Website fetch timeout (milliseconds).
+   */
+  WEBSITE_FETCH_MS: 10000, // 10 seconds
+
+  /**
    * Max age (seconds) of a Slack request timestamp before it's rejected as a replay attack.
    */
   SLACK_SIGNATURE_TOLERANCE_SECONDS: 300, // 5 minutes
