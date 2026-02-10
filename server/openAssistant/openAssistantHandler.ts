@@ -21,7 +21,7 @@ import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS } from "../config/models";
-import { TIMEOUTS, CONTENT_LIMITS } from "../config/constants";
+import { TIMEOUT_CONSTANTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
 import { buildGeneralAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
 
@@ -281,7 +281,7 @@ async function fetchWebsiteContent(url: string): Promise<{ success: boolean; con
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
       redirect: 'manual', // Handle redirects manually for safety
-      signal: AbortSignal.timeout(TIMEOUTS.WEBSITE_FETCH_MS),
+      signal: AbortSignal.timeout(TIMEOUT_CONSTANTS.WEBSITE_FETCH_MS),
     });
 
     // Handle redirects safely - only follow if redirect stays on allowed domain

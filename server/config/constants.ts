@@ -28,10 +28,20 @@ export const MEETING_CONSTANTS = {
 
 /**
  * Progress message configuration
+ *
+ * Progress messages are separate Slack thread posts (e.g., "Searching notes...")
+ * sent while async operations run. They're distinct from streaming placeholder
+ * updates which show actual response content.
  */
 export const PROGRESS_MESSAGE_CONSTANTS = {
   /**
-   * Maximum number of progress messages to send during processing.
+   * Maximum progress messages per request.
+   *
+   * Set to 1 to avoid thread noise — multiple progress posts in rapid
+   * succession feel spammy. A single progress message signals "working on it"
+   * without cluttering the conversation. The actual response replaces/follows it.
+   *
+   * Previously 4, reduced after user feedback about thread clutter.
    */
   MAX_PROGRESS_MESSAGES: 1,
 
@@ -67,7 +77,6 @@ export const TIMEOUT_CONSTANTS = {
   SLACK_SIGNATURE_TOLERANCE_SECONDS: 300, // 5 minutes
 } as const;
 
-export const TIMEOUTS = TIMEOUT_CONSTANTS;
 
 /**
  * Session and authentication configuration

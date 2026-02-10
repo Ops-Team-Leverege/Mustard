@@ -248,7 +248,9 @@ export async function semanticAnswerSingleMeeting(
 
   console.log(`[SemanticAnswer] Data fetch: ${Date.now() - startTime}ms`);
 
-  // Validate critical data
+  // getTranscriptById returns null when the meeting ID doesn't exist in the database
+  // (e.g., deleted transcript, stale thread context). The other three methods always
+  // return arrays (possibly empty), so only transcript needs a null guard.
   if (!transcript) {
     throw new Error(`Transcript not found for meeting ${meetingId}`);
   }

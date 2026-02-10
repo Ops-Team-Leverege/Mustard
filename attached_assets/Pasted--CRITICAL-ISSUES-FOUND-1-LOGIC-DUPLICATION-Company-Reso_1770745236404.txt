@@ -1,0 +1,123 @@
+⚠️ CRITICAL ISSUES FOUND
+1. LOGIC DUPLICATION - Company Resolution (Commit 359f63f)
+Location: 
+events.ts
+ lines 473-545
+
+Issue: The company resolution logic has become a nested waterfall of fallbacks:
+
+if (threadContext?.companyId) {
+  // Fetch from DB
+} 
+if (!companyMentioned) {
+  if (decisionLayerResult.extractedCompany) {
+    // Try exact match
+    if (!found) {
+      // Try prefix match  
+      if (!found && name.length >= 4) {
+        // Try word boundary match
+      }
+    }
+  }
+  if (!companyMentioned) {
+    // Try regex extraction
+    if (!companyMentioned) {
+      // Scan thread history
+    }
+  }
+}
+Problems:
+
+7 levels of nesting - violates complexity guidelines
+4 different company resolution strategies in one function
+Duplicate database queries (thread context + LLM extraction both query DB)
+Magic number extractedName.length >= 4 - why 4? No documentation
+No single source of truth for company resolution
+Recommendation:
+
+// Extract to dedicated function
+async function resolveCompany(
+  threadContext, 
+  decisionLayerResult, 
+  text, 
+  threadMessages
+): Promise<CompanyMention | null> {
+  // Single responsibility: resolve company from all sources
+  // Return first match, document priority order
+}
+2. ARCHITECTURAL VIOLATION - Bypassing Decision Layer (Commit 359f63f)
+Location: 
+events.ts
+ lines 527-545
+
+Issue: After Decision Layer runs, code still does regex-based company extraction:
+
+// Fallback: If LLM didn't extract company, try regex-based extraction
+if (!companyMentioned) {
+  companyMentioned = await extractCompanyFromMessage(text);
+}
+Problem: This violates the Decision Layer as Single Source of Truth principle documented in your architecture. The Decision Layer already has LLM-based semantic extraction - why fall back to regex?
+
+Impact:
+
+Undermines Decision Layer authority
+Creates inconsistent behavior (sometimes LLM, sometimes regex)
+Adds latency for no clear benefit
+Recommendation: Either:
+
+Remove regex fallback - trust Decision Layer
+Move regex INTO Decision Layer - make it part of the classification pipeline
+3. CONSTANTS ANTI-PATTERN (Commit 26d7345)
+Location: 
+constants.ts
+
+Issue: Constants file has inconsistent export patterns:
+
+export const TIMEOUT_CONSTANTS = { ... } as const;
+export const TIMEOUTS = TIMEOUT_CONSTANTS;  // ❌ Duplicate export
+
+export const MEETING_CONSTANTS = { ... } as const;
+// No alias export - inconsistent
+Problems:
+
+TIMEOUTS is an alias for TIMEOUT_CONSTANTS - why both?
+Some constants have aliases, others don't
+No clear naming convention
+Recommendation:
+
+// Pick ONE pattern and stick to it
+export const TIMEOUTS = { ... } as const;
+export const MEETINGS = { ... } as const;
+export const PROGRESS = { ... } as const;
+// OR
+export const TIMEOUT_CONSTANTS = { ... } as const;
+export const MEETING_CONSTANTS = { ... } as const;
+export const PROGRESS_CONSTANTS = { ... } as const;
+4. MAGIC NUMBER WITHOUT JUSTIFICATION (Commit 26d7345)
+Location: 
+constants.ts
+ line 42
+
+MAX_PROGRESS_MESSAGES: 1,  // ❌ Changed from 4 to 1 - why?
+Issue: The commit message says "MAX_PROGRESS_MESSAGES (4)" but the code has 1. This is either:
+
+A typo in the commit message
+A last-minute change not documented
+A bug where the wrong value was committed
+Impact: Users will see fewer progress messages than intended, potentially thinking the system is frozen.
+
+Recommendation: Clarify which value is correct and document the reasoning.
+
+5. NULL SAFETY BAND-AID (Commit 26d7345)
+Location: 
+semanticAnswerSingleMeeting.ts
+
+Issue: Commit message says "Added null check after Promise.all" but doesn't show WHERE or WHY this was needed.
+
+Problem: This is a symptom fix without addressing the root cause. Why was Promise.all returning null? What conditions cause this?
+
+Recommendation:
+
+Find the actual change in the diff
+Document WHY null can occur
+Consider if the upstream code should be fixed instead

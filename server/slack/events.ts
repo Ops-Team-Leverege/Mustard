@@ -24,7 +24,8 @@ import { createMCP, type MCPResult } from "../mcp/toolRouter";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";
-import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference, extractCompanyFromMessage } from "./context/meetingResolver";
+import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "./context/meetingResolver";
+import { resolveCompany } from "./context/companyResolver";
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
@@ -468,80 +469,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       console.log(`[Slack] Control plane: intent=${decisionLayerResult.intent}, contract=${decisionLayerResult.answerContract}, method=${decisionLayerResult.intentDetectionMethod}, layers=${JSON.stringify(decisionLayerResult.contextLayers)}`);
 
-      // Use LLM-extracted company from Decision Layer (semantic understanding)
-      // This replaces regex-based extraction with conversation-aware context extraction
-      if (threadContext?.companyId) {
-        // Thread already has company context from prior interaction — populate companyMentioned
-        // so downstream code (meeting resolution, Open Assistant) has it available
-        const companyRows = await storage.rawQuery(
-          `SELECT id, name FROM companies WHERE id = $1`,
-          [threadContext.companyId]
-        );
-        if (companyRows && companyRows.length > 0) {
-          companyMentioned = {
-            companyId: companyRows[0].id as string,
-            companyName: companyRows[0].name as string,
-          };
-          console.log(`[Slack] Company from thread context: ${companyMentioned.companyName}`);
-        }
-      }
-
-      if (!companyMentioned) {
-        // Check if LLM extracted a company from conversation context
-        if (decisionLayerResult.extractedCompany) {
-          let companyRows = await storage.rawQuery(
-            `SELECT id, name FROM companies WHERE LOWER(name) = LOWER($1)`,
-            [decisionLayerResult.extractedCompany]
-          );
-
-          if (!companyRows || companyRows.length === 0) {
-            companyRows = await storage.rawQuery(
-              `SELECT id, name FROM companies WHERE LOWER(name) LIKE LOWER($1) || '%'`,
-              [decisionLayerResult.extractedCompany]
-            );
-          }
-
-          const extractedName = decisionLayerResult.extractedCompany;
-          if ((!companyRows || companyRows.length === 0) && extractedName.length >= 4) {
-            companyRows = await storage.rawQuery(
-              `SELECT id, name FROM companies WHERE 
-                LOWER(name) LIKE LOWER($1) || ' %' OR 
-                LOWER(name) LIKE '% ' || LOWER($1) || '%' OR
-                LOWER(name) LIKE '%(' || LOWER($1) || ')%' OR
-                LOWER(name) LIKE '%(' || LOWER($1) || ' %'`,
-              [extractedName]
-            );
-          }
-
-          if (companyRows && companyRows.length > 0) {
-            companyMentioned = {
-              companyId: companyRows[0].id as string,
-              companyName: companyRows[0].name as string,
-            };
-            console.log(`[Slack] Company resolved from LLM extraction: ${companyMentioned.companyName}`);
-          } else {
-            console.warn(`[Slack] Company "${decisionLayerResult.extractedCompany}" not found in database`);
-          }
-        }
-
-        // Fallback: If LLM didn't extract company, try regex-based extraction
-        if (!companyMentioned) {
-          companyMentioned = await extractCompanyFromMessage(text);
-        }
-
-        // If still not found, scan thread history for company mentions
-        if (!companyMentioned && threadContextForCP?.messages && threadContextForCP.messages.length > 1) {
-          for (const msg of threadContextForCP.messages) {
-            if (msg.isBot) continue;
-            const extracted = await extractCompanyFromMessage(msg.text);
-            if (extracted) {
-              companyMentioned = extracted;
-              console.log(`[Slack] Company resolved from thread history: ${companyMentioned.companyName}`);
-              break;
-            }
-          }
-        }
-      }
+      // Resolve company from thread context or Decision Layer extraction
+      companyMentioned = await resolveCompany({
+        threadContext,
+        decisionLayerResult,
+      });
 
       // STEP 1.5: INTENT-CONDITIONAL MEETING RESOLUTION
       // Only resolve meeting for SINGLE_MEETING or MULTI_MEETING intents (saves ~1.5s for 60% of requests)

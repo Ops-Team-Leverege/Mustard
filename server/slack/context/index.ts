@@ -12,3 +12,4 @@ export {
   extractCompanyFromMessage,
   type MeetingResolutionResult,
 } from './meetingResolver';
+export { resolveCompany, type CompanyMention } from './companyResolver';
