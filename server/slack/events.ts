@@ -574,31 +574,35 @@ export async function slackEventsHandler(req: Request, res: Response) {
         duration_ms: cpDuration,
       });
 
-      // EARLY PROGRESS MESSAGE: Send personalized progress after intent classification
-      // Uses response coordination to prevent posting after response is sent
+      // EARLY PROGRESS: For SINGLE_MEETING with resolved meeting, create streaming placeholder
+      // The placeholder ("...") gets updated with progress text, then with the final answer
+      // This avoids posting separate progress + answer messages
       if (!testRun && decisionLayerResult.intent === 'SINGLE_MEETING' && resolvedMeeting) {
+        const placeholderMsg = await postSlackMessage({
+          channel,
+          text: "...",
+          thread_ts: threadTs,
+        });
+        streamingContext = {
+          channel,
+          messageTs: placeholderMsg.ts,
+          threadTs,
+        };
+        console.log(`[Slack] Single-meeting streaming placeholder posted: ts=${placeholderMsg.ts}`);
+
         generatePersonalizedProgressMessage(text, 'single_meeting').then(async (personalizedProgress) => {
-          // Double-check coordination flag to prevent race condition
-          // Must check BOTH before and after any async gap
-          if (!canPostProgress()) {
-            console.log(`[Slack] Progress skipped - response already sent`);
-            return;
-          }
+          if (!canPostProgress()) return;
           try {
-            // Double-check after await to prevent race (response may have been sent during LLM generation)
-            if (responseSent) {
-              console.log(`[Slack] Progress skipped - response sent during generation`);
-              return;
-            }
-            await postSlackMessage({
+            if (responseSent) return;
+            const { updateSlackMessage } = await import("./slackApi");
+            await updateSlackMessage({
               channel,
+              ts: placeholderMsg.ts,
               text: personalizedProgress,
-              thread_ts: threadTs,
             });
-            progressMessageCount++;
-            console.log(`[Slack] Personalized progress sent: "${personalizedProgress.substring(0, 50)}..."`);
+            console.log(`[Slack] Updated placeholder with progress: "${personalizedProgress.substring(0, 50)}..."`);
           } catch (err) {
-            console.error(`[Slack] Failed to send progress:`, err);
+            console.error(`[Slack] Failed to update placeholder with progress:`, err);
           }
         }).catch(err => {
           console.log(`[Slack] Personalized progress generation failed:`, err);

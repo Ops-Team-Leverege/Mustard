@@ -100,7 +100,6 @@ Keep it concise but comprehensive.`;
 const SEMANTIC_ANSWER_DONOT_RULES = `
 STRICT RULES (DO NOT VIOLATE):
 - Do NOT explain your reasoning
-- Do NOT quote long transcript passages unless specifically asked
 - Do NOT replace a direct answer with context
 - Do NOT apologize for missing information
 - Do NOT say "I couldn't generate an answer" or "I wasn't able to"
@@ -114,16 +113,18 @@ const SHAPE_INSTRUCTIONS: Record<AnswerShape, string> = {
   single_value: `
 ANSWER FORMAT: Single Value
 The user asked a specific factual question (which/where/who/when).
-The direct answer is already in the meeting data.
 
 RESPOND WITH:
-- The direct answer only
-- One short sentence
-- Do NOT summarize
-- Do NOT quote context
+- The direct answer first
+- Then include a brief supporting quote from the transcript in _italics_ to show evidence
+- Keep it concise but substantive — 2-4 sentences, not just one word
+- Do NOT summarize the whole meeting
 - Do NOT explain unless the user asks why
 
-Example good response: "It was Store 2."
+Example good response:
+"Robert mentioned that determining an accurate delayed number for services is a major struggle.
+_"We're trying to figure out what our delayed number should actually be... it's been a real pain point."_ — Robert"
+
 Example bad response: "Based on the meeting discussion about store locations, it appears that..."`,
 
   yes_no: `
@@ -132,13 +133,16 @@ The user asked a yes/no question.
 
 RESPOND WITH:
 - Answer yes or no FIRST
-- Add the key fact (e.g., date, name)
-- Then optionally offer more detail
+- Add the key facts with supporting evidence from the transcript
+- Include a brief quote in _italics_ showing what was actually said
+- Provide enough detail to be actionable — 2-4 sentences beyond the yes/no
 - Do NOT include a summary unless explicitly requested
 
 Example good response:
-"Yes — there was a meeting with Walmart on October 29, 2025.
-Would you like a brief summary?"
+"Yes — Robert mentioned that determining an accurate delayed number for services is a struggle.
+_"We're trying to figure out what our delayed number should actually be... it's been a real pain point."_ — Robert
+
+He also noted they've been working with a third-party consultant to benchmark against industry standards."
 
 Example bad response:
 "The meeting with Walmart covered several topics including..."`,
