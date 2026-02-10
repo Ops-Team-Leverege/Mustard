@@ -20,6 +20,7 @@ import OpenAI from "openai";
 import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { SEMANTIC_ANSWER } from "../config/constants";
 import { buildSemanticAnswerPrompt } from "../config/prompts/singleMeeting";
 
 const openai = new OpenAI({
@@ -186,7 +187,7 @@ function extractSemanticKeywords(query: string): { keywords: string[]; speakerNa
 function selectRelevantChunks(
   chunks: TranscriptChunk[],
   question: string,
-  maxChunks: number = 20
+  maxChunks: number = SEMANTIC_ANSWER.MAX_RELEVANT_CHUNKS
 ): TranscriptChunk[] {
   if (chunks.length <= maxChunks) return chunks;
 
@@ -208,7 +209,7 @@ function selectRelevantChunks(
     score += keywordHits * 3;
 
     if (chunk.content.length > 100) score += 1;
-    if (chunk.content.length > 200) score += 1;
+    if (chunk.content.length > SEMANTIC_ANSWER.MIN_SUBSTANTIVE_LENGTH) score += 1;
 
     return { chunk, score };
   });
@@ -283,13 +284,13 @@ function buildContextWindow(ctx: MeetingContext, question?: string): string {
   if (ctx.transcriptChunks.length > 0) {
     const relevant = question
       ? selectRelevantChunks(ctx.transcriptChunks, question)
-      : ctx.transcriptChunks.slice(0, 20);
+      : ctx.transcriptChunks.slice(0, SEMANTIC_ANSWER.MAX_RELEVANT_CHUNKS);
 
     sections.push(`\n## Relevant Transcript Excerpts`);
     relevant.forEach((chunk, i) => {
       const speaker = chunk.speakerName || "Unknown";
-      const content = chunk.content.length > 500
-        ? chunk.content.substring(0, 500) + "..."
+      const content = chunk.content.length > SEMANTIC_ANSWER.MAX_CHUNK_DISPLAY_LENGTH
+        ? chunk.content.substring(0, SEMANTIC_ANSWER.MAX_CHUNK_DISPLAY_LENGTH) + "..."
         : chunk.content;
       sections.push(`\n[${i + 1}] ${speaker}:\n"${content}"`);
     });
@@ -324,7 +325,7 @@ export async function semanticAnswerSingleMeeting(
     storage.getTranscriptById(meetingId),
     storage.getCustomerQuestionsByTranscript(meetingId),
     storage.getMeetingActionItemsByTranscript(meetingId),
-    storage.getChunksForTranscript(meetingId, 500),
+    storage.getChunksForTranscript(meetingId, SEMANTIC_ANSWER.CHUNK_FETCH_LIMIT),
   ]);
 
   console.log(`[SemanticAnswer] Data fetch: ${Date.now() - startTime}ms`);
