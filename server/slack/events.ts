@@ -826,10 +826,12 @@ export async function slackEventsHandler(req: Request, res: Response) {
       const sourceAttribution = getSourceAttribution({
         dataSource,
         semanticAnswerUsed,
+        semanticConfidence,
         intent: decisionLayerResult.intent,
         answerContract: openAssistantResultData?.answerContract || decisionLayerResult.answerContract,
         usedSingleMeetingMode,
         isClarificationRequest,
+        responseText,
       });
       if (sourceAttribution && responseText) {
         responseText += sourceAttribution;

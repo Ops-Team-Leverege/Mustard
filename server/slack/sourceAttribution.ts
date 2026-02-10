@@ -19,10 +19,12 @@ export const SOURCE_ATTRIBUTION_CONFIG = {
 type SourceAttributionContext = {
   dataSource: string | null;
   semanticAnswerUsed?: boolean;
+  semanticConfidence?: string;
   intent?: string | null;
   answerContract?: string | null;
   usedSingleMeetingMode?: boolean;
   isClarificationRequest?: boolean;
+  responseText?: string;
 };
 
 const FRIENDLY_MODEL_NAMES: Record<string, string> = {
@@ -36,14 +38,37 @@ function friendlyModelName(model: string): string {
   return FRIENDLY_MODEL_NAMES[model] || model;
 }
 
+const NEGATIVE_ANSWER_PATTERNS = [
+  /no information/i,
+  /no data/i,
+  /not mentioned/i,
+  /not discussed/i,
+  /no mention/i,
+  /couldn't find/i,
+  /could not find/i,
+  /I'm sorry, but there is no/i,
+  /does not contain/i,
+  /do not mention/i,
+  /no relevant/i,
+];
+
+function isNegativeAnswer(responseText?: string, confidence?: string): boolean {
+  if (confidence === "low") return true;
+  if (!responseText) return false;
+  return NEGATIVE_ANSWER_PATTERNS.some(pattern => pattern.test(responseText));
+}
+
 export function getSourceAttribution(ctx: SourceAttributionContext): string {
-  const { dataSource, semanticAnswerUsed, intent, usedSingleMeetingMode, isClarificationRequest } = ctx;
+  const { dataSource, semanticAnswerUsed, semanticConfidence, intent, usedSingleMeetingMode, isClarificationRequest, responseText } = ctx;
 
   if (isClarificationRequest || dataSource === "none" || dataSource === "clarification" || dataSource === "not_found") {
     return "";
   }
 
   if ((dataSource === "semantic" || semanticAnswerUsed) && SOURCE_ATTRIBUTION_CONFIG.transcripts_semantic) {
+    if (isNegativeAnswer(responseText, semanticConfidence)) {
+      return "";
+    }
     const model = friendlyModelName(MODEL_ASSIGNMENTS.SEMANTIC_ANSWER_SYNTHESIS);
     return `\n\n_Source: PitCrew Meeting Transcripts (synthesized by ${model})_`;
   }
