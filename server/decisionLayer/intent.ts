@@ -394,77 +394,18 @@ async function classifyByKeyword(
     };
   }
 
-  // Entity detection: Only triggers if no action-based pattern matched first
+  // Entity detection: Detect known companies/contacts for observability logging,
+  // but always defer to LLM for intent classification. Mentioning a company name
+  // does NOT lock the intent — the user could be asking about meetings, Slack,
+  // product features, external research, or anything else involving that company.
   const companyMatch = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
 
-  // Contact-only matches (no company) fall through to LLM classification.
-  // A generic first name like "robert" isn't authoritative enough to skip LLM —
-  // the LLM needs to run to extract the company name (even misspelled ones like "cotsco" → Costco),
-  // propose the right contract, and set requiresSemantic properly.
-  // Company matches ARE authoritative — if someone mentions "Les Schwab" we know it's about a meeting.
-  if (contact && !companyMatch) {
-    console.log(`[IntentClassifier] Contact-only match "${contact}" — falling through to LLM for full classification (need company extraction)`);
+  if (companyMatch) {
+    console.log(`[IntentClassifier] Known entity "${companyMatch.company}" detected (${companyMatch.matchType}) — deferring to LLM for intent classification`);
   }
-
-  // Explicit Slack signals: when user references Slack as a data source
-  // These bypass the entity fast-path and defer to LLM for semantic classification
-  const hasExplicitSlackSignal = /\b(in\s+slack|on\s+slack|from\s+slack|via\s+slack|search\s+slack|check\s+slack|slack\s+(for|about|messages?|channels?|threads?|dms?)|channel\s+#\w+|#[a-z][a-z0-9_-]+)\b/i.test(question);
-
-  if (companyMatch && hasExplicitSlackSignal) {
-    console.log(`[IntentClassifier] Entity "${companyMatch.company}" found but explicit Slack signal detected — falling through to LLM for semantic classification`);
-    // Don't fast-path to any intent — let the LLM decide whether this is
-    // SLACK_SEARCH, PRODUCT_KNOWLEDGE, or something else based on full context.
-  }
-
-  if (companyMatch && !hasExplicitSlackSignal) {
-    const entityName = companyMatch.company;
-    // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
-    const detectionMethod: IntentDetectionMethod = companyMatch.matchType === "acronym" ? "entity_acronym" : "entity";
-    // Lower confidence for acronym matches since they need validation
-    const confidence = companyMatch.matchType === "acronym" ? 0.70 : 0.85;
-
-    // Multi-meeting signals: strong standalone words + weak words that need meeting context
-    // "all/every/across" are strong scope signals on their own
-    // "find/which" only signal multi-meeting when near meeting-related words
-    const hasStrongMultiMeetingSignal = /\b(all|every|across)\b/i.test(question);
-    const hasWeakMultiMeetingSignal = /\b(find|which)\b/i.test(question) &&
-      /\b(meetings?|calls?|conversations?|transcripts?)\b/i.test(question);
-    const hasMultiMeetingSignal = hasStrongMultiMeetingSignal || hasWeakMultiMeetingSignal;
-    const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want)\b/i.test(question);
-
-    // If describing a situation with a strategic advice request, go to PRODUCT_KNOWLEDGE
-    if (isDescribingSituation) {
-      // Check if it's asking for strategic advice (how to approach, what to do)
-      const wantsAdvice = /\b(how\s+(can|should|do)\s+we|help\s+me|what\s+should|approach\s+this)\b/i.test(question);
-      if (wantsAdvice) {
-        console.log(`[Intent] Situation description + advice request - fast-path to PRODUCT_KNOWLEDGE`);
-        return {
-          intent: Intent.PRODUCT_KNOWLEDGE,
-          intentDetectionMethod: "situation_advice",
-          confidence: 0.90,
-          reason: "Describing customer situation and asking for strategic advice",
-        };
-      }
-    }
-
-    if (hasMultiMeetingSignal) {
-      return {
-        intent: Intent.MULTI_MEETING,
-        intentDetectionMethod: detectionMethod,
-        confidence,
-        reason: `Contains known entity "${entityName}" with multi-meeting signal`,
-        requiresSemantic: true, // Entity fast-path bypasses LLM; default to true for safety (artifact-complete contracts have their own guard)
-      };
-    }
-
-    return {
-      intent: Intent.SINGLE_MEETING,
-      intentDetectionMethod: detectionMethod,
-      confidence,
-      reason: `Contains known entity "${entityName}" - likely asking about meeting`,
-      requiresSemantic: true, // Entity fast-path bypasses LLM; default to true for safety (artifact-complete contracts have their own guard)
-    };
+  if (contact) {
+    console.log(`[IntentClassifier] Known contact "${contact}" detected — deferring to LLM for intent classification`);
   }
 
   return null;
@@ -573,7 +514,7 @@ async function classifyByLLM(
 const LOW_CONFIDENCE_THRESHOLD = 0.88;
 
 // Detection methods that are considered "weak" and need LLM validation
-// "entity" (full company name match) is AUTHORITATIVE - no validation needed
+// Entity detection now always defers to LLM for classification, so "entity" is no longer a fast-path
 // "entity_acronym" (first-word acronym match) is WEAK - needs LLM to confirm semantic intent
 const WEAK_DETECTION_METHODS: IntentDetectionMethod[] = ["keyword", "entity_acronym"];
 
@@ -583,14 +524,8 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
     return false;
   }
 
-  // Full entity detection (known customers from database) doesn't need validation
-  // When someone mentions a known customer like "Les Schwab", trust it's about meetings
-  if (result.intentDetectionMethod === "entity") {
-    return false;
-  }
-
-  // Product signal and situation_advice are high-confidence fast-paths
-  if (result.intentDetectionMethod === "product_signal" || result.intentDetectionMethod === "situation_advice") {
+  // Product signal is a high-confidence fast-path
+  if (result.intentDetectionMethod === "product_signal") {
     return false;
   }
 

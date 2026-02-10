@@ -23,8 +23,8 @@ The application offers a transcript detail view, meeting date support, dashboard
 The system employs **true LLM-FIRST classification** for intent routing, primarily using `gpt-4o-mini` for semantic understanding. Minimal fast-paths handle absolute certainties (e.g., entity detection via database lookups or high-confidence regex). LLM validation is applied only for weak detection methods like keyword detection.
 
 **Classification Strategy:**
-1.  **Minimal fast-paths**: Handles REFUSE, MULTI_INTENT, simple greetings, and entity detection.
-2.  **LLM semantic classification**: For all other intents, using a dedicated intent classification prompt.
+1.  **Minimal fast-paths**: Handles REFUSE, MULTI_INTENT, simple greetings, and product knowledge signals only. Entity detection (company/contact names) is used for observability logging but does NOT fast-path to any intent — all entity-containing queries are classified by the LLM.
+2.  **LLM semantic classification**: For all other intents (including entity-containing queries), using a dedicated intent classification prompt.
 3.  **LLM validation**: Only for weak heuristic matches.
 
 **Key Components:**
