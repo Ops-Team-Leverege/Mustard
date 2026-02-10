@@ -404,9 +404,13 @@ async function classifyByKeyword(
     // Lower confidence for acronym matches since they need validation
     const confidence = companyMatch?.matchType === "acronym" ? 0.70 : 0.85;
 
-    // Don't trigger multi-meeting for strategic advice requests
-    // "across all their stores" is about customer behavior, not "search across all meetings"
-    const hasMultiMeetingSignal = /\b(all|every|across|find|which|any)\b/i.test(question);
+    // Multi-meeting signals: strong standalone words + weak words that need meeting context
+    // "all/every/across" are strong scope signals on their own
+    // "find/which" only signal multi-meeting when near meeting-related words
+    const hasStrongMultiMeetingSignal = /\b(all|every|across)\b/i.test(question);
+    const hasWeakMultiMeetingSignal = /\b(find|which)\b/i.test(question) &&
+      /\b(meetings?|calls?|conversations?|transcripts?)\b/i.test(question);
+    const hasMultiMeetingSignal = hasStrongMultiMeetingSignal || hasWeakMultiMeetingSignal;
     const isDescribingSituation = /\b(pattern\s+we['']?re\s+seeing|emerging\s+pattern|customers?\s+want|they\s+want)\b/i.test(question);
 
     // If describing a situation with a strategic advice request, go to PRODUCT_KNOWLEDGE

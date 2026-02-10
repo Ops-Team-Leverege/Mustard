@@ -1320,6 +1320,13 @@ Would you like a brief meeting summary instead?`,
 function isSemanticQuestion(question: string): boolean {
   const q = question.toLowerCase();
   const semanticPatterns = [
+    // "any particular/specific [topic-word]" - strong semantic signal requiring LLM judgment
+    /\bany\s+(?:particular|specific)\s+(?:pain|issue|concern|problem|challenge|point|topic|question|feedback|need|request|objection|worry|feature|capability|requirement|interest|priority)\b/,
+    // "did [name] (from [company])? mention/discuss" - person-specific mention queries (not they/we/anyone which are handled below)
+    /\bdid\s+\w+\s+(?:from\s+\w+\s+)?(?:mention|mentioned|discuss|discussed|say|said|talk|bring)\s+(?:any|about|anything|something|that|the)\b/,
+    // pain point questions with discussion context - require semantic understanding
+    /\b(?:pain\s*points?|pain\s*areas?)\b.*\b(?:mention|discuss|talk|said|help|address|solve)\b/,
+    /\b(?:mention|discuss|talk|said|help|address|solve)\b.*\b(?:pain\s*points?|pain\s*areas?)\b/,
     // "any X device/hardware/etc"
     /\bany\s+\w+\s+(device|product|hardware|software|system|tool|appliance)\b/,
     // "what was the piece/type/kind of X" - specific vague referents

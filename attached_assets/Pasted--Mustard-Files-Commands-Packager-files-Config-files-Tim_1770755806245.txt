@@ -1,0 +1,226 @@
+
+
+
+Mustard
+Files
+Commands
+Packager files
+Config files
+/
+
+Time
+Deployment
+Source
+Log
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-10T20:33:31.242Z ==========
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] Received event request
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-10T20:33:31.242Z ==========
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] Received event request
+2026-02-10 12:33:31.24
+2912b19c
+User
+Event type: app_mention
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] Processing app_mention
+2026-02-10 12:33:31.24
+2912b19c
+User
+Event type: app_mention
+2026-02-10 12:33:31.24
+2912b19c
+User
+Slack payload type: event_callback
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] Event details: eventId=Ev0AE1B1AJQ3, clientMsgId=7d40e695-5b6b-49d8-b7d2-203a2fd971af, messageTs=1770755609.363189, threadTs=1770755609.363189, channel=C0A80S3HJNL
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] Event details: eventId=Ev0AE1B1AJQ3, clientMsgId=7d40e695-5b6b-49d8-b7d2-203a2fd971af, messageTs=1770755609.363189, threadTs=1770755609.363189, channel=C0A80S3HJNL
+2026-02-10 12:33:31.24
+2912b19c
+User
+[Slack] Processing app_mention
+2026-02-10 12:33:31.24
+2912b19c
+User
+Slack payload type: event_callback
+2026-02-10 12:33:31.24
+2912b19c
+User
+8:33:31 PM [express] POST /api/slack/events 200 in 9ms
+2026-02-10 12:33:31.24
+2912b19c
+User
+8:33:31 PM [express] POST /api/slack/events 200 in 9ms
+2026-02-10 12:33:31.85
+2912b19c
+User
+[Dedupe] Cleaned up 9 old entries
+2026-02-10 12:33:31.85
+2912b19c
+User
+[Dedupe] Cleaned up 9 old entries
+2026-02-10 12:33:33.72
+2912b19c
+User
+Processing: "did robert from cotsco mentioned any particular paint point that pitcrew could help with?" in channel C0A80S3HJNL (isReply=false)
+2026-02-10 12:33:33.72
+2912b19c
+User
+[INFO] [31d07433] Slack event received {"correlationId":"31d07433","channel":"C0A80S3HJNL","threadTs":"1770755609.363189","userId":"U082TV42FM0","duration":0,"text":"did robert from cotsco mentioned any particular paint point that pitcrew could help with?","isReply":false,"testRun":false}
+2026-02-10 12:33:33.72
+2912b19c
+User
+Processing: "did robert from cotsco mentioned any particular paint point that pitcrew could help with?" in channel C0A80S3HJNL (isReply=false)
+2026-02-10 12:33:33.72
+2912b19c
+User
+[INFO] [31d07433] Slack event received {"correlationId":"31d07433","channel":"C0A80S3HJNL","threadTs":"1770755609.363189","userId":"U082TV42FM0","duration":0,"text":"did robert from cotsco mentioned any particular paint point that pitcrew could help with?","isReply":false,"testRun":false}
+2026-02-10 12:33:35.52
+2912b19c
+User
+[ThreadResolver] Not a reply - returning empty context
+2026-02-10 12:33:35.52
+2912b19c
+User
+[ThreadResolver] Not a reply - returning empty context
+2026-02-10 12:33:35.82
+2912b19c
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-10 12:33:35.82
+2912b19c
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-10 12:33:41.72
+2912b19c
+User
+Last 3 messages:
+2026-02-10 12:33:41.72
+2912b19c
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-10 12:33:41.72
+2912b19c
+User
+Messages: 2
+2026-02-10 12:33:41.72
+2912b19c
+User
+Thread: 1770755609.363189
+2026-02-10 12:33:41.72
+2912b19c
+User
+Thread: 1770755609.363189
+2026-02-10 12:33:41.72
+2912b19c
+User
+[Slack] ✅ CONTEXT CHECKPOINT 2 - Slack Thread History:
+2026-02-10 12:33:41.72
+2912b19c
+User
+Messages: 2
+2026-02-10 12:33:41.72
+2912b19c
+User
+Last 3 messages:
+2026-02-10 12:33:41.72
+2912b19c
+User
+Question: "did robert from cotsco mentioned any particular paint point that pitcrew could help with?"
+2026-02-10 12:33:41.72
+2912b19c
+User
+2. Bot: "On it, <@U082TV42FM0> — let me check..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-10 12:33:41.72
+2912b19c
+User
+Thread Messages Preview:
+2026-02-10 12:33:41.72
+2912b19c
+User
+Thread Messages Preview:
+2026-02-10 12:33:41.72
+2912b19c
+User
+1. User: "<@U0A704T7THR> did robert from cotsco mentioned any particular paint point that pitcrew could help w..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+2. Bot: "On it, <@U082TV42FM0> — let me check..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+Thread Context: 2 messages
+2026-02-10 12:33:41.72
+2912b19c
+User
+Bot: "On it, <@U082TV42FM0> — let me check..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+Bot: "On it, <@U082TV42FM0> — let me check..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+Thread Context: 2 messages
+2026-02-10 12:33:41.72
+2912b19c
+User
+1. User: "<@U0A704T7THR> did robert from cotsco mentioned any particular paint point that pitcrew could help w..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+User: "<@U0A704T7THR> did robert from cotsco mentioned any particular paint point that ..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+Question: "did robert from cotsco mentioned any particular paint point that pitcrew could help with?"
+2026-02-10 12:33:41.72
+2912b19c
+User
+User: "<@U0A704T7THR> did robert from cotsco mentioned any particular paint point that ..."
+2026-02-10 12:33:41.72
+2912b19c
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-10 12:33:44.62
+2912b19c
+User
+[Intent] Loaded 39 companies from database
+2026-02-10 12:33:44.62
+2912b19c
+User
+[Intent] Loaded 39 companies from database
+2026-02-10 12:33:44.71
+2912b19c
+User
+[DecisionLayer] Contract: PATTERN_ANALYSIS (default)
+2026-02-10 12:33:44.71
+2912b19c
+User
+[AnswerContract] Selected: PATTERN_ANALYSIS (default)
+2026-02-10 12:33:44.71
+2912b19c
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":false,"multi_meeting":true,"slack_search":false}
