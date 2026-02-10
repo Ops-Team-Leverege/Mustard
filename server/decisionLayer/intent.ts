@@ -407,7 +407,22 @@ async function classifyByKeyword(
     console.log(`[IntentClassifier] Contact-only match "${contact}" — falling through to LLM for full classification (need company extraction)`);
   }
 
-  if (companyMatch) {
+  // Explicit Slack signals: when user references Slack as a data source
+  // These override entity-based fast-path to route to SLACK_SEARCH
+  const hasExplicitSlackSignal = /\b(in\s+slack|on\s+slack|from\s+slack|via\s+slack|search\s+slack|check\s+slack|slack\s+(for|about|messages?|channels?|threads?|dms?)|channel\s+#\w+|#[a-z][a-z0-9_-]+)\b/i.test(question);
+
+  if (companyMatch && hasExplicitSlackSignal) {
+    console.log(`[IntentClassifier] Entity "${companyMatch.company}" found with explicit Slack signal — fast-path to SLACK_SEARCH`);
+    return {
+      intent: Intent.SLACK_SEARCH,
+      intentDetectionMethod: "entity",
+      confidence: 0.92,
+      reason: `Contains known entity "${companyMatch.company}" with explicit Slack data source signal`,
+      extractedCompany: companyMatch.company,
+    };
+  }
+
+  if (companyMatch && !hasExplicitSlackSignal) {
     const entityName = companyMatch.company;
     // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
     const detectionMethod: IntentDetectionMethod = companyMatch.matchType === "acronym" ? "entity_acronym" : "entity";

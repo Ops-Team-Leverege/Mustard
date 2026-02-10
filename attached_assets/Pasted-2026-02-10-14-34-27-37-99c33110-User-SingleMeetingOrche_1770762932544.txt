@@ -1,0 +1,164 @@
+2026-02-10 14:34:27.37
+99c33110
+User
+[SingleMeetingOrchestrator] Keywords: update, costco | Proper nouns: slack
+2026-02-10 14:34:27.37
+99c33110
+User
+[SingleMeetingOrchestrator] Keywords: update, costco | Proper nouns: slack
+2026-02-10 14:34:27.37
+99c33110
+User
+[SingleMeetingOrchestrator] Parallel fetch complete: 4099ms
+2026-02-10 14:34:27.37
+99c33110
+User
+[SingleMeetingOrchestrator] Parallel fetch complete: 4099ms
+2026-02-10 14:34:27.47
+99c33110
+User
+[SingleMeetingOrchestrator] Fallback: transcript search
+2026-02-10 14:34:27.47
+99c33110
+User
+[SingleMeetingOrchestrator] Fallback: transcript search
+2026-02-10 14:34:29.47
+99c33110
+User
+[SingleMeetingOrchestrator] Transcript fetch: 6197ms
+2026-02-10 14:34:29.47
+99c33110
+User
+[SearchTranscript] Found 7 chunks matching keywords only
+2026-02-10 14:34:29.47
+99c33110
+User
+[SearchTranscript] Found 7 chunks matching keywords only
+2026-02-10 14:34:29.47
+99c33110
+User
+[SingleMeetingOrchestrator] Transcript fetch: 6197ms
+2026-02-10 14:34:29.77
+99c33110
+User
+[SingleMeetingOrchestrator] Semantic processing: judgment question requires filtering, using LLM answer
+2026-02-10 14:34:29.77
+99c33110
+User
+[SingleMeetingOrchestrator] Semantic processing: judgment question requires filtering, using LLM answer
+2026-02-10 14:34:29.77
+99c33110
+User
+[SingleMeetingOrchestrator] LLM judgment decision: isSemantic=true, isArtifactComplete=false, hasArtifacts=false, needsLLMJudgment=true
+2026-02-10 14:34:29.77
+99c33110
+User
+[SingleMeetingOrchestrator] LLM judgment decision: isSemantic=true, isArtifactComplete=false, hasArtifacts=false, needsLLMJudgment=true
+2026-02-10 14:34:29.87
+99c33110
+User
+[SemanticAnswer] Starting for meeting 23556924-79a5-43fd-b849-0ce88897a8bd
+2026-02-10 14:34:29.87
+99c33110
+User
+[SemanticAnswer] Starting for meeting 23556924-79a5-43fd-b849-0ce88897a8bd
+2026-02-10 14:34:38.18
+99c33110
+User
+[SemanticAnswer] Data fetch: 8304ms
+2026-02-10 14:34:38.18
+99c33110
+User
+[SemanticAnswer] Data fetch: 8304ms
+2026-02-10 14:34:39.17
+99c33110
+User
+[SemanticAnswer] Context window: 29909 chars (153 chunks fetched)
+2026-02-10 14:34:39.17
+99c33110
+User
+[SemanticAnswer] Context window: 29909 chars (153 chunks fetched)
+2026-02-10 14:34:39.27
+99c33110
+User
+[SemanticAnswer] Detected answer shape: yes_no
+2026-02-10 14:34:39.27
+99c33110
+User
+[SemanticAnswer] Detected answer shape: yes_no
+2026-02-10 14:34:41.14
+9d36b642
+System
+system: received signal terminated
+2026-02-10 14:34:41.14
+9d36b642
+System
+system: received signal terminated
+2026-02-10 14:34:41.17
+99c33110
+User
+[Slack] Updated placeholder with progress: "Gathering the latest updates on Slack regarding Co..."
+2026-02-10 14:34:41.17
+99c33110
+User
+[Slack] Updated placeholder with progress: "Gathering the latest updates on Slack regarding Co..."
+2026-02-10 14:34:43.78
+99c33110
+User
+[SemanticAnswer] Gemini call: 13904ms
+2026-02-10 14:34:43.78
+99c33110
+User
+[SemanticAnswer] Response length: 112
+2026-02-10 14:34:43.78
+99c33110
+User
+[SemanticAnswer] Gemini call: 13904ms
+2026-02-10 14:34:43.78
+99c33110
+User
+[SemanticAnswer] Response length: 112
+2026-02-10 14:34:44.07
+99c33110
+User
+[SingleMeetingOrchestrator] Semantic success: confidence=low
+2026-02-10 14:34:44.07
+99c33110
+User
+[SemanticAnswer] Complete | shape=yes_no | confidence=low | sources=customer_questions,action_items,transcript_chunks,attendees
+2026-02-10 14:34:44.07
+99c33110
+User
+[SemanticAnswer] Complete | shape=yes_no | confidence=low | sources=customer_questions,action_items,transcript_chunks,attendees
+2026-02-10 14:34:44.07
+99c33110
+User
+[SingleMeetingOrchestrator] Semantic success: confidence=low
+2026-02-10 14:34:44.17
+99c33110
+User
+[INFO] [77ce640b] Single meeting response generated {"correlationId":"77ce640b","channel":"C0A80S3HJNL","threadTs":"1770761507.122219","userId":"U082TV42FM0","duration":35999,"intent":"extractive","dataSource":"semantic","duration_ms":20799}
+2026-02-10 14:34:44.17
+99c33110
+User
+[INFO] [77ce640b] Single meeting response generated {"correlationId":"77ce640b","channel":"C0A80S3HJNL","threadTs":"1770761507.122219","userId":"U082TV42FM0","duration":35999,"intent":"extractive","dataSource":"semantic","duration_ms":20799}
+2026-02-10 14:34:44.17
+99c33110
+User
+[Slack] Single-meeting response: intent=extractive, source=semantic, pendingOffer=undefined, semantic=low
+2026-02-10 14:34:44.28
+99c33110
+User
+[Slack] Document decision: testRun=false, contract=NONE, streaming=true, willGenerateDoc=false
+2026-02-10 14:34:44.28
+99c33110
+User
+[Slack] Pipeline completed in 32004ms, progressMessages=0
+2026-02-10 14:34:45.17
+99c33110
+User
+[Slack] Updated streaming placeholder with final content (94 chars)
+2026-02-10 14:34:45.17
+99c33110
+User
+[INFO] [77ce640b] Request completed successfully {"correlationId":"77ce640b","channel":"C0A80S3HJNL","threadTs":"1770761507.122219","userId":"U082TV42FM0","duration":37100,"intent":"SINGLE_MEETING","contract":"EXTRACTIVE_FACT","responseLength":94,"totalTimeMs":32004,"stages":{"meeting_resolution":0,"decision_layer":2401,"handler":20799}}
