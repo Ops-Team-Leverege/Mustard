@@ -1,0 +1,63 @@
+Summary: Code Quality Improvements (Ousterhout-Style)
+What We Accomplished
+Phase 1: Critical Fixes ✅
+
+Consolidated duplicate MEETING_WORDS constant (was in 2 files)
+Centralized production-tunable values (timeouts, rate limits, session TTL)
+Added null safety check in semanticAnswerSingleMeeting.ts
+Removed unused test utilities from production code
+Phase 2: Maintainability Focus ✅
+
+Fixed misleading @deprecated comment (it wasn't deprecated, just internal)
+Created ERROR_HANDLING.md documenting existing patterns
+Added missing timeout constants (with Replit Agent's help)
+Key Decisions (Following Ousterhout)
+What We Did:
+
+✅ Centralized values used in multiple places
+✅ Centralized values that need production tuning
+✅ Documented existing patterns instead of creating new frameworks
+✅ Fixed misleading comments
+What We Avoided (No Over-Engineering):
+
+❌ Didn't create constants for every number
+❌ Didn't create custom error classes
+❌ Didn't add try-catch everywhere
+❌ Didn't create logging frameworks
+❌ Didn't move script-specific batch sizes to constants
+Files Changed
+Production Code:
+
+constants.ts
+ - Centralized configuration
+utils.ts
+ - Uses shared MEETING_WORDS
+meetingResolver.ts
+ - Removed duplicate
+events.ts
+ - Uses progress message constants
+transcriptAnalyzer.ts
+ - Uses timeout constants
+replitAuth.ts
+ - Uses auth constants
+security.ts
+ - Uses rate limit constants
+semanticAnswerSingleMeeting.ts
+ - Added null check
+followUpDetector.ts
+ - Removed test utilities
+singleMeetingOrchestrator.ts
+ - Fixed comment
+Documentation:
+
+ERROR_HANDLING.md
+ - Error handling patterns guide
+BUG_FIXES_PHASE1.md
+ - What was fixed and why
+.gitignore - Added ERROR_HANDLING.md to tracked docs
+Commits
+26d7345 - Phase 1: Consolidate constants and fix critical bugs
+f391e52 - Clarify error handling strategy
+97aeef2 - (Replit) Add missing constants for timeouts
+1d0feba - Fix missing WEBSITE_FETCH_MS constant
+The codebase is now more maintainable without being over-engineered. All changes follow the principle: make the code easier to understand and modify, not just "cleaner" by some abstract standard.
