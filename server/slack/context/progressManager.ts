@@ -7,6 +7,7 @@
 
 import { postSlackMessage } from "../slackApi";
 import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "../progressMessages";
+import { PROGRESS_MESSAGE_CONSTANTS } from "../../config/constants";
 
 export interface ProgressContext {
   channel: string;
@@ -23,7 +24,7 @@ export interface ProgressManager {
   sendPersonalizedProgress(userMessage: string, intentType: ProgressIntentType): Promise<void>;
 }
 
-const MAX_PROGRESS_MESSAGES = 4;
+const MAX_PROGRESS_MESSAGES = PROGRESS_MESSAGE_CONSTANTS.MAX_PROGRESS_MESSAGES;
 
 /**
  * Create a progress manager for a Slack thread.

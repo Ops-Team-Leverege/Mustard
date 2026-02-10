@@ -33,7 +33,7 @@ export const PROGRESS_MESSAGE_CONSTANTS = {
   /**
    * Maximum number of progress messages to send during processing.
    */
-  MAX_PROGRESS_MESSAGES: 4,
+  MAX_PROGRESS_MESSAGES: 1,
 
   /**
    * Delay between progress messages (milliseconds).
@@ -107,6 +107,18 @@ export const CONTENT_LIMITS = {
    * Maximum characters to keep from fetched website content.
    */
   WEBSITE_CONTENT_MAX_CHARS: 50000,
+} as const;
+
+export const STREAMING = {
+  /**
+   * Minimum interval between Slack message updates during streaming (milliseconds).
+   */
+  UPDATE_INTERVAL_MS: 1500,
+
+  /**
+   * Minimum accumulated content length before first Slack update.
+   */
+  MIN_CONTENT_FOR_UPDATE: 100,
 } as const;
 
 export const BATCH_CONSTANTS = {
