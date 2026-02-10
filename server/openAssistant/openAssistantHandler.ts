@@ -23,7 +23,7 @@ import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts"
 import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS, TOKEN_LIMITS } from "../config/models";
 import { TIMEOUT_CONSTANTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
-import { buildGeneralAssistancePrompt, buildGuidedAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
+import { buildGeneralAssistancePrompt, buildGuidedAssistancePrompt, buildMinimalAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
 
 import {
   type EvidenceSource,
@@ -41,6 +41,7 @@ import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getP
 import { getMeetingNotFoundMessage } from "../utils/notFoundMessages";
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "../storage";
+import { detectPromptSufficiency } from "../services/promptSufficiencyDetector";
 
 export type { EvidenceSource, IntentClassification, OpenAssistantContext, OpenAssistantResult };
 
@@ -1593,11 +1594,32 @@ Use this context to align suggestions with PitCrew's terminology and value propo
     }
   }
 
-  const systemPrompt = buildGuidedAssistancePrompt({
-    productKnowledgeSection,
-    meetingContext: meetingContextStr,
-    threadContext: threadContextSection,
-  });
+  // Detect prompt sufficiency (MINIMAL vs GUIDED mode)
+  const sufficiencyResult = await detectPromptSufficiency(userMessage);
+  console.log(`[OpenAssistant] Prompt mode: ${sufficiencyResult.mode} (${sufficiencyResult.reason})`);
+
+  // Build appropriate system prompt based on mode
+  let systemPrompt: string;
+  if (sufficiencyResult.mode === "MINIMAL") {
+    systemPrompt = buildMinimalAssistancePrompt({
+      productKnowledgeSection,
+      meetingContext: meetingContextStr,
+      threadContext: threadContextSection,
+    });
+  } else {
+    systemPrompt = buildGuidedAssistancePrompt({
+      productKnowledgeSection,
+      meetingContext: meetingContextStr,
+      threadContext: threadContextSection,
+    });
+  }
+
+  // Build personalized progress message for drafting contracts
+  let progressMessage: string | undefined;
+  if (isDraftingContract) {
+    const intentType = actualContract === AnswerContract.DRAFT_EMAIL ? 'draft_email' : 'draft_response';
+    progressMessage = await generatePersonalizedProgress(userMessage, intentType);
+  }
 
   // Use Gemini for GENERAL_HELP responses (comprehensive document generation)
   const gemini = getGeminiClient();
@@ -1613,6 +1635,7 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       context.slackStreaming
     );
     console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+    console.log(`[OpenAssistant] Fallback used: Gemini not configured. Mode: ${sufficiencyResult.mode}`);
 
     return {
       answer,
@@ -1625,11 +1648,6 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       delegatedToSingleMeeting: false,
       progressMessage,
       streamingCompleted: !!context.slackStreaming,
-      metadata: {
-        model: MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
-        fallbackUsed: true,
-        fallbackReason: "Gemini not configured",
-      },
     };
   }
 
@@ -1644,14 +1662,15 @@ Use this context to align suggestions with PitCrew's terminology and value propo
           parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }],
         },
       ],
-      generationConfig: {
+      config: {
         maxOutputTokens: maxTokens,
         temperature: 0.7,  // Balanced creativity
       },
     });
 
-    const answer = response.response?.text() || "I'd be happy to help. Could you provide more details?";
+    const answer = response.text || "I'd be happy to help. Could you provide more details?";
     console.log(`[OpenAssistant] Gemini response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+    console.log(`[OpenAssistant] Mode: ${sufficiencyResult.mode}, Confidence: ${sufficiencyResult.confidence}, Method: ${sufficiencyResult.detectionMethod}`);
 
     return {
       answer,
@@ -1664,11 +1683,6 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       delegatedToSingleMeeting: false,
       progressMessage,
       streamingCompleted: false,  // Gemini doesn't stream in this implementation
-      metadata: {
-        model: MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE,
-        maxTokens,
-        responseTime: Date.now() - startTime,
-      },
     };
   } catch (error) {
     console.error(`[OpenAssistant] Gemini error, falling back to OpenAI:`, error);
@@ -1681,6 +1695,7 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       context.slackStreaming
     );
     console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+    console.log(`[OpenAssistant] Fallback used: Gemini error. Mode: ${sufficiencyResult.mode}, Error: ${error instanceof Error ? error.message : "Unknown"}`);
 
     return {
       answer,
@@ -1693,12 +1708,6 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       delegatedToSingleMeeting: false,
       progressMessage,
       streamingCompleted: !!context.slackStreaming,
-      metadata: {
-        model: "gpt-4o",
-        fallbackUsed: true,
-        fallbackReason: error instanceof Error ? error.message : "Gemini API error",
-        maxTokens: 4000,  // Lower than Gemini
-      },
     };
   }
 }
