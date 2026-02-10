@@ -152,10 +152,9 @@ export const MODEL_ASSIGNMENTS = {
 /**
  * Token limits by model
  */
-export const TOKEN_LIMITS = {
+export const TOKEN_LIMITS: Record<string, number> = {
   [LLM_MODELS.FAST_CLASSIFICATION]: 1000,
   [LLM_MODELS.STANDARD_REASONING]: 2000,
   [LLM_MODELS.HEAVY_ANALYSIS]: 4000,
-  [LLM_MODELS.STREAMING_RESPONSE]: 2000,
-  [GEMINI_MODELS.FLASH]: 8000,  // For GENERAL_HELP and semantic analysis
-} as const;
+  [GEMINI_MODELS.FLASH]: 8000,
+};
