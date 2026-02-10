@@ -408,18 +408,13 @@ async function classifyByKeyword(
   }
 
   // Explicit Slack signals: when user references Slack as a data source
-  // These override entity-based fast-path to route to SLACK_SEARCH
+  // These bypass the entity fast-path and defer to LLM for semantic classification
   const hasExplicitSlackSignal = /\b(in\s+slack|on\s+slack|from\s+slack|via\s+slack|search\s+slack|check\s+slack|slack\s+(for|about|messages?|channels?|threads?|dms?)|channel\s+#\w+|#[a-z][a-z0-9_-]+)\b/i.test(question);
 
   if (companyMatch && hasExplicitSlackSignal) {
-    console.log(`[IntentClassifier] Entity "${companyMatch.company}" found with explicit Slack signal — fast-path to SLACK_SEARCH`);
-    return {
-      intent: Intent.SLACK_SEARCH,
-      intentDetectionMethod: "entity",
-      confidence: 0.92,
-      reason: `Contains known entity "${companyMatch.company}" with explicit Slack data source signal`,
-      extractedCompany: companyMatch.company,
-    };
+    console.log(`[IntentClassifier] Entity "${companyMatch.company}" found but explicit Slack signal detected — falling through to LLM for semantic classification`);
+    // Don't fast-path to any intent — let the LLM decide whether this is
+    // SLACK_SEARCH, PRODUCT_KNOWLEDGE, or something else based on full context.
   }
 
   if (companyMatch && !hasExplicitSlackSignal) {
