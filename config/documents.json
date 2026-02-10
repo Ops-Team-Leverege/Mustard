@@ -11,7 +11,7 @@
     "SLACK_MESSAGE_SEARCH",
     "SLACK_CHANNEL_INFO"
   ],
-  "wordThreshold": 200,
+  "wordThreshold": 300,
   "fileNamePattern": "{customer}_{type}_{date}.docx",
   "messages": {
     "VALUE_PROPOSITION": "Here's your value proposition doc — ready to edit and make it your own.",
