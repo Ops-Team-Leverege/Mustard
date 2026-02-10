@@ -1241,8 +1241,17 @@ function detectPitCrewContext(message: string): boolean {
  * Detect if the user wants to connect external research with PitCrew's
  * internal product knowledge (value props, features, etc.).
  * 
- * TODO: This should be replaced by proper contract chain detection.
- * Currently used as interim solution for EXTERNAL_RESEARCH intent.
+ * ARCHITECTURAL EXCEPTION: This bypasses the Decision Layer's contract chain
+ * mechanism. The Decision Layer is the sole authority for intent classification
+ * and contract selection, but product knowledge enrichment is handled here as
+ * a post-processing step because:
+ * 1. It depends on the EXTERNAL_RESEARCH result being available first
+ * 2. Contract chains don't yet support conditional chaining based on response content
+ * 3. The enrichment is a synthesis step (combining research + product data),
+ *    not a separate intent
+ * 
+ * TODO: Migrate to proper contract chain execution once the contract executor
+ * supports conditional/dependent chaining (tracked for future sprint).
  */
 function detectProductKnowledgeEnrichment(message: string): boolean {
   const lower = message.toLowerCase();
@@ -1265,7 +1274,12 @@ function detectProductKnowledgeEnrichment(message: string): boolean {
  * Chain product knowledge to enrich external research results with
  * internal PitCrew product data from Airtable.
  * 
- * TODO: Refactor to use proper contract chain execution via contractExecutor.
+ * ARCHITECTURAL EXCEPTION: See detectProductKnowledgeEnrichment() for rationale.
+ * This function executes the enrichment step, making a second LLM call to
+ * synthesize external research with internal product knowledge from Airtable.
+ * 
+ * TODO: Migrate to contract chain execution via contractExecutor once
+ * conditional/dependent chaining is supported.
  */
 async function chainProductKnowledgeEnrichment(
   originalRequest: string,

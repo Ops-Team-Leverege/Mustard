@@ -49,7 +49,6 @@ export type SingleMeetingResult = {
   pendingOffer?: "summary";
   semanticAnswerUsed?: boolean;
   semanticConfidence?: "high" | "medium" | "low";
-  isSemanticDebug?: boolean;
   semanticError?: string;
   isClarificationRequest?: boolean;
   isBinaryQuestion?: boolean;

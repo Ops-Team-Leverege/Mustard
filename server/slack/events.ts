@@ -23,6 +23,7 @@ import { generateAckWithMention, generateAck } from "./acknowledgments";
 import { createMCP, type MCPResult } from "../mcp/toolRouter";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
+import { classifyPipelineError } from "../utils/errorHandler";
 import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "./context/meetingResolver";
 import { resolveCompany } from "./context/companyResolver";
@@ -404,7 +405,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let pendingOffer: string | undefined;
       let semanticAnswerUsed: boolean | undefined;
       let semanticConfidence: string | undefined;
-      let isSemanticDebug: boolean | undefined;
       let semanticError: string | undefined;
       // Conversational behavior tracking
       let isClarificationRequest: boolean | undefined;
@@ -673,7 +673,6 @@ export async function slackEventsHandler(req: Request, res: Response) {
         pendingOffer = result.pendingOffer;
         semanticAnswerUsed = result.semanticAnswerUsed;
         semanticConfidence = result.semanticConfidence;
-        isSemanticDebug = result.isSemanticDebug;
         semanticError = result.semanticError;
         isClarificationRequest = result.isClarificationRequest;
         isBinaryQuestion = result.isBinaryQuestion;
@@ -1073,50 +1072,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
         });
       }
     } catch (err) {
-      // CRITICAL: Cancel progress timer to prevent sending progress message after error
       clearProgressTimer();
 
-      // Detect specific error types for better user messaging
-      const errorMessage = err instanceof Error ? err.message : String(err);
-      const errorCode = (err as any)?.code || (err as any)?.status;
+      const classified = classifyPipelineError(err);
 
-      let userMessage: string;
-      let errorType: string;
-
-      // OpenAI quota/rate limit errors
-      if (errorCode === 'insufficient_quota' || errorCode === 429 ||
-        errorMessage.includes('exceeded your current quota') ||
-        errorMessage.includes('rate limit')) {
-        errorType = "openai_quota";
-        userMessage = "I can't process this right now — the AI service quota has been exceeded. Please contact an admin to check the OpenAI billing settings.";
-      }
-      // OpenAI API key errors
-      else if (errorCode === 401 || errorMessage.includes('Incorrect API key') ||
-        errorMessage.includes('invalid_api_key')) {
-        errorType = "openai_auth";
-        userMessage = "I can't process this right now — there's an issue with the AI service configuration. Please contact an admin.";
-      }
-      // Generic errors
-      else {
-        errorType = "internal";
-        userMessage = "Sorry — I hit an internal error while processing that request.";
-      }
-
-      // Log with full context to persistent file AND console
-      const fullStack = err instanceof Error ? err.stack : undefined;
-      console.error(`[PIPELINE ERROR] ${errorType}:`, errorMessage, fullStack);
+      console.error(`[PIPELINE ERROR] ${classified.type}:`, classified.errorMessage, classified.stack);
       logger.error('Pipeline error', err, {
-        errorType,
-        errorCode,
-        errorMessage,
-        stack: fullStack,
+        errorType: classified.type,
+        errorCode: classified.errorCode,
+        errorMessage: classified.errorMessage,
+        stack: classified.stack,
         text: text.substring(0, 100),
       });
 
       if (!testRun) {
         await postSlackMessage({
           channel,
-          text: userMessage,
+          text: classified.userMessage,
           thread_ts: threadTs,
         });
       }

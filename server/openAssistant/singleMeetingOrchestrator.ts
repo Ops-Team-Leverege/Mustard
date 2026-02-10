@@ -1599,7 +1599,6 @@ export async function handleSingleMeetingQuestion(
             dataSource: "semantic",
             semanticAnswerUsed: true,
             semanticConfidence: semanticResult.confidence,
-            isSemanticDebug: true,
           };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
@@ -1613,9 +1612,9 @@ export async function handleSingleMeetingQuestion(
 
       // If still not found, offer summary
       if (result.dataSource === "not_found") {
-        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic, semanticError };
+        return { ...result, pendingOffer: "summary", semanticError };
       }
-      return { ...result, isSemanticDebug: isSemantic, semanticError };
+      return { ...result, semanticError };
     }
 
     case "aggregative": {
@@ -1639,7 +1638,6 @@ export async function handleSingleMeetingQuestion(
             dataSource: "semantic",
             semanticAnswerUsed: true,
             semanticConfidence: semanticResult.confidence,
-            isSemanticDebug: true,
           };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
@@ -1651,18 +1649,18 @@ export async function handleSingleMeetingQuestion(
 
       // If still not found, offer summary
       if (result.dataSource === "not_found") {
-        return { ...result, pendingOffer: "summary", isSemanticDebug: isSemantic, semanticError: aggSemanticError };
+        return { ...result, pendingOffer: "summary", semanticError: aggSemanticError };
       }
-      return { ...result, isSemanticDebug: isSemantic, semanticError: aggSemanticError };
+      return { ...result, semanticError: aggSemanticError };
     }
 
     case "summary":
       const summaryResult = await handleSummaryIntent(ctx);
-      return { ...summaryResult, isSemanticDebug: isSemantic };
+      return summaryResult;
 
     case "drafting": {
       const draftResult = await handleDraftingIntent(ctx, question, contract);
-      return { ...draftResult, isSemanticDebug: isSemantic };
+      return draftResult;
     }
 
     default:
@@ -1671,7 +1669,6 @@ export async function handleSingleMeetingQuestion(
         intent: "extractive",
         dataSource: "not_found",
         pendingOffer: "summary",
-        isSemanticDebug: isSemantic,
       };
   }
 }

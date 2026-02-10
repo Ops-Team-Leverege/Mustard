@@ -1,0 +1,125 @@
+⚠️ ISSUES FOUND
+1. ARCHITECTURAL VIOLATION: Bypassing Decision Layer
+Location: 
+openAssistantHandler.ts 1244-1270
+
+// TODO: This should be replaced by proper contract chain detection.
+// Currently used as interim solution for EXTERNAL_RESEARCH intent.
+Problem: Two functions (chainExternalResearchWithProductKnowledge and chainProductKnowledgeEnrichment) bypass the Decision Layer's contract chain mechanism. This violates the stated architecture where "Decision Layer is the SOLE authority for intent classification."
+
+Impact:
+
+Inconsistent routing logic
+Technical debt acknowledged but not addressed
+Makes debugging harder (two paths to same outcome)
+Recommendation: Either:
+
+Prioritize removing these TODO items
+Or document them as intentional exceptions with business justification
+2. POTENTIAL BUG: Unsafe Type Casting
+Location: 
+index.ts 254-255
+
+const meetingCountRows = await storage.rawQuery(`SELECT COUNT(*) as cnt FROM transcripts`);
+const meetingCount = parseInt(meetingCountRows?.[0]?.cnt as string, 10) || 0;
+Problem: Casting to string before parseInt assumes the database returns a string, but PostgreSQL COUNT() returns a number. If the value is already a number, parseInt will coerce it, but the cast is misleading.
+
+Recommendation:
+
+const meetingCount = Number(meetingCountRows?.[0]?.cnt) || 0;
+3. PERFORMANCE CONCERN: Sequential Database Queries
+Location: 
+companyResolver.ts 60-68
+
+async function resolveFromLLMExtraction(extractedName: string): Promise<CompanyMention | null> {
+  let rows = await storage.rawQuery(COMPANY_QUERIES.EXACT, [extractedName]);
+  if (!rows || rows.length === 0) {
+    rows = await storage.rawQuery(COMPANY_QUERIES.PREFIX, [extractedName]);
+  }
+  if ((!rows || rows.length === 0) && extractedName.length >= MIN_NAME_LENGTH_FOR_WORD_BOUNDARY) {
+    rows = await storage.rawQuery(COMPANY_QUERIES.WORD_BOUNDARY, [extractedName]);
+  }
+}
+Problem: Up to 3 sequential database calls for a single company lookup. In high-traffic scenarios, this adds latency (3x round-trip time).
+
+Impact:
+
+Worst case: 3 × 50ms = 150ms just for company lookup
+Multiplied across concurrent requests, this adds up
+Recommendation: Combine into a single query with priority ordering:
+
+SELECT id, name FROM companies 
+WHERE LOWER(name) = LOWER($1)
+   OR LOWER(name) LIKE LOWER($1) || '%'
+   OR (LENGTH($1) >= 4 AND (
+       LOWER(name) LIKE LOWER($1) || ' %' OR 
+       LOWER(name) LIKE '% ' || LOWER($1) || '%'
+   ))
+ORDER BY 
+  CASE 
+    WHEN LOWER(name) = LOWER($1) THEN 1
+    WHEN LOWER(name) LIKE LOWER($1) || '%' THEN 2
+    ELSE 3
+  END
+LIMIT 1;
+4. MISSING CONSTANT: Magic Number
+Location: 
+index.ts 257
+
+if (!hasTime && meetingCount > 100) {
+Problem: Hardcoded threshold 100 should be a named constant for maintainability.
+
+Recommendation: Add to MEETING_CONSTANTS:
+
+export const MEETING_CONSTANTS = {
+  // ... existing constants
+  CLARIFICATION_THRESHOLD: 100, // Ask for time range when meeting count exceeds this
+} as const;
+5. DEBUG CODE IN PRODUCTION
+Location: Multiple files (6+ occurrences)
+
+isSemanticDebug?: boolean;
+Problem: Debug flags scattered throughout production code without clear purpose or documentation.
+
+Recommendation:
+
+If still needed: Document why and control via environment variable
+If obsolete: Remove in next cleanup pass
+6. INCONSISTENT ERROR HANDLING
+Location: 
+events.ts 1084-1110
+
+The error handler has good categorization but:
+
+Logs to both console AND file (potentially redundant)
+Error type detection could be consolidated into a utility function
+No retry logic for transient failures (e.g., rate limits)
+Recommendation: Extract error classification into a utility:
+
+function classifyError(err: unknown): { type: string; userMessage: string; shouldRetry: boolean }
+🔴 BAD PRACTICES
+1. Inconsistent Naming Conventions
+scopeNote vs scope_note (camelCase vs snake_case mixing in metadata)
+meetingId vs meeting_id in different contexts
+cpDuration vs decision_layer_duration (abbreviations vs full names)
+Impact: Makes codebase harder to navigate and increases cognitive load.
+
+2. Comment Bloat
+Some files have excessive comments that restate the code:
+
+// Resolve company from thread context or Decision Layer extraction
+companyMentioned = await resolveCompany({
+  threadContext,
+  decisionLayerResult,
+});
+The function name already says what it does. Comments should explain "why", not "what".
+
+3. Long Functions
+slackEventsHandler is 1132 lines - way too long. While some extraction has been done (handlers), the main function is still a monolith that's hard to test and reason about.
+
+4. Type Safety Issues
+Multiple uses of as string and as any casts that bypass TypeScript's safety:
+
+meetingCountRows?.[0]?.cnt as string (line 255)
+(err as any)?.code (line 1088)
+These casts hide potential runtime errors.

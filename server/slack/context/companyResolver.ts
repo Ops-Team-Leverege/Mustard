@@ -34,13 +34,23 @@ const MIN_NAME_LENGTH_FOR_WORD_BOUNDARY = 4;
 
 const COMPANY_QUERIES = {
   BY_ID: `SELECT id, name FROM companies WHERE id = $1`,
-  EXACT: `SELECT id, name FROM companies WHERE LOWER(name) = LOWER($1)`,
-  PREFIX: `SELECT id, name FROM companies WHERE LOWER(name) LIKE LOWER($1) || '%'`,
-  WORD_BOUNDARY: `SELECT id, name FROM companies WHERE 
-    LOWER(name) LIKE LOWER($1) || ' %' OR 
-    LOWER(name) LIKE '% ' || LOWER($1) || '%' OR
-    LOWER(name) LIKE '%(' || LOWER($1) || ')%' OR
-    LOWER(name) LIKE '%(' || LOWER($1) || ' %'`,
+  PRIORITIZED_MATCH: `SELECT id, name,
+    CASE 
+      WHEN LOWER(name) = LOWER($1) THEN 1
+      WHEN LOWER(name) LIKE LOWER($1) || '%' THEN 2
+      ELSE 3
+    END AS match_priority
+    FROM companies
+    WHERE LOWER(name) = LOWER($1)
+      OR LOWER(name) LIKE LOWER($1) || '%'
+      OR (LENGTH($1) >= ${MIN_NAME_LENGTH_FOR_WORD_BOUNDARY} AND (
+        LOWER(name) LIKE LOWER($1) || ' %' OR 
+        LOWER(name) LIKE '% ' || LOWER($1) || '%' OR
+        LOWER(name) LIKE '%(' || LOWER($1) || ')%' OR
+        LOWER(name) LIKE '%(' || LOWER($1) || ' %'
+      ))
+    ORDER BY match_priority
+    LIMIT 1`,
 } as const;
 
 function toMention(row: Record<string, unknown>): CompanyMention {
@@ -57,16 +67,7 @@ async function resolveFromThreadContext(
 async function resolveFromLLMExtraction(
   extractedName: string
 ): Promise<CompanyMention | null> {
-  let rows = await storage.rawQuery(COMPANY_QUERIES.EXACT, [extractedName]);
-
-  if (!rows || rows.length === 0) {
-    rows = await storage.rawQuery(COMPANY_QUERIES.PREFIX, [extractedName]);
-  }
-
-  if ((!rows || rows.length === 0) && extractedName.length >= MIN_NAME_LENGTH_FOR_WORD_BOUNDARY) {
-    rows = await storage.rawQuery(COMPANY_QUERIES.WORD_BOUNDARY, [extractedName]);
-  }
-
+  const rows = await storage.rawQuery(COMPANY_QUERIES.PRIORITIZED_MATCH, [extractedName]);
   return rows?.[0] ? toMention(rows[0]) : null;
 }
 

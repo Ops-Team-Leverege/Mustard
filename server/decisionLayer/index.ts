@@ -18,6 +18,7 @@ import {
   type IntentClassificationResult,
   type IntentDetectionMethod,
 } from "./intent";
+import { MEETING_CONSTANTS } from "../config/constants";
 
 import {
   computeContextLayers,
@@ -198,7 +199,7 @@ function generateScopeNote(hasTime: boolean, hasScope: boolean): string {
 }
 
 function shouldAskForTimeRange(hasTime: boolean, meetingCount: number): string {
-  if (!hasTime && meetingCount > 100) {
+  if (!hasTime && meetingCount > MEETING_CONSTANTS.CLARIFICATION_THRESHOLD) {
     return `You have ${meetingCount} meetings on record. To keep the analysis focused, could you narrow the time range?
 
 - Last month
@@ -269,7 +270,7 @@ export async function runDecisionLayer(
 
     if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
       const meetingCountRows = await storage.rawQuery(`SELECT COUNT(*) as cnt FROM transcripts`);
-      const meetingCount = parseInt(meetingCountRows?.[0]?.cnt as string, 10) || 0;
+      const meetingCount = Number(meetingCountRows?.[0]?.cnt) || 0;
 
       const clarifyMessage = shouldAskForTimeRange(specificity.hasTimeRange, meetingCount);
 

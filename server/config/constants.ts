@@ -24,6 +24,8 @@ export const MEETING_CONSTANTS = {
    * Maximum number of chunks to retrieve for semantic search.
    */
   MAX_CHUNKS_FOR_SEARCH: 10,
+
+  CLARIFICATION_THRESHOLD: 100,
 } as const;
 
 /**

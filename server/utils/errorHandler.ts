@@ -114,3 +114,42 @@ export function logError(context: string, error: unknown): void {
   const stack = error instanceof Error ? error.stack : undefined;
   console.error(`[${context}] ${message}`, stack ? `\n${stack}` : "");
 }
+
+export interface ClassifiedError {
+  type: string;
+  userMessage: string;
+  errorMessage: string;
+  errorCode: string | number | undefined;
+  stack: string | undefined;
+}
+
+export function classifyPipelineError(err: unknown): ClassifiedError {
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  const errorCode = (err as AppError)?.code || (err as AppError)?.statusCode;
+  const stack = err instanceof Error ? err.stack : undefined;
+
+  if (errorCode === 'insufficient_quota' || errorCode === 429 ||
+    errorMessage.includes('exceeded your current quota') ||
+    errorMessage.includes('rate limit')) {
+    return {
+      type: "openai_quota",
+      userMessage: "I can't process this right now — the AI service quota has been exceeded. Please contact an admin to check the OpenAI billing settings.",
+      errorMessage, errorCode, stack,
+    };
+  }
+
+  if (errorCode === 401 || errorMessage.includes('Incorrect API key') ||
+    errorMessage.includes('invalid_api_key')) {
+    return {
+      type: "openai_auth",
+      userMessage: "I can't process this right now — there's an issue with the AI service configuration. Please contact an admin.",
+      errorMessage, errorCode, stack,
+    };
+  }
+
+  return {
+    type: "internal",
+    userMessage: "Sorry — I hit an internal error while processing that request.",
+    errorMessage, errorCode, stack,
+  };
+}
