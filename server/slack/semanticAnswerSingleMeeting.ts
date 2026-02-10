@@ -20,7 +20,6 @@ import OpenAI from "openai";
 import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
-import { MEETING_CONSTANTS } from "../config/constants";
 import { buildSemanticAnswerPrompt } from "../config/prompts/singleMeeting";
 
 const openai = new OpenAI({
@@ -157,7 +156,85 @@ function formatMeetingDate(date: Date | null | undefined): string {
   });
 }
 
-function buildContextWindow(ctx: MeetingContext): string {
+const SEMANTIC_STOP_WORDS = new Set([
+  "what", "when", "where", "which", "who", "whom", "whose", "that", "this",
+  "these", "those", "with", "from", "about", "into", "through", "during",
+  "before", "after", "above", "below", "between", "does", "have", "been",
+  "being", "having", "would", "could", "should", "might", "will", "shall",
+  "must", "need", "want", "like", "just", "also", "very", "much", "more",
+  "most", "some", "such", "than", "then", "them", "they", "their", "there",
+  "here", "only", "even", "well", "back", "were", "said", "each", "make",
+  "over", "because", "help", "mentioned", "mention", "particular", "could",
+  "pain", "point", "pitcrew",
+]);
+
+function extractSemanticKeywords(query: string): { keywords: string[]; speakerNames: string[] } {
+  const words = query.split(/\s+/);
+
+  const speakerNames = words
+    .filter((w, i) => i > 0 && /^[A-Z][a-z]+$/.test(w))
+    .map(w => w.toLowerCase());
+
+  const keywords = query.toLowerCase()
+    .split(/\s+/)
+    .map(w => w.replace(/[^a-z]/g, ''))
+    .filter(w => w.length > 2 && !SEMANTIC_STOP_WORDS.has(w) && !speakerNames.includes(w));
+
+  return { keywords, speakerNames };
+}
+
+function selectRelevantChunks(
+  chunks: TranscriptChunk[],
+  question: string,
+  maxChunks: number = 20
+): TranscriptChunk[] {
+  if (chunks.length <= maxChunks) return chunks;
+
+  const { keywords, speakerNames } = extractSemanticKeywords(question);
+  console.log(`[SemanticAnswer] Relevance filter: speakers=[${speakerNames.join(",")}], keywords=[${keywords.join(",")}]`);
+
+  const scored = chunks.map(chunk => {
+    let score = 0;
+    const content = chunk.content.toLowerCase();
+    const speaker = (chunk.speakerName || "").toLowerCase();
+
+    if (speakerNames.length > 0 && speakerNames.some(name => speaker.includes(name))) {
+      const isSubstantive = chunk.content.length > 30
+        && !/^(mhm|yeah|okay|cool|right|yes|no|uh|um|oh|hmm)[.!?,\s]*$/i.test(chunk.content.trim());
+      score += isSubstantive ? 10 : 1;
+    }
+
+    const keywordHits = keywords.filter(kw => content.includes(kw)).length;
+    score += keywordHits * 3;
+
+    if (chunk.content.length > 100) score += 1;
+    if (chunk.content.length > 200) score += 1;
+
+    return { chunk, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score || a.chunk.chunkIndex - b.chunk.chunkIndex);
+
+  const selected = scored
+    .filter(s => s.score > 0)
+    .slice(0, maxChunks)
+    .map(s => s.chunk);
+
+  if (selected.length < maxChunks) {
+    const selectedIds = new Set(selected.map(c => c.id));
+    const remaining = chunks
+      .filter(c => !selectedIds.has(c.id) && c.content.length > 50)
+      .slice(0, maxChunks - selected.length);
+    selected.push(...remaining);
+  }
+
+  selected.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+  console.log(`[SemanticAnswer] Selected ${selected.length} relevant chunks from ${chunks.length} total`);
+  return selected;
+}
+
+function buildContextWindow(ctx: MeetingContext, question?: string): string {
   const sections: string[] = [];
   const dateSuffix = ctx.meetingDate ? ` (${formatMeetingDate(ctx.meetingDate)})` : "";
 
@@ -204,8 +281,12 @@ function buildContextWindow(ctx: MeetingContext): string {
   }
 
   if (ctx.transcriptChunks.length > 0) {
+    const relevant = question
+      ? selectRelevantChunks(ctx.transcriptChunks, question)
+      : ctx.transcriptChunks.slice(0, 20);
+
     sections.push(`\n## Relevant Transcript Excerpts`);
-    ctx.transcriptChunks.slice(0, 5).forEach((chunk, i) => {
+    relevant.forEach((chunk, i) => {
       const speaker = chunk.speakerName || "Unknown";
       const content = chunk.content.length > 500
         ? chunk.content.substring(0, 500) + "..."
@@ -243,7 +324,7 @@ export async function semanticAnswerSingleMeeting(
     storage.getTranscriptById(meetingId),
     storage.getCustomerQuestionsByTranscript(meetingId),
     storage.getMeetingActionItemsByTranscript(meetingId),
-    storage.getChunksForTranscript(meetingId, MEETING_CONSTANTS.MAX_CHUNKS_FOR_SEARCH),
+    storage.getChunksForTranscript(meetingId, 500),
   ]);
 
   console.log(`[SemanticAnswer] Data fetch: ${Date.now() - startTime}ms`);
@@ -273,8 +354,8 @@ export async function semanticAnswerSingleMeeting(
     transcriptChunks: chunks,
   };
 
-  const contextWindow = buildContextWindow(context);
-  console.log(`[SemanticAnswer] Context window: ${contextWindow.length} chars`);
+  const contextWindow = buildContextWindow(context, userQuestion);
+  console.log(`[SemanticAnswer] Context window: ${contextWindow.length} chars (${chunks.length} chunks fetched)`);
 
   // STEP 1: Detect answer shape BEFORE prompting
   const answerShape = detectAnswerShape(userQuestion);
