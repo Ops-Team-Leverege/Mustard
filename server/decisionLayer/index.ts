@@ -114,6 +114,7 @@ export type DecisionLayerResult = {
   keyTopics?: string[];                            // Key topics being discussed
   shouldProceed?: boolean;                         // Should we proceed without clarification?
   clarificationSuggestion?: string;               // Specific clarification message if ambiguous
+  requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
 };
 
 // Backward compatibility alias
@@ -330,12 +331,14 @@ export async function runDecisionLayer(
     keyTopics: intentResult.keyTopics,
     shouldProceed: intentResult.shouldProceed,
     clarificationSuggestion: intentResult.clarificationSuggestion,
+    requiresSemantic: intentResult.requiresSemantic,
   };
 
   console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);
   console.log(`  Final Intent: ${finalResult.intent}`);
   console.log(`  Final Contract: ${finalResult.answerContract}`);
   console.log(`  Will Clarify: ${!!finalResult.clarifyMessage}`);
+  console.log(`  Requires Semantic: ${finalResult.requiresSemantic ?? 'not set (will default true)'}`);
   console.log(`  Scope Info: ${scopeInfo ? 'present' : 'none'}`);
   if (scopeNote) console.log(`  Scope Note: ${scopeNote}`);
 

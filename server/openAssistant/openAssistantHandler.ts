@@ -698,12 +698,13 @@ async function handleMeetingDataIntent(
     // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
 
-    // Pass the primary contract to the orchestrator to skip deprecated classification
+    // Pass the primary contract and LLM-determined semantic flag to the orchestrator
     const singleMeetingResult = await handleSingleMeetingQuestion(
       context.resolvedMeeting,
       userMessage,
       false,
-      primaryContract
+      primaryContract,
+      context.decisionLayerResult?.requiresSemantic
     );
 
     return {
@@ -769,12 +770,13 @@ async function handleMeetingDataIntent(
     // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
 
-    // Pass the primary contract to the orchestrator
+    // Pass the primary contract and LLM-determined semantic flag to the orchestrator
     const singleMeetingResult = await handleSingleMeetingQuestion(
       meeting,
       userMessage,
       false,
-      primaryContract
+      primaryContract,
+      context.decisionLayerResult?.requiresSemantic
     );
 
     return {
@@ -907,7 +909,8 @@ async function handleMultiMeetingIntent(
       meeting,
       userMessage,
       false,
-      primaryContract
+      primaryContract,
+      context.decisionLayerResult?.requiresSemantic
     );
 
     return {

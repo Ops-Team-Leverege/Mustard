@@ -112,6 +112,7 @@ export type IntentClassificationResult = {
   keyTopics?: string[];                            // Key topics being discussed
   shouldProceed?: boolean;                         // Should we proceed without clarification?
   clarificationSuggestion?: string;               // Specific clarification message if ambiguous
+  requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
 };
 
 // ============================================================================
@@ -434,6 +435,7 @@ async function classifyByKeyword(
         intentDetectionMethod: detectionMethod,
         confidence,
         reason: `Contains known entity "${entityName}" with multi-meeting signal`,
+        requiresSemantic: true, // Entity fast-path bypasses LLM; default to true for safety (artifact-complete contracts have their own guard)
       };
     }
 
@@ -442,6 +444,7 @@ async function classifyByKeyword(
       intentDetectionMethod: detectionMethod,
       confidence,
       reason: `Contains known entity "${entityName}" - likely asking about meeting`,
+      requiresSemantic: true, // Entity fast-path bypasses LLM; default to true for safety (artifact-complete contracts have their own guard)
     };
   }
 
@@ -521,6 +524,7 @@ async function classifyByLLM(
         keyTopics: parsed.keyTopics || undefined,
         shouldProceed: parsed.shouldProceed !== false, // Default to true unless explicitly false
         clarificationSuggestion: parsed.clarificationSuggestion || undefined,
+        requiresSemantic: parsed.requiresSemantic ?? undefined, // LLM-determined semantic processing flag
       };
     }
 

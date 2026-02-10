@@ -144,6 +144,32 @@ Always extract ANY company or entity name the user mentions, even if it is NOT i
 - "Tell me about the Pep Boys meeting" → extractedCompany: "Pep Boys" (even if not in list)
 This is essential so downstream logic can tell the user "I couldn't find X in our records" instead of asking them to repeat information they already provided.
 
+SEMANTIC PROCESSING DETERMINATION (requiresSemantic):
+For SINGLE_MEETING and MULTI_MEETING intents, determine whether the question requires semantic LLM processing of the full transcript, or whether structured artifacts (action items, attendees, customer questions) are sufficient.
+
+Set requiresSemantic = true when the question:
+- Asks about abstract concepts, implications, or interpretations ("any hardware device", "pain points")
+- References things discussed vaguely ("they were talking about", "mentioned", "brought up")
+- Asks person-specific mention queries ("did Robert mention any particular...", "what did Tyler say about...")
+- Requires judgment or filtering ("should we mention", "key points to bring up", "important things to discuss")
+- Uses vague referents ("the thing they mentioned", "what kind of", "anything about")
+- Asks "what type/kind/sort of" questions
+- Asks about topics, concerns, or issues in an open-ended way
+
+Set requiresSemantic = false when the question:
+- Asks for a simple list of artifacts ("what are the action items", "who attended", "what questions were asked")
+- Asks for a meeting summary
+- Asks for a specific factual detail that would be in structured data
+- Is a straightforward data retrieval that doesn't need interpretation
+
+Examples:
+- "what action items came out of the meeting?" → requiresSemantic: false (artifact retrieval)
+- "did Robert mention any particular pain point?" → requiresSemantic: true (person-specific, open-ended)
+- "what were their concerns about cameras?" → requiresSemantic: true (interpretation needed)
+- "who was in the meeting?" → requiresSemantic: false (artifact retrieval)
+- "should we mention the ROI discussion?" → requiresSemantic: true (judgment needed)
+- "what kind of hardware were they talking about?" → requiresSemantic: true (vague referent)
+
 Respond with JSON: {
   "intent": "INTENT_NAME", 
   "confidence": 0.0-1.0, 
@@ -151,6 +177,7 @@ Respond with JSON: {
   "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
   "extractedCompanies": ["array of company names if multiple"],
   "proposedContracts": ["CONTRACT_NAME"],
+  "requiresSemantic": true/false,
   "isAmbiguous": true/false,
   "conversationContext": "what is this conversation about?",
   "keyTopics": ["topic1", "topic2"],

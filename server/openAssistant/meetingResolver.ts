@@ -739,7 +739,7 @@ export async function searchAcrossMeetings(
     meetingsToSearch.map(async (meeting) => {
       try {
         // Use EXTRACTIVE_FACT for cross-meeting search (enforces Decision Layer authority)
-        const result = await handleSingleMeetingQuestion(meeting, userMessage, false, AnswerContract.EXTRACTIVE_FACT);
+        const result = await handleSingleMeetingQuestion(meeting, userMessage, false, AnswerContract.EXTRACTIVE_FACT, undefined);
         if (result.dataSource !== "not_found") {
           return {
             companyName: meeting.companyName,
