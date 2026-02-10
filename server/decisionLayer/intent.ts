@@ -398,12 +398,21 @@ async function classifyByKeyword(
   const companyMatch = await containsKnownCompany(question);
   const contact = containsKnownContact(question);
 
-  if (companyMatch || contact) {
-    const entityName = companyMatch?.company || contact;
+  // Contact-only matches (no company) fall through to LLM classification.
+  // A generic first name like "robert" isn't authoritative enough to skip LLM —
+  // the LLM needs to run to extract the company name (even misspelled ones like "cotsco" → Costco),
+  // propose the right contract, and set requiresSemantic properly.
+  // Company matches ARE authoritative — if someone mentions "Les Schwab" we know it's about a meeting.
+  if (contact && !companyMatch) {
+    console.log(`[IntentClassifier] Contact-only match "${contact}" — falling through to LLM for full classification (need company extraction)`);
+  }
+
+  if (companyMatch) {
+    const entityName = companyMatch.company;
     // "entity" = full match (authoritative), "entity_acronym" = acronym match (needs LLM validation)
-    const detectionMethod: IntentDetectionMethod = companyMatch?.matchType === "acronym" ? "entity_acronym" : "entity";
+    const detectionMethod: IntentDetectionMethod = companyMatch.matchType === "acronym" ? "entity_acronym" : "entity";
     // Lower confidence for acronym matches since they need validation
-    const confidence = companyMatch?.matchType === "acronym" ? 0.70 : 0.85;
+    const confidence = companyMatch.matchType === "acronym" ? 0.70 : 0.85;
 
     // Multi-meeting signals: strong standalone words + weak words that need meeting context
     // "all/every/across" are strong scope signals on their own

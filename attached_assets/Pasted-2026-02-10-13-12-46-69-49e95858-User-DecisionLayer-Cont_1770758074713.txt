@@ -1,0 +1,208 @@
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"slack_search":false}
+2026-02-10 13:12:46.69
+49e95858
+User
+Contract: EXTRACTIVE_FACT
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] Intent: SINGLE_MEETING (entity)
+2026-02-10 13:12:46.69
+49e95858
+User
+- Conversation Context: none
+2026-02-10 13:12:46.69
+49e95858
+User
+- Clarification Suggestion: none
+2026-02-10 13:12:46.69
+49e95858
+User
+Will Clarify: false
+2026-02-10 13:12:46.69
+49e95858
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"slack_search":false}
+2026-02-10 13:12:46.69
+49e95858
+User
+Will Clarify: false
+2026-02-10 13:12:46.69
+49e95858
+User
+Requires Semantic: true
+2026-02-10 13:12:46.69
+49e95858
+User
+- Extracted Companies: none
+2026-02-10 13:12:46.69
+49e95858
+User
+- Extracted Company: none
+2026-02-10 13:12:46.69
+49e95858
+User
+Clarify Message: none
+2026-02-10 13:12:46.69
+49e95858
+User
+[Slack] Control plane: intent=SINGLE_MEETING, contract=EXTRACTIVE_FACT, method=entity, layers={"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"slack_search":false}
+2026-02-10 13:12:46.69
+49e95858
+User
+Scope Info: none
+2026-02-10 13:12:46.69
+49e95858
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-10 13:12:46.69
+49e95858
+User
+[CompanyResolver] No company resolved from any source
+2026-02-10 13:12:46.69
+49e95858
+User
+Intent: SINGLE_MEETING (entity)
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-10 13:12:46.69
+49e95858
+User
+Final Intent: SINGLE_MEETING
+2026-02-10 13:12:46.69
+49e95858
+User
+Clarify Message: none
+2026-02-10 13:12:46.69
+49e95858
+User
+[AnswerContract] Selected: EXTRACTIVE_FACT (default)
+2026-02-10 13:12:46.69
+49e95858
+User
+- Should Proceed: yes
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] Intent: SINGLE_MEETING (entity)
+2026-02-10 13:12:46.69
+49e95858
+User
+Scope: undefined
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-10 13:12:46.69
+49e95858
+User
+Intent: SINGLE_MEETING (entity)
+2026-02-10 13:12:46.69
+49e95858
+User
+- Is Ambiguous: no
+2026-02-10 13:12:46.69
+49e95858
+User
+[IntentClassifier] Keyword match: SINGLE_MEETING
+2026-02-10 13:12:46.69
+49e95858
+User
+[AnswerContract] Selected: EXTRACTIVE_FACT (default)
+2026-02-10 13:12:46.69
+49e95858
+User
+Semantic Context:
+2026-02-10 13:12:46.69
+49e95858
+User
+Scope Info: none
+2026-02-10 13:12:46.69
+49e95858
+User
+- Extracted Company: none
+2026-02-10 13:12:46.69
+49e95858
+User
+[IntentClassifier] Keyword match: SINGLE_MEETING
+2026-02-10 13:12:46.69
+49e95858
+User
+- Extracted Companies: none
+2026-02-10 13:12:46.69
+49e95858
+User
+Final Contract: EXTRACTIVE_FACT
+2026-02-10 13:12:46.69
+49e95858
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":true,"multi_meeting":false,"slack_search":false}
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] Contract: EXTRACTIVE_FACT (default)
+2026-02-10 13:12:46.69
+49e95858
+User
+Requires Semantic: true
+2026-02-10 13:12:46.69
+49e95858
+User
+[DecisionLayer] Contract: EXTRACTIVE_FACT (default)
+2026-02-10 13:12:46.69
+49e95858
+User
+Scope: undefined
+2026-02-10 13:12:50.80
+49e95858
+User
+[MeetingResolver] Meeting reference detection: regex=false, llm=true, final=true, latency=3300ms
+2026-02-10 13:12:50.80
+49e95858
+User
+[Slack] Meeting resolution: hasMeetingRef=true, company=none
+2026-02-10 13:12:50.80
+49e95858
+User
+[MeetingResolver] LLM classifier: "did robert from cotsco mentioned any par..." -> YES (3300ms)
+2026-02-10 13:12:50.89
+49e95858
+User
+[MeetingResolver] Resolving meeting from message: "did robert from cotsco mentioned any particular pa..." (llmDetected=true)
+2026-02-10 13:12:51.90
+49e95858
+User
+[INFO] [e606d6c3] Decision Layer completed {"correlationId":"e606d6c3","channel":"C0A80S3HJNL","threadTs":"1770757955.829069","userId":"U082TV42FM0","duration":11700,"intent":"SINGLE_MEETING","contract":"EXTRACTIVE_FACT","method":"entity","duration_ms":3002}
+2026-02-10 13:12:51.90
+49e95858
+User
+[INFO] [e606d6c3] Decision Layer completed {"correlationId":"e606d6c3","channel":"C0A80S3HJNL","threadTs":"1770757955.829069","userId":"U082TV42FM0","duration":11700,"intent":"SINGLE_MEETING","contract":"EXTRACTIVE_FACT","method":"entity","duration_ms":3002}
+2026-02-10 13:12:51.99
+49e95858
+User
+[Slack] Document decision: testRun=false, contract=NONE, streaming=false, willGenerateDoc=false
+2026-02-10 13:12:51.99
+49e95858
+User
+[Slack] Document decision: testRun=false, contract=NONE, streaming=false, willGenerateDoc=false
+2026-02-10 13:12:51.99
+49e95858
+User
+[Slack] Pipeline completed in 9299ms, progressMessages=0
+2026-02-10 13:12:51.99
+49e95858
+User
+[Slack] Pipeline completed in 9299ms, progressMessages=0
+2026-02-10 13:12:53.80
+49e95858
+User
+[INFO] [e606d6c3] Request completed successfully {"correlationId":"e606d6c3","channel":"C0A80S3HJNL","threadTs":"1770757955.829069","userId":"U082TV42FM0","duration":13600,"intent":"SINGLE_MEETING","contract":"EXTRACTIVE_FACT","responseLength":95,"totalTimeMs":9299,"stages":{"meeting_resolution":1100,"decision_layer":3002,"handler":0}}
+2026-02-10 13:12:53.80
+49e95858
+User
+[INFO] [e606d6c3] Request completed successfully {"correlationId":"e606d6c3","channel":"C0A80S3HJNL","threadTs":"1770757955.829069","userId":"U082TV42FM0","duration":13600,"intent":"SINGLE_MEETING","contract":"EXTRACTIVE_FACT","responseLength":95,"totalTimeMs":9299,"stages":{"meeting_resolution":1100,"decision_layer":3002,"handler":0}}
