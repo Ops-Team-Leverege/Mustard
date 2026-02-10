@@ -55,7 +55,14 @@ export const TIMEOUT_CONSTANTS = {
    * Standard API timeout (milliseconds).
    */
   STANDARD_API_TIMEOUT_MS: 60000, // 1 minute
+
+  /**
+   * Max age (seconds) of a Slack request timestamp before it's rejected as a replay attack.
+   */
+  SLACK_SIGNATURE_TOLERANCE_SECONDS: 300, // 5 minutes
 } as const;
+
+export const TIMEOUTS = TIMEOUT_CONSTANTS;
 
 /**
  * Session and authentication configuration
@@ -90,6 +97,13 @@ export const RATE_LIMIT_CONSTANTS = {
 /**
  * Batch processing configuration
  */
+export const CONTENT_LIMITS = {
+  /**
+   * Maximum characters to keep from fetched website content.
+   */
+  WEBSITE_CONTENT_MAX_CHARS: 50000,
+} as const;
+
 export const BATCH_CONSTANTS = {
   /**
    * Default batch size for processing operations.
