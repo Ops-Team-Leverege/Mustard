@@ -8,6 +8,13 @@
 /**
  * Meeting-related constants
  */
+export const MEETING_LIMITS = {
+  MAX_MEETINGS_PER_COMPANY: 10,
+  MAX_TOTAL_TRANSCRIPTS: 50,
+  CHUNK_LIMIT_DEFAULT: 50,
+  CHUNK_LIMIT_COMMITMENTS: 200,
+} as const;
+
 export const MEETING_CONSTANTS = {
   /**
    * Meeting-like words that users use to refer to meetings.
