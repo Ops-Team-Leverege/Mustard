@@ -21,6 +21,7 @@ import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { MEETING_CONSTANTS } from "../config/constants";
+import { buildSemanticAnswerPrompt } from "../config/prompts/singleMeeting";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -145,118 +146,7 @@ interface MeetingContext {
   transcriptChunks: TranscriptChunk[];
 }
 
-/**
- * Global "DO NOT" rules for all prompts.
- * These reduce variability and make outputs stable.
- */
-const GLOBAL_DONOT_RULES = `
-STRICT RULES (DO NOT VIOLATE):
-- Do NOT explain your reasoning
-- Do NOT quote long transcript passages unless specifically asked
-- Do NOT replace a direct answer with context
-- Do NOT apologize for missing information
-- Do NOT say "I couldn't generate an answer" or "I wasn't able to"
-- Do NOT summarize unless the user explicitly asked for a summary
-- Do NOT mention other meetings
-- You may ONLY use the provided meeting data`;
-
-/**
- * Build shape-specific system prompt.
- * Prompts only decide HOW to say it, not WHAT the answer is.
- */
-function buildSystemPrompt(shape: AnswerShape): string {
-  const basePrompt = `You are answering a question about a single meeting.
-Use Slack markdown formatting (*bold* for emphasis, _italics_ for quotes).`;
-
-  let shapeInstructions: string;
-
-  switch (shape) {
-    case "single_value":
-      shapeInstructions = `
-ANSWER FORMAT: Single Value
-The user asked a specific factual question (which/where/who/when).
-The direct answer is already in the meeting data.
-
-RESPOND WITH:
-- The direct answer only
-- One short sentence
-- Do NOT summarize
-- Do NOT quote context
-- Do NOT explain unless the user asks why
-
-Example good response: "It was Store 2."
-Example bad response: "Based on the meeting discussion about store locations, it appears that..."`;
-      break;
-
-    case "yes_no":
-      shapeInstructions = `
-ANSWER FORMAT: Yes/No
-The user asked a yes/no question.
-
-RESPOND WITH:
-- Answer yes or no FIRST
-- Add the key fact (e.g., date, name)
-- Then optionally offer more detail
-- Do NOT include a summary unless explicitly requested
-
-Example good response:
-"Yes — there was a meeting with Walmart on October 29, 2025.
-Would you like a brief summary?"
-
-Example bad response:
-"The meeting with Walmart covered several topics including..."`;
-      break;
-
-    case "list":
-      shapeInstructions = `
-ANSWER FORMAT: List (Next Steps / Action Items)
-The user asked for a list of action items, next steps, or things to mention.
-
-RESPOND WITH:
-- A structured bullet list with rich formatting
-- Each item on its own line starting with •
-- Include WHO is responsible (if known), and any DEADLINE (if mentioned)
-- Include a brief citation in _italics_ showing the speaker's actual words
-- Filter/prioritize based on what the user asked (e.g., "should we mention" = most important items)
-
-FORMAT EACH ITEM AS:
-• [Action description] — [Owner] _(deadline if any)_
-  _"[Brief quote from transcript]"_
-  — [Speaker name]
-
-Example good response:
-• Remove specific bays from report calculations — Eric
-  _"Eric's asking if we can remove the bays from those calculations."_
-  — Corey Chang
-
-• Set up text messaging alerts for the manager — Rob _(End of day)_
-  _"We're going to set up the text messaging so that way the manager gets alerts today."_
-  — Corey Chang`;
-      break;
-
-    case "summary":
-      shapeInstructions = `
-ANSWER FORMAT: Summary
-The user explicitly requested a summary.
-
-RESPOND WITH:
-- A concise summary of the meeting
-- Do not introduce new facts
-- Clearly label it as a summary
-- Focus on key points, decisions, and outcomes`;
-      break;
-  }
-
-  return `${basePrompt}
-${shapeInstructions}
-${GLOBAL_DONOT_RULES}
-
-CONFIDENCE ASSESSMENT:
-At the end of your response, on a new line, add exactly one of:
-[CONFIDENCE: high] - Answer is directly supported by meeting data
-[CONFIDENCE: medium] - Answer is reasonably inferred from context
-[CONFIDENCE: low] - Answer is uncertain, partial, OR the information was not found in the meeting data`;
-}
+// buildSystemPrompt and GLOBAL_DONOT_RULES moved to config/prompts/singleMeeting.ts
 
 function formatMeetingDate(date: Date | null | undefined): string {
   if (!date) return "";
@@ -395,7 +285,7 @@ export async function semanticAnswerSingleMeeting(
   if (leverageTeam.length > 0 || customerNames.length > 0) evidenceSources.push("attendees");
 
   // STEP 2: Build shape-specific prompt
-  const systemPrompt = buildSystemPrompt(answerShape);
+  const systemPrompt = buildSemanticAnswerPrompt(answerShape);
 
   try {
     const response = await openai.chat.completions.create({

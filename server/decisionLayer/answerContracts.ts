@@ -87,6 +87,7 @@ import { OpenAI } from "openai";
 import { Intent } from "./intent";
 import { ContextLayers } from "./contextLayers";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { buildContractSelectionPrompt } from "../config/prompts/decisionLayer";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -1113,21 +1114,7 @@ async function selectContractByLLM(
   _layers: ContextLayers
 ): Promise<AnswerContractResult> {
   const validContracts = Object.keys(AnswerContract).join(", ");
-
-  const systemPrompt = `You are selecting an answer contract for a question.
-
-Intent: ${intent}
-
-Available contracts: ${validContracts}
-
-For SINGLE_MEETING intent, prefer:
-- MEETING_SUMMARY: when user asks for summary/overview
-- NEXT_STEPS: when asking about action items, commitments, follow-ups
-- ATTENDEES: when asking who was present
-- CUSTOMER_QUESTIONS: when asking what the customer asked
-- EXTRACTIVE_FACT: for specific factual questions about the meeting
-
-Respond with JSON: {"contract": "CONTRACT_NAME", "reason": "brief explanation"}`;
+  const systemPrompt = buildContractSelectionPrompt(intent, validContracts);
 
   try {
     const response = await openai.chat.completions.create({
