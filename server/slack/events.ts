@@ -719,32 +719,36 @@ export async function slackEventsHandler(req: Request, res: Response) {
           };
           console.log(`[Slack] Streaming placeholder posted with preview mode: ts=${placeholderMsg.ts}`);
         } else if (mightGenerateDoc) {
-          console.log(`[Slack] Skipping streaming for doc-generating contract: ${decisionLayerResult.answerContract}`);
-          // For doc-generating contracts, send personalized progress (with coordination)
+          // Doc-generating contracts also use a streaming placeholder
+          // The placeholder gets updated with progress, then final answer (or doc link)
+          const placeholderMsg = await postSlackMessage({
+            channel,
+            text: "...",
+            thread_ts: threadTs,
+          });
+          streamingContext = {
+            channel,
+            messageTs: placeholderMsg.ts,
+            threadTs,
+          };
+          console.log(`[Slack] Doc-generating streaming placeholder posted: ts=${placeholderMsg.ts}`);
+
           const intentType = decisionLayerResult.intent === 'MULTI_MEETING' ? 'multi_meeting' :
             decisionLayerResult.intent === 'PRODUCT_KNOWLEDGE' ? 'product_knowledge' :
               decisionLayerResult.intent === 'EXTERNAL_RESEARCH' ? 'external_research' : 'single_meeting';
           generatePersonalizedProgressMessage(text, intentType as ProgressIntentType).then(async (personalizedProgress) => {
-            // Double-check coordination flag to prevent race condition
-            if (!canPostProgress()) {
-              console.log(`[Slack] Doc progress skipped - response already sent`);
-              return;
-            }
+            if (!canPostProgress()) return;
             try {
-              // Double-check after await to prevent race (response may have been sent during LLM generation)
-              if (responseSent) {
-                console.log(`[Slack] Doc progress skipped - response sent during generation`);
-                return;
-              }
-              await postSlackMessage({
+              if (responseSent) return;
+              const { updateSlackMessage } = await import("./slackApi");
+              await updateSlackMessage({
                 channel,
+                ts: placeholderMsg.ts,
                 text: personalizedProgress,
-                thread_ts: threadTs,
               });
-              progressMessageCount++;
-              console.log(`[Slack] Doc personalized progress sent`);
+              console.log(`[Slack] Updated doc placeholder with progress: "${personalizedProgress.substring(0, 50)}..."`);
             } catch (err) {
-              console.error(`[Slack] Failed to send doc progress:`, err);
+              console.error(`[Slack] Failed to update doc placeholder with progress:`, err);
             }
           }).catch(() => { });
         }
