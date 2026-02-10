@@ -268,7 +268,7 @@ export async function runDecisionLayer(
 
     console.log(`[DecisionLayer] LLM scope detection: scopeType=${scopeInfo.scopeType}, allCustomers=${scopeInfo.allCustomers}, specificCompanies=${JSON.stringify(scopeInfo.specificCompanies)}, hasTimeRange=${scopeInfo.hasTimeRange} (${scopeInfo.timeRangeExplanation}), meetingLimit=${scopeInfo.meetingLimit}`);
 
-    if (AGGREGATE_CONTRACTS.includes(contractResult.contract)) {
+    if (AGGREGATE_CONTRACTS.includes(contractResult.contract) && effectiveAllCustomers) {
       const meetingCountRows = await storage.rawQuery(`SELECT COUNT(*) as cnt FROM transcripts`);
       const meetingCount = Number(meetingCountRows?.[0]?.cnt) || 0;
 
