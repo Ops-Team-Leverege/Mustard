@@ -470,17 +470,30 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Use LLM-extracted company from Decision Layer (semantic understanding)
       // This replaces regex-based extraction with conversation-aware context extraction
-      if (!threadContext?.companyId) {
+      if (threadContext?.companyId) {
+        // Thread already has company context from prior interaction — populate companyMentioned
+        // so downstream code (meeting resolution, Open Assistant) has it available
+        const companyRows = await storage.rawQuery(
+          `SELECT id, name FROM companies WHERE id = $1`,
+          [threadContext.companyId]
+        );
+        if (companyRows && companyRows.length > 0) {
+          companyMentioned = {
+            companyId: companyRows[0].id as string,
+            companyName: companyRows[0].name as string,
+          };
+          console.log(`[Slack] Company from thread context: ${companyMentioned.companyName}`);
+        }
+      }
+
+      if (!companyMentioned) {
         // Check if LLM extracted a company from conversation context
         if (decisionLayerResult.extractedCompany) {
-          // Look up company ID from extracted name
-          // Try exact match first, then partial match (for "ACE" → "ACE Hardware")
           let companyRows = await storage.rawQuery(
             `SELECT id, name FROM companies WHERE LOWER(name) = LOWER($1)`,
             [decisionLayerResult.extractedCompany]
           );
 
-          // If no exact match, try prefix match (company name starts with extracted name)
           if (!companyRows || companyRows.length === 0) {
             companyRows = await storage.rawQuery(
               `SELECT id, name FROM companies WHERE LOWER(name) LIKE LOWER($1) || '%'`,
@@ -488,11 +501,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
             );
           }
 
-          // If still no match, try word boundary match (extracted name as complete word in company name)
-          // Only if extracted name is 4+ chars to avoid false positives like "ACE" matching "Palace"
           const extractedName = decisionLayerResult.extractedCompany;
           if ((!companyRows || companyRows.length === 0) && extractedName.length >= 4) {
-            // Match as word boundary: start of string, after space, or in parentheses
             companyRows = await storage.rawQuery(
               `SELECT id, name FROM companies WHERE 
                 LOWER(name) LIKE LOWER($1) || ' %' OR 
@@ -508,7 +518,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               companyId: companyRows[0].id as string,
               companyName: companyRows[0].name as string,
             };
-            console.log(`[Slack] Company resolved: ${companyMentioned.companyName}`);
+            console.log(`[Slack] Company resolved from LLM extraction: ${companyMentioned.companyName}`);
           } else {
             console.warn(`[Slack] Company "${decisionLayerResult.extractedCompany}" not found in database`);
           }
@@ -522,10 +532,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
         // If still not found, scan thread history for company mentions
         if (!companyMentioned && threadContextForCP?.messages && threadContextForCP.messages.length > 1) {
           for (const msg of threadContextForCP.messages) {
-            if (msg.isBot) continue; // Skip bot messages
+            if (msg.isBot) continue;
             const extracted = await extractCompanyFromMessage(msg.text);
             if (extracted) {
               companyMentioned = extracted;
+              console.log(`[Slack] Company resolved from thread history: ${companyMentioned.companyName}`);
               break;
             }
           }
@@ -807,8 +818,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
         openAssistantResultData = await handleOpenAssistant(text, {
           userId: userId || undefined,
           threadId: threadTs,
-          conversationContext: threadContext ? `Company: ${resolvedMeeting?.companyName || 'unknown'}` :
-            companyMentioned ? `Company: ${companyMentioned.companyName}` : undefined,
+          conversationContext: companyMentioned ? `Company: ${companyMentioned.companyName}` :
+            resolvedMeeting ? `Company: ${resolvedMeeting.companyName}` : undefined,
           threadMessages: threadContextForCP?.messages,
           resolvedMeeting: resolvedMeeting ? {
             meetingId: resolvedMeeting.meetingId,
