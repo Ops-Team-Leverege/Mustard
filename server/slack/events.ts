@@ -43,6 +43,7 @@ import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmat
 import { handleAnswerQuestions } from "./handlers/answerQuestionsHandler";
 import { createProgressManager } from "./context/progressManager";
 import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
+import { getSourceAttribution } from "./sourceAttribution";
 import { getMeetingNotFoundMessage } from "../utils/notFoundMessages";
 
 export interface PipelineTiming {
@@ -821,6 +822,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
       // Clear progress timer now that we have a response ready
       clearProgressTimer();
 
+      // Append source attribution to response for transparency
+      const sourceAttribution = getSourceAttribution({
+        dataSource,
+        semanticAnswerUsed,
+        intent: decisionLayerResult.intent,
+        answerContract: openAssistantResultData?.answerContract || decisionLayerResult.answerContract,
+        usedSingleMeetingMode,
+        isClarificationRequest,
+      });
+      if (sourceAttribution && responseText) {
+        responseText += sourceAttribution;
+      }
+
       // Calculate total pipeline time
       const totalTimeMs = Date.now() - pipelineStartTime;
       console.log(`[Slack] Pipeline completed in ${totalTimeMs}ms, progressMessages=${progressMessageCount}`);
@@ -843,7 +857,22 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
         if (handlerAlreadyStreamed) {
           // Handler already updated the message with final content (e.g., streaming OpenAI)
-          console.log(`[Slack] Handler already streamed to message: ${botReply.ts}`);
+          // Append source attribution if needed (handler didn't include it)
+          if (sourceAttribution && responseText) {
+            try {
+              const { updateSlackMessage: updateMsg } = await import("./slackApi");
+              await updateMsg({
+                channel: streamingContext!.channel,
+                ts: streamingContext!.messageTs,
+                text: responseText,
+              });
+              console.log(`[Slack] Updated streamed message with source attribution`);
+            } catch (err) {
+              console.error(`[Slack] Failed to append source attribution to streamed message:`, err);
+            }
+          } else {
+            console.log(`[Slack] Handler already streamed to message: ${botReply.ts}`);
+          }
         } else if (responseText && responseText !== "...") {
           // Handler returned result but didn't update the placeholder - do it now
           try {
