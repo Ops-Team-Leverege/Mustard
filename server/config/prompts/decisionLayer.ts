@@ -210,6 +210,19 @@ FOLLOW - UP MESSAGES:
     - "no, I meant X" → Correction, re - classify based on X
       - "what about for Costco?" → Applying previous task type to a new entity
 
+INTENT SHIFT IN THREADS (CRITICAL):
+A follow-up message may change intent entirely. The thread provides CONTEXT (company name, topics), but does NOT lock the intent.
+Always reclassify the intent based on the current message. If the user's new message clearly signals a different intent, use that intent — not the thread's original one.
+
+Examples of intent shifts within a thread:
+- Thread was about Costco meeting → User asks "are there any updates about Costco in Slack?" → SLACK_SEARCH (explicit "in Slack" overrides meeting context, but company "Costco" is preserved from context)
+- Thread was about ACE action items → User asks "what does PitCrew's camera system do?" → PRODUCT_KNOWLEDGE (new intent, thread context irrelevant)
+- Thread was about Les Schwab meeting → User asks "create a report about Les Schwab" → MULTI_MEETING (different intent, company preserved from context)
+- Thread was about meeting notes → User asks "compare Costco and ACE feedback" → MULTI_MEETING (scope expanded beyond single meeting)
+- Thread was about product features → User asks "did Robert mention anything about that?" → SINGLE_MEETING (shifted to meeting, uses thread context for company)
+
+Rule: Thread context informs ENTITY resolution (company, contact names), but the CURRENT message determines the INTENT.
+
 CRITICAL - ANSWERING CLARIFICATION QUESTIONS:
 If the bot's LAST message asked for clarification (time range, customer scope, etc.) and the user responds with that information, this is an ANSWER not CLARIFY:
   - Bot asked "what time range?" → User says "last month is fine" → MULTI_MEETING(not CLARIFY!)
@@ -236,9 +249,10 @@ When you see conversation history, look for company names mentioned in earlier m
       - If user asks about "what they said" and thread mentions "Jiffy Lube pilot", extract company: "Jiffy Lube"
         - Use the FULL conversation context to understand which company the user is referring to
 
-The conversation history shows previous exchanges.Use it to understand what the user is refining or continuing.
-If user's short message clearly refines a previous bot response about meetings → keep the meeting intent.
-If user's short message clearly refines a previous bot response about product knowledge → PRODUCT_KNOWLEDGE.
+The conversation history shows previous exchanges. Use it to understand what the user is refining or continuing.
+If user's short message is a REFINEMENT of the previous response (e.g., "include names", "add dates") → keep the same intent.
+If user's message introduces a NEW request or explicitly signals a different data source → reclassify the intent based on the current message.
+Always preserve entity context (company names, contacts) from the thread regardless of intent changes.
 
 Respond with JSON: { "intent": "INTENT_NAME", "confidence": 0.0 - 1.0, "reason": "brief explanation", "isFollowUp": true / false, "extractedCompany": "company name from context or null" } `;
 
