@@ -25,6 +25,7 @@ type SourceAttributionContext = {
   usedSingleMeetingMode?: boolean;
   isClarificationRequest?: boolean;
   responseText?: string;
+  isCapabilityResponse?: boolean;
 };
 
 const FRIENDLY_MODEL_NAMES: Record<string, string> = {
@@ -61,7 +62,7 @@ function isNegativeAnswer(responseText?: string, confidence?: string): boolean {
 export function getSourceAttribution(ctx: SourceAttributionContext): string {
   const { dataSource, semanticAnswerUsed, semanticConfidence, intent, usedSingleMeetingMode, isClarificationRequest, responseText } = ctx;
 
-  if (isClarificationRequest || dataSource === "none" || dataSource === "clarification" || dataSource === "not_found") {
+  if (isClarificationRequest || ctx.isCapabilityResponse || dataSource === "none" || dataSource === "clarification" || dataSource === "not_found") {
     return "";
   }
 

@@ -831,6 +831,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         answerContract: openAssistantResultData?.answerContract || decisionLayerResult.answerContract,
         usedSingleMeetingMode,
         isClarificationRequest,
+        isCapabilityResponse: openAssistantResultData?.isCapabilityResponse,
         responseText,
       });
       if (sourceAttribution && responseText) {

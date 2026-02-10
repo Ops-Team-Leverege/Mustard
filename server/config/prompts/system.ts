@@ -137,21 +137,18 @@ export function getCapabilitiesPrompt(): string {
     .map(ex => `- "${ex}"`)
     .join('\n');
 
-  return `The user is asking what you can help with or what you're connected to. Give a SHORT, friendly response (3-4 sentences max).
+  return `The user is asking what you can help with. Give a warm, concise response (2-3 sentences max). Don't list everything — highlight 3-4 key things naturally in a sentence or two, then invite them to ask.
 
 ${config.intro}
 
-MY DATA SOURCES & INTEGRATIONS:
-${dataSourceLines}
-
-CAPABILITIES:
+WHAT I CAN HELP WITH:
 ${capabilityLines}
 
-EXAMPLE QUESTIONS:
-${exampleLines}
+MY DATA SOURCES:
+${dataSourceLines}
 
-If they're asking about data sources specifically, mention those. If asking about capabilities generally, mention what you can do.
-Keep it conversational and brief. ${config.closing}`;
+TONE: Conversational and brief. No bullet points or formal lists. Just a quick, friendly answer that makes them want to try asking something. End with something like "${config.closing}"
+Do NOT start with "Hey there!" or similar generic greetings — the greeting is already handled separately.`;
 }
 
 /**

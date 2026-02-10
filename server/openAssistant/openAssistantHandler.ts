@@ -1533,8 +1533,9 @@ async function handleGeneralAssistanceIntent(
       decisionLayerIntent: Intent.GENERAL_HELP,
       answerContract: AnswerContract.GENERAL_RESPONSE,
       dataSource: "general_knowledge",
+      isCapabilityResponse: true,
       delegatedToSingleMeeting: false,
-      streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
+      streamingCompleted: !!context.slackStreaming,
     };
   }
 
