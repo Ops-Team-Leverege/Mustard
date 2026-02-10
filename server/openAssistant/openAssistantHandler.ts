@@ -884,6 +884,47 @@ async function handleMultiMeetingIntent(
     };
   }
 
+  if (meetingSearch.meetings.length === 1) {
+    const meeting = meetingSearch.meetings[0];
+    console.log(`[OpenAssistant] MULTI_MEETING found only 1 meeting — delegating to SINGLE_MEETING: ${meeting.companyName} (${meeting.meetingId})`);
+
+    let primaryContract: AnswerContract;
+    let contractChain: AnswerContract[];
+
+    if (dlContractChain && dlContractChain.length > 0) {
+      primaryContract = dlContractChain[0];
+      contractChain = dlContractChain;
+    } else if (contract) {
+      primaryContract = contract;
+      contractChain = [contract];
+    } else {
+      throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
+    }
+
+    const chainProgress = generateContractChainProgress(contractChain);
+
+    const singleMeetingResult = await handleSingleMeetingQuestion(
+      meeting,
+      userMessage,
+      false,
+      primaryContract
+    );
+
+    return {
+      answer: singleMeetingResult.answer,
+      intent: "meeting_data",
+      intentClassification: classification,
+      decisionLayerIntent: Intent.SINGLE_MEETING,
+      answerContract: primaryContract,
+      answerContractChain: contractChain,
+      ssotMode: "none" as SSOTMode,
+      dataSource: "meeting_artifacts",
+      singleMeetingResult,
+      delegatedToSingleMeeting: true,
+      progressMessage: chainProgress || singleMeetingResult.progressMessage,
+    };
+  }
+
   const uniqueCompanies = new Set(meetingSearch.meetings.map(m => m.companyId));
   const scope = {
     type: "multi_meeting" as const,
