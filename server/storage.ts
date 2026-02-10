@@ -144,7 +144,7 @@ export interface IStorage {
 
   // Transcript Chunks (for RAG)
   getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date; contentType: string } | null>;
-  getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]>;
+  getChunksForTranscript(transcriptId: string, limit?: number): Promise<TranscriptChunk[]>;
   listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]>;
   insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void>;
 
@@ -1133,7 +1133,7 @@ export class MemStorage implements IStorage {
     throw new Error("MemStorage not supported for Transcript Chunks");
   }
 
-  async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {
+  async getChunksForTranscript(transcriptId: string, limit?: number): Promise<TranscriptChunk[]> {
     throw new Error("MemStorage not supported for Transcript Chunks");
   }
 
@@ -2390,13 +2390,13 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getChunksForTranscript(transcriptId: string, limit: number): Promise<TranscriptChunk[]> {
-    return this.db
+  async getChunksForTranscript(transcriptId: string, limit?: number): Promise<TranscriptChunk[]> {
+    const query = this.db
       .select()
       .from(transcriptChunksTable)
       .where(eq(transcriptChunksTable.transcriptId, transcriptId))
-      .orderBy(drizzleSql`${transcriptChunksTable.chunkIndex} ASC`)
-      .limit(limit);
+      .orderBy(drizzleSql`${transcriptChunksTable.chunkIndex} ASC`);
+    return limit ? query.limit(limit) : query;
   }
 
   async listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]> {

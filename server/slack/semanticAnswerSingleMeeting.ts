@@ -216,8 +216,8 @@ function selectRelevantChunks(
 
   scored.sort((a, b) => b.score - a.score || a.chunk.chunkIndex - b.chunk.chunkIndex);
 
-  const selected = scored
-    .filter(s => s.score > 0)
+  const relevant = scored.filter(s => s.score > 0);
+  const selected = relevant
     .slice(0, maxChunks)
     .map(s => s.chunk);
 
@@ -231,7 +231,12 @@ function selectRelevantChunks(
 
   selected.sort((a, b) => a.chunkIndex - b.chunkIndex);
 
-  console.log(`[SemanticAnswer] Selected ${selected.length} relevant chunks from ${chunks.length} total`);
+  const dropped = relevant.length - Math.min(relevant.length, maxChunks);
+  console.log(`[SemanticAnswer] Selected ${selected.length}/${chunks.length} chunks (${relevant.length} scored relevant, ${dropped} relevant dropped due to limit)`);
+  if (dropped > 0) {
+    const droppedScores = relevant.slice(maxChunks).map(s => s.score);
+    console.log(`[SemanticAnswer] Dropped chunk scores: min=${Math.min(...droppedScores)}, max=${Math.max(...droppedScores)}`);
+  }
   return selected;
 }
 
@@ -325,7 +330,7 @@ export async function semanticAnswerSingleMeeting(
     storage.getTranscriptById(meetingId),
     storage.getCustomerQuestionsByTranscript(meetingId),
     storage.getMeetingActionItemsByTranscript(meetingId),
-    storage.getChunksForTranscript(meetingId, SEMANTIC_ANSWER.CHUNK_FETCH_LIMIT),
+    storage.getChunksForTranscript(meetingId),
   ]);
 
   console.log(`[SemanticAnswer] Data fetch: ${Date.now() - startTime}ms`);
