@@ -11,23 +11,24 @@
  * - Stop word filtering for search relevance
  * - Proper noun + keyword matching for transcript search
  * 
- * Uses: GPT-5 (temperature 1) for semantic interpretation
+ * Uses: Gemini 2.5 Flash (1M context) for semantic interpretation with full transcript
  * 
  * Layer: Slack (semantic answering)
  */
 
-import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 import { storage } from "../storage";
 import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
-import { SEMANTIC_ANSWER } from "../config/constants";
 import { buildSemanticAnswerPrompt } from "../config/prompts/singleMeeting";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  timeout: 60000,
-  maxRetries: 1,
-});
+let _geminiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  if (!_geminiClient) {
+    _geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+  }
+  return _geminiClient;
+}
 
 export type SemanticAnswerResult = {
   answer: string;
@@ -157,90 +158,7 @@ function formatMeetingDate(date: Date | null | undefined): string {
   });
 }
 
-const SEMANTIC_STOP_WORDS = new Set([
-  "what", "when", "where", "which", "who", "whom", "whose", "that", "this",
-  "these", "those", "with", "from", "about", "into", "through", "during",
-  "before", "after", "above", "below", "between", "does", "have", "been",
-  "being", "having", "would", "could", "should", "might", "will", "shall",
-  "must", "need", "want", "like", "just", "also", "very", "much", "more",
-  "most", "some", "such", "than", "then", "them", "they", "their", "there",
-  "here", "only", "even", "well", "back", "were", "said", "each", "make",
-  "over", "because", "help", "mentioned", "mention", "particular", "could",
-  "pain", "point", "pitcrew",
-]);
-
-function extractSemanticKeywords(query: string): { keywords: string[]; speakerNames: string[] } {
-  const words = query.split(/\s+/);
-
-  const speakerNames = words
-    .filter((w, i) => i > 0 && /^[A-Z][a-z]+$/.test(w))
-    .map(w => w.toLowerCase());
-
-  const keywords = query.toLowerCase()
-    .split(/\s+/)
-    .map(w => w.replace(/[^a-z]/g, ''))
-    .filter(w => w.length > 2 && !SEMANTIC_STOP_WORDS.has(w) && !speakerNames.includes(w));
-
-  return { keywords, speakerNames };
-}
-
-function selectRelevantChunks(
-  chunks: TranscriptChunk[],
-  question: string,
-  maxChunks: number = SEMANTIC_ANSWER.MAX_RELEVANT_CHUNKS
-): TranscriptChunk[] {
-  if (chunks.length <= maxChunks) return chunks;
-
-  const { keywords, speakerNames } = extractSemanticKeywords(question);
-  console.log(`[SemanticAnswer] Relevance filter: speakers=[${speakerNames.join(",")}], keywords=[${keywords.join(",")}]`);
-
-  const scored = chunks.map(chunk => {
-    let score = 0;
-    const content = chunk.content.toLowerCase();
-    const speaker = (chunk.speakerName || "").toLowerCase();
-
-    if (speakerNames.length > 0 && speakerNames.some(name => speaker.includes(name))) {
-      const isSubstantive = chunk.content.length > 30
-        && !/^(mhm|yeah|okay|cool|right|yes|no|uh|um|oh|hmm)[.!?,\s]*$/i.test(chunk.content.trim());
-      score += isSubstantive ? 10 : 1;
-    }
-
-    const keywordHits = keywords.filter(kw => content.includes(kw)).length;
-    score += keywordHits * 3;
-
-    if (chunk.content.length > 100) score += 1;
-    if (chunk.content.length > SEMANTIC_ANSWER.MIN_SUBSTANTIVE_LENGTH) score += 1;
-
-    return { chunk, score };
-  });
-
-  scored.sort((a, b) => b.score - a.score || a.chunk.chunkIndex - b.chunk.chunkIndex);
-
-  const relevant = scored.filter(s => s.score > 0);
-  const selected = relevant
-    .slice(0, maxChunks)
-    .map(s => s.chunk);
-
-  if (selected.length < maxChunks) {
-    const selectedIds = new Set(selected.map(c => c.id));
-    const remaining = chunks
-      .filter(c => !selectedIds.has(c.id) && c.content.length > 50)
-      .slice(0, maxChunks - selected.length);
-    selected.push(...remaining);
-  }
-
-  selected.sort((a, b) => a.chunkIndex - b.chunkIndex);
-
-  const dropped = relevant.length - Math.min(relevant.length, maxChunks);
-  console.log(`[SemanticAnswer] Selected ${selected.length}/${chunks.length} chunks (${relevant.length} scored relevant, ${dropped} relevant dropped due to limit)`);
-  if (dropped > 0) {
-    const droppedScores = relevant.slice(maxChunks).map(s => s.score);
-    console.log(`[SemanticAnswer] Dropped chunk scores: min=${Math.min(...droppedScores)}, max=${Math.max(...droppedScores)}`);
-  }
-  return selected;
-}
-
-function buildContextWindow(ctx: MeetingContext, question?: string): string {
+function buildContextWindow(ctx: MeetingContext): string {
   const sections: string[] = [];
   const dateSuffix = ctx.meetingDate ? ` (${formatMeetingDate(ctx.meetingDate)})` : "";
 
@@ -287,17 +205,26 @@ function buildContextWindow(ctx: MeetingContext, question?: string): string {
   }
 
   if (ctx.transcriptChunks.length > 0) {
-    const relevant = question
-      ? selectRelevantChunks(ctx.transcriptChunks, question)
-      : ctx.transcriptChunks.slice(0, SEMANTIC_ANSWER.MAX_RELEVANT_CHUNKS);
+    const MAX_CONTEXT_CHARS = 800_000;
+    const preambleLength = sections.join("\n").length;
+    const budget = MAX_CONTEXT_CHARS - preambleLength;
 
-    sections.push(`\n## Relevant Transcript Excerpts`);
-    relevant.forEach((chunk, i) => {
+    let totalChars = 0;
+    let chunksToInclude = ctx.transcriptChunks.length;
+    for (let i = 0; i < ctx.transcriptChunks.length; i++) {
+      totalChars += ctx.transcriptChunks[i].content.length + 50;
+      if (totalChars > budget) {
+        chunksToInclude = i;
+        console.log(`[SemanticAnswer] Context budget hit at chunk ${i}/${ctx.transcriptChunks.length} (${totalChars} chars > ${budget} budget)`);
+        break;
+      }
+    }
+
+    const included = ctx.transcriptChunks.slice(0, chunksToInclude);
+    sections.push(`\n## Full Transcript (${included.length}/${ctx.transcriptChunks.length} segments)`);
+    included.forEach((chunk, i) => {
       const speaker = chunk.speakerName || "Unknown";
-      const content = chunk.content.length > SEMANTIC_ANSWER.MAX_CHUNK_DISPLAY_LENGTH
-        ? chunk.content.substring(0, SEMANTIC_ANSWER.MAX_CHUNK_DISPLAY_LENGTH) + "..."
-        : chunk.content;
-      sections.push(`\n[${i + 1}] ${speaker}:\n"${content}"`);
+      sections.push(`\n[${i + 1}] ${speaker}:\n"${chunk.content}"`);
     });
   }
 
@@ -360,7 +287,7 @@ export async function semanticAnswerSingleMeeting(
     transcriptChunks: chunks,
   };
 
-  const contextWindow = buildContextWindow(context, userQuestion);
+  const contextWindow = buildContextWindow(context);
   console.log(`[SemanticAnswer] Context window: ${contextWindow.length} chars (${chunks.length} chunks fetched)`);
 
   // STEP 1: Detect answer shape BEFORE prompting
@@ -377,42 +304,22 @@ export async function semanticAnswerSingleMeeting(
   const systemPrompt = buildSemanticAnswerPrompt(answerShape);
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getGeminiClient().models.generateContent({
       model: MODEL_ASSIGNMENTS.SEMANTIC_ANSWER_SYNTHESIS,
-      max_completion_tokens: 2000, // Increased from 500 to handle list-based answers with citations
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: `MEETING DATA:\n${contextWindow}\n\n---\n\nUSER QUESTION: ${userQuestion}`,
-        },
-      ],
+      config: {
+        maxOutputTokens: 2000,
+        temperature: 0.3,
+        systemInstruction: systemPrompt,
+      },
+      contents: `MEETING DATA:\n${contextWindow}\n\n---\n\nUSER QUESTION: ${userQuestion}`,
     });
 
-    console.log(`[SemanticAnswer] LLM call: ${Date.now() - startTime}ms`);
-    console.log(`[SemanticAnswer] Response choices: ${response.choices?.length || 0}`);
-    console.log(`[SemanticAnswer] Response finish_reason: ${response.choices?.[0]?.finish_reason}`);
-    console.log(`[SemanticAnswer] Response message role: ${response.choices?.[0]?.message?.role}`);
-    console.log(`[SemanticAnswer] Response content length: ${response.choices?.[0]?.message?.content?.length || 0}`);
-    console.log(`[SemanticAnswer] Response refusal: ${response.choices?.[0]?.message?.refusal || 'none'}`);
+    const rawAnswer = response.text;
+    console.log(`[SemanticAnswer] Gemini call: ${Date.now() - startTime}ms`);
+    console.log(`[SemanticAnswer] Response length: ${rawAnswer?.length || 0}`);
 
-    // Check for refusal (GPT-5 safety feature)
-    const refusal = response.choices?.[0]?.message?.refusal;
-    if (refusal) {
-      console.log(`[SemanticAnswer] Model refused: ${refusal}`);
-      return {
-        answer: "I wasn't able to find a clear answer to that question in the meeting data.",
-        confidence: "low",
-        evidenceSources,
-      };
-    }
-
-    const rawAnswer = response.choices[0]?.message?.content;
     if (!rawAnswer) {
-      console.log(`[SemanticAnswer] Empty content - full response: ${JSON.stringify(response.choices?.[0])}`);
+      console.log(`[SemanticAnswer] Empty response from Gemini`);
       return {
         answer: "I don't see this explicitly mentioned in the meeting.",
         confidence: "low",
@@ -432,7 +339,7 @@ export async function semanticAnswerSingleMeeting(
       answerShape,
     };
   } catch (error) {
-    console.error(`[SemanticAnswer] LLM error:`, error);
+    console.error(`[SemanticAnswer] Gemini error:`, error);
     throw error;
   }
 }

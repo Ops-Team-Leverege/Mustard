@@ -15,12 +15,6 @@ export const MEETING_LIMITS = {
   CHUNK_LIMIT_COMMITMENTS: 200,
 } as const;
 
-export const SEMANTIC_ANSWER = {
-  MAX_RELEVANT_CHUNKS: 50,
-  MIN_SUBSTANTIVE_LENGTH: 200,
-  MAX_CHUNK_DISPLAY_LENGTH: 500,
-} as const;
-
 export const MEETING_CONSTANTS = {
   /**
    * Meeting-like words that users use to refer to meetings.

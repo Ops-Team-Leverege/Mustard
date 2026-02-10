@@ -72,6 +72,7 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 
 ### AI Services
 -   OpenAI API (GPT-5, GPT-4o, GPT-4o-mini)
+-   Google Gemini 2.5 Flash (semantic transcript analysis — full transcript context with 1M token window)
 
 ### Database
 -   PostgreSQL
