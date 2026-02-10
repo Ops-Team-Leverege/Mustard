@@ -37,6 +37,7 @@ import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
 import { AnswerContract } from "../decisionLayer/answerContracts";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
+import { buildCustomerQuestionsAssessmentPrompt } from "../config/prompts/singleMeeting";
 import {
   type SingleMeetingContext as SharedSingleMeetingContext,
   type SingleMeetingResult as SharedSingleMeetingResult,
@@ -1415,34 +1416,7 @@ async function generateKBAssistedCustomerQuestionAnswers(
     });
   }
 
-  const systemPrompt = `You are helping a sales team review customer questions from a meeting and provide accurate product-based responses.
-
-PRODUCT KNOWLEDGE (use this as your source of truth):
-${productKnowledge}
-
-YOUR TASK:
-1. For ANSWERED questions: Assess the answer given in the meeting against the product knowledge.
-   - If the answer is correct: Mark as [Correct]
-   - If the answer is partially correct or needs clarification: Mark as [Needs Clarification] and explain
-   - If the answer is incorrect: Mark as [Incorrect] and provide the correct answer
-   
-2. For OPEN questions: Provide a suggested answer based on the product knowledge.
-   - If you can answer from the product data: Provide a clear, accurate answer
-   - If you can't answer from the data: Say "I'd need to verify this with the product team"
-
-FORMAT YOUR RESPONSE:
-For each question, use this structure:
-
-**Answered Questions Assessment:**
-1. Q: [question]
-   A (from meeting): [their answer]
-   Assessment: [Correct/Needs Clarification/Incorrect] [your assessment and any corrections]
-
-**Suggested Answers for Open Questions:**
-1. Q: [question]
-   Suggested Answer: [your answer based on product knowledge]
-
-Be concise but thorough. Prioritize accuracy over completeness.`;
+  const systemPrompt = buildCustomerQuestionsAssessmentPrompt(productKnowledge);
 
   try {
     const response = await openai.chat.completions.create({

@@ -23,6 +23,7 @@
 import { storage } from "../../storage";
 import { OpenAI } from "openai";
 import { MODEL_ASSIGNMENTS } from "../../config/models";
+import { getMeetingReferenceClassifierPrompt } from "../../config/prompts/utility";
 import {
   type MeetingResolutionResult as SharedMeetingResolutionResult,
   type MeetingThreadContext,
@@ -646,15 +647,7 @@ async function llmMeetingReferenceClassifier(question: string): Promise<boolean>
       messages: [
         {
           role: "system",
-          content: `You are a classifier.
-
-Task:
-Does this question clearly refer to a specific meeting instance
-(e.g. a call, visit, demo, sync, conversation, or other concrete interaction),
-rather than a general account-level or relationship question?
-
-Answer ONLY one word:
-YES or NO`
+          content: getMeetingReferenceClassifierPrompt()
         },
         {
           role: "user",

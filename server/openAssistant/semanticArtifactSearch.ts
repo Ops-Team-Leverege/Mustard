@@ -16,6 +16,7 @@ import { storage } from "../storage";
 import { OpenAI } from "openai";
 import type { CustomerQuestion, MeetingActionItem, Product } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
+import { getSemanticArtifactSearchPrompt } from "../config/prompts/utility";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -148,23 +149,7 @@ async function rankByRelevance<T extends CustomerQuestion | MeetingActionItem>(
     messages: [
       {
         role: "system",
-        content: `You are a semantic matching assistant. Given a search topic and a list of items, rate each item's relevance to the topic on a scale of 0-100.
-
-Return a JSON object with:
-{
-  "rankings": [
-    { "index": 0, "score": 85, "reason": "Directly mentions pricing" },
-    { "index": 1, "score": 20, "reason": "Unrelated to topic" },
-    ...
-  ]
-}
-
-RULES:
-- Score 80-100: Directly about the topic
-- Score 50-79: Related but not directly about the topic
-- Score 20-49: Tangentially related
-- Score 0-19: Not related
-- Be strict - only give high scores for clear matches`,
+        content: getSemanticArtifactSearchPrompt(),
       },
       {
         role: "user",
