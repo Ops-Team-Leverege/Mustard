@@ -62,7 +62,8 @@ export function clearCapabilitiesCache(): void {
  * NOTE: This context is derived from the Airtable Product Knowledge Base.
  * Update this if the product positioning changes significantly.
  */
-export const AMBIENT_PRODUCT_CONTEXT = `You are an assistant for PitCrew, a vision AI platform built by Leverege.
+export const AMBIENT_PRODUCT_CONTEXT = `=== PITCREW PRODUCT BACKGROUND ===
+PitCrew is a vision AI platform built by Leverege.
 
 WHAT PITCREW DOES:
 PitCrew provides computer vision and AI for automotive service businesses. It offers:
