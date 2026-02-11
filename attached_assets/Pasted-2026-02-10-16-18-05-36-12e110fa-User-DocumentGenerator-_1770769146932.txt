@@ -1,0 +1,213 @@
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentGenerator] Contract not in list, checking word count: 442 > 300 = true
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Document title: PitCrew Report
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 442, Generate doc: true
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Document title: PitCrew Report
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 442, Generate doc: true
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentGenerator] Contract not in list, checking word count: 442 > 300 = true
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Parsed 1 sections
+2026-02-10 16:18:05.36
+12e110fa
+User
+[DocumentResponse] Parsed 1 sections
+2026-02-10 16:18:05.45
+12e110fa
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T00:18:05.453Z ==========
+2026-02-10 16:18:05.45
+12e110fa
+User
+[Slack] Received event request
+2026-02-10 16:18:05.45
+12e110fa
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T00:18:05.453Z ==========
+2026-02-10 16:18:05.45
+12e110fa
+User
+[Slack] Received event request
+2026-02-10 16:18:05.45
+12e110fa
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-10 16:18:05.45
+12e110fa
+User
+Slack payload type: event_callback
+2026-02-10 16:18:05.45
+12e110fa
+User
+Event type: message
+2026-02-10 16:18:05.45
+12e110fa
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-10 16:18:05.45
+12e110fa
+User
+Slack payload type: event_callback
+2026-02-10 16:18:05.45
+12e110fa
+User
+Event type: message
+2026-02-10 16:18:05.45
+12e110fa
+User
+12:18:05 AM [express] POST /api/slack/events 200 in 2ms
+2026-02-10 16:18:05.45
+12e110fa
+User
+12:18:05 AM [express] POST /api/slack/events 200 in 2ms
+2026-02-10 16:18:05.52
+12e110fa
+User
+[DocumentResponse] Uploading to Slack: General_General_Response_2026-02-11.docx (document only, no message)
+2026-02-10 16:18:05.52
+12e110fa
+User
+[DocumentResponse] Uploading to Slack: General_General_Response_2026-02-11.docx (document only, no message)
+2026-02-10 16:18:05.52
+12e110fa
+User
+[DocumentResponse] Generated document buffer: 20298 bytes
+2026-02-10 16:18:05.52
+12e110fa
+User
+[DocumentResponse] Generated document buffer: 20298 bytes
+2026-02-10 16:18:06.13
+12e110fa
+User
+[DocumentResponse] Successfully uploaded document: General_General_Response_2026-02-11.docx
+2026-02-10 16:18:06.13
+12e110fa
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-10 16:18:06.13
+12e110fa
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-10 16:18:06.13
+12e110fa
+User
+[DocumentResponse] Successfully uploaded document: General_General_Response_2026-02-11.docx
+2026-02-10 16:18:06.24
+12e110fa
+User
+[Slack] Document check complete
+2026-02-10 16:18:06.24
+12e110fa
+User
+[Slack] Document check complete
+2026-02-10 16:18:06.24
+12e110fa
+User
+[INFO] [093bd349] Request completed successfully {"correlationId":"093bd349","channel":"D0A7A4R9C04","threadTs":"1770769051.583329","userId":"U082TV42FM0","duration":29575,"intent":"GENERAL_HELP","contract":"GENERAL_RESPONSE","responseLength":3199,"totalTimeMs":23069,"stages":{"meeting_resolution":0,"decision_layer":4458,"handler":14902}}
+2026-02-10 16:18:06.69
+12e110fa
+User
+[Slack] Received event request
+2026-02-10 16:18:06.69
+12e110fa
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T00:18:06.697Z ==========
+2026-02-10 16:18:06.69
+12e110fa
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T00:18:06.697Z ==========
+2026-02-10 16:18:06.69
+12e110fa
+User
+[Slack] Received event request
+2026-02-10 16:18:06.69
+12e110fa
+User
+Event type: message
+2026-02-10 16:18:06.69
+12e110fa
+User
+Slack payload type: event_callback
+2026-02-10 16:18:06.69
+12e110fa
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-10 16:18:06.69
+12e110fa
+User
+12:18:06 AM [express] POST /api/slack/events 200 in 2ms
+2026-02-10 16:18:09.36
+12e110fa
+User
+[Slack] Received event request
+2026-02-10 16:18:09.36
+12e110fa
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T00:18:09.360Z ==========
+2026-02-10 16:18:09.36
+12e110fa
+User
+[Slack] Received event request
+2026-02-10 16:18:09.36
+12e110fa
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T00:18:09.360Z ==========
+2026-02-10 16:18:09.36
+12e110fa
+User
+[Slack] Ignoring bot message (preventing loop)
+2026-02-10 16:18:09.36
+12e110fa
+User
+12:18:09 AM [express] POST /api/slack/events 200 in 2ms
+2026-02-10 16:18:09.36
+12e110fa
+User
+Event type: message
+2026-02-10 16:18:09.36
+12e110fa
+User
+Slack payload type: event_callback
+2026-02-10 16:18:09.36
+12e110fa
+User
+Event type: message
+2026-02-10 16:18:09.36
+12e110fa
+User
+Slack payload type: event_callback
+2026-02-10 16:18:09.36
+12e110fa
+User
+12:18:09 AM [express] POST /api/slack/events 200 in 2ms
+2026-02-10 16:18:09.36
+12e110fa
+User
+[Slack] Ignoring bot message (preventing loop)
+Wrap
