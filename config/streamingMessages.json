@@ -1,7 +1,7 @@
 {
   "preview": {
     "enabled": true,
-    "maxVisibleChars": 350,
+    "maxVisibleChars": 150,
     "minParagraphLength": 50,
     "message": "Full details in the attached document below."
   },
