@@ -62,7 +62,7 @@ interface DocumentConfig {
 
 interface DocumentSection {
   heading?: string;
-  level?: 1 | 2 | 3;
+  level?: 1 | 2 | 3 | 4;
   content: string | string[];
 }
 
@@ -208,7 +208,18 @@ function parseMarkdownContent(content: string): Paragraph[] {
     const trimmed = line.trim();
     if (!trimmed) continue;
     
-    if (trimmed.startsWith('## ')) {
+    if (trimmed.startsWith('#### ')) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: trimmed.substring(5), bold: true, size: 24 })],
+        spacing: { before: 300, after: 150 },
+      }));
+    } else if (trimmed.startsWith('### ')) {
+      paragraphs.push(new Paragraph({
+        text: trimmed.substring(4),
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 300, after: 150 },
+      }));
+    } else if (trimmed.startsWith('## ')) {
       paragraphs.push(new Paragraph({
         text: trimmed.substring(3),
         heading: HeadingLevel.HEADING_2,
@@ -263,19 +274,26 @@ function renderSection(section: DocumentSection): Paragraph[] {
   const paragraphs: Paragraph[] = [];
   
   if (section.heading) {
-    let headingLevel: typeof HeadingLevel.HEADING_1 | typeof HeadingLevel.HEADING_2 | typeof HeadingLevel.HEADING_3;
-    if (section.level === 1) {
-      headingLevel = HeadingLevel.HEADING_1;
-    } else if (section.level === 3) {
-      headingLevel = HeadingLevel.HEADING_3;
+    if (section.level === 4) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: section.heading, bold: true, size: 24 })],
+        spacing: { before: 300, after: 150 },
+      }));
     } else {
-      headingLevel = HeadingLevel.HEADING_2;
+      let headingLevel: typeof HeadingLevel.HEADING_1 | typeof HeadingLevel.HEADING_2 | typeof HeadingLevel.HEADING_3;
+      if (section.level === 1) {
+        headingLevel = HeadingLevel.HEADING_1;
+      } else if (section.level === 3) {
+        headingLevel = HeadingLevel.HEADING_3;
+      } else {
+        headingLevel = HeadingLevel.HEADING_2;
+      }
+      paragraphs.push(new Paragraph({
+        text: section.heading,
+        heading: headingLevel,
+        spacing: { before: 400, after: 200 },
+      }));
     }
-    paragraphs.push(new Paragraph({
-      text: section.heading,
-      heading: headingLevel,
-      spacing: { before: 400, after: 200 },
-    }));
   }
   
   if (Array.isArray(section.content)) {
@@ -422,8 +440,20 @@ export function contentToSections(content: string, title?: string): DocumentSect
       continue;
     }
     
+    // Handle #### headers (level 4)
+    if (trimmed.startsWith('#### ')) {
+      if (currentSection || currentContent.length > 0) {
+        sections.push({
+          heading: currentSection?.heading,
+          level: currentSection?.level || 4,
+          content: currentContent.join('\n'),
+        });
+      }
+      currentSection = { heading: trimmed.substring(5), level: 4, content: '' };
+      currentContent = [];
+    }
     // Handle ### headers (level 3)
-    if (trimmed.startsWith('### ')) {
+    else if (trimmed.startsWith('### ')) {
       if (currentSection || currentContent.length > 0) {
         sections.push({
           heading: currentSection?.heading,
