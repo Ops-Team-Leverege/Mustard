@@ -134,7 +134,14 @@ Write a detailed action plan:
 ${meetingContext || ''}
 ${threadContext || ''}
 
-=== CRITICAL INSTRUCTION ===
+=== USER INTENT OVERRIDE ===
+If the user explicitly asks you to propose structure first, ask questions, or give feedback before writing:
+- RESPECT THAT REQUEST. Do not write the full document.
+- Propose the structure, ask your questions, or give feedback as requested.
+- Only write the full document when the user is ready for it.
+
+=== CRITICAL INSTRUCTION (when writing the document) ===
+When the user IS ready for the document (no request to pause and discuss first):
 WRITE THE COMPLETE DOCUMENT NOW. Do not provide an outline. Do not provide a structure. Do not provide instructions. WRITE THE ACTUAL CONTENT.`;
 }
 
