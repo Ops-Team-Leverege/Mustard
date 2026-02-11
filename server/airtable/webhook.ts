@@ -68,8 +68,8 @@ export async function handleAirtableWebhook(req: Request, res: Response): Promis
 export function verifyAirtableWebhook(req: Request): boolean {
   const secret = process.env.AIRTABLE_WEBHOOK_SECRET;
   if (!secret) {
-    console.log("[Airtable Webhook] No AIRTABLE_WEBHOOK_SECRET configured, accepting all webhooks");
-    return true;
+    console.error("[Airtable Webhook] AIRTABLE_WEBHOOK_SECRET is not configured — rejecting request");
+    return false;
   }
 
   const providedSecret = req.headers["x-airtable-secret"] || req.query.secret;

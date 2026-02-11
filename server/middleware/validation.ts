@@ -35,7 +35,7 @@ export function validate(schemas: ValidationSchemas): RequestHandler {
         req.params = schemas.params.parse(req.params);
       }
       if (schemas.query) {
-        (req as any).query = schemas.query.parse(req.query);
+        (req.query as Record<string, unknown>) = schemas.query.parse(req.query);
       }
       if (schemas.body) {
         req.body = schemas.body.parse(req.body);

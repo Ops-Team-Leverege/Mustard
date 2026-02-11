@@ -168,7 +168,7 @@ export function validateCSRFToken(req: Request, res: Response, next: NextFunctio
 
     const tokenFromHeader = req.get('X-CSRF-Token');
     const tokenFromBody = req.body?.csrfToken;
-    const sessionToken = (req.session as any)?.csrfToken;
+    const sessionToken = req.session?.csrfToken;
 
     const providedToken = tokenFromHeader || tokenFromBody;
 
@@ -188,12 +188,12 @@ export function setupCSRFToken(req: Request, res: Response, next: NextFunction) 
     }
 
     // Generate token if not exists
-    if (!(req.session as any).csrfToken) {
-        (req.session as any).csrfToken = generateCSRFToken();
+    if (!req.session.csrfToken) {
+        req.session.csrfToken = generateCSRFToken();
     }
 
     // Add token to response headers for client access
-    res.setHeader('X-CSRF-Token', (req.session as any).csrfToken);
+    res.setHeader('X-CSRF-Token', req.session.csrfToken);
 
     next();
 }

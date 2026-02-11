@@ -49,7 +49,7 @@ export async function isDuplicate(eventId: string, clientMsgId?: string): Promis
       `);
       
       // If no row returned, the INSERT was skipped due to conflict = duplicate
-      if ((result as any).rowCount === 0 || (result as any).rows?.length === 0) {
+      if (result.rows.length === 0) {
         console.log(`[Dedupe] Duplicate detected (DB atomic): ${key}`);
         return true;
       }
@@ -89,14 +89,16 @@ function isDuplicateMemory(keys: string[]): boolean {
 export async function cleanupOldEntries(): Promise<number> {
   try {
     const cutoff = new Date(Date.now() - (DEDUPE_TTL_HOURS * 60 * 60 * 1000));
-    const result = await db.delete(slackEventDedupe)
+    const entriesToDelete = await db.select({ id: slackEventDedupe.id })
+      .from(slackEventDedupe)
       .where(lt(slackEventDedupe.processedAt, cutoff));
     
-    const count = (result as any).rowCount || 0;
-    if (count > 0) {
-      console.log(`[Dedupe] Cleaned up ${count} old entries`);
+    if (entriesToDelete.length > 0) {
+      await db.delete(slackEventDedupe)
+        .where(lt(slackEventDedupe.processedAt, cutoff));
+      console.log(`[Dedupe] Cleaned up ${entriesToDelete.length} old entries`);
     }
-    return count;
+    return entriesToDelete.length;
   } catch (error) {
     console.log(`[Dedupe] Cleanup error: ${error}`);
     return 0;

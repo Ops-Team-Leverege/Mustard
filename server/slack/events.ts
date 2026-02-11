@@ -32,6 +32,10 @@ import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./lo
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 import type { SlackStreamingContext } from "../openAssistant/types";
 import { runDecisionLayer, type DecisionLayerResult } from "../decisionLayer";
+import { Intent } from "../decisionLayer/intent";
+import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
+import type { ContextLayers } from "../decisionLayer/contextLayers";
+import type { ContractChainEntry } from "./interactionMetadata";
 import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
 import { PROGRESS_MESSAGE_CONSTANTS } from "../config/constants";
@@ -1020,41 +1024,44 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
           // Use Decision Layer result directly (full pipeline with intent, contract, layers)
           // OpenAssistant may override contract if it does additional processing
-          const actualIntent = decisionLayerResult?.intent || openAssistantResultData?.decisionLayerIntent || "GENERAL_HELP";
-          const actualContract = decisionLayerResult?.answerContract || openAssistantResultData?.answerContract || "GENERAL_RESPONSE";
+          const actualIntent: Intent = decisionLayerResult?.intent ?? openAssistantResultData?.decisionLayerIntent ?? Intent.GENERAL_HELP;
+          const actualContract: AnswerContract = decisionLayerResult?.answerContract ?? openAssistantResultData?.answerContract ?? AnswerContract.GENERAL_RESPONSE;
           const actualContractChain = openAssistantResultData?.answerContractChain;
-          const actualSsotMode = openAssistantResultData?.ssotMode || "none";
+          const actualSsotMode: SSOTMode = openAssistantResultData?.ssotMode ?? "none";
 
           // Use context layers from Decision Layer result directly
-          const contextLayers = (decisionLayerResult?.contextLayers || {
-            product_identity: true, // Always on
-            product_ssot: actualIntent === "PRODUCT_KNOWLEDGE",
-            single_meeting: actualIntent === "SINGLE_MEETING",
-            multi_meeting: actualIntent === "MULTI_MEETING",
-          }) as any;
+          const contextLayers: ContextLayers & { proposedInterpretation?: unknown; awaitingClarification?: string } = decisionLayerResult?.contextLayers ?? {
+            product_identity: true,
+            product_ssot: actualIntent === Intent.PRODUCT_KNOWLEDGE,
+            single_meeting: actualIntent === Intent.SINGLE_MEETING,
+            multi_meeting: actualIntent === Intent.MULTI_MEETING,
+            slack_search: false,
+          };
 
           // Store proposedInterpretation for CLARIFY follow-ups
-          if (actualIntent === "CLARIFY" && decisionLayerResult?.proposedInterpretation) {
+          if (actualIntent === Intent.CLARIFY && decisionLayerResult?.proposedInterpretation) {
             contextLayers.proposedInterpretation = decisionLayerResult.proposedInterpretation;
             contextLayers.awaitingClarification = "proposed_interpretation";
           }
+
+          const contractChain: ContractChainEntry[] | undefined = actualContractChain?.map((c) => ({
+            contract: c,
+            ssot_mode: actualSsotMode,
+            selection_method: "default" as const,
+          }));
 
           return buildInteractionMetadata(
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
               entryPoint: "slack",
               decisionLayer: {
-                intent: actualIntent as any,
+                intent: actualIntent,
                 intentDetectionMethod: (decisionLayerResult?.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "keyword",
                 contextLayers,
-                answerContract: actualContract as any,
-                contractChain: actualContractChain?.map((c: any) => ({
-                  contract: String(c),
-                  ssot_mode: actualSsotMode as any,
-                  selection_method: "default" as const
-                })),
+                answerContract: actualContract,
+                contractChain,
                 contractSelectionMethod: (decisionLayerResult?.contractSelectionMethod as "keyword" | "llm" | "default") || "default",
-                ssotMode: actualSsotMode as any,
+                ssotMode: actualSsotMode,
               },
               answerShape: "summary",
               dataSource: mappedDataSource,

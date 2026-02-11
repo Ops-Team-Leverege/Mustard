@@ -1245,14 +1245,13 @@ export class DbStorage implements IStorage {
   }
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
-    const { customers, ...dbValues } = insertTranscript as any;
+    const { customers, serviceTags, meetingDate, createdAt, ...dbFields } = insertTranscript;
     
-    // Handle meetingDate: convert string to Date or null
-    if (dbValues.meetingDate && typeof dbValues.meetingDate === 'string') {
-      dbValues.meetingDate = new Date(dbValues.meetingDate);
-    } else if (!dbValues.meetingDate) {
-      dbValues.meetingDate = null;
-    }
+    const dbValues: typeof transcriptsTable.$inferInsert = {
+      ...dbFields,
+      meetingDate: meetingDate ? new Date(meetingDate) : null,
+      createdAt: createdAt ? new Date(createdAt as string) : undefined,
+    };
     
     const results = await this.db
       .insert(transcriptsTable)

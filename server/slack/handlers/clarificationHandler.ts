@@ -14,6 +14,7 @@ import { buildInteractionMetadata, type LegacyIntent, type ClarificationResoluti
 import { storage } from "../../storage";
 import type { ThreadContext } from "../../mcp/context";
 import { AnswerContract } from "../../decisionLayer/answerContracts";
+import { Intent } from "../../decisionLayer/intent";
 
 export interface ClarificationContext {
   channel: string;
@@ -162,27 +163,32 @@ export async function handleProposedInterpretationConfirmation(
   console.log(`[Slack] Clarification confirmed - using proposed interpretation: intent=${proposedIntent}, contract=${proposedContract}`);
   
   // Map intent string to Intent enum
-  const intentMap: Record<string, string> = {
-    "SINGLE_MEETING": "SINGLE_MEETING",
-    "MULTI_MEETING": "MULTI_MEETING", 
-    "PRODUCT_KNOWLEDGE": "PRODUCT_KNOWLEDGE",
-    "EXTERNAL_RESEARCH": "EXTERNAL_RESEARCH",
-    "GENERAL_HELP": "GENERAL_HELP",
+  const intentMap: Record<string, Intent> = {
+    "SINGLE_MEETING": Intent.SINGLE_MEETING,
+    "MULTI_MEETING": Intent.MULTI_MEETING, 
+    "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
+    "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
+    "GENERAL_HELP": Intent.GENERAL_HELP,
   };
   
-  const mappedIntent = intentMap[proposedIntent] || "GENERAL_HELP";
+  const mappedIntent: Intent = intentMap[proposedIntent] ?? Intent.GENERAL_HELP;
+  
+  // Map contract string to AnswerContract enum
+  const mappedContract: AnswerContract = (proposedContract in AnswerContract) 
+    ? AnswerContract[proposedContract as keyof typeof AnswerContract] 
+    : AnswerContract.GENERAL_RESPONSE;
   
   // Create synthetic Decision Layer result with the stored interpretation
   const syntheticDecisionLayer = {
-    intent: mappedIntent as any,
-    answerContract: proposedContract as any,
-    intentDetectionMethod: "clarification_followup",
-    contractSelectionMethod: "clarification_followup",
+    intent: mappedIntent,
+    answerContract: mappedContract,
+    intentDetectionMethod: "clarification_followup" as const,
+    contractSelectionMethod: "clarification_followup" as const,
     contextLayers: {
       product_identity: true,
       product_ssot: false,
-      single_meeting: mappedIntent === "SINGLE_MEETING",
-      multi_meeting: mappedIntent === "MULTI_MEETING",
+      single_meeting: mappedIntent === Intent.SINGLE_MEETING,
+      multi_meeting: mappedIntent === Intent.MULTI_MEETING,
       slack_search: false,
     },
   };
@@ -224,7 +230,7 @@ export async function handleProposedInterpretationConfirmation(
         entryPoint: "slack",
         legacyIntent: proposedIntent.toLowerCase() as LegacyIntent,
         answerShape: "summary",
-        dataSource: openAssistantResult.dataSource as any,
+        dataSource: mapLegacyDataSource(openAssistantResult.dataSource),
         clarificationState: {
           awaiting: false,
           resolvedWith: "confirmed" as ClarificationResolution,
