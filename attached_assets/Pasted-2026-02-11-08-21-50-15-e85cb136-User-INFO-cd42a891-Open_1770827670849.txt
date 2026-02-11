@@ -1,0 +1,212 @@
+2026-02-11 08:21:50.15
+e85cb136
+User
+[INFO] [cd42a891] Open Assistant response generated {"correlationId":"cd42a891","channel":"D0A7A4R9C04","threadTs":"1770826774.025189","userId":"U082TV42FM0","duration":23847,"intent":"general_assistance","contract":"GENERAL_RESPONSE","delegated":false,"duration_ms":15300}
+2026-02-11 08:21:51.05
+e85cb136
+User
+[SlackAPI] Failed to update message: msg_too_long
+2026-02-11 08:21:51.05
+e85cb136
+User
+[SlackAPI] Failed to update message: msg_too_long
+2026-02-11 08:21:51.05
+e85cb136
+User
+[Slack] Updated streaming placeholder with final content (8689 chars)
+2026-02-11 08:21:51.05
+e85cb136
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-11 08:21:51.05
+e85cb136
+User
+[Slack] Updated streaming placeholder with final content (8689 chars)
+2026-02-11 08:21:51.05
+e85cb136
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentResponse] Document title: PitCrew Report
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentResponse] Document title: PitCrew Report
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentGenerator] Contract not in list, checking word count: 1251 > 300 = true
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentGenerator] Contract not in list, checking word count: 1251 > 300 = true
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 1251, Generate doc: true
+2026-02-11 08:21:51.45
+e85cb136
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 1251, Generate doc: true
+2026-02-11 08:21:51.55
+e85cb136
+User
+[DocumentResponse] Parsed 5 sections
+2026-02-11 08:21:51.55
+e85cb136
+User
+[DocumentResponse] Parsed 5 sections
+2026-02-11 08:21:59.95
+e85cb136
+User
+[DocumentResponse] Uploading to Slack: General_General_Response_2026-02-11.docx (document only, no message)
+2026-02-11 08:21:59.95
+e85cb136
+User
+[DocumentResponse] Uploading to Slack: General_General_Response_2026-02-11.docx (document only, no message)
+2026-02-11 08:21:59.95
+e85cb136
+User
+[DocumentResponse] Generated document buffer: 22698 bytes
+2026-02-11 08:21:59.95
+e85cb136
+User
+[DocumentResponse] Generated document buffer: 22698 bytes
+2026-02-11 08:22:02.25
+e85cb136
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-11 08:22:02.25
+e85cb136
+User
+[DocumentResponse] Successfully uploaded document: General_General_Response_2026-02-11.docx
+2026-02-11 08:22:02.25
+e85cb136
+User
+[DocumentResponse] Successfully uploaded document: General_General_Response_2026-02-11.docx
+2026-02-11 08:22:02.25
+e85cb136
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-11 08:22:02.85
+e85cb136
+User
+[INFO] [cd42a891] Request completed successfully {"correlationId":"cd42a891","channel":"D0A7A4R9C04","threadTs":"1770826774.025189","userId":"U082TV42FM0","duration":36548,"intent":"GENERAL_HELP","contract":"GENERAL_RESPONSE","responseLength":8689,"totalTimeMs":23002,"stages":{"meeting_resolution":0,"decision_layer":4908,"handler":15300}}
+2026-02-11 08:22:02.85
+e85cb136
+User
+[INFO] [cd42a891] Request completed successfully {"correlationId":"cd42a891","channel":"D0A7A4R9C04","threadTs":"1770826774.025189","userId":"U082TV42FM0","duration":36548,"intent":"GENERAL_HELP","contract":"GENERAL_RESPONSE","responseLength":8689,"totalTimeMs":23002,"stages":{"meeting_resolution":0,"decision_layer":4908,"handler":15300}}
+2026-02-11 08:22:02.85
+e85cb136
+User
+[Slack] Document check complete
+2026-02-11 08:22:02.85
+e85cb136
+User
+[Slack] Document check complete
+2026-02-11 08:22:03.03
+e85cb136
+User
+[Slack] Received event request
+2026-02-11 08:22:03.03
+e85cb136
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T16:22:03.032Z ==========
+2026-02-11 08:22:03.03
+e85cb136
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T16:22:03.032Z ==========
+2026-02-11 08:22:03.03
+e85cb136
+User
+[Slack] Received event request
+2026-02-11 08:22:03.03
+e85cb136
+User
+4:22:03 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-11 08:22:03.03
+e85cb136
+User
+Event type: message
+2026-02-11 08:22:03.03
+e85cb136
+User
+Slack payload type: event_callback
+2026-02-11 08:22:03.03
+e85cb136
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-11 08:22:03.03
+e85cb136
+User
+Slack payload type: event_callback
+2026-02-11 08:22:03.03
+e85cb136
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-11 08:22:03.03
+e85cb136
+User
+Event type: message
+2026-02-11 08:22:03.03
+e85cb136
+User
+4:22:03 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-11 08:22:12.95
+e85cb136
+User
+[Slack] Received event request
+2026-02-11 08:22:12.95
+e85cb136
+User
+[Slack] Received event request
+2026-02-11 08:22:12.95
+e85cb136
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T16:22:12.957Z ==========
+2026-02-11 08:22:12.95
+e85cb136
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-11T16:22:12.957Z ==========
+2026-02-11 08:22:12.95
+e85cb136
+User
+Event type: message
+2026-02-11 08:22:12.95
+e85cb136
+User
+[Slack] Ignoring bot message (preventing loop)
+2026-02-11 08:22:12.95
+e85cb136
+User
+Slack payload type: event_callback
+2026-02-11 08:22:12.95
+e85cb136
+User
+Slack payload type: event_callback
+2026-02-11 08:22:12.95
+e85cb136
+User
+[Slack] Ignoring bot message (preventing loop)
+2026-02-11 08:22:12.95
+e85cb136
+User
+Event type: message
+2026-02-11 08:22:12.95
+e85cb136
+User
+4:22:12 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-11 08:22:12.95
+e85cb136
+User
+4:22:12 PM [express] POST /api/slack/events 200 in 1ms
