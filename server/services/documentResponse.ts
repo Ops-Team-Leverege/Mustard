@@ -392,7 +392,3 @@ function generateSlackMessage(query?: string, contract?: AnswerContract): string
   // Fall back to config-based messages
   return getDocumentMessage(contract || 'default');
 }
-
-export function isDocumentEligibleContract(contract: AnswerContract): boolean {
-  return shouldGenerateDocument(contract, 0);
-}

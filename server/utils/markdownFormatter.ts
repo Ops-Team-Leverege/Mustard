@@ -64,24 +64,3 @@ export function formatMarkdown(text: string, format: MarkdownFormat): string {
   return result;
 }
 
-/**
- * Register a custom format or extend an existing one.
- * 
- * @param name - Format name
- * @param rules - Array of format rules
- */
-export function registerFormat(name: string, rules: FormatRule[]): void {
-  (formatters as Record<string, MarkdownFormatter>)[name] = { rules };
-}
-
-/**
- * Add rules to an existing format.
- * 
- * @param name - Existing format name
- * @param rules - Additional rules to add
- */
-export function extendFormat(name: MarkdownFormat, rules: FormatRule[]): void {
-  if (formatters[name]) {
-    formatters[name].rules.push(...rules);
-  }
-}

@@ -11,10 +11,9 @@
  * - system.ts: Base system prompts, personas, shared context
  * - decisionLayer.ts: Intent classification, contract selection, clarification
  * - extraction.ts: Customer question extraction, Q&A resolution
- * - singleMeeting.ts: Single meeting handlers (extractive, aggregative, summary)
- * - multiMeeting.ts: Cross-meeting analysis, patterns, trends
+ * - singleMeeting.ts: Single meeting handlers (assessment, semantic answer)
  * - transcript.ts: Transcript analysis, insight extraction
- * - external.ts: External research, Gemini prompts, MCP routing
+ * - external.ts: MCP routing
  * - generalHelp.ts: General assistance, product knowledge, strategy synthesis, style writing
  * - slackSearch.ts: Slack message search and synthesis
  * - utility.ts: Classifiers, semantic search, research prompts
@@ -24,7 +23,6 @@ export * from "./system";
 export * from "./decisionLayer";
 export * from "./extraction";
 export * from "./singleMeeting";
-export * from "./multiMeeting";
 export * from "./transcript";
 export * from "./external";
 export * from "./generalHelp";

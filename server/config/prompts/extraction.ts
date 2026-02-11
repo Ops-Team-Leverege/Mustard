@@ -60,34 +60,6 @@ Example output format:
 }`;
 
 /**
- * Build prompt for resolving customer question answers.
- */
-export function buildQuestionAnswerResolutionPrompt(questionText: string): string {
-  return `Customer question: "${questionText}"
-
-Based on the available product knowledge and context, provide an accurate answer.
-If you cannot answer definitively, say so clearly.`;
-}
-
-/**
- * Customer questions from text extraction prompt.
- * For extracting questions from raw transcript text without turn markers.
- */
-export const CUSTOMER_QUESTIONS_FROM_TEXT_PROMPT = `You are a strict extraction engine analyzing meeting transcripts for customer questions.
-
-Extract ONLY genuine, information-seeking questions asked by customers.
-
-RULES:
-1. Extract verbatim or near-verbatim question text
-2. Identify the speaker name if available
-3. Mark status: ANSWERED, OPEN, or DEFERRED
-4. Include answer evidence if available
-5. Do NOT invent or paraphrase questions
-6. When in doubt, don't extract
-
-Return JSON with "questions" array.`;
-
-/**
  * Build transcript chunk analysis prompt.
  */
 export function buildTranscriptChunkPrompt(params: {
