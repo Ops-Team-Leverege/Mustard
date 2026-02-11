@@ -113,6 +113,8 @@ export type IntentClassificationResult = {
   shouldProceed?: boolean;                         // Should we proceed without clarification?
   clarificationSuggestion?: string;               // Specific clarification message if ambiguous
   requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
+  requiresProductKnowledge?: boolean;              // LLM-determined: should response be enriched with PitCrew product data from Airtable?
+  requiresStyleMatching?: boolean;                 // LLM-determined: should output match PitCrew's existing feature description style?
 };
 
 // ============================================================================
@@ -485,6 +487,8 @@ async function classifyByLLM(
         shouldProceed: parsed.shouldProceed !== false, // Default to true unless explicitly false
         clarificationSuggestion: parsed.clarificationSuggestion || undefined,
         requiresSemantic: parsed.requiresSemantic ?? undefined, // LLM-determined semantic processing flag
+        requiresProductKnowledge: parsed.requiresProductKnowledge ?? undefined, // LLM-determined product knowledge enrichment flag
+        requiresStyleMatching: parsed.requiresStyleMatching ?? undefined, // LLM-determined style matching flag
       };
     }
 

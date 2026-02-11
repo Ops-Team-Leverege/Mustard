@@ -115,6 +115,8 @@ export type DecisionLayerResult = {
   shouldProceed?: boolean;                         // Should we proceed without clarification?
   clarificationSuggestion?: string;               // Specific clarification message if ambiguous
   requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
+  requiresProductKnowledge?: boolean;              // LLM-determined: should response be enriched with PitCrew product data from Airtable?
+  requiresStyleMatching?: boolean;                 // LLM-determined: should output match PitCrew's existing feature description style?
 };
 
 // Backward compatibility alias
@@ -332,6 +334,8 @@ export async function runDecisionLayer(
     shouldProceed: intentResult.shouldProceed,
     clarificationSuggestion: intentResult.clarificationSuggestion,
     requiresSemantic: intentResult.requiresSemantic,
+    requiresProductKnowledge: intentResult.requiresProductKnowledge,
+    requiresStyleMatching: intentResult.requiresStyleMatching,
   };
 
   console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);
@@ -339,6 +343,8 @@ export async function runDecisionLayer(
   console.log(`  Final Contract: ${finalResult.answerContract}`);
   console.log(`  Will Clarify: ${!!finalResult.clarifyMessage}`);
   console.log(`  Requires Semantic: ${finalResult.requiresSemantic ?? 'not set (will default true)'}`);
+  console.log(`  Requires Product Knowledge: ${finalResult.requiresProductKnowledge ?? 'not set (will default false)'}`);
+  console.log(`  Requires Style Matching: ${finalResult.requiresStyleMatching ?? 'not set (will default false)'}`);
   console.log(`  Scope Info: ${scopeInfo ? 'present' : 'none'}`);
   if (scopeNote) console.log(`  Scope Note: ${scopeNote}`);
 

@@ -218,6 +218,50 @@ Examples:
 - "should we mention the ROI discussion?" → requiresSemantic: true (judgment needed)
 - "what kind of hardware were they talking about?" → requiresSemantic: true (vague referent)
 
+PRODUCT KNOWLEDGE ENRICHMENT (requiresProductKnowledge):
+Applies to ALL intents. Determine whether the response should be enriched with PitCrew's internal product knowledge from Airtable (features, value props, capabilities, roadmap). This is about enriching any response with product context — not the same as routing to the PRODUCT_KNOWLEDGE intent.
+
+Set requiresProductKnowledge = true when the user:
+- Asks to connect external research to PitCrew's value props, features, or capabilities
+- Mentions "our value", "PitCrew's value", "our features", "our capabilities", "our approach"
+- Asks how PitCrew can address, help with, or solve something
+- Wants to align findings with PitCrew's platform or offerings
+- Asks to think through something using PitCrew's product context
+- Requests a response that should reference what PitCrew actually does or offers
+- Asks "based on PitCrew" or "using PitCrew" in the context of enriching other information
+
+Set requiresProductKnowledge = false when the user:
+- Asks a pure meeting data question with no product context needed
+- Asks for external research without connecting it to PitCrew
+- Asks about general topics unrelated to PitCrew's product
+- Is asking about the bot's own capabilities (GENERAL_HELP about the bot)
+
+Examples:
+- "Research Mavis and connect it to PitCrew's value props" → requiresProductKnowledge: true
+- "How can PitCrew help with their camera needs?" → requiresProductKnowledge: true
+- "What's PitCrew's approach to this?" → requiresProductKnowledge: true
+- "Align our offerings with what they discussed" → requiresProductKnowledge: true
+- "Research Valvoline's fleet services" → requiresProductKnowledge: false (pure research)
+- "What were the action items from the meeting?" → requiresProductKnowledge: false
+- "Summarize all calls with AutoZone" → requiresProductKnowledge: false
+
+STYLE MATCHING DETERMINATION (requiresStyleMatching):
+Applies primarily to EXTERNAL_RESEARCH and PRODUCT_KNOWLEDGE intents. Determine whether the output should match PitCrew's existing feature description style and tone.
+
+Set requiresStyleMatching = true when the user:
+- Asks to write or draft a feature description
+- Wants output "similar to" or "like" existing features or descriptions
+- Asks for style-matched, consistent, or same-format output
+- Requests creating product content that should match existing marketing/product materials
+
+Set requiresStyleMatching = false for all other requests.
+
+Examples:
+- "Write a feature description similar to our other features" → requiresStyleMatching: true
+- "Draft a description for this feature matching our style" → requiresStyleMatching: true
+- "Research what Mavis does" → requiresStyleMatching: false
+- "What's PitCrew's value prop for this?" → requiresStyleMatching: false
+
 Respond with JSON: {
   "intent": "INTENT_NAME", 
   "confidence": 0.0-1.0, 
@@ -226,6 +270,8 @@ Respond with JSON: {
   "extractedCompanies": ["array of company names if multiple"],
   "proposedContracts": ["CONTRACT_NAME"],
   "requiresSemantic": true/false,
+  "requiresProductKnowledge": true/false,
+  "requiresStyleMatching": true/false,
   "isAmbiguous": true/false,
   "conversationContext": "what is this conversation about?",
   "keyTopics": ["topic1", "topic2"],

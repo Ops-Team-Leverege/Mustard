@@ -1112,13 +1112,12 @@ async function handleExternalResearchIntent(
 
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
 
-  // Determine what chaining is needed based on LLM contract chain or fallback detection
+  // LLM-determined flags from Decision Layer (replaces regex-based detection)
   const chainIncludesSalesDocsPrep = dlContractChain?.includes(AnswerContract.SALES_DOCS_PREP) ?? false;
-  const needsProductKnowledge = detectProductKnowledgeEnrichment(userMessage);
-  // LLM contract chain takes precedence over heuristic detection
-  const needsStyleMatching = chainIncludesSalesDocsPrep || detectStyleMatchingRequest(userMessage);
+  const needsProductKnowledge = context.decisionLayerResult?.requiresProductKnowledge ?? false;
+  const needsStyleMatching = context.decisionLayerResult?.requiresStyleMatching ?? chainIncludesSalesDocsPrep;
 
-  console.log(`[OpenAssistant] Chain-based style matching: ${chainIncludesSalesDocsPrep}, Product knowledge enrichment: ${needsProductKnowledge}, Style matching needed: ${needsStyleMatching}`);
+  console.log(`[OpenAssistant] LLM-determined: productKnowledge=${needsProductKnowledge}, styleMatching=${needsStyleMatching}, chainSalesDocsPrep=${chainIncludesSalesDocsPrep}`);
 
   // Generate personalized progress message
   console.log(`[OpenAssistant] Generating progress message...`);
@@ -1161,14 +1160,12 @@ async function handleExternalResearchIntent(
     };
   }
 
-  // LLM contract chain takes PRIORITY over heuristic detection
-  // If LLM explicitly requested style matching (SALES_DOCS_PREP), do that first
+  // Style matching takes priority over product knowledge enrichment
   if (chainIncludesSalesDocsPrep) {
-    console.log(`[OpenAssistant] LLM requested style matching via contract chain - prioritizing over product knowledge enrichment`);
+    console.log(`[OpenAssistant] Contract chain includes SALES_DOCS_PREP - prioritizing style matching`);
   }
 
-  // If user wants style-matched output (LLM chain or heuristic detection), chain product knowledge for style examples
-  // This runs FIRST when LLM explicitly requested it via contract chain
+  // Style-matched output: chain product knowledge for style examples
   if (needsStyleMatching) {
     console.log(`[OpenAssistant] Chaining product knowledge for style matching...`);
     try {
@@ -1242,88 +1239,13 @@ async function handleExternalResearchIntent(
 }
 
 /**
- * Detect if the user request involves writing content that should match
- * existing product content style (features, descriptions, etc.)
- */
-function detectStyleMatchingRequest(message: string): boolean {
-  const lower = message.toLowerCase();
-  const stylePatterns = [
-    /similar\s+to\s+(?:our\s+)?(?:other\s+)?(?:features?|descriptions?)/i,
-    /like\s+(?:our\s+)?(?:other\s+)?(?:features?|descriptions?)/i,
-    /match(?:ing)?\s+(?:the\s+)?style/i,
-    /(?:same|consistent)\s+(?:style|format|tone)/i,
-    /(?:write|create|draft)\s+(?:a\s+)?(?:feature\s+)?description/i,
-    /making\s+it\s+similar/i,
-    /write\s+(?:the|a)\s+description\s+for\s+(?:the\s+)?feature/i,
-  ];
-
-  return stylePatterns.some(pattern => pattern.test(lower));
-}
-
-/**
- * Detect if the user is asking about PitCrew's own value props/features.
- * When this is true, we should include internal product knowledge from Airtable
- * instead of (or in addition to) web research.
- */
-function detectPitCrewContext(message: string): boolean {
-  const lower = message.toLowerCase();
-  const pitcrewContextPatterns = [
-    /pitcrew['']?s?\s+value\s+prop/i,
-    /our\s+value\s+prop/i,
-    /pitcrew['']?s?\s+(?:features?|capabilities?|offerings?)/i,
-    /our\s+(?:features?|capabilities?|offerings?|approach|methodology)/i,
-    /how\s+pitcrew\s+(?:works?|helps?|can\s+help)/i,
-    /what\s+pitcrew\s+(?:does|offers?|provides?)/i,
-    /based\s+on\s+pitcrew/i,
-    /using\s+pitcrew['']?s?\s+(?:product|features?|value)/i,
-  ];
-
-  return pitcrewContextPatterns.some(pattern => pattern.test(lower));
-}
-
-/**
- * Detect if the user wants to connect external research with PitCrew's
- * internal product knowledge (value props, features, etc.).
- * 
- * ARCHITECTURAL EXCEPTION: This bypasses the Decision Layer's contract chain
- * mechanism. The Decision Layer is the sole authority for intent classification
- * and contract selection, but product knowledge enrichment is handled here as
- * a post-processing step because:
- * 1. It depends on the EXTERNAL_RESEARCH result being available first
- * 2. Contract chains don't yet support conditional chaining based on response content
- * 3. The enrichment is a synthesis step (combining research + product data),
- *    not a separate intent
- * 
- * TODO: Migrate to proper contract chain execution once the contract executor
- * supports conditional/dependent chaining (tracked for future sprint).
- */
-function detectProductKnowledgeEnrichment(message: string): boolean {
-  const lower = message.toLowerCase();
-  const enrichmentPatterns = [
-    /pitcrew['']?s?\s+value/i,
-    /our\s+value/i,
-    /based\s+on\s+pitcrew/i,
-    /connect.*pitcrew/i,
-    /align.*(?:our|pitcrew)/i,
-    /how\s+(?:we|pitcrew)\s+(?:can|could)\s+(?:address|help|solve)/i,
-    /approach\s+this\s+(?:with|using)\s+pitcrew/i,
-    /pitcrew['']?s?\s+(?:features?|capabilities?|approach|offerings?)/i,
-    /think\s+through.*(?:our|pitcrew)/i,
-  ];
-
-  return enrichmentPatterns.some(pattern => pattern.test(lower));
-}
-
-/**
  * Chain product knowledge to enrich external research results with
  * internal PitCrew product data from Airtable.
  * 
- * ARCHITECTURAL EXCEPTION: See detectProductKnowledgeEnrichment() for rationale.
- * This function executes the enrichment step, making a second LLM call to
- * synthesize external research with internal product knowledge from Airtable.
- * 
- * TODO: Migrate to contract chain execution via contractExecutor once
- * conditional/dependent chaining is supported.
+ * The Decision Layer determines when this is needed via the `requiresProductKnowledge`
+ * flag in IntentClassificationResult. This function executes the enrichment step,
+ * making a second LLM call to synthesize external research with internal product
+ * knowledge from Airtable.
  */
 async function chainProductKnowledgeEnrichment(
   originalRequest: string,
