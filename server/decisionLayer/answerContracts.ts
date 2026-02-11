@@ -129,15 +129,6 @@ export enum AnswerContract {
   PRODUCT_KNOWLEDGE = "PRODUCT_KNOWLEDGE",     // Fetch product data for chain context
 
   // ============================================================================
-  // Chainable Tool Contracts (enrichment/processing steps for contract chains)
-  // ============================================================================
-  // These are tool steps the LLM can include in a contract chain to request
-  // specific post-processing. They replace boolean flags with explicit chain steps.
-  PRODUCT_KNOWLEDGE_ENRICH = "PRODUCT_KNOWLEDGE_ENRICH",  // Enrich response with PitCrew product data from Airtable
-  STYLE_MATCH_WRITE = "STYLE_MATCH_WRITE",                // Rewrite output to match PitCrew's feature description style
-  SEMANTIC_TRANSCRIPT_ANALYSIS = "SEMANTIC_TRANSCRIPT_ANALYSIS", // Use full semantic LLM analysis instead of artifact retrieval
-
-  // ============================================================================
   // Authoritative contracts (SSOT mode: authoritative)
   // ============================================================================
   FEATURE_VERIFICATION = "FEATURE_VERIFICATION",
@@ -374,32 +365,6 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
     requiresCitation: true,   // Must cite source tables
     responseFormat: "text",
     emptyResultBehavior: "return_empty",  // Can return empty if no matching data
-  },
-
-  // Chainable Tool Contracts (enrichment/processing steps)
-  [AnswerContract.PRODUCT_KNOWLEDGE_ENRICH]: {
-    ssotMode: "authoritative",
-    requiresEvidence: false,
-    allowsSummary: true,
-    requiresCitation: false,
-    responseFormat: "text",
-    emptyResultBehavior: "return_empty",
-  },
-  [AnswerContract.STYLE_MATCH_WRITE]: {
-    ssotMode: "descriptive",
-    requiresEvidence: false,
-    allowsSummary: true,
-    requiresCitation: false,
-    responseFormat: "text",
-    emptyResultBehavior: "return_empty",
-  },
-  [AnswerContract.SEMANTIC_TRANSCRIPT_ANALYSIS]: {
-    ssotMode: "none",
-    requiresEvidence: true,
-    allowsSummary: true,
-    requiresCitation: true,
-    responseFormat: "text",
-    emptyResultBehavior: "clarify",
   },
 
   // General/Legacy contracts
