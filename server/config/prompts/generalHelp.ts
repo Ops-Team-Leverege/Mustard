@@ -80,7 +80,7 @@ CREATE COMPLETE, EXECUTIVE-READY DOCUMENTS. Write the full deliverable now - not
 === QUALITY STANDARDS ===
 Your deliverables must be:
 - Complete and ready to send (not drafts or outlines)
-- Comprehensive and thorough (3,000+ words for major documents)
+- Comprehensive and thorough
 - Professionally formatted with markdown
 - Anticipate stakeholder questions proactively
 - Include executive summaries (2-3 paragraphs)
