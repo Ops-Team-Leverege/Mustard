@@ -10,7 +10,9 @@ import { AMBIENT_PRODUCT_CONTEXT } from "./system";
 
 /**
  * Build general assistance prompt for GENERAL_RESPONSE contract.
- * Used when the user asks for advisory, creative, or framing help.
+ * FALLBACK ONLY: Used when Gemini is not configured and OpenAI handles GENERAL_HELP.
+ * The primary paths use buildGuidedAssistancePrompt (GUIDED mode) or
+ * buildMinimalAssistancePrompt (MINIMAL mode) with Gemini.
  */
 export function buildGeneralAssistancePrompt(params: {
   productKnowledgeSection?: string;
