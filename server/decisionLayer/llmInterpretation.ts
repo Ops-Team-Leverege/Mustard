@@ -29,6 +29,7 @@ import {
   AMBIGUOUS_QUERY_INTERPRETATION_PROMPT,
   FALLBACK_CLARIFY_MESSAGE 
 } from "../config/prompts";
+import { getIntentContractMapping } from "../config/capabilities";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -108,15 +109,7 @@ export type ClarifyWithInterpretation = {
   metadata: InterpretationMetadata;
 };
 
-const INTENT_CONTRACT_MAPPING: Record<IntentString, ContractString[]> = {
-  "SINGLE_MEETING": ["MEETING_SUMMARY", "NEXT_STEPS", "ATTENDEES", "CUSTOMER_QUESTIONS", "EXTRACTIVE_FACT", "AGGREGATIVE_LIST"],
-  "MULTI_MEETING": ["PATTERN_ANALYSIS", "COMPARISON", "TREND_SUMMARY", "CROSS_MEETING_QUESTIONS"],
-  "PRODUCT_KNOWLEDGE": ["PRODUCT_EXPLANATION", "FEATURE_VERIFICATION", "FAQ_ANSWER"],
-  "EXTERNAL_RESEARCH": ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP", "VALUE_PROPOSITION"],
-  "GENERAL_HELP": ["GENERAL_RESPONSE", "DRAFT_RESPONSE", "DRAFT_EMAIL", "VALUE_PROPOSITION"],
-  "REFUSE": ["REFUSE"],
-  "CLARIFY": ["CLARIFY"],
-};
+const INTENT_CONTRACT_MAPPING = getIntentContractMapping() as Record<IntentString, ContractString[]>;
 
 const VALID_INTENTS: IntentString[] = ["SINGLE_MEETING", "MULTI_MEETING", "PRODUCT_KNOWLEDGE", "EXTERNAL_RESEARCH", "GENERAL_HELP", "REFUSE", "CLARIFY"];
 

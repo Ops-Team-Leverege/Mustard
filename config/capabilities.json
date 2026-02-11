@@ -33,7 +33,7 @@
         "What were the next steps from the ACE meeting?",
         "What questions did the customer ask?"
       ],
-      "contracts": ["MEETING_SUMMARY", "NEXT_STEPS", "ATTENDEES", "CUSTOMER_QUESTIONS", "EXTRACTIVE_FACT"]
+      "contracts": ["MEETING_SUMMARY", "NEXT_STEPS", "ATTENDEES", "CUSTOMER_QUESTIONS", "EXTRACTIVE_FACT", "AGGREGATIVE_LIST"]
     },
     "MULTI_MEETING": {
       "label": "Cross-Meeting Insights",
@@ -63,7 +63,7 @@
         "What are quick lube industry trends?",
         "Prepare sales docs for Valvoline"
       ],
-      "contracts": ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP"]
+      "contracts": ["EXTERNAL_RESEARCH", "SALES_DOCS_PREP", "VALUE_PROPOSITION"]
     },
     "SLACK_SEARCH": {
       "label": "Slack Search",
@@ -76,14 +76,16 @@
       "contracts": ["SLACK_MESSAGE_SEARCH", "SLACK_CHANNEL_INFO"]
     },
     "GENERAL_HELP": {
-      "label": "Sales Support & Drafting",
-      "description": "Draft emails, responses, and provide general assistance",
+      "label": "General Assistance",
+      "description": "General guidance, drafting, formatting, and conversational help",
       "examples": [
         "Draft a follow-up email to the customer",
         "Help me prepare for the Costco meeting",
-        "Create value props for tire shops"
+        "Create value props for tire shops",
+        "What can you do?",
+        "Give me 5 bullet points about tire features"
       ],
-      "contracts": ["DRAFT_EMAIL", "DRAFT_RESPONSE", "VALUE_PROPOSITION", "GENERAL_RESPONSE"]
+      "contracts": ["GENERAL_RESPONSE", "DRAFT_RESPONSE", "DRAFT_EMAIL", "VALUE_PROPOSITION"]
     }
   }
 }

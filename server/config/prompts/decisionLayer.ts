@@ -59,7 +59,7 @@ INTENT CLASSIFICATION:
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - EXTERNAL_RESEARCH: Requests requiring PUBLIC/WEB information
 - SLACK_SEARCH: User explicitly wants to search Slack messages or channels (not meeting transcripts)
-- GENERAL_HELP: Greetings, meta questions, general assistance requests, document creation/drafting
+- GENERAL_HELP: General guidance, drafting, formatting, conversational help, and meta questions
 - REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
 - CLARIFY: Request is genuinely ambiguous about what the user wants
 
@@ -374,7 +374,7 @@ VALID INTENTS:
   - MULTI_MEETING: Questions across multiple meetings(search all calls, find patterns, compare, or "all [company] calls")
     - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
       - EXTERNAL_RESEARCH: Research about companies NOT in our meeting database, OR explicit external research requests(earnings calls, news, market analysis)
-          - GENERAL_HELP: Drafting emails, documents, general assistance
+          - GENERAL_HELP: General guidance, drafting, formatting, and conversational help
             - REFUSE: Out - of - scope requests(weather, jokes, personal info)
 
 KEY DISTINCTIONS:
@@ -422,7 +422,7 @@ VALID INTENTS:
   - MULTI_MEETING: Questions across multiple meetings(trends, patterns)
     - PRODUCT_KNOWLEDGE: Questions about PitCrew product capabilities
       - EXTERNAL_RESEARCH: Research requiring web / public information - either external companies(earnings calls, news, priorities) OR topics / concepts needing web research(industry practices, domain knowledge)
-          - GENERAL_HELP: Drafting, writing, documents, general assistance
+          - GENERAL_HELP: General guidance, drafting, formatting, and conversational help
             - REFUSE: Clearly out - of - scope requests
 
 VALID CONTRACTS per intent:
