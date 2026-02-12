@@ -32,5 +32,9 @@ export function verifyZendeskWebhook(req: Request): boolean {
   }
 
   const providedSecret = req.headers["x-zendesk-secret"] || req.query.secret;
-  return providedSecret === secret;
+  const match = providedSecret === secret;
+  if (!match) {
+    console.error(`[Zendesk Webhook] Secret mismatch. Header present: ${!!providedSecret}, Secret len: ${secret.length}, Provided len: ${String(providedSecret || '').length}`);
+  }
+  return match;
 }
