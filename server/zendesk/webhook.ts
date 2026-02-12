@@ -25,9 +25,9 @@ export async function handleZendeskWebhook(req: Request, res: Response): Promise
 }
 
 export function verifyZendeskWebhook(req: Request): boolean {
-  const secret = process.env.ZENDESK_WEBHOOK_SECRET;
+  const secret = process.env.ZENDESK_WEBHOOK_ZAPIER;
   if (!secret) {
-    console.error("[Zendesk Webhook] ZENDESK_WEBHOOK_SECRET is not configured — rejecting request");
+    console.error("[Zendesk Webhook] ZENDESK_WEBHOOK_ZAPIER is not configured — rejecting request");
     return false;
   }
 

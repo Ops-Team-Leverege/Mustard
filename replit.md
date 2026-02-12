@@ -123,6 +123,6 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 
 ### Zendesk Webhook
 -   **Endpoint**: `POST https://mustard.leverege.com/api/zendesk/webhook`
--   **Authentication**: Header `X-Zendesk-Secret` (uses `ZENDESK_WEBHOOK_SECRET` secret)
+-   **Authentication**: Header `X-Zendesk-Secret` (uses `ZENDESK_WEBHOOK_ZAPIER` secret)
 -   **Behavior**: Triggers full Zendesk Help Center article sync, waits for completion before responding.
 -   **Trigger**: Zapier automation on Zendesk article create/update.
