@@ -75,7 +75,21 @@ export const GEMINI_MODELS = {
   PRO: "gemini-3-pro-preview",
 } as const;
 
+/**
+ * Claude model constants for Anthropic's models.
+ */
+export const CLAUDE_MODELS = {
+  /**
+   * Claude Opus 4.6 - Anthropic's most capable model.
+   * 200K token context (1M beta), 128K output tokens.
+   * Best for complex reasoning, coding, and agentic workflows.
+   */
+  OPUS: "claude-opus-4-6",
+} as const;
+
 export type GeminiModelType = typeof GEMINI_MODELS[keyof typeof GEMINI_MODELS];
+
+export type ClaudeModelType = typeof CLAUDE_MODELS[keyof typeof CLAUDE_MODELS];
 
 export type LLMModelType = typeof LLM_MODELS[keyof typeof LLM_MODELS];
 
@@ -165,4 +179,5 @@ export const TOKEN_LIMITS: Record<string, number> = {
   [LLM_MODELS.HEAVY_ANALYSIS]: 4000,
   [GEMINI_MODELS.FLASH]: 8000,
   [GEMINI_MODELS.PRO]: 8000,
+  [CLAUDE_MODELS.OPUS]: 8000,
 };
