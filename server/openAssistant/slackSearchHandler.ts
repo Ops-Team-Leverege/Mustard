@@ -302,8 +302,11 @@ Link: ${msg.permalink || 'N/A'}`;
         keyTopics?: string[],
         conversationContext?: string
     ): string {
-        const isReferential = /\b(this|that|the|it|them|those|these)\s+(conversation|discussion|topic|meeting|company|thread)\b/i.test(question)
-            || /\b(link me|find the|show me the)\b.*\b(conversation|discussion|message|thread)\b/i.test(question);
+        const isReferential =
+            /\b(this|that|the|it|them|those|these)\s+(conversation|discussion|topic|meeting|company|thread|chat|exchange)\b/i.test(question)
+            || /\b(link\s+me|find\s+the|show\s+me|pull\s+up|look\s+up|search\s+for)\b.*\b(conversation|discussion|message|thread|chat|exchange)\b/i.test(question)
+            || /\b(link|find|search|pull\s+up|show)\b.*\b(to|for|about)\s+(this|that|them|it)\b/i.test(question)
+            || /\b(about|regarding|related\s+to)\s+(this|that|them|it|the\s+above)\b/i.test(question);
 
         if (isReferential && (extractedCompany || (keyTopics && keyTopics.length > 0))) {
             const parts: string[] = [];
