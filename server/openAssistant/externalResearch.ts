@@ -70,20 +70,21 @@ function getExtractionDate(): string {
 export async function performExternalResearch(
   query: string,
   companyName?: string | null,
-  topic?: string | null
+  topic?: string | null,
+  threadContext?: string
 ): Promise<ResearchResult> {
   const extractionDate = getExtractionDate();
-  console.log(`[ExternalResearch] Research request: query="${query}", company="${companyName}", topic="${topic}"`);
+  console.log(`[ExternalResearch] Research request: query="${query}", company="${companyName}", topic="${topic}", hasThreadContext=${!!threadContext}`);
   
   const gemini = getGeminiClient();
   
   if (!gemini) {
     console.log(`[ExternalResearch] Gemini not available, falling back to general knowledge`);
-    return provideGeneralKnowledge(query, companyName, topic, extractionDate);
+    return provideGeneralKnowledge(query, companyName, topic, extractionDate, threadContext);
   }
   
   try {
-    const researchPrompt = buildResearchPrompt(query, companyName, topic);
+    const researchPrompt = buildResearchPrompt(query, companyName, topic, threadContext);
     
     console.log(`[ExternalResearch] Calling Gemini for web research...`);
     const startTime = Date.now();
@@ -99,7 +100,7 @@ export async function performExternalResearch(
     const content = response.text;
     if (!content) {
       console.log(`[ExternalResearch] Empty response from Gemini`);
-      return provideGeneralKnowledge(query, companyName, topic, extractionDate);
+      return provideGeneralKnowledge(query, companyName, topic, extractionDate, threadContext);
     }
     
     const citations = extractCitations(content);
@@ -115,7 +116,7 @@ export async function performExternalResearch(
     };
   } catch (error) {
     console.error("[ExternalResearch] Gemini API error:", error);
-    return provideGeneralKnowledge(query, companyName, topic, extractionDate);
+    return provideGeneralKnowledge(query, companyName, topic, extractionDate, threadContext);
   }
 }
 
@@ -126,7 +127,8 @@ export async function performExternalResearch(
 function buildResearchPrompt(
   query: string,
   companyName?: string | null,
-  topic?: string | null
+  topic?: string | null,
+  threadContext?: string
 ): string {
   // Detect if this is topic/concept research (no specific company, or query is about understanding something)
   const queryLower = query.toLowerCase();
@@ -140,11 +142,15 @@ function buildResearchPrompt(
     queryLower.includes('why are') ||
     queryLower.includes('why is');
   
-  if (isTopicResearch) {
-    return buildTopicResearchPrompt(query);
+  const basePrompt = isTopicResearch
+    ? buildTopicResearchPrompt(query)
+    : buildCompanyResearchPrompt(query, companyName);
+  
+  if (threadContext) {
+    return `${threadContext}\n\n${basePrompt}`;
   }
   
-  return buildCompanyResearchPrompt(query, companyName);
+  return basePrompt;
 }
 
 
@@ -155,9 +161,14 @@ async function provideGeneralKnowledge(
   query: string,
   companyName?: string | null,
   topic?: string | null,
-  extractionDate?: string
+  extractionDate?: string,
+  threadContext?: string
 ): Promise<ResearchResult> {
-  console.log(`[ExternalResearch] Providing general knowledge (Gemini not available)`);
+  console.log(`[ExternalResearch] Providing general knowledge (Gemini not available), hasThreadContext=${!!threadContext}`);
+  
+  const systemPrompt = threadContext
+    ? `${getGeneralKnowledgeFallbackPrompt()}\n\n${threadContext}`
+    : getGeneralKnowledgeFallbackPrompt();
   
   const startTime = Date.now();
   const response = await Promise.race([
@@ -166,7 +177,7 @@ async function provideGeneralKnowledge(
       messages: [
         {
           role: "system",
-          content: getGeneralKnowledgeFallbackPrompt(),
+          content: systemPrompt,
         },
         {
           role: "user",

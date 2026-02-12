@@ -1107,8 +1107,8 @@ async function handleExternalResearchIntent(
 
   const actualContract = contract || AnswerContract.EXTERNAL_RESEARCH;
 
-  // Extract company name from the user message
-  const companyName = extractCompanyFromMessage(userMessage);
+  // Use Decision Layer's extracted company (thread-context-aware) with regex fallback
+  const companyName = context.decisionLayerResult?.extractedCompany || extractCompanyFromMessage(userMessage);
 
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
 
@@ -1139,12 +1139,16 @@ async function handleExternalResearchIntent(
     }
   }
 
+  // Build thread context for conversation continuity
+  const threadContext = buildThreadContextSection(context);
+
   // Perform the research
   console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
     userMessage,
     companyName,
-    null // topic derived from message
+    null, // topic derived from message
+    threadContext || undefined
   );
   console.log(`[OpenAssistant] Research complete (${Date.now() - startTime}ms), answer length: ${researchResult.answer?.length || 0}`);
 
@@ -1261,16 +1265,19 @@ async function chainProductKnowledgeEnrichment(
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
+  const threadContext = buildThreadContextSection(context);
+  const systemContent = buildProductStrategySynthesisPrompt({
+    productKnowledge: snapshotResult.promptText,
+    originalRequest,
+    researchContent,
+  });
+
   const response = await openai.chat.completions.create({
     model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
     messages: [
       {
         role: "system",
-        content: buildProductStrategySynthesisPrompt({
-          productKnowledge: snapshotResult.promptText,
-          originalRequest,
-          researchContent,
-        })
+        content: threadContext ? `${systemContent}\n\n${threadContext}` : systemContent,
       },
       {
         role: "user",
@@ -1317,8 +1324,15 @@ async function chainProductStyleWriting(
   console.log(`[OpenAssistant] Style matching - feature examples length: ${featureExamples.length} chars`);
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+  const threadContext = buildThreadContextSection(context);
 
   console.log(`[OpenAssistant] Calling OpenAI for style-matched writing (fromResearchChain: ${fromResearchChain})...`);
+
+  const styleSystemPrompt = buildProductStyleWritingPrompt({
+    featureExamples,
+    researchContent,
+    fromResearchChain,
+  });
 
   const response = await Promise.race([
     openai.chat.completions.create({
@@ -1326,11 +1340,7 @@ async function chainProductStyleWriting(
       messages: [
         {
           role: "system",
-          content: buildProductStyleWritingPrompt({
-            featureExamples,
-            researchContent,
-            fromResearchChain,
-          }),
+          content: threadContext ? `${styleSystemPrompt}\n\n${threadContext}` : styleSystemPrompt,
         },
         {
           role: "user",
@@ -1629,9 +1639,14 @@ async function handleSlackSearchIntent(
   console.log(`[OpenAssistant] Slack search: contract=${contract}`);
 
   try {
+    const threadContext = buildThreadContextSection(context);
     const result = await SlackSearchHandler.handleSlackSearch({
       question: userMessage,
       contract: contract,
+      threadContext: threadContext || undefined,
+      extractedCompany: context.decisionLayerResult?.extractedCompany,
+      keyTopics: context.decisionLayerResult?.keyTopics,
+      conversationContext: context.decisionLayerResult?.conversationContext,
     });
 
     // Map to OpenAssistantResult format

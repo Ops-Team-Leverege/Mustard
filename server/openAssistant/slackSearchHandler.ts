@@ -19,6 +19,10 @@ import { getSlackSearchSystemPrompt, buildSlackSearchAnalysisPrompt } from '../c
 export interface SlackSearchContext {
     question: string;
     contract: AnswerContract;
+    threadContext?: string;
+    extractedCompany?: string;
+    keyTopics?: string[];
+    conversationContext?: string;
 }
 
 // Default classification for Slack search results
@@ -46,21 +50,21 @@ export class SlackSearchHandler {
      * Routes to appropriate handler based on contract.
      */
     static async handleSlackSearch(context: SlackSearchContext): Promise<OpenAssistantResult> {
-        const { question, contract } = context;
+        const { question, contract, threadContext, extractedCompany, keyTopics, conversationContext } = context;
 
-        console.log(`[SlackSearchHandler] Handling ${contract} for: "${question}"`);
+        console.log(`[SlackSearchHandler] Handling ${contract} for: "${question}", hasThreadContext=${!!threadContext}, extractedCompany=${extractedCompany || 'none'}`);
 
         try {
             switch (contract) {
                 case AnswerContract.SLACK_MESSAGE_SEARCH:
-                    return await this.handleMessageSearch(question);
+                    return await this.handleMessageSearch(question, threadContext, extractedCompany, keyTopics, conversationContext);
 
                 case AnswerContract.SLACK_CHANNEL_INFO:
                     return await this.handleChannelInfo(question);
 
                 default:
                     // Default to message search
-                    return await this.handleMessageSearch(question);
+                    return await this.handleMessageSearch(question, threadContext, extractedCompany, keyTopics, conversationContext);
             }
         } catch (error) {
             console.error('[SlackSearchHandler] Error:', error);
@@ -82,9 +86,15 @@ export class SlackSearchHandler {
      * Handle message search queries.
      * Searches Slack and synthesizes findings into a coherent answer with metadata.
      */
-    private static async handleMessageSearch(question: string): Promise<OpenAssistantResult> {
-        // Extract search query from question
-        const searchQuery = this.extractSearchQuery(question);
+    private static async handleMessageSearch(
+        question: string,
+        threadContext?: string,
+        extractedCompany?: string,
+        keyTopics?: string[],
+        conversationContext?: string
+    ): Promise<OpenAssistantResult> {
+        // Build search query using thread context when the question is referential
+        const searchQuery = this.buildContextAwareSearchQuery(question, extractedCompany, keyTopics, conversationContext);
 
         console.log(`[SlackSearchHandler] Searching for: "${searchQuery}"`);
 
@@ -118,7 +128,8 @@ export class SlackSearchHandler {
             searchResponse.results,
             searchResponse.totalCount,
             uniqueChannels.size,
-            searchResponse.hasMore
+            searchResponse.hasMore,
+            threadContext
         );
 
         return {
@@ -187,7 +198,8 @@ export class SlackSearchHandler {
         results: SlackSearchResult[],
         totalCount: number,
         channelsSearched: number,
-        hasMore: boolean
+        hasMore: boolean,
+        threadContext?: string
     ): Promise<string> {
         const { OpenAI } = await import('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
@@ -227,11 +239,16 @@ Link: ${msg.permalink || 'N/A'}`;
             messagesContext,
         });
 
+        // Include thread context in system prompt so LLM understands follow-up references
+        const systemPrompt = threadContext
+            ? `${getSlackSearchSystemPrompt()}\n\n${threadContext}`
+            : getSlackSearchSystemPrompt();
+
         try {
             const response = await openai.chat.completions.create({
                 model: 'gpt-4o-mini',
                 messages: [
-                    { role: 'system', content: getSlackSearchSystemPrompt() },
+                    { role: 'system', content: systemPrompt },
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3,
@@ -271,6 +288,40 @@ Link: ${msg.permalink || 'N/A'}`;
         } catch (error) {
             return 'Unknown date';
         }
+    }
+
+    /**
+     * Build a context-aware search query.
+     * When the user's question is referential ("this conversation", "that", "them"),
+     * uses Decision Layer context (extractedCompany, keyTopics, conversationContext)
+     * to build a meaningful search query instead of searching for "this conversation".
+     */
+    private static buildContextAwareSearchQuery(
+        question: string,
+        extractedCompany?: string,
+        keyTopics?: string[],
+        conversationContext?: string
+    ): string {
+        const isReferential = /\b(this|that|the|it|them|those|these)\s+(conversation|discussion|topic|meeting|company|thread)\b/i.test(question)
+            || /\b(link me|find the|show me the)\b.*\b(conversation|discussion|message|thread)\b/i.test(question);
+
+        if (isReferential && (extractedCompany || (keyTopics && keyTopics.length > 0))) {
+            const parts: string[] = [];
+            if (extractedCompany) parts.push(extractedCompany);
+            if (keyTopics && keyTopics.length > 0) {
+                parts.push(...keyTopics.slice(0, 2));
+            }
+            const contextQuery = parts.join(' ');
+            console.log(`[SlackSearchHandler] Referential query detected, resolved to: "${contextQuery}" (from extractedCompany=${extractedCompany}, keyTopics=${keyTopics?.join(', ')})`);
+            return contextQuery;
+        }
+
+        if (isReferential && conversationContext) {
+            console.log(`[SlackSearchHandler] Referential query detected, using conversationContext: "${conversationContext}"`);
+            return this.extractSearchQuery(conversationContext);
+        }
+
+        return this.extractSearchQuery(question);
     }
 
     /**
