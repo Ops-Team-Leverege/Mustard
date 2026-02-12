@@ -44,7 +44,6 @@ export type DataSource = "meeting_artifacts" | "semantic" | "product_ssot" | "no
 export type MeetingArtifactType =
   | "action_items"
   | "attendees"
-  | "customer_questions"
   | "qa_pairs"
   | null;
 
@@ -205,7 +204,7 @@ export function buildInteractionMetadata(
     semanticConfidence?: string;
     awaitingClarification?: ClarificationType;
     pendingOffer?: string;
-    lastResponseType?: string; // For follow-up context (e.g., "customer_questions")
+    lastResponseType?: string; // For follow-up context (e.g., "qa_pairs")
     testRun?: boolean;
     meetingDetection?: {
       regexResult: boolean;

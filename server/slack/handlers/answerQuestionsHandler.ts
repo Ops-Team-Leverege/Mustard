@@ -46,7 +46,7 @@ function wantsToAnswerQuestions(text: string): boolean {
 export async function handleAnswerQuestions(ctx: AnswerQuestionsContext): Promise<AnswerQuestionsResult> {
   const { channel, threadTs, messageTs, text, userId, testRun, threadContext, lastResponseType, companyNameFromContext, clearProgressTimer } = ctx;
   
-  if ((lastResponseType !== "customer_questions" && lastResponseType !== "qa_pairs") || !threadContext?.meetingId || !threadContext?.companyId) {
+  if (lastResponseType !== "qa_pairs" || !threadContext?.meetingId || !threadContext?.companyId) {
     return { handled: false };
   }
   

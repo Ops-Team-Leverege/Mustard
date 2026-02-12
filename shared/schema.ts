@@ -127,47 +127,10 @@ export const qaPairs = pgTable("qa_pairs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Customer Questions (DEPRECATED)
-// 
-// This table is DEPRECATED. All Q&A retrieval now uses qa_pairs instead.
-// The table and data are preserved for historical reference but no new rows are created.
-// 
-// | Table              | Nature       | Evidence Required | Inference Allowed | Use Case              |
-// |--------------------|--------------|-------------------|-------------------|-----------------------|
-// | qa_pairs           | Interpreted  | No                | Yes               | Browsing, analytics   |
-// | customer_questions | Extractive   | Yes               | No                | Meeting intelligence  |
-//
-// This table stores ONLY questions asked by customers, with:
-// - Verbatim transcript evidence (no paraphrasing)
-// - Explicit status (ANSWERED, OPEN, DEFERRED)
-// - Answer evidence when available
-//
-// Extraction uses gpt-4o at temperature 0 for deterministic output.
-export const CUSTOMER_QUESTION_STATUSES = ["ANSWERED", "OPEN", "DEFERRED"] as const;
-export type CustomerQuestionStatus = typeof CUSTOMER_QUESTION_STATUSES[number];
-
-export const customerQuestions = pgTable("customer_questions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  product: text("product").default("PitCrew").notNull(),
-  transcriptId: varchar("transcript_id").notNull(),
-  companyId: varchar("company_id"),
-  questionText: text("question_text").notNull(), // Verbatim from transcript
-  askedByName: text("asked_by_name").notNull(), // Speaker name from transcript
-  questionTurnIndex: integer("question_turn_index").notNull(), // Position in transcript for ordering
-  status: text("status").notNull(), // "ANSWERED" | "OPEN" | "DEFERRED"
-  answerEvidence: text("answer_evidence"), // Exact quote if answered
-  answeredByName: text("answered_by_name"), // Who answered (if applicable)
-  resolutionTurnIndex: integer("resolution_turn_index"), // Turn where answer was found (Resolution Pass)
-  // Context Anchoring fields - restores verbatim adjacency for context-dependent questions
-  requiresContext: boolean("requires_context").default(false).notNull(), // Deterministic: has "this", "that", "it", etc.
-  contextBefore: text("context_before"), // Verbatim preceding transcript turns (speaker + text only)
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // Meeting Action Items (Tier-1, Materialized at Ingestion)
 // 
 // This table stores action items extracted during transcript ingestion.
-// Like customer_questions, these are Tier-1 artifacts:
+// These are Tier-1 artifacts:
 // - Extracted once at ingestion time (not on query path)
 // - Verbatim evidence from transcript
 // - No inference or hallucination
@@ -351,14 +314,6 @@ export const insertPOSSystemSchema = createInsertSchema(posSystems).omit({
   companyIds: z.array(z.string()).optional(),
 });
 
-export const insertCustomerQuestionSchema = createInsertSchema(customerQuestions).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  product: z.enum(PRODUCTS).default("PitCrew"),
-  status: z.enum(CUSTOMER_QUESTION_STATUSES),
-});
-
 export const insertMeetingActionItemSchema = createInsertSchema(meetingActionItems).omit({
   id: true,
   createdAt: true,
@@ -390,9 +345,6 @@ export type Feature = typeof features.$inferSelect;
 
 export type InsertPOSSystem = z.infer<typeof insertPOSSystemSchema>;
 export type POSSystem = typeof posSystems.$inferSelect;
-
-export type InsertCustomerQuestion = z.infer<typeof insertCustomerQuestionSchema>;
-export type CustomerQuestion = typeof customerQuestions.$inferSelect;
 
 export type InsertMeetingActionItem = z.infer<typeof insertMeetingActionItemSchema>;
 export type MeetingActionItem = typeof meetingActionItems.$inferSelect;

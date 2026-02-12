@@ -44,7 +44,7 @@ export type MeetingResolutionResult =
 export type SingleMeetingResult = {
   answer: string;
   intent: "extractive" | "aggregative" | "summary" | "drafting";
-  dataSource: "attendees" | "customer_questions" | "qa_pairs" | "action_items" | "transcript" | "summary" | "semantic" | "not_found" | "clarification" | "binary_answer";
+  dataSource: "attendees" | "qa_pairs" | "action_items" | "transcript" | "summary" | "semantic" | "not_found" | "clarification" | "binary_answer";
   evidence?: string;
   pendingOffer?: "summary";
   semanticAnswerUsed?: boolean;

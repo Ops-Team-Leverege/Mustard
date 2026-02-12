@@ -32,8 +32,6 @@ import {
   type InsertMeetingSummary,
   type InteractionLog,
   type InsertInteractionLog,
-  type CustomerQuestion,
-  type InsertCustomerQuestion,
   type MeetingActionItem,
   type InsertMeetingActionItem,
   transcripts as transcriptsTable,
@@ -49,7 +47,6 @@ import {
   transcriptChunks as transcriptChunksTable,
   meetingSummaries as meetingSummariesTable,
   interactionLogs as interactionLogsTable,
-  customerQuestions as customerQuestionsTable,
   meetingActionItems as meetingActionItemsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -158,21 +155,6 @@ export interface IStorage {
 
   // Q&A Pairs - meeting-scoped lookup (no product required, for bot/Slack pipeline)
   getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
-
-  // Customer Questions (DEPRECATED - use qa_pairs instead)
-  // Kept for backward compatibility and historical data access
-  getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]>;
-  createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]>;
-  deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean>;
-  updateCustomerQuestionResolution(
-    id: string,
-    resolution: {
-      status: "ANSWERED" | "DEFERRED" | "OPEN";
-      answerEvidence: string | null;
-      answeredByName: string | null;
-      resolutionTurnIndex: number | null;
-    }
-  ): Promise<CustomerQuestion | null>;
 
   // Meeting Action Items (read-only artifact, materialized at ingestion)
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
@@ -1168,30 +1150,6 @@ export class MemStorage implements IStorage {
     return Array.from(this.qaPairs.values())
       .filter(qa => qa.transcriptId === transcriptId)
       .map(qa => ({ ...qa, categoryName: null, contactName: null, contactJobTitle: null, transcriptDate: null }));
-  }
-
-  async getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]> {
-    throw new Error("MemStorage not supported for Customer Questions");
-  }
-
-  async createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]> {
-    throw new Error("MemStorage not supported for Customer Questions");
-  }
-
-  async deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean> {
-    throw new Error("MemStorage not supported for Customer Questions");
-  }
-
-  async updateCustomerQuestionResolution(
-    id: string,
-    resolution: {
-      status: "ANSWERED" | "DEFERRED" | "OPEN";
-      answerEvidence: string | null;
-      answeredByName: string | null;
-      resolutionTurnIndex: number | null;
-    }
-  ): Promise<CustomerQuestion | null> {
-    throw new Error("MemStorage not supported for Customer Questions");
   }
 
   async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {
@@ -2538,54 +2496,6 @@ export class DbStorage implements IStorage {
       contactJobTitle: r.contactJobTitle || null,
       transcriptDate: r.transcriptDate || null,
     }));
-  }
-
-  // Customer Questions (DEPRECATED - use qa_pairs via getQAPairsByTranscriptId instead)
-  async getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]> {
-    return await this.db
-      .select()
-      .from(customerQuestionsTable)
-      .where(eq(customerQuestionsTable.transcriptId, transcriptId))
-      .orderBy(customerQuestionsTable.questionTurnIndex);
-  }
-
-  async createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]> {
-    if (questions.length === 0) return [];
-    const results = await this.db
-      .insert(customerQuestionsTable)
-      .values(questions)
-      .returning();
-    return results;
-  }
-
-  async deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean> {
-    const results = await this.db
-      .delete(customerQuestionsTable)
-      .where(eq(customerQuestionsTable.transcriptId, transcriptId))
-      .returning();
-    return results.length > 0;
-  }
-
-  async updateCustomerQuestionResolution(
-    id: string,
-    resolution: {
-      status: "ANSWERED" | "DEFERRED" | "OPEN";
-      answerEvidence: string | null;
-      answeredByName: string | null;
-      resolutionTurnIndex: number | null;
-    }
-  ): Promise<CustomerQuestion | null> {
-    const [result] = await this.db
-      .update(customerQuestionsTable)
-      .set({
-        status: resolution.status,
-        answerEvidence: resolution.answerEvidence,
-        answeredByName: resolution.answeredByName,
-        resolutionTurnIndex: resolution.resolutionTurnIndex,
-      })
-      .where(eq(customerQuestionsTable.id, id))
-      .returning();
-    return result ?? null;
   }
 
   async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {

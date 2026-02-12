@@ -889,7 +889,7 @@ async function handleAggregativeIntent(
   const wantsQuestions = /\bquestions?\b/.test(q) || /\bask/.test(q);
   const wantsConcerns = /\bissues?\b/.test(q) || /\bconcerns?\b/.test(q) || /\bproblems?\b/.test(q);
 
-  // FAST PATH: Questions about customer questions - only fetch customer_questions
+  // FAST PATH: Questions about customer questions - only fetch qa_pairs
   if (wantsQuestions) {
     console.log(`[SingleMeetingOrchestrator] Aggregative: customer questions`);
     const customerQuestions = await lookupQAPairs(ctx.meetingId);
@@ -928,7 +928,7 @@ async function handleAggregativeIntent(
     };
   }
 
-  // FAST PATH: Questions about issues/concerns - fetch customer_questions and filter
+  // FAST PATH: Questions about issues/concerns - fetch qa_pairs and filter
   if (wantsConcerns) {
     console.log(`[SingleMeetingOrchestrator] Aggregative: concerns/issues`);
     const customerQuestions = await lookupQAPairs(ctx.meetingId);
@@ -1487,7 +1487,7 @@ export async function handleSingleMeetingQuestion(
         AnswerContract.CUSTOMER_QUESTIONS,
       ];
       // Check for actual structured artifacts, not transcript fallback
-      const artifactDataSources = ["action_items", "attendees", "customer_questions"];
+      const artifactDataSources = ["action_items", "attendees", "qa_pairs"];
       const hasArtifacts = artifactDataSources.includes(result.dataSource);
       const isArtifactComplete = contract && artifactCompleteContracts.includes(contract);
 

@@ -4,8 +4,6 @@ import { storage } from "./storage";
 import { analyzeTranscript } from "./transcriptAnalyzer";
 import { extractTextFromFile, extractTextFromUrl } from "./textExtractor";
 import { ingestTranscriptChunks } from "./ingestion/ingestTranscriptChunks";
-import { extractCustomerQuestions } from "./extraction/extractCustomerQuestions";
-import { resolveCustomerQuestionAnswers } from "./ingestion/resolveCustomerQuestionAnswers";
 import { extractMeetingActionStates, type MeetingActionItem as ComposerActionItem, type TranscriptChunk as ComposerChunk } from "./rag/composer";
 import multer from "multer";
 import { createMCP } from "./mcp";
@@ -73,99 +71,6 @@ async function getUserAndProduct(
 
 // In-memory lock to prevent concurrent processing of the same transcript
 const processingLocks = new Set<string>();
-
-/**
- * Customer Questions Extraction (High-Trust, Evidence-Based Layer)
- * 
- * This function orchestrates customer question extraction for a transcript.
- * It runs AFTER transcript chunking, asynchronously and independently.
- * 
- * Characteristics:
- * - Uses gpt-4o at temperature 0 for deterministic output
- * - Fails independently without affecting other extractors
- * - Retryable - cleans up existing questions before re-extraction
- * - Does NOT affect existing Q&A pairs (qa_pairs table)
- */
-async function extractCustomerQuestionsForTranscript(
-  transcriptId: string,
-  product: Product,
-): Promise<void> {
-  console.log(`[CustomerQuestions] Starting extraction for transcript ${transcriptId}`);
-  
-  // Get transcript chunks (these have speaker attribution)
-  const chunks = await storage.getChunksForTranscript(transcriptId, 1000);
-  
-  if (chunks.length === 0) {
-    console.log(`[CustomerQuestions] No chunks found for transcript ${transcriptId}, skipping`);
-    return;
-  }
-  
-  // Idempotent: Clear any existing customer questions from previous runs
-  await storage.deleteCustomerQuestionsByTranscript(transcriptId);
-  
-  // Get transcript for companyId
-  const transcript = await storage.getTranscript(product, transcriptId);
-  if (!transcript) {
-    console.log(`[CustomerQuestions] Transcript ${transcriptId} not found, skipping`);
-    return;
-  }
-  
-  // Run extraction
-  const extractedQuestions = await extractCustomerQuestions(chunks);
-  
-  if (extractedQuestions.length === 0) {
-    console.log(`[CustomerQuestions] No customer questions found in transcript ${transcriptId}`);
-    return;
-  }
-  
-  // Save to database (including Context Anchoring fields)
-  // Initially save with status from extraction (may be overwritten by Resolution Pass)
-  const savedQuestions = await storage.createCustomerQuestions(
-    extractedQuestions.map((q) => ({
-      product,
-      transcriptId,
-      companyId: transcript.companyId,
-      questionText: q.question_text,
-      askedByName: q.asked_by_name,
-      questionTurnIndex: q.question_turn_index,
-      status: q.status,
-      answerEvidence: q.answer_evidence,
-      answeredByName: q.answered_by_name,
-      requiresContext: q.requires_context,
-      contextBefore: q.context_before,
-    })),
-  );
-  
-  console.log(`[CustomerQuestions] Saved ${savedQuestions.length} customer questions for transcript ${transcriptId}`);
-  
-  // Resolution Pass: Verify if questions were answered in transcript
-  // This is a separate verifier-only pass that runs AFTER extraction
-  // It uses a focused search window and strictly quotes verbatim evidence
-  console.log(`[Resolution] Starting Resolution Pass for ${savedQuestions.length} questions`);
-  
-  const questionsToResolve = savedQuestions.map(q => ({
-    id: q.id,
-    questionText: q.questionText,
-    questionTurnIndex: q.questionTurnIndex,
-  }));
-  
-  const resolvedQuestions = await resolveCustomerQuestionAnswers(questionsToResolve, chunks);
-  
-  // Update each question with resolution results
-  for (const resolved of resolvedQuestions) {
-    await storage.updateCustomerQuestionResolution(resolved.id, {
-      status: resolved.status,
-      answerEvidence: resolved.answerEvidence,
-      answeredByName: resolved.answeredByName,
-      resolutionTurnIndex: resolved.resolutionTurnIndex,
-    });
-  }
-  
-  const answered = resolvedQuestions.filter(r => r.status === "ANSWERED").length;
-  const deferred = resolvedQuestions.filter(r => r.status === "DEFERRED").length;
-  const open = resolvedQuestions.filter(r => r.status === "OPEN").length;
-  console.log(`[Resolution] Complete: ${answered} answered, ${deferred} deferred, ${open} open`);
-}
 
 /**
  * Meeting Action Items Extraction (Read-only Artifact, Materialized at Ingestion)
@@ -420,9 +325,6 @@ async function processTranscriptInBackground(
     // Chunk transcript for RAG/MCP queries (non-blocking, fire-and-forget)
     ingestTranscriptChunks({ transcriptId }).then(async (result) => {
       console.log(`Chunked transcript ${transcriptId}: ${result.chunksPrepared} chunks created`);
-      
-      // DEPRECATED: customer_questions extraction removed - qa_pairs (from transcript analyzer) is the sole Q&A source
-      // extractCustomerQuestionsForTranscript() no longer called during ingestion
       
       // Meeting Action Items Extraction (Read-only Artifact, Materialized)
       // Runs AFTER chunking, fails independently, retryable
@@ -1833,10 +1735,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Fetch all related data
-      const [insights, qaPairs, customerQuestions, actionItems, chunks, company] = await Promise.all([
+      const [insights, qaPairs, actionItems, chunks, company] = await Promise.all([
         storage.getProductInsightsByTranscript(product, id),
         storage.getQAPairsByTranscript(product, id),
-        storage.getCustomerQuestionsByTranscript(id),
         storage.getMeetingActionItemsByTranscript(id),
         storage.getChunksForTranscript(id, 1000),
         transcript.companyId ? storage.getCompany(product, transcript.companyId) : Promise.resolve(undefined),
@@ -1848,7 +1749,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         company,
         insights,
         qaPairs,
-        customerQuestions,
         actionItems,
         chunks: chunks.map((c: { chunkIndex: number; speakerName: string | null; speakerRole: string | null; content: string }) => ({
           chunkIndex: c.chunkIndex,
