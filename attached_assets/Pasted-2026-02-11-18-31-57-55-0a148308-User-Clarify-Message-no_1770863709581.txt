@@ -1,0 +1,212 @@
+2026-02-11 18:31:57.55
+0a148308
+User
+Clarify Message: none
+2026-02-11 18:31:58.95
+0a148308
+User
+[CompanyResolver] Resolved from LLM extraction: Ivy Lane (Valvoline)
+2026-02-11 18:31:58.95
+0a148308
+User
+[INFO] [26fd1869] Decision Layer completed {"correlationId":"26fd1869","channel":"C0A80S3HJNL","threadTs":"1770862680.378999","userId":"U082TV42FM0","duration":14400,"intent":"GENERAL_HELP","contract":"GENERAL_RESPONSE","method":"llm","duration_ms":9900}
+2026-02-11 18:31:58.95
+0a148308
+User
+[Slack] Open Assistant mode - intent=GENERAL_HELP, routing to appropriate handler
+2026-02-11 18:31:58.95
+0a148308
+User
+[Slack] Non-meeting intent (GENERAL_HELP) - skipping meeting resolution
+2026-02-11 18:31:59.75
+0a148308
+User
+[Slack] Streaming placeholder posted with preview mode: ts=1770863519.655839
+2026-02-11 18:31:59.75
+0a148308
+User
+[OpenAssistant] Processing: "The "Blind" Baseline: yes, CSAT Calculation: point increase, Installation Support: yes. Create the report"
+2026-02-11 18:32:00.15
+0a148308
+User
+[OpenAssistant] Using full Decision Layer result: intent=GENERAL_HELP, contract=GENERAL_RESPONSE, method=llm
+2026-02-11 18:32:00.15
+0a148308
+User
+[OpenAssistant] Routing to general assistance path (CP contract: GENERAL_RESPONSE)
+2026-02-11 18:32:00.15
+0a148308
+User
+[OpenAssistant] Evidence source: general_assistance (from Decision Layer: GENERAL_HELP -> GENERAL_RESPONSE)
+2026-02-11 18:32:01.55
+0a148308
+User
+[OpenAssistant] Calling Gemini gemini-3-pro-preview for GENERAL_HELP (max tokens: 8000)...
+2026-02-11 18:32:01.55
+0a148308
+User
+[ProductData] Using snapshot: 80 records, synced 2026-02-11T09:01:05.959Z
+2026-02-11 18:32:01.55
+0a148308
+User
+[OpenAssistant] GENERAL_HELP enriched with product knowledge (12833 chars)
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-11 18:32:32.75
+0a148308
+User
+[OpenAssistant] Gemini response received in 32600ms (5763 chars)
+2026-02-11 18:32:32.75
+0a148308
+User
+[OpenAssistant] Gemini response received in 32600ms (5763 chars)
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Pipeline completed in 46402ms, progressMessages=0
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Document decision: testRun=false, contract=GENERAL_RESPONSE, streaming=true, willGenerateDoc=true
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Open Assistant response: intent=general_assistance, decisionLayer=GENERAL_HELP, contract=GENERAL_RESPONSE, delegated=false
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Document decision: testRun=false, contract=GENERAL_RESPONSE, streaming=true, willGenerateDoc=true
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Open Assistant response: intent=general_assistance, decisionLayer=GENERAL_HELP, contract=GENERAL_RESPONSE, delegated=false
+2026-02-11 18:32:32.75
+0a148308
+User
+[Slack] Pipeline completed in 46402ms, progressMessages=0
+2026-02-11 18:32:32.75
+0a148308
+User
+[INFO] [26fd1869] Open Assistant response generated {"correlationId":"26fd1869","channel":"C0A80S3HJNL","threadTs":"1770862680.378999","userId":"U082TV42FM0","duration":48201,"intent":"general_assistance","contract":"GENERAL_RESPONSE","delegated":false,"duration_ms":33000}
+2026-02-11 18:32:32.75
+0a148308
+User
+[INFO] [26fd1869] Open Assistant response generated {"correlationId":"26fd1869","channel":"C0A80S3HJNL","threadTs":"1770862680.378999","userId":"U082TV42FM0","duration":48201,"intent":"general_assistance","contract":"GENERAL_RESPONSE","delegated":false,"duration_ms":33000}
+2026-02-11 18:32:33.65
+0a148308
+User
+[Slack] Updated streaming placeholder with final content (5800 chars)
+2026-02-11 18:32:33.65
+0a148308
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-11 18:32:33.65
+0a148308
+User
+[SlackAPI] Failed to update message: msg_too_long
+2026-02-11 18:32:33.65
+0a148308
+User
+[Slack] Updated streaming placeholder with final content (5800 chars)
+2026-02-11 18:32:33.65
+0a148308
+User
+[SlackAPI] Failed to update message: msg_too_long
+2026-02-11 18:32:33.65
+0a148308
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-11 18:32:34.05
+0a148308
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 841, Generate doc: true
+2026-02-11 18:32:34.05
+0a148308
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-11 18:32:34.05
+0a148308
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 841, Generate doc: true
+2026-02-11 18:32:34.05
+0a148308
+User
+[DocumentGenerator] Contract not in list, checking word count: 841 > 300 = true
+2026-02-11 18:32:34.05
+0a148308
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-11 18:32:34.05
+0a148308
+User
+[DocumentGenerator] Contract not in list, checking word count: 841 > 300 = true
+2026-02-11 18:32:34.25
+0a148308
+User
+[DocumentResponse] Document title: PitCrew Report
+2026-02-11 18:32:34.25
+0a148308
+User
+[DocumentResponse] Document title: PitCrew Report
+2026-02-11 18:32:34.25
+0a148308
+User
+[DocumentResponse] Parsed 11 sections
+2026-02-11 18:32:34.25
+0a148308
+User
+[DocumentResponse] Parsed 11 sections
+2026-02-11 18:32:42.95
+0a148308
+User
+[DocumentResponse] Uploading to Slack: General_General_Response_2026-02-12.docx (document only, no message)
+2026-02-11 18:32:42.95
+0a148308
+User
+[DocumentResponse] Uploading to Slack: General_General_Response_2026-02-12.docx (document only, no message)
+2026-02-11 18:32:42.95
+0a148308
+User
+[DocumentResponse] Generated document buffer: 21805 bytes
+2026-02-11 18:32:42.95
+0a148308
+User
+[DocumentResponse] Generated document buffer: 21805 bytes
+2026-02-11 18:32:56.05
+0a148308
+User
+[DocumentResponse] Successfully uploaded document: General_General_Response_2026-02-12.docx
+2026-02-11 18:32:56.05
+0a148308
+User
+[DocumentResponse] Successfully uploaded document: General_General_Response_2026-02-12.docx
+2026-02-11 18:32:56.05
+0a148308
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-11 18:32:56.05
+0a148308
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-11 18:32:56.65
+0a148308
+User
+[Slack] Document check complete
+2026-02-11 18:32:56.65
+0a148308
+User
+[Slack] Document check complete
+2026-02-11 18:32:57.35
+0a148308
+User
+[INFO] [26fd1869] Request completed successfully {"correlationId":"26fd1869","channel":"C0A80S3HJNL","threadTs":"1770862680.378999","userId":"U082TV42FM0","duration":72600,"intent":"GENERAL_HELP","contract":"GENERAL_RESPONSE","responseLength":5800,"totalTimeMs":46402,"stages":{"meeting_resolution":0,"decision_layer":9900,"handler":33000}}
+2026-02-11 18:32:57.35
+0a148308
+User
+[INFO] [26fd1869] Request completed successfully {"correlationId":"26fd1869","channel":"C0A80S3HJNL","threadTs":"1770862680.378999","userId":"U082TV42FM0","duration":72600,"intent":"GENERAL_HELP","contract":"GENERAL_RESPONSE","responseLength":5800,"totalTimeMs":46402,"stages":{"meeting_resolution":0,"decision_layer":9900,"handler":33000}}
