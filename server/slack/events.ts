@@ -43,7 +43,7 @@ import { PROGRESS_MESSAGE_CONSTANTS } from "../config/constants";
 // Extracted handler modules
 import { handleAmbiguity } from "./handlers/ambiguityHandler";
 import { handleBinaryQuestion } from "./handlers/binaryQuestionHandler";
-import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation } from "./handlers/clarificationHandler";
+import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation, handleSlackSearchOfferResponse } from "./handlers/clarificationHandler";
 import { handleAnswerQuestions } from "./handlers/answerQuestionsHandler";
 import { createProgressManager } from "./context/progressManager";
 import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
@@ -331,6 +331,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     // 8.5 CLARIFICATION RESPONSE HANDLING (fast path)
     // Extracted to handlers/clarificationHandler.ts
+    const pendingOfferFromThread = threadResolution.pendingOffer;
+
     const clarificationCtx = {
       channel,
       threadTs,
@@ -343,7 +345,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
       companyNameFromContext,
       storedProposedInterpretation,
       originalQuestion,
+      pendingOffer: pendingOfferFromThread,
     };
+
+    // 8.4.5 SLACK SEARCH OFFER RESPONSE (from pending offer)
+    const slackSearchOfferResult = await handleSlackSearchOfferResponse(clarificationCtx);
+    if (slackSearchOfferResult.handled) {
+      clearProgressTimer();
+      return;
+    }
 
     const nextStepsResult = await handleNextStepsOrSummaryResponse(clarificationCtx);
     if (nextStepsResult.handled) {
@@ -840,6 +850,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
       });
       if (sourceAttribution && responseText) {
         responseText += sourceAttribution;
+      }
+
+      // Offer Slack search follow-up for meeting-based responses
+      // Generic: any SINGLE_MEETING or MULTI_MEETING response that isn't a clarification
+      const isMeetingBasedResponse = (
+        decisionLayerResult.intent === "SINGLE_MEETING" ||
+        decisionLayerResult.intent === "MULTI_MEETING"
+      ) && !isClarificationRequest && responseText && responseText.length > 0;
+
+      if (isMeetingBasedResponse) {
+        responseText += "\n\n_I can also check Slack for any internal discussions about this — would you like me to?_";
+        pendingOffer = "slack_search";
+        console.log(`[Slack] Appended slack_search offer to meeting-based response`);
       }
 
       // Calculate total pipeline time

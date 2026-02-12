@@ -15,6 +15,7 @@ export interface ThreadResolutionResult {
   storedProposedInterpretation: { intent: string; contract: string; summary: string } | null;
   originalQuestion: string | null;
   lastResponseType: string | null;
+  pendingOffer: string | null;
 }
 
 /**
@@ -62,6 +63,7 @@ export async function resolveThreadContext(
     storedProposedInterpretation: null,
     originalQuestion: null,
     lastResponseType: null,
+    pendingOffer: null,
   };
 
   if (!isReply) {
@@ -100,6 +102,9 @@ export async function resolveThreadContext(
     // Track what the last response was about (for follow-up context)
     const lastResponseType = (contextLayers?.lastResponseType as string) || null;
 
+    // Surface pending offer from interaction metadata for follow-up handling
+    const pendingOfferValue = (resolution?.pendingOffer as string) || null;
+
     console.log(`[ThreadResolver] ✅ CONTEXT CHECKPOINT 1 - Thread Resolution:`);
     console.log(`  Thread: ${threadTs}`);
     console.log(`  Meeting: ${threadContext.meetingId || 'none'}`);
@@ -107,6 +112,7 @@ export async function resolveThreadContext(
     console.log(`  Awaiting Clarification: ${awaitingClarification || 'none'}`);
     console.log(`  Proposed Interpretation: ${storedProposedInterpretation ? 'yes' : 'none'}`);
     console.log(`  Last Response Type: ${lastResponseType || 'none'}`);
+    console.log(`  Pending Offer: ${pendingOfferValue || 'none'}`);
 
     return {
       threadContext,
@@ -115,6 +121,7 @@ export async function resolveThreadContext(
       storedProposedInterpretation,
       originalQuestion,
       lastResponseType,
+      pendingOffer: pendingOfferValue,
     };
   } catch (err) {
     // Non-fatal - just proceed without context

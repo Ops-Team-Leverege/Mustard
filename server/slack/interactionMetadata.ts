@@ -120,6 +120,7 @@ export interface InteractionMetadata {
     meeting_id?: string | null;
     company_source: ResolutionSource;
     meeting_source: ResolutionSource;
+    pendingOffer?: string;
   };
 
   evidence_sources?: Array<{
@@ -275,6 +276,7 @@ export function buildInteractionMetadata(
       meeting_id: base.meetingId,
       company_source: execution.companySource || "none",
       meeting_source: execution.meetingSource || "none",
+      pendingOffer: execution.pendingOffer,
     },
 
     evidence_sources: execution.evidenceSources,
