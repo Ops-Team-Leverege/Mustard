@@ -20,7 +20,7 @@ import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeet
 import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
-import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS, TOKEN_LIMITS } from "../config/models";
+import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS, CLAUDE_MODELS, TOKEN_LIMITS } from "../config/models";
 import { TIMEOUT_CONSTANTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
 import { buildGeneralAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
@@ -40,6 +40,7 @@ import { executeContractChain, mapOrchestratorIntentToContract } from "./contrac
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
 import { getMeetingNotFoundMessage } from "../utils/notFoundMessages";
 import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 import { storage } from "../storage";
 
 export type { EvidenceSource, IntentClassification, OpenAssistantContext, OpenAssistantResult };
@@ -55,6 +56,15 @@ function getGeminiClient() {
     return null;
   }
   return new GoogleGenAI({ apiKey });
+}
+
+function getClaudeClient(): Anthropic | null {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.log("[OpenAssistant] ANTHROPIC_API_KEY not configured");
+    return null;
+  }
+  return new Anthropic({ apiKey });
 }
 
 /**
@@ -1540,53 +1550,60 @@ Use this context to align suggestions with PitCrew's terminology and value propo
     progressMessage = await generatePersonalizedProgress(userMessage, intentType);
   }
 
-  // Use Gemini 2.5 Flash for GENERAL_HELP — direct chat with the user
-  const gemini = getGeminiClient();
+  // Use Claude Opus 4.6 for GENERAL_HELP — direct chat with the user
+  const claude = getClaudeClient();
   const maxTokens = TOKEN_LIMITS[MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE];
 
-  if (!gemini) {
-    console.log(`[OpenAssistant] Gemini not configured, falling back to OpenAI for GENERAL_HELP`);
+  if (!claude) {
+    console.log(`[OpenAssistant] Claude not configured, falling back to Gemini for GENERAL_HELP`);
+    const gemini = getGeminiClient();
+    if (gemini) {
+      try {
+        const response = await gemini.models.generateContent({
+          model: GEMINI_MODELS.PRO,
+          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }] }],
+          config: { maxOutputTokens: maxTokens, temperature: 0.7 },
+        });
+        const answer = response.text || "I'd be happy to help. Could you provide more details?";
+        console.log(`[OpenAssistant] Gemini fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+        return {
+          answer, intent: "general_assistance", intentClassification: classification,
+          decisionLayerIntent: Intent.GENERAL_HELP, answerContract: actualContract,
+          ssotMode: "none" as SSOTMode, dataSource: "general_knowledge",
+          delegatedToSingleMeeting: false, progressMessage, streamingCompleted: false,
+        };
+      } catch (geminiError) {
+        console.error(`[OpenAssistant] Gemini fallback also failed:`, geminiError);
+      }
+    }
     const answer = await streamOpenAIResponse(
-      MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE,
-      systemPrompt,
-      userMessage,
-      context.slackStreaming
+      MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE, systemPrompt, userMessage, context.slackStreaming
     );
     console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-
     return {
-      answer,
-      intent: "general_assistance",
-      intentClassification: classification,
-      decisionLayerIntent: Intent.GENERAL_HELP,
-      answerContract: actualContract,
-      ssotMode: "none" as SSOTMode,
-      dataSource: "general_knowledge",
-      delegatedToSingleMeeting: false,
-      progressMessage,
-      streamingCompleted: !!context.slackStreaming,
+      answer, intent: "general_assistance", intentClassification: classification,
+      decisionLayerIntent: Intent.GENERAL_HELP, answerContract: actualContract,
+      ssotMode: "none" as SSOTMode, dataSource: "general_knowledge",
+      delegatedToSingleMeeting: false, progressMessage, streamingCompleted: !!context.slackStreaming,
     };
   }
 
-  console.log(`[OpenAssistant] Calling Gemini ${MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE} for GENERAL_HELP (max tokens: ${maxTokens})...`);
+  console.log(`[OpenAssistant] Calling Claude ${MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE} for GENERAL_HELP (max tokens: ${maxTokens})...`);
 
   try {
-    const response = await gemini.models.generateContent({
+    const response = await claude.messages.create({
       model: MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }],
-        },
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [
+        { role: "user", content: userMessage },
       ],
-      config: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.7,
-      },
+      temperature: 0.7,
     });
 
-    const answer = response.text || "I'd be happy to help. Could you provide more details?";
-    console.log(`[OpenAssistant] Gemini response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+    const textBlock = response.content.find((block) => block.type === "text");
+    const answer = textBlock?.text || "I'd be happy to help. Could you provide more details?";
+    console.log(`[OpenAssistant] Claude response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
 
     return {
       answer,
@@ -1601,13 +1618,31 @@ Use this context to align suggestions with PitCrew's terminology and value propo
       streamingCompleted: false,
     };
   } catch (error) {
-    console.error(`[OpenAssistant] Gemini error, falling back to OpenAI:`, error);
+    console.error(`[OpenAssistant] Claude error, falling back to Gemini/OpenAI:`, error);
+
+    const gemini = getGeminiClient();
+    if (gemini) {
+      try {
+        const response = await gemini.models.generateContent({
+          model: GEMINI_MODELS.PRO,
+          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }] }],
+          config: { maxOutputTokens: maxTokens, temperature: 0.7 },
+        });
+        const answer = response.text || "I'd be happy to help. Could you provide more details?";
+        console.log(`[OpenAssistant] Gemini fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
+        return {
+          answer, intent: "general_assistance", intentClassification: classification,
+          decisionLayerIntent: Intent.GENERAL_HELP, answerContract: actualContract,
+          ssotMode: "none" as SSOTMode, dataSource: "general_knowledge",
+          delegatedToSingleMeeting: false, progressMessage, streamingCompleted: false,
+        };
+      } catch (geminiError) {
+        console.error(`[OpenAssistant] Gemini fallback also failed:`, geminiError);
+      }
+    }
 
     const answer = await streamOpenAIResponse(
-      "gpt-4o",
-      systemPrompt,
-      userMessage,
-      context.slackStreaming
+      "gpt-4o", systemPrompt, userMessage, context.slackStreaming
     );
     console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
 

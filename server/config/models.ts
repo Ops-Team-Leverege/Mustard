@@ -157,10 +157,10 @@ export const MODEL_ASSIGNMENTS = {
 
   /**
    * GENERAL_HELP responses - comprehensive document generation
-   * Uses Gemini 3 Pro for advanced reasoning and long-form content
+   * Uses Claude Opus 4.6 for advanced reasoning and long-form content
    * ~8000 token responses for executive-ready documents
    */
-  GENERAL_HELP_RESPONSE: GEMINI_MODELS.PRO,
+  GENERAL_HELP_RESPONSE: CLAUDE_MODELS.OPUS,
 
   // Multi-Meeting Synthesis - Pattern analysis across meetings
   MULTI_MEETING_SYNTHESIS: LLM_MODELS.STANDARD_REASONING,

@@ -11,8 +11,8 @@ import { AMBIENT_PRODUCT_CONTEXT } from "./system";
 /**
  * Build general assistance prompt for GENERAL_HELP intent.
  * Single clean system prompt — sets role and guardrails, then lets the LLM
- * handle the user's request directly. Used with Gemini 3 Pro (primary)
- * and OpenAI (fallback when Gemini is unavailable).
+ * handle the user's request directly. Used with Claude Opus 4.6 (primary),
+ * Gemini 3 Pro (fallback), and OpenAI (final fallback).
  */
 export function buildGeneralAssistancePrompt(params: {
   productKnowledgeSection?: string;

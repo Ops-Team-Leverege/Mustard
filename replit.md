@@ -75,7 +75,7 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 
 ### AI Services
 -   OpenAI API (GPT-5, GPT-4o, GPT-4o-mini)
--   Anthropic Claude Opus 4.6 (available in registry, not yet assigned to tasks)
+-   Anthropic Claude Opus 4.6 (GENERAL_HELP responses, with Gemini 3 Pro and OpenAI as fallbacks)
 -   Google Gemini 3 Pro (GENERAL_HELP responses, external research, website analysis)
 -   Google Gemini 2.5 Flash (semantic transcript analysis with 1M token window)
 
