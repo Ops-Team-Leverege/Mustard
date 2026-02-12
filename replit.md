@@ -117,12 +117,12 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 
 ### Airtable Webhook
 -   **Endpoint**: `POST https://mustard.leverege.com/api/airtable/webhook`
--   **Authentication**: Header `X-Airtable-Secret`
+-   **Authentication**: Header `X-Airtable-Secret` (uses `AIRTABLE_WEBHOOK_ZAPIER` secret)
 -   **Behavior**: Waits for sync, auto-discovers new tables, and auto-adds new columns.
 -   **Trigger**: Zapier automation on Airtable record changes.
 
 ### Zendesk Webhook
 -   **Endpoint**: `POST https://mustard.leverege.com/api/zendesk/webhook`
--   **Authentication**: Header `X-Airtable-Secret` (reuses same shared secret)
+-   **Authentication**: Header `X-Zendesk-Secret` (uses `ZENDESK_WEBHOOK_SECRET` secret)
 -   **Behavior**: Triggers full Zendesk Help Center article sync, waits for completion before responding.
 -   **Trigger**: Zapier automation on Zendesk article create/update.

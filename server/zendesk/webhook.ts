@@ -25,12 +25,12 @@ export async function handleZendeskWebhook(req: Request, res: Response): Promise
 }
 
 export function verifyZendeskWebhook(req: Request): boolean {
-  const secret = process.env.AIRTABLE_WEBHOOK_SECRET;
+  const secret = process.env.ZENDESK_WEBHOOK_SECRET;
   if (!secret) {
-    console.error("[Zendesk Webhook] AIRTABLE_WEBHOOK_SECRET is not configured — rejecting request");
+    console.error("[Zendesk Webhook] ZENDESK_WEBHOOK_SECRET is not configured — rejecting request");
     return false;
   }
 
-  const providedSecret = req.headers["x-airtable-secret"] || req.query.secret;
+  const providedSecret = req.headers["x-zendesk-secret"] || req.query.secret;
   return providedSecret === secret;
 }
