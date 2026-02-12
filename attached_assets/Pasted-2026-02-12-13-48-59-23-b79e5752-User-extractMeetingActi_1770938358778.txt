@@ -1,0 +1,212 @@
+2026-02-12 13:48:59.23
+b79e5752
+User
+[extractMeetingActionStates] Parsed 7 action items
+2026-02-12 13:48:59.23
+b79e5752
+User
+"type": "commitment",
+2026-02-12 13:48:59.23
+b79e5752
+User
+{
+2026-02-12 13:48:59.23
+b79e5752
+User
+"deadline": "Monday or Tuesday",
+2026-02-12 13:48:59.23
+b79e5752
+User
+},
+2026-02-12 13:48:59.23
+b79e5752
+User
+"deadline": "Not specified",
+2026-02-12 13:48:59.23
+b79e5752
+User
+"type": "commitment",
+2026-02-12 13:48:59.23
+b79e5752
+User
+[
+2026-02-12 13:48:59.23
+b79e5752
+User
+{
+2026-02-12 13:48:59.23
+b79e5752
+User
+"confidence": 0.95
+2026-02-12 13:48:59.23
+b79e5752
+User
+"action": "Report back on the status of the 1739 TV installation by Monday or Tuesday.",
+2026-02-12 13:48:59.23
+b79e5752
+User
+"action": "Get the replacement LG TV for the store with the Samsung issue and install it at 1739.",
+2026-02-12 13:48:59.23
+b79e5752
+User
+"action": "Get the replacement LG TV for the store with the Samsung issue and install it at 1739.",
+2026-02-12 13:48:59.23
+b79e5752
+User
+[extractMeetingActionStates] LLM response length: 2328 chars
+2026-02-12 13:48:59.23
+b79e5752
+User
+"action": "Report back on the status of the 1739 TV installation by Monday or Tuesday.",
+2026-02-12 13:48:59.23
+b79e5752
+User
+"
+2026-02-12 13:48:59.23
+b79e5752
+User
+{
+2026-02-12 13:48:59.23
+b79e5752
+User
+[extractMeetingActionStates] LLM response length: 2328 chars
+2026-02-12 13:48:59.23
+b79e5752
+User
+"owner": "Robert Colongo",
+2026-02-12 13:48:59.23
+b79e5752
+User
+[extractMeetingActionStates] Raw response preview: ```json
+2026-02-12 13:48:59.23
+b79e5752
+User
+"owner": "Robert Colongo",
+2026-02-12 13:48:59.83
+b79e5752
+User
+[extractMeetingActionStates] After Green Room filter: 7 items (removed 0)
+2026-02-12 13:48:59.83
+b79e5752
+User
+[extractMeetingActionStates] After Green Room filter: 7 items (removed 0)
+2026-02-12 13:49:01.23
+b79e5752
+User
+[ActionItems] Extraction complete for transcript 75771448-e30d-43e8-867a-654e0ed31efe: 7 items (7 primary, 0 secondary) (success=true)
+2026-02-12 13:49:01.23
+b79e5752
+User
+[ActionItems] Extraction complete for transcript 75771448-e30d-43e8-867a-654e0ed31efe: 7 items (7 primary, 0 secondary) (success=true)
+2026-02-12 14:18:10.10
+b79e5752
+System
+system: received signal terminated
+2026-02-12 14:18:10.10
+b79e5752
+System
+system: received signal terminated
+2026-02-12 14:32:54.39
+b79e5752
+System
+starting up user application
+2026-02-12 14:32:54.39
+b79e5752
+System
+starting up user application
+2026-02-12 14:32:54.39
+b79e5752
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-12 14:32:54.39
+b79e5752
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-12 14:32:54.39
+b79e5752
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-12 14:32:54.39
+b79e5752
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-12 14:32:55.45
+b79e5752
+User
+> rest-express@1.0.0 start
+2026-02-12 14:32:55.45
+b79e5752
+User
+> NODE_ENV=production node dist/index.js
+2026-02-12 14:32:55.45
+b79e5752
+User
+> rest-express@1.0.0 start
+2026-02-12 14:32:55.45
+b79e5752
+User
+> NODE_ENV=production node dist/index.js
+2026-02-12 14:32:57.65
+b79e5752
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-12 14:32:57.65
+b79e5752
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-12 14:32:57.67
+b79e5752
+User
+Slack routes registered at /api/slack/events
+2026-02-12 14:32:57.67
+b79e5752
+User
+Slack routes registered at /api/slack/events
+2026-02-12 14:32:57.96
+b79e5752
+User
+10:32:57 PM [express] serving on port 5000
+2026-02-12 14:32:57.96
+b79e5752
+User
+10:32:57 PM [express] serving on port 5000
+2026-02-12 14:55:10.11
+b79e5752
+System
+system: received signal terminated
+2026-02-12 14:55:10.11
+b79e5752
+System
+system: received signal terminated
+2026-02-12 15:05:51.49
+b79e5752
+System
+starting up user application
+2026-02-12 15:05:51.49
+b79e5752
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-12 15:05:51.50
+b79e5752
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-12 15:05:52.85
+b79e5752
+User
+> NODE_ENV=production node dist/index.js
+2026-02-12 15:05:52.85
+b79e5752
+User
+> rest-express@1.0.0 start
+2026-02-12 15:05:55.12
+b79e5752
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-12 15:05:55.14
+b79e5752
+User
+Slack routes registered at /api/slack/events
+2026-02-12 15:05:55.48
+b79e5752
+User
+11:05:55 PM [express] serving on port 5000

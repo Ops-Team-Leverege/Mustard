@@ -109,7 +109,16 @@ Examples:
 ✅ "Create a document with sections A, B, C" → GENERAL_HELP (wants: structured document)
 ⚠️ "Summarize the meeting AND check pricing" → CLARIFY (wants: two things)
 ⚠️ "Tell me about that thing" → CLARIFY (wants: unknown)
-⚠️ "What have customers said?" → CLARIFY (wants: unclear scope)
+⚠️ "What have customers said?" → CLARIFY (wants: unclear scope - no topic specified)
+
+CROSS-MEETING QUESTIONS (MULTI_MEETING, not CLARIFY):
+When a user asks about customer feedback across meetings WITH a specific topic, route to MULTI_MEETING:
+✅ "What are customers saying about TV issues?" → MULTI_MEETING (clear topic: TV issues)
+✅ "Using transcripts, what are customers saying about pricing?" → MULTI_MEETING (clear topic + explicit source)
+✅ "What questions have customers asked about cameras?" → MULTI_MEETING (clear topic: cameras)
+✅ "What concerns are customers raising about installation?" → MULTI_MEETING (clear topic: installation)
+The key distinction: topic-specific cross-meeting questions are MULTI_MEETING, not CLARIFY.
+Only CLARIFY when there is truly NO topic: "What have customers said?" (about what?)
 
 SLACK vs MEETING DISAMBIGUATION:
 When a query could refer to EITHER Slack messages OR meeting transcripts:
