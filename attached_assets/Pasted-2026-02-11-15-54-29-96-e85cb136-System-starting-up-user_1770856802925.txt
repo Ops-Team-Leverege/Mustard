@@ -1,0 +1,214 @@
+2026-02-11 15:54:29.96
+e85cb136
+System
+starting up user application
+2026-02-11 15:54:29.96
+e85cb136
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-11 15:54:29.96
+e85cb136
+System
+starting up user application
+2026-02-11 15:54:29.96
+e85cb136
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-11 15:54:29.96
+e85cb136
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-11 15:54:29.96
+e85cb136
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-11 15:54:31.25
+e85cb136
+User
+> rest-express@1.0.0 start
+2026-02-11 15:54:31.25
+e85cb136
+User
+> NODE_ENV=production node dist/index.js
+2026-02-11 15:54:31.25
+e85cb136
+User
+> NODE_ENV=production node dist/index.js
+2026-02-11 15:54:31.25
+e85cb136
+User
+> rest-express@1.0.0 start
+2026-02-11 15:54:33.07
+e85cb136
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-11 15:54:33.07
+e85cb136
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-11 15:54:33.08
+e85cb136
+User
+Slack routes registered at /api/slack/events
+2026-02-11 15:54:33.08
+e85cb136
+User
+Slack routes registered at /api/slack/events
+2026-02-11 15:54:33.34
+e85cb136
+User
+11:54:33 PM [express] serving on port 5000
+2026-02-11 15:54:33.34
+e85cb136
+User
+11:54:33 PM [express] serving on port 5000
+2026-02-11 16:33:38.08
+e85cb136
+System
+system: received signal terminated
+2026-02-11 16:33:38.08
+e85cb136
+System
+system: received signal terminated
+2026-02-11 16:36:42.36
+e85cb136
+System
+starting up user application
+2026-02-11 16:36:42.36
+e85cb136
+System
+starting up user application
+2026-02-11 16:36:42.36
+e85cb136
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-11 16:36:42.36
+e85cb136
+System
+forwarding local port 5000 to external port 80 (mapped as 1104)
+2026-02-11 16:36:42.36
+e85cb136
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-11 16:36:42.36
+e85cb136
+System
+metasidecar: loaded enterprise status from environment is_enterprise=false
+2026-02-11 16:36:44.51
+e85cb136
+User
+> rest-express@1.0.0 start
+2026-02-11 16:36:44.51
+e85cb136
+User
+> NODE_ENV=production node dist/index.js
+2026-02-11 16:36:44.51
+e85cb136
+User
+> NODE_ENV=production node dist/index.js
+2026-02-11 16:36:44.51
+e85cb136
+User
+> rest-express@1.0.0 start
+2026-02-11 16:36:47.01
+e85cb136
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-11 16:36:47.01
+e85cb136
+User
+[DocumentGenerator] Found logo at: /home/runner/workspace/server/assets/leverege-logo.png
+2026-02-11 16:36:47.03
+e85cb136
+User
+Slack routes registered at /api/slack/events
+2026-02-11 16:36:47.03
+e85cb136
+User
+Slack routes registered at /api/slack/events
+2026-02-11 16:36:47.32
+e85cb136
+User
+12:36:47 AM [express] serving on port 5000
+2026-02-11 16:36:47.32
+e85cb136
+User
+12:36:47 AM [express] serving on port 5000
+2026-02-11 16:36:50.45
+e85cb136
+User
+12:36:50 AM [express] GET /api/auth/user 304 in 372ms :: {"id":"49346173","email":"ops-user@leverege.…
+2026-02-11 16:36:50.45
+e85cb136
+User
+12:36:50 AM [express] GET /api/auth/user 304 in 372ms :: {"id":"49346173","email":"ops-user@leverege.…
+2026-02-11 16:36:50.75
+e85cb136
+User
+12:36:50 AM [express] GET /api/companies 304 in 205ms :: [{"id":"dbb806f5-c83a-49b7-9182-f506b86826af…
+2026-02-11 16:36:50.75
+e85cb136
+User
+12:36:50 AM [express] GET /api/companies 304 in 205ms :: [{"id":"dbb806f5-c83a-49b7-9182-f506b86826af…
+2026-02-11 16:36:53.99
+e85cb136
+User
+12:36:53 AM [express] PUT /api/user/product 200 in 118ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-11 16:36:53.99
+e85cb136
+User
+12:36:53 AM [express] PUT /api/user/product 200 in 118ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-11 16:36:54.17
+e85cb136
+User
+12:36:54 AM [express] GET /api/companies 200 in 93ms :: [{"id":"42ec847e-5d00-4398-b8f1-653e36ac65f3"…
+2026-02-11 16:36:54.17
+e85cb136
+User
+12:36:54 AM [express] GET /api/companies 200 in 93ms :: [{"id":"42ec847e-5d00-4398-b8f1-653e36ac65f3"…
+2026-02-11 16:36:54.18
+e85cb136
+User
+12:36:54 AM [express] GET /api/auth/user 200 in 70ms :: {"id":"49346173","email":"ops-user@leverege.c…
+2026-02-11 16:36:56.80
+e85cb136
+User
+12:36:56 AM [express] PUT /api/user/product 200 in 104ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-11 16:36:56.80
+e85cb136
+User
+12:36:56 AM [express] PUT /api/user/product 200 in 104ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-11 16:36:56.95
+e85cb136
+User
+12:36:56 AM [express] GET /api/auth/user 200 in 68ms :: {"id":"49346173","email":"ops-user@leverege.c…
+2026-02-11 16:36:56.97
+e85cb136
+User
+12:36:56 AM [express] GET /api/companies 200 in 93ms :: [{"id":"2f012854-0d3e-4eb7-a6b6-f88ca205ca9b"…
+2026-02-11 16:36:58.31
+e85cb136
+User
+12:36:58 AM [express] PUT /api/user/product 200 in 100ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-11 16:36:58.31
+e85cb136
+User
+12:36:58 AM [express] PUT /api/user/product 200 in 100ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-11 16:36:58.46
+e85cb136
+User
+12:36:58 AM [express] GET /api/auth/user 200 in 67ms :: {"id":"49346173","email":"ops-user@leverege.c…
+2026-02-11 16:36:58.46
+e85cb136
+User
+12:36:58 AM [express] GET /api/auth/user 200 in 67ms :: {"id":"49346173","email":"ops-user@leverege.c…
+2026-02-11 16:36:58.47
+e85cb136
+User
+12:36:58 AM [express] GET /api/companies 200 in 88ms :: []
+2026-02-11 16:36:58.47
+e85cb136
+User
+12:36:58 AM [express] GET /api/companies 200 in 88ms :: []
+Wrap
+C
