@@ -63,9 +63,16 @@ export const LLM_MODELS = {
 export const GEMINI_MODELS = {
   /**
    * Fast Gemini model with web grounding capabilities.
-   * Used for external company research, website analysis, and real-time web data.
+   * Used for semantic transcript analysis with 1M token context window.
    */
   FLASH: "gemini-2.5-flash",
+
+  /**
+   * Gemini 3 Pro for advanced reasoning and research.
+   * 1M token context window, 64K output tokens.
+   * Used for General Help responses and external research.
+   */
+  PRO: "gemini-3-pro-preview",
 } as const;
 
 export type GeminiModelType = typeof GEMINI_MODELS[keyof typeof GEMINI_MODELS];
@@ -136,17 +143,17 @@ export const MODEL_ASSIGNMENTS = {
 
   /**
    * GENERAL_HELP responses - comprehensive document generation
-   * Uses Gemini 2.5 Flash for hybrid reasoning and long-form content
+   * Uses Gemini 3 Pro for advanced reasoning and long-form content
    * ~8000 token responses for executive-ready documents
    */
-  GENERAL_HELP_RESPONSE: GEMINI_MODELS.FLASH,
+  GENERAL_HELP_RESPONSE: GEMINI_MODELS.PRO,
 
   // Multi-Meeting Synthesis - Pattern analysis across meetings
   MULTI_MEETING_SYNTHESIS: LLM_MODELS.STANDARD_REASONING,
 
-  // Gemini - Web-grounded research tasks
-  EXTERNAL_RESEARCH_WEB: GEMINI_MODELS.FLASH,
-  WEBSITE_ANALYSIS: GEMINI_MODELS.FLASH,
+  // Gemini - Web-grounded research tasks (Gemini 3 Pro for deeper analysis)
+  EXTERNAL_RESEARCH_WEB: GEMINI_MODELS.PRO,
+  WEBSITE_ANALYSIS: GEMINI_MODELS.PRO,
 } as const;
 
 /**
@@ -157,4 +164,5 @@ export const TOKEN_LIMITS: Record<string, number> = {
   [LLM_MODELS.STANDARD_REASONING]: 2000,
   [LLM_MODELS.HEAVY_ANALYSIS]: 4000,
   [GEMINI_MODELS.FLASH]: 8000,
+  [GEMINI_MODELS.PRO]: 8000,
 };

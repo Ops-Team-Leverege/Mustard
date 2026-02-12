@@ -75,7 +75,8 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 
 ### AI Services
 -   OpenAI API (GPT-5, GPT-4o, GPT-4o-mini)
--   Google Gemini 2.5 Flash (semantic transcript analysis with 1M token window; also handles GENERAL_HELP responses as a direct chat model)
+-   Google Gemini 3 Pro (GENERAL_HELP responses, external research, website analysis)
+-   Google Gemini 2.5 Flash (semantic transcript analysis with 1M token window)
 
 ### Database
 -   PostgreSQL

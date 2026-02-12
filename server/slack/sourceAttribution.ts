@@ -33,6 +33,7 @@ const FRIENDLY_MODEL_NAMES: Record<string, string> = {
   "gpt-4o": "GPT-4o",
   "gpt-5": "GPT-5",
   "gemini-2.5-flash": "Gemini 2.5 Flash",
+  "gemini-3-pro-preview": "Gemini 3 Pro",
 };
 
 function friendlyModelName(model: string): string {
