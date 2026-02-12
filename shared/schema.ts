@@ -596,6 +596,27 @@ export const slackEventDedupe = pgTable("slack_event_dedupe", {
   processedAt: timestamp("processed_at").defaultNow().notNull(),
 });
 
+// Zendesk Help Center articles - synced from pitcrewsupport.zendesk.com
+export const zendeskArticles = pgTable("zendesk_articles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  externalId: text("external_id").notNull().unique(),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  htmlUrl: text("html_url").notNull(),
+  sectionId: text("section_id"),
+  sectionName: text("section_name"),
+  categoryId: text("category_id"),
+  categoryName: text("category_name"),
+  locale: text("locale").default("en-us"),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+  syncedAt: timestamp("synced_at").defaultNow().notNull(),
+});
+
+export const insertZendeskArticleSchema = createInsertSchema(zendeskArticles).omit({ id: true, syncedAt: true });
+export type InsertZendeskArticle = z.infer<typeof insertZendeskArticleSchema>;
+export type ZendeskArticle = typeof zendeskArticles.$inferSelect;
+
 // Types
 export type PitcrewAirtableFeature = typeof pitcrewAirtableFeatures.$inferSelect;
 export type InsertPitcrewAirtableFeature = typeof pitcrewAirtableFeatures.$inferInsert;
