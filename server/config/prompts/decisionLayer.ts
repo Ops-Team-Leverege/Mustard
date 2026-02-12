@@ -145,6 +145,11 @@ CRITICAL RULES:
 3. **Understand references** - "their concerns", "what they said", "last week's call" - who is "they"?
 4. **Jump into action** - If context is clear, don't ask for clarification
 5. **Be smart about follow-ups** - "action items from last week" + ACE context = ACE action items
+6. **Company name = meeting data** - When a company/customer name is mentioned, questions about their setup, deployment, hardware, cameras, installation, concerns, or feedback should route to SINGLE_MEETING (not PRODUCT_KNOWLEDGE). The user is asking about what was discussed in meetings with that customer, not about PitCrew's generic product features.
+   - "Does Costco have outside cameras?" → SINGLE_MEETING, Company: Costco (asking about Costco's PitCrew deployment)
+   - "What hardware is ACE using?" → SINGLE_MEETING, Company: ACE (asking about ACE's specific setup)
+   - "How many cameras does Jiffy Lube have?" → SINGLE_MEETING, Company: Jiffy Lube
+   Only route to PRODUCT_KNOWLEDGE when the question is about PitCrew's generic capabilities with NO customer context.
 
 EXAMPLES WITH CONTEXT:
 Thread: "ACE weekly slides starting here @calum"
