@@ -10,6 +10,7 @@ import { extractMeetingActionStates, type MeetingActionItem as ComposerActionIte
 import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
+import { handleZendeskWebhook, verifyZendeskWebhook } from "./zendesk/webhook";
 import { 
   handleAirtableWebhook, 
   handleAirtableRefresh,
@@ -1886,6 +1887,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
     await handleAirtableRefresh(req, res);
+  });
+
+  // ===== ZENDESK INTEGRATION =====
+
+  // Webhook endpoint for Zendesk article updates (triggered by Zapier)
+  app.post("/api/zendesk/webhook", async (req, res) => {
+    if (!verifyZendeskWebhook(req)) {
+      res.status(401).json({ success: false, error: "Unauthorized" });
+      return;
+    }
+    await handleZendeskWebhook(req, res);
   });
 
   // Get all product features from Airtable
