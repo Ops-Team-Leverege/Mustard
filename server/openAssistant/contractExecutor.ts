@@ -201,9 +201,9 @@ async function fetchActualEvidence(
       case AnswerContract.CROSS_MEETING_QUESTIONS:
       case AnswerContract.CUSTOMER_QUESTIONS:
         for (const meetingId of meetingIds) {
-          const questions = await storage.getCustomerQuestionsByTranscript(meetingId);
-          if (questions.length > 0) {
-            items.push(...questions);
+          const qaPairs = await storage.getQAPairsByTranscriptId(meetingId);
+          if (qaPairs.length > 0) {
+            items.push(...qaPairs);
             meetingsWithEvidence++;
           }
         }

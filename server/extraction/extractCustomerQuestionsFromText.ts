@@ -1,8 +1,9 @@
 /**
- * Extract customer questions directly from raw transcript text.
+ * DEPRECATED: Extract customer questions directly from raw transcript text.
  * 
- * This is a fallback for transcripts that don't have chunks available.
- * Uses the same gpt-4o model at temperature 0 for consistency.
+ * This module is no longer called during transcript ingestion.
+ * All Q&A retrieval now uses qa_pairs (from transcript analyzer) instead.
+ * Kept for historical reference.
  */
 
 import OpenAI from "openai";

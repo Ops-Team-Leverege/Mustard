@@ -28,7 +28,7 @@ vi.mock('../storage', () => ({
   storage: {
     rawQuery: vi.fn().mockResolvedValue([]),
     getCompanies: vi.fn().mockResolvedValue([]),
-    getCustomerQuestionsByTranscript: vi.fn().mockResolvedValue([]),
+    getQAPairsByTranscriptId: vi.fn().mockResolvedValue([]),
     getTranscript: vi.fn().mockResolvedValue(null),
   }
 }));

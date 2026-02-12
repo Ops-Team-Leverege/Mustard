@@ -2,7 +2,7 @@
  * Semantic Artifact Search
  * 
  * Purpose:
- * Searches over deterministic meeting artifacts (customer_questions, meeting_action_items,
+ * Searches over deterministic meeting artifacts (qa_pairs, meeting_action_items,
  * meeting_summaries) using semantic similarity.
  * 
  * Key Principles:
@@ -14,7 +14,7 @@
 
 import { storage } from "../storage";
 import { OpenAI } from "openai";
-import type { CustomerQuestion, MeetingActionItem, Product } from "@shared/schema";
+import type { MeetingActionItem, Product, QAPairWithCategory } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { getSemanticArtifactSearchPrompt } from "../config/prompts/utility";
 
@@ -29,7 +29,7 @@ export type SemanticMatch<T> = {
 };
 
 export type ArtifactSearchResult = {
-  customerQuestions: SemanticMatch<CustomerQuestion>[];
+  qaPairs: SemanticMatch<QAPairWithCategory>[];
   actionItems: SemanticMatch<MeetingActionItem>[];
   summaryRelevant: boolean;
   summaryMatch?: {
@@ -57,15 +57,15 @@ export async function searchArtifactsSemanticly(
     return emptyResult(query);
   }
 
-  const [customerQuestions, actionItems] = await Promise.all([
-    storage.getCustomerQuestionsByTranscript(transcriptId),
+  const [qaPairs, actionItems] = await Promise.all([
+    storage.getQAPairsByTranscriptId(transcriptId),
     storage.getMeetingActionItemsByTranscript(transcriptId),
   ]);
 
   const searchTopic = extractSearchTopic(query);
   
   const [questionMatches, actionMatches] = await Promise.all([
-    rankByRelevance(customerQuestions, searchTopic, "customer_question"),
+    rankByRelevance(qaPairs, searchTopic, "qa_pair"),
     rankByRelevance(actionItems, searchTopic, "action_item"),
   ]);
 
@@ -83,7 +83,7 @@ export async function searchArtifactsSemanticly(
   }
 
   return {
-    customerQuestions: questionMatches.slice(0, limit),
+    qaPairs: questionMatches.slice(0, limit),
     actionItems: actionMatches.slice(0, limit),
     summaryRelevant: Boolean(summaryMatch),
     summaryMatch,
@@ -129,16 +129,17 @@ function extractSearchTopic(query: string): string {
 /**
  * Rank items by semantic relevance to the topic.
  */
-async function rankByRelevance<T extends CustomerQuestion | MeetingActionItem>(
+async function rankByRelevance<T extends QAPairWithCategory | MeetingActionItem>(
   items: T[],
   topic: string,
-  itemType: "customer_question" | "action_item"
+  itemType: "qa_pair" | "action_item"
 ): Promise<SemanticMatch<T>[]> {
   if (items.length === 0) return [];
 
   const itemTexts = items.map(item => {
-    if (itemType === "customer_question") {
-      return (item as CustomerQuestion).questionText;
+    if (itemType === "qa_pair") {
+      const qa = item as QAPairWithCategory;
+      return `${qa.question} — ${qa.answer}`;
     } else {
       return (item as MeetingActionItem).actionText;
     }
@@ -222,7 +223,7 @@ Return JSON: { "isRelevant": true/false, "reason": "Brief explanation" }`,
 
 function emptyResult(topic: string): ArtifactSearchResult {
   return {
-    customerQuestions: [],
+    qaPairs: [],
     actionItems: [],
     summaryRelevant: false,
     searchTopic: topic,
@@ -236,12 +237,14 @@ function emptyResult(topic: string): ArtifactSearchResult {
 export function formatArtifactResults(result: ArtifactSearchResult): string {
   const parts: string[] = [];
 
-  if (result.customerQuestions.length > 0) {
-    parts.push("*Customer Questions:*");
-    result.customerQuestions.forEach((m, i) => {
+  if (result.qaPairs.length > 0) {
+    parts.push("*Customer Q&A:*");
+    result.qaPairs.forEach((m, i) => {
       const q = m.item;
-      const status = q.status === "ANSWERED" ? "answered" : q.status.toLowerCase();
-      parts.push(`${i + 1}. "${q.questionText}" (${status})`);
+      parts.push(`${i + 1}. "${q.question}"`);
+      if (q.answer) {
+        parts.push(`   _Answer: ${q.answer}_`);
+      }
     });
   }
 

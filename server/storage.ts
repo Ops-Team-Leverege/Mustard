@@ -156,8 +156,11 @@ export interface IStorage {
   insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
   getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null>;
 
-  // Customer Questions (High-Trust, Evidence-Based Layer)
-  // IMPORTANT: These are INDEPENDENT from qa_pairs - do NOT merge or treat as interchangeable
+  // Q&A Pairs - meeting-scoped lookup (no product required, for bot/Slack pipeline)
+  getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
+
+  // Customer Questions (DEPRECATED - use qa_pairs instead)
+  // Kept for backward compatibility and historical data access
   getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]>;
   createCustomerQuestions(questions: InsertCustomerQuestion[]): Promise<CustomerQuestion[]>;
   deleteCustomerQuestionsByTranscript(transcriptId: string): Promise<boolean>;
@@ -1159,6 +1162,12 @@ export class MemStorage implements IStorage {
 
   async getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null> {
     throw new Error("MemStorage not supported for Interaction Logs");
+  }
+
+  async getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]> {
+    return Array.from(this.qaPairs.values())
+      .filter(qa => qa.transcriptId === transcriptId)
+      .map(qa => ({ ...qa, categoryName: null, contactName: null, contactJobTitle: null, transcriptDate: null }));
   }
 
   async getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]> {
@@ -2496,8 +2505,42 @@ export class DbStorage implements IStorage {
     return result ?? null;
   }
 
-  // Customer Questions (High-Trust, Evidence-Based Layer)
-  // IMPORTANT: These are INDEPENDENT from qa_pairs - do NOT merge or treat as interchangeable
+  async getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]> {
+    const results = await this.db
+      .select({
+        id: qaPairsTable.id,
+        product: qaPairsTable.product,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
+        categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
+      .where(eq(qaPairsTable.transcriptId, transcriptId));
+
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      contactName: r.contactName || null,
+      contactJobTitle: r.contactJobTitle || null,
+      transcriptDate: r.transcriptDate || null,
+    }));
+  }
+
+  // Customer Questions (DEPRECATED - use qa_pairs via getQAPairsByTranscriptId instead)
   async getCustomerQuestionsByTranscript(transcriptId: string): Promise<CustomerQuestion[]> {
     return await this.db
       .select()

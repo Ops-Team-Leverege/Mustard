@@ -127,9 +127,10 @@ export const qaPairs = pgTable("qa_pairs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-// Customer Questions (High-Trust, Evidence-Based Layer)
+// Customer Questions (DEPRECATED)
 // 
-// IMPORTANT: This table is INDEPENDENT from qa_pairs and must NOT be merged.
+// This table is DEPRECATED. All Q&A retrieval now uses qa_pairs instead.
+// The table and data are preserved for historical reference but no new rows are created.
 // 
 // | Table              | Nature       | Evidence Required | Inference Allowed | Use Case              |
 // |--------------------|--------------|-------------------|-------------------|-----------------------|

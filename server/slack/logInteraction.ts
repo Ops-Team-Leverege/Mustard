@@ -93,6 +93,7 @@ export function mapLegacyDataSource(dataSource: string): "meeting_artifacts" | "
     case "action_items":
     case "attendees":
     case "customer_questions":
+    case "qa_pairs":
     case "meeting_artifacts":
       return "meeting_artifacts";
     case "semantic":
@@ -109,7 +110,7 @@ export function mapLegacyDataSource(dataSource: string): "meeting_artifacts" | "
   }
 }
 
-export function mapLegacyArtifactType(dataSource: string): "action_items" | "attendees" | "customer_questions" | null {
+export function mapLegacyArtifactType(dataSource: string): "action_items" | "attendees" | "customer_questions" | "qa_pairs" | null {
   switch (dataSource) {
     case "action_items":
       return "action_items";
@@ -117,6 +118,8 @@ export function mapLegacyArtifactType(dataSource: string): "action_items" | "att
       return "attendees";
     case "customer_questions":
       return "customer_questions";
+    case "qa_pairs":
+      return "qa_pairs";
     default:
       return null;
   }

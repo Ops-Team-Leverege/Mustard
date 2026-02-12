@@ -18,7 +18,7 @@
 
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "../storage";
-import type { CustomerQuestion, MeetingActionItem, TranscriptChunk } from "@shared/schema";
+import type { MeetingActionItem, TranscriptChunk, QAPairWithCategory } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { buildSemanticAnswerPrompt } from "../config/prompts/singleMeeting";
 
@@ -142,7 +142,7 @@ interface MeetingContext {
   meetingDate?: Date | null;
   leverageTeam: string[];
   customerNames: string[];
-  customerQuestions: CustomerQuestion[];
+  qaPairs: QAPairWithCategory[];
   actionItems: MeetingActionItem[];
   transcriptChunks: TranscriptChunk[];
 }
@@ -174,21 +174,16 @@ function buildContextWindow(ctx: MeetingContext): string {
     }
   }
 
-  if (ctx.customerQuestions.length > 0) {
-    sections.push(`\n## Customer Questions (Verbatim)`);
-    ctx.customerQuestions.forEach((q, i) => {
-      let entry = `${i + 1}. "${q.questionText}"`;
-      if (q.askedByName) {
-        entry += ` — ${q.askedByName}`;
+  if (ctx.qaPairs.length > 0) {
+    sections.push(`\n## Customer Q&A`);
+    ctx.qaPairs.forEach((q, i) => {
+      let entry = `${i + 1}. "${q.question}"`;
+      if (q.asker) {
+        entry += ` — ${q.asker}`;
       }
       sections.push(entry);
-      if (q.status === "ANSWERED" && q.answerEvidence) {
-        sections.push(`   Answer: "${q.answerEvidence}"`);
-        if (q.answeredByName) {
-          sections.push(`   — ${q.answeredByName}`);
-        }
-      } else if (q.status === "OPEN") {
-        sections.push(`   (Left open in meeting)`);
+      if (q.answer) {
+        sections.push(`   Answer: "${q.answer}"`);
       }
     });
   }
@@ -253,9 +248,9 @@ export async function semanticAnswerSingleMeeting(
   console.log(`[SemanticAnswer] Starting for meeting ${meetingId}`);
   const startTime = Date.now();
 
-  const [transcript, customerQuestions, actionItems, chunks] = await Promise.all([
+  const [transcript, qaPairs, actionItems, chunks] = await Promise.all([
     storage.getTranscriptById(meetingId),
-    storage.getCustomerQuestionsByTranscript(meetingId),
+    storage.getQAPairsByTranscriptId(meetingId),
     storage.getMeetingActionItemsByTranscript(meetingId),
     storage.getChunksForTranscript(meetingId),
   ]);
@@ -282,7 +277,7 @@ export async function semanticAnswerSingleMeeting(
     meetingDate,
     leverageTeam,
     customerNames,
-    customerQuestions,
+    qaPairs,
     actionItems,
     transcriptChunks: chunks,
   };
@@ -295,7 +290,7 @@ export async function semanticAnswerSingleMeeting(
   console.log(`[SemanticAnswer] Detected answer shape: ${answerShape}`);
 
   const evidenceSources: string[] = [];
-  if (customerQuestions.length > 0) evidenceSources.push("customer_questions");
+  if (qaPairs.length > 0) evidenceSources.push("qa_pairs");
   if (actionItems.length > 0) evidenceSources.push("action_items");
   if (chunks.length > 0) evidenceSources.push("transcript_chunks");
   if (leverageTeam.length > 0 || customerNames.length > 0) evidenceSources.push("attendees");

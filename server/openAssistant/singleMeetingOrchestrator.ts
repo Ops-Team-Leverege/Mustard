@@ -13,9 +13,9 @@
  * - Only read-only meeting artifacts allowed
  * 
  * Data Access Layers:
- * - Meeting Artifacts (Allowed): attendees, customer_questions, next_steps/commitments, raw transcript
+ * - Meeting Artifacts (Allowed): attendees, qa_pairs, next_steps/commitments, raw transcript
  * - Semantic Layer (Summary Only): meeting_summaries, GPT-5 (explicit opt-in)
- * - Extended Search (Blocked): qa_pairs, searchQuestions, searchCompanyFeedback, etc.
+ * - Extended Search (Blocked): searchQuestions, searchCompanyFeedback, etc.
  * 
  * IMPORTANT: Intent Classification Authority
  * The Intent Router (server/decisionLayer/intent.ts) is the SOLE authority for intent classification.
@@ -329,8 +329,8 @@ function extractKeywords(query: string): { keywords: string[]; properNouns: stri
 }
 
 /**
- * Lookup customer questions for a specific meeting.
- * Returns questions from the high-trust customer_questions table only.
+ * Lookup Q&A pairs for a specific meeting.
+ * Returns Q&A from the qa_pairs table (interpreted, paraphrased Q&A with full answers).
  * 
  * This is strictly meeting-scoped and does NOT use searchQuestions or cross-meeting logic.
  * 
@@ -339,7 +339,7 @@ function extractKeywords(query: string): { keywords: string[]; properNouns: stri
  * 2. Fall back to general keyword matches (excluding stop words)
  * 3. Return empty if no meaningful matches found
  */
-async function lookupCustomerQuestions(
+async function lookupQAPairs(
   meetingId: string,
   userQuestion?: string
 ): Promise<Array<{
@@ -347,20 +347,25 @@ async function lookupCustomerQuestions(
   askedByName: string | null;
   status: string;
   answerEvidence: string | null;
-  answeredByName: string | null;
-  contextBefore: string | null;
 }>> {
-  const questions = await storage.getCustomerQuestionsByTranscript(meetingId);
+  const qaPairs = await storage.getQAPairsByTranscriptId(meetingId);
+
+  const mapped = qaPairs.map(qa => ({
+    questionText: qa.question,
+    askedByName: qa.asker || null,
+    status: "ANSWERED" as const,
+    answerEvidence: qa.answer,
+  }));
 
   if (!userQuestion) {
-    return questions;
+    return mapped;
   }
 
   const { keywords, properNouns } = extractKeywords(userQuestion);
 
   // PRIORITY 1: Questions matching BOTH proper nouns AND keywords (most relevant)
   if (properNouns.length > 0 && keywords.length > 0) {
-    const bothMatches = questions.filter(cq => {
+    const bothMatches = mapped.filter(cq => {
       const text = cq.questionText.toLowerCase();
       const hasProperNoun = properNouns.some(noun => text.includes(noun));
       const hasKeyword = keywords.some(kw => text.includes(kw));
@@ -374,7 +379,7 @@ async function lookupCustomerQuestions(
 
   // PRIORITY 2: Questions matching keywords only (topic-relevant)
   if (keywords.length > 0) {
-    const keywordMatches = questions.filter(cq => {
+    const keywordMatches = mapped.filter(cq => {
       const text = cq.questionText.toLowerCase();
       return keywords.some(kw => text.includes(kw));
     });
@@ -386,7 +391,7 @@ async function lookupCustomerQuestions(
 
   // PRIORITY 3: Questions matching proper nouns only (valid for name-based queries)
   if (properNouns.length > 0) {
-    const properNounMatches = questions.filter(cq => {
+    const properNounMatches = mapped.filter(cq => {
       const text = cq.questionText.toLowerCase();
       return properNouns.some(noun => text.includes(noun));
     });
@@ -616,7 +621,7 @@ async function handleExtractiveIntent(
 
   if (isCustomerQuestionsRequest) {
     console.log(`[SingleMeetingOrchestrator] Fast path: customer questions (contract=${contract}, wantsKBAnswers=${wantsKBAnswers})`);
-    const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
+    const customerQuestions = await lookupQAPairs(ctx.meetingId);
     console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
 
     if (customerQuestions.length === 0) {
@@ -624,60 +629,40 @@ async function handleExtractiveIntent(
       return {
         answer: `No customer questions were identified in this meeting${dateSuffix}.`,
         intent: "extractive",
-        dataSource: "customer_questions",
+        dataSource: "qa_pairs",
       };
     }
 
-    const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
-    const answeredQuestions = customerQuestions.filter(q => q.status === "ANSWERED");
-
-    // If user wants KB-assisted answers, provide assessments and answers
+    // If user wants KB-assisted answers, provide assessments
     if (wantsKBAnswers) {
       console.log(`[SingleMeetingOrchestrator] User requested KB-assisted answers for customer questions`);
-      return await generateKBAssistedCustomerQuestionAnswers(ctx, openQuestions, answeredQuestions);
+      return await generateKBAssistedCustomerQuestionAnswers(ctx, [], customerQuestions);
     }
 
-    // Standard customer questions listing
+    // Standard customer questions listing (qa_pairs always have answers)
     const lines: string[] = [];
     const dateSuffix = getMeetingDateSuffix(ctx);
     lines.push(`*Customer Questions — ${ctx.companyName}${dateSuffix}*`);
 
-    if (openQuestions.length > 0) {
-      lines.push("\n*Open Questions:*");
-      openQuestions.forEach(q => {
-        lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
-      });
-    }
-
-    if (answeredQuestions.length > 0) {
-      lines.push("\n*Answered in Meeting:*");
-      answeredQuestions.slice(0, 10).forEach(q => {
-        lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
-      });
-      if (answeredQuestions.length > 10) {
-        lines.push(`_...and ${answeredQuestions.length - 10} more_`);
+    customerQuestions.slice(0, 15).forEach(q => {
+      lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+      if (q.answerEvidence) {
+        lines.push(`  _Answer: ${q.answerEvidence}_`);
       }
+    });
+    if (customerQuestions.length > 15) {
+      lines.push(`_...and ${customerQuestions.length - 15} more_`);
     }
 
-    // Offer KB-assisted answers if there are questions to assess
-    if (openQuestions.length > 0 || answeredQuestions.length > 0) {
+    if (customerQuestions.length > 0) {
       lines.push("\n---");
-      if (openQuestions.length > 0 && answeredQuestions.length > 0) {
-        lines.push("_Would you like me to:_");
-        lines.push("_• Answer the open questions using our product knowledge?_");
-        lines.push("_• Check the answered questions for correctness?_");
-        lines.push("\n_Just say \"help me answer those\" or \"check for correctness\" and I'll review them against our product database._");
-      } else if (openQuestions.length > 0) {
-        lines.push("_Would you like me to answer these open questions using our product knowledge? Just say \"help me answer those\" and I'll provide suggested responses._");
-      } else {
-        lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
-      }
+      lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
     }
 
     return {
       answer: lines.join("\n"),
       intent: "extractive",
-      dataSource: "customer_questions",
+      dataSource: "qa_pairs",
     };
   }
 
@@ -749,7 +734,7 @@ async function handleExtractiveIntent(
   // Treat as "term lookup" - prefer action items and customer questions (cleanest nouns)
   console.log(`[SingleMeetingOrchestrator] General path: parallel fetch`);
   const [customerQuestions, actionItems] = await Promise.all([
-    lookupCustomerQuestions(ctx.meetingId, question),
+    lookupQAPairs(ctx.meetingId, question),
     getMeetingActionItems(ctx.meetingId),
   ]);
   console.log(`[SingleMeetingOrchestrator] Parallel fetch complete: ${Date.now() - startTime}ms`);
@@ -837,19 +822,14 @@ async function handleExtractiveIntent(
     if (match.askedByName) {
       lines.push(`— ${match.askedByName}`);
     }
-    if (match.status === "ANSWERED" && match.answerEvidence) {
+    if (match.answerEvidence) {
       lines.push(`\n*Answer provided:* ${match.answerEvidence}`);
-      if (match.answeredByName) {
-        lines.push(`— ${match.answeredByName}`);
-      }
-    } else if (match.status === "OPEN") {
-      lines.push(`\n_This question was left open in the meeting._`);
     }
 
     return {
       answer: lines.join("\n"),
       intent: "extractive",
-      dataSource: "customer_questions",
+      dataSource: "qa_pairs",
       evidence: match.questionText,
     };
   }
@@ -912,7 +892,7 @@ async function handleAggregativeIntent(
   // FAST PATH: Questions about customer questions - only fetch customer_questions
   if (wantsQuestions) {
     console.log(`[SingleMeetingOrchestrator] Aggregative: customer questions`);
-    const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
+    const customerQuestions = await lookupQAPairs(ctx.meetingId);
     console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
 
     if (customerQuestions.length === 0) {
@@ -926,52 +906,32 @@ async function handleAggregativeIntent(
     const lines: string[] = [];
     lines.push(`*Customer Questions from the meeting with ${ctx.companyName}:*`);
 
-    const openQuestions = customerQuestions.filter(q => q.status === "OPEN");
-    const answeredQuestions = customerQuestions.filter(q => q.status === "ANSWERED");
-
-    if (openQuestions.length > 0) {
-      lines.push("\n*Open Questions:*");
-      openQuestions.forEach(q => {
-        lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
-      });
-    }
-
-    if (answeredQuestions.length > 0) {
-      lines.push("\n*Answered in Meeting:*");
-      answeredQuestions.slice(0, 5).forEach(q => {
-        lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
-      });
-      if (answeredQuestions.length > 5) {
-        lines.push(`_...and ${answeredQuestions.length - 5} more_`);
+    customerQuestions.slice(0, 10).forEach(q => {
+      lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+      if (q.answerEvidence) {
+        lines.push(`  _Answer: ${q.answerEvidence}_`);
       }
+    });
+    if (customerQuestions.length > 10) {
+      lines.push(`_...and ${customerQuestions.length - 10} more_`);
     }
 
-    // Offer KB-assisted answers if there are questions to assess
-    if (openQuestions.length > 0 || answeredQuestions.length > 0) {
+    if (customerQuestions.length > 0) {
       lines.push("\n---");
-      if (openQuestions.length > 0 && answeredQuestions.length > 0) {
-        lines.push("_Would you like me to:_");
-        lines.push("_• Answer the open questions using our product knowledge?_");
-        lines.push("_• Check the answered questions for correctness?_");
-        lines.push("\n_Just say \"help me answer those\" or \"check for correctness\" and I'll review them against our product database._");
-      } else if (openQuestions.length > 0) {
-        lines.push("_Would you like me to answer these open questions using our product knowledge? Just say \"help me answer those\" and I'll provide suggested responses._");
-      } else {
-        lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
-      }
+      lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
     }
 
     return {
       answer: lines.join("\n"),
       intent: "aggregative",
-      dataSource: "customer_questions",
+      dataSource: "qa_pairs",
     };
   }
 
   // FAST PATH: Questions about issues/concerns - fetch customer_questions and filter
   if (wantsConcerns) {
     console.log(`[SingleMeetingOrchestrator] Aggregative: concerns/issues`);
-    const customerQuestions = await lookupCustomerQuestions(ctx.meetingId);
+    const customerQuestions = await lookupQAPairs(ctx.meetingId);
     console.log(`[SingleMeetingOrchestrator] Customer questions fetch: ${Date.now() - startTime}ms`);
 
     const concernQuestions = customerQuestions.filter(cq => {
@@ -996,7 +956,7 @@ async function handleAggregativeIntent(
     return {
       answer: lines.join("\n"),
       intent: "aggregative",
-      dataSource: "customer_questions",
+      dataSource: "qa_pairs",
     };
   }
 
@@ -1043,7 +1003,7 @@ async function handleDraftingIntent(
   console.log(`[SingleMeetingOrchestrator] Drafting: fetching all context for meeting ${ctx.meetingId}`);
 
   const [customerQuestions, actionItems, chunks, productKnowledge] = await Promise.all([
-    lookupCustomerQuestions(ctx.meetingId),
+    lookupQAPairs(ctx.meetingId),
     getMeetingActionItems(ctx.meetingId),
     storage.getChunksForTranscript(ctx.meetingId, 50),
     getComprehensiveProductKnowledge(),
@@ -1063,13 +1023,12 @@ async function handleDraftingIntent(
     contextParts.push("");
   }
 
-  // Include customer questions if available
+  // Include Q&A pairs if available
   if (customerQuestions.length > 0) {
-    contextParts.push("CUSTOMER QUESTIONS FROM THE MEETING:");
+    contextParts.push("CUSTOMER Q&A FROM THE MEETING:");
     customerQuestions.forEach(cq => {
-      const status = cq.status === "OPEN" ? " [OPEN]" : " [ANSWERED]";
-      contextParts.push(`- "${cq.questionText}"${cq.askedByName ? ` (asked by ${cq.askedByName})` : ""}${status}`);
-      if (cq.status === "ANSWERED" && cq.answerEvidence) {
+      contextParts.push(`- "${cq.questionText}"${cq.askedByName ? ` (asked by ${cq.askedByName})` : ""}`);
+      if (cq.answerEvidence) {
         contextParts.push(`  Answer: ${cq.answerEvidence}`);
       }
     });
@@ -1149,7 +1108,7 @@ Format the email with:
   return {
     answer: `Here's a draft follow-up email for ${ctx.companyName}${dateSuffix}:\n\n${draft}`,
     intent: "drafting",
-    dataSource: "customer_questions",
+    dataSource: "qa_pairs",
   };
 }
 
@@ -1255,7 +1214,7 @@ Would you like a brief summary of what was discussed?`;
 
     // Search for the subject in meeting artifacts AND transcript (parallel fetch)
     const [customerQuestions, actionItems, transcriptSnippets] = await Promise.all([
-      lookupCustomerQuestions(ctx.meetingId, subject),
+      lookupQAPairs(ctx.meetingId, subject),
       searchActionItemsForRelevantIssues(ctx.meetingId, subject),
       searchTranscriptSnippets(ctx.meetingId, subject, 2),
     ]);
@@ -1326,11 +1285,10 @@ Would you like a brief meeting summary instead?`,
 async function generateKBAssistedCustomerQuestionAnswers(
   ctx: SingleMeetingContext,
   openQuestions: Array<{ questionText: string; askedByName?: string | null; answerEvidence?: string | null }>,
-  answeredQuestions: Array<{ questionText: string; askedByName?: string | null; answerEvidence?: string | null; answeredByName?: string | null }>
+  answeredQuestions: Array<{ questionText: string; askedByName?: string | null; answerEvidence?: string | null }>
 ): Promise<SingleMeetingResult> {
   console.log(`[SingleMeetingOrchestrator] Generating KB-assisted answers: ${openQuestions.length} open, ${answeredQuestions.length} answered`);
 
-  // Build user-friendly progress message explaining what we're doing
   const progressParts: string[] = [];
   progressParts.push(`I found ${openQuestions.length + answeredQuestions.length} customer question${openQuestions.length + answeredQuestions.length !== 1 ? 's' : ''} from your ${ctx.companyName} meeting.`);
 
@@ -1344,7 +1302,6 @@ async function generateKBAssistedCustomerQuestionAnswers(
 
   const progressMessage = progressParts.join(' ');
 
-  // Fetch product knowledge for assessment
   let productKnowledge = "";
   try {
     const pkResult = await getComprehensiveProductKnowledge();
@@ -1355,16 +1312,14 @@ async function generateKBAssistedCustomerQuestionAnswers(
     productKnowledge = "Product knowledge unavailable - provide best-effort answers.";
   }
 
-  // Format questions for LLM
   const questionsForAssessment: string[] = [];
 
   if (answeredQuestions.length > 0) {
     questionsForAssessment.push("## Questions Answered in Meeting (assess for correctness):");
     answeredQuestions.forEach((q, i) => {
       const answer = q.answerEvidence || "[Answer not recorded]";
-      const answerer = q.answeredByName ? ` (answered by ${q.answeredByName})` : "";
       questionsForAssessment.push(`${i + 1}. Q: "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
-      questionsForAssessment.push(`   A (from meeting)${answerer}: ${answer}`);
+      questionsForAssessment.push(`   A (from meeting): ${answer}`);
     });
   }
 
@@ -1396,7 +1351,7 @@ async function generateKBAssistedCustomerQuestionAnswers(
     return {
       answer: header + answer,
       intent: "extractive",
-      dataSource: "customer_questions",
+      dataSource: "qa_pairs",
       progressMessage,
     };
   } catch (err) {

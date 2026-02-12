@@ -46,7 +46,7 @@ function wantsToAnswerQuestions(text: string): boolean {
 export async function handleAnswerQuestions(ctx: AnswerQuestionsContext): Promise<AnswerQuestionsResult> {
   const { channel, threadTs, messageTs, text, userId, testRun, threadContext, lastResponseType, companyNameFromContext, clearProgressTimer } = ctx;
   
-  if (lastResponseType !== "customer_questions" || !threadContext?.meetingId || !threadContext?.companyId) {
+  if ((lastResponseType !== "customer_questions" && lastResponseType !== "qa_pairs") || !threadContext?.meetingId || !threadContext?.companyId) {
     return { handled: false };
   }
   
@@ -59,20 +59,19 @@ export async function handleAnswerQuestions(ctx: AnswerQuestionsContext): Promis
   let questionList: string | null = null;
   
   try {
-    const customerQuestions = await storage.getCustomerQuestionsByTranscript(threadContext.meetingId);
-    const unansweredQuestions = customerQuestions.filter(q => !q.answerEvidence);
+    const qaPairs = await storage.getQAPairsByTranscriptId(threadContext.meetingId);
     
-    if (unansweredQuestions.length > 0) {
-      questionList = unansweredQuestions
-        .map(q => `• ${q.questionText}${q.askedByName ? ` (asked by ${q.askedByName})` : ''}`)
+    if (qaPairs.length > 0) {
+      questionList = qaPairs
+        .map(q => `• ${q.question}${q.asker ? ` (asked by ${q.asker})` : ''}${q.answer ? `\n  Answer from meeting: ${q.answer}` : ''}`)
         .join('\n');
     }
   } catch (error) {
-    console.error('[Slack] Error fetching customer questions:', error);
+    console.error('[Slack] Error fetching Q&A pairs:', error);
   }
   
   if (!questionList) {
-    const noQuestionsResponse = "I don't see any unanswered customer questions from this meeting. All questions may have been addressed, or there might not be any recorded questions.";
+    const noQuestionsResponse = "I don't see any customer questions from this meeting. There might not be any recorded questions.";
     if (!testRun) {
       await postSlackMessage({
         channel,

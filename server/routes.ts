@@ -418,18 +418,11 @@ async function processTranscriptInBackground(
     console.log(`Successfully processed transcript ${transcriptId}`);
 
     // Chunk transcript for RAG/MCP queries (non-blocking, fire-and-forget)
-    // Then run customer questions extraction after chunking (async, independent, retryable)
     ingestTranscriptChunks({ transcriptId }).then(async (result) => {
       console.log(`Chunked transcript ${transcriptId}: ${result.chunksPrepared} chunks created`);
       
-      // Customer Questions Extraction (High-Trust Layer)
-      // Runs AFTER chunking, uses gpt-4o temp=0, fails independently
-      try {
-        await extractCustomerQuestionsForTranscript(transcriptId, product);
-      } catch (err) {
-        // Non-fatal: log and continue - does not affect transcript or Q&A processing
-        console.error(`[CustomerQuestions] Extraction failed for transcript ${transcriptId}:`, err);
-      }
+      // DEPRECATED: customer_questions extraction removed - qa_pairs (from transcript analyzer) is the sole Q&A source
+      // extractCustomerQuestionsForTranscript() no longer called during ingestion
       
       // Meeting Action Items Extraction (Read-only Artifact, Materialized)
       // Runs AFTER chunking, fails independently, retryable

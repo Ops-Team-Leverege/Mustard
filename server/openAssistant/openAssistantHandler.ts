@@ -112,17 +112,15 @@ async function buildMeetingContextForProductKnowledge(
   companyName: string
 ): Promise<string> {
   try {
-    // Fetch customer questions from this meeting
-    const customerQuestions = await storage.getCustomerQuestionsByTranscript(meetingId);
+    const qaPairs = await storage.getQAPairsByTranscriptId(meetingId);
 
-    if (!customerQuestions || customerQuestions.length === 0) {
+    if (!qaPairs || qaPairs.length === 0) {
       return "";
     }
 
-    // Format questions for context
-    const questionsSection = customerQuestions
-      .slice(0, 10) // Limit to 10 most relevant questions
-      .map((q, i) => `${i + 1}. "${q.questionText}"${q.askedByName ? ` (asked by ${q.askedByName})` : ""}`)
+    const questionsSection = qaPairs
+      .slice(0, 10)
+      .map((q, i) => `${i + 1}. "${q.question}"${q.asker ? ` (asked by ${q.asker})` : ""}${q.answer ? `\n   Answer: ${q.answer}` : ""}`)
       .join("\n");
 
     return `

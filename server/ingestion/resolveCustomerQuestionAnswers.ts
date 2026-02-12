@@ -1,8 +1,12 @@
 /**
- * Customer Questions Resolution Pass (Verifier-Only, Meeting Artifact)
+ * DEPRECATED: Customer Questions Resolution Pass
  * 
- * This module resolves whether customer questions were explicitly answered
- * during the meeting. It runs AFTER question extraction, as a separate pass.
+ * This module is no longer called during transcript ingestion.
+ * All Q&A retrieval now uses qa_pairs (from transcript analyzer) instead.
+ * Kept for historical reference.
+ * 
+ * Previously resolved whether customer questions were explicitly answered
+ * during the meeting. Ran AFTER question extraction, as a separate pass.
  * 
  * Architectural Invariants:
  * - Runs offline (ingestion or post-ingestion job)

@@ -2,8 +2,7 @@
  * Get Company Questions Capability
  * 
  * Purpose:
- * Retrieves Q&A pairs (interpreted Q&A) for a specific company.
- * Note: For verbatim customer questions, use customer_questions table instead.
+ * Retrieves Q&A pairs for a specific company from the qa_pairs table.
  * 
  * Layer: MCP Tool (Extended Search - blocked in Single-Meeting Orchestrator)
  */

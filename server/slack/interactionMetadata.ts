@@ -45,6 +45,7 @@ export type MeetingArtifactType =
   | "action_items"
   | "attendees"
   | "customer_questions"
+  | "qa_pairs"
   | null;
 
 export type LlmPurpose =

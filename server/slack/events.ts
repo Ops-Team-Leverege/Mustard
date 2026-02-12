@@ -991,7 +991,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
           const mappedShape: AnswerShape =
             intentClassification === "summary" ? "summary" :
               isBinaryQuestion ? "yes_no" :
-                (dataSource === "attendees" || dataSource === "action_items" || dataSource === "customer_questions") ? "list" : "single_value";
+                (dataSource === "attendees" || dataSource === "action_items" || dataSource === "customer_questions" || dataSource === "qa_pairs") ? "list" : "single_value";
 
           // Collect LLM purposes
           const llmPurposes: LlmPurpose[] = [];

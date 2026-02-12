@@ -1,7 +1,11 @@
 /**
- * Customer Questions Extraction (High-Trust, Evidence-Based Layer)
+ * DEPRECATED: Customer Questions Extraction
+ * 
+ * This module is no longer called during transcript ingestion.
+ * All Q&A retrieval now uses qa_pairs (from transcript analyzer) instead.
+ * Kept for historical reference and potential re-extraction of legacy data.
  *
- * This extractor is INDEPENDENT from the existing Q&A pair extraction.
+ * This extractor was INDEPENDENT from the existing Q&A pair extraction.
  * 
  * Key differences from qa_pairs:
  * | Table              | Nature       | Evidence Required | Inference Allowed | Use Case              |
