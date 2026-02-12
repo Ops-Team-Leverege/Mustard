@@ -154,6 +154,11 @@ Thread: "Need to prep for ACE call tomorrow"
 User: "give me a summary of the last meeting"
 → Intent: SINGLE_MEETING, Company: ACE, Contracts: ["MEETING_SUMMARY"]
 
+Thread: "Allied Lube status check"
+User: "what is the update on Allied Lube?"
+→ Intent: SINGLE_MEETING, Company: Allied Lube, Contracts: ["MEETING_SUMMARY"]
+(Note: "update", "status", "where do we stand", "catch me up", "what's new" = MEETING_SUMMARY)
+
 Thread: "Check Slack for pilot feedback"
 User: "search #pitcrew_collaboration for Pomps pilot"
 → Intent: SLACK_SEARCH, Contracts: ["SLACK_MESSAGE_SEARCH"]
@@ -172,7 +177,7 @@ If the bot's LAST message asked for clarification and user responds:
 CONTRACT SELECTION (propose the best contract for this request):
 SINGLE_MEETING contracts:
 - NEXT_STEPS: Action items, follow-ups, commitments, next steps, what to do next
-- MEETING_SUMMARY: General summary or recap of a meeting
+- MEETING_SUMMARY: General summary, recap, update, status, "where do we stand", "catch me up", "what's new"
 - ATTENDEES: Who was in the meeting, participants
 - CUSTOMER_QUESTIONS: Questions the customer asked
 - EXTRACTIVE_FACT: Specific factual information from a meeting
@@ -359,7 +364,7 @@ export const CONTRACT_SELECTION_PROMPT = `You are selecting an answer contract f
 Based on the user's question and intent, select the most appropriate contract:
 
 SINGLE_MEETING contracts:
-- MEETING_SUMMARY: For "summarize", "overview", "recap" requests
+- MEETING_SUMMARY: For "summarize", "overview", "recap", "update", "status", "where do we stand", "catch me up", "what's new" requests
   - NEXT_STEPS: For "action items", "next steps", "commitments", "follow up"
     - ATTENDEES: For "who was on", "who attended", "participants"
       - CUSTOMER_QUESTIONS: For "what did they ask", "questions asked"
@@ -599,7 +604,7 @@ Intent: ${intent}
 Available contracts: ${validContracts}
 
 For SINGLE_MEETING intent, prefer:
-- MEETING_SUMMARY: when user asks for summary/overview
+- MEETING_SUMMARY: when user asks for summary/overview/update/status/"where do we stand"/"catch me up"/"what's new"
 - NEXT_STEPS: when asking about action items, commitments, follow-ups
 - ATTENDEES: when asking who was present
 - CUSTOMER_QUESTIONS: when asking what the customer asked
