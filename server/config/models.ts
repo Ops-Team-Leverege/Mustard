@@ -159,8 +159,11 @@ export const MODEL_ASSIGNMENTS = {
    * GENERAL_HELP responses - comprehensive document generation
    * Uses Claude Opus 4.6 for advanced reasoning and long-form content
    * ~8000 token responses for executive-ready documents
+   * Fallback chain: Claude → Gemini 3 Pro → OpenAI GPT-4o
    */
   GENERAL_HELP_RESPONSE: CLAUDE_MODELS.OPUS,
+  GENERAL_HELP_FALLBACK_1: GEMINI_MODELS.PRO,
+  GENERAL_HELP_FALLBACK_2: LLM_MODELS.STANDARD_REASONING,
 
   // Multi-Meeting Synthesis - Pattern analysis across meetings
   MULTI_MEETING_SYNTHESIS: LLM_MODELS.STANDARD_REASONING,

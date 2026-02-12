@@ -20,7 +20,7 @@ import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeet
 import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
-import { MODEL_ASSIGNMENTS, getModelDescription, GEMINI_MODELS, CLAUDE_MODELS, TOKEN_LIMITS } from "../config/models";
+import { MODEL_ASSIGNMENTS, getModelDescription, TOKEN_LIMITS } from "../config/models";
 import { TIMEOUT_CONSTANTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
 import { buildGeneralAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
@@ -1448,6 +1448,74 @@ function extractCompanyFromMessage(message: string): string | null {
 }
 
 /**
+ * Unified LLM invocation for GENERAL_HELP with ordered fallback chain.
+ * 
+ * Tries models in order: Claude Opus → Gemini 3 Pro → OpenAI GPT-4o.
+ * All model references come from MODEL_ASSIGNMENTS (no hardcoded strings).
+ * Returns consistent metadata regardless of which model responds.
+ * 
+ * The streamingCompleted flag is set consistently:
+ * - Claude/Gemini: false (non-streaming calls, caller handles finalization)
+ * - OpenAI: matches whether streaming context was provided
+ */
+async function callGeneralHelpWithFallback(
+  systemPrompt: string,
+  userMessage: string,
+  slackStreaming: SlackStreamingContext | undefined,
+  startTime: number,
+): Promise<{ answer: string; streamingCompleted: boolean }> {
+  const maxTokens = TOKEN_LIMITS[MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE];
+
+  const claude = getClaudeClient();
+  if (claude) {
+    try {
+      console.log(`[GeneralHelp] Calling Claude ${MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE} (max tokens: ${maxTokens})...`);
+      const response = await claude.messages.create({
+        model: MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userMessage }],
+        temperature: 0.7,
+      });
+      const textBlock = response.content.find((block) => block.type === "text");
+      const answer = textBlock?.text || "I'd be happy to help. Could you provide more details?";
+      console.log(`[GeneralHelp] Claude response in ${Date.now() - startTime}ms (${answer.length} chars)`);
+      return { answer, streamingCompleted: false };
+    } catch (error) {
+      console.error(`[GeneralHelp] Claude failed, trying fallback:`, error instanceof Error ? error.message : error);
+    }
+  } else {
+    console.log(`[GeneralHelp] Claude not configured, trying fallback chain`);
+  }
+
+  const gemini = getGeminiClient();
+  if (gemini) {
+    try {
+      const fallbackModel = MODEL_ASSIGNMENTS.GENERAL_HELP_FALLBACK_1;
+      console.log(`[GeneralHelp] Trying Gemini ${fallbackModel}...`);
+      const response = await gemini.models.generateContent({
+        model: fallbackModel,
+        contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }] }],
+        config: { maxOutputTokens: maxTokens, temperature: 0.7 },
+      });
+      const answer = response.text || "I'd be happy to help. Could you provide more details?";
+      console.log(`[GeneralHelp] Gemini fallback response in ${Date.now() - startTime}ms (${answer.length} chars)`);
+      return { answer, streamingCompleted: false };
+    } catch (geminiError) {
+      console.error(`[GeneralHelp] Gemini fallback failed:`, geminiError instanceof Error ? geminiError.message : geminiError);
+    }
+  }
+
+  const fallbackModel = MODEL_ASSIGNMENTS.GENERAL_HELP_FALLBACK_2;
+  console.log(`[GeneralHelp] Final fallback: OpenAI ${fallbackModel}`);
+  const answer = await streamOpenAIResponse(
+    fallbackModel, systemPrompt, userMessage, slackStreaming
+  );
+  console.log(`[GeneralHelp] OpenAI fallback response in ${Date.now() - startTime}ms (${answer.length} chars)`);
+  return { answer, streamingCompleted: !!slackStreaming };
+}
+
+/**
  * Handle GENERAL_HELP intent.
  */
 async function handleGeneralAssistanceIntent(
@@ -1550,115 +1618,25 @@ Use this context to align suggestions with PitCrew's terminology and value propo
     progressMessage = await generatePersonalizedProgress(userMessage, intentType);
   }
 
-  // Use Claude Opus 4.6 for GENERAL_HELP — direct chat with the user
-  const claude = getClaudeClient();
-  const maxTokens = TOKEN_LIMITS[MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE];
+  const { answer, streamingCompleted } = await callGeneralHelpWithFallback(
+    systemPrompt,
+    userMessage,
+    context.slackStreaming,
+    startTime,
+  );
 
-  if (!claude) {
-    console.log(`[OpenAssistant] Claude not configured, falling back to Gemini for GENERAL_HELP`);
-    const gemini = getGeminiClient();
-    if (gemini) {
-      try {
-        const response = await gemini.models.generateContent({
-          model: GEMINI_MODELS.PRO,
-          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }] }],
-          config: { maxOutputTokens: maxTokens, temperature: 0.7 },
-        });
-        const answer = response.text || "I'd be happy to help. Could you provide more details?";
-        console.log(`[OpenAssistant] Gemini fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-        return {
-          answer, intent: "general_assistance", intentClassification: classification,
-          decisionLayerIntent: Intent.GENERAL_HELP, answerContract: actualContract,
-          ssotMode: "none" as SSOTMode, dataSource: "general_knowledge",
-          delegatedToSingleMeeting: false, progressMessage, streamingCompleted: false,
-        };
-      } catch (geminiError) {
-        console.error(`[OpenAssistant] Gemini fallback also failed:`, geminiError);
-      }
-    }
-    const answer = await streamOpenAIResponse(
-      MODEL_ASSIGNMENTS.GENERAL_ASSISTANCE, systemPrompt, userMessage, context.slackStreaming
-    );
-    console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-    return {
-      answer, intent: "general_assistance", intentClassification: classification,
-      decisionLayerIntent: Intent.GENERAL_HELP, answerContract: actualContract,
-      ssotMode: "none" as SSOTMode, dataSource: "general_knowledge",
-      delegatedToSingleMeeting: false, progressMessage, streamingCompleted: !!context.slackStreaming,
-    };
-  }
-
-  console.log(`[OpenAssistant] Calling Claude ${MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE} for GENERAL_HELP (max tokens: ${maxTokens})...`);
-
-  try {
-    const response = await claude.messages.create({
-      model: MODEL_ASSIGNMENTS.GENERAL_HELP_RESPONSE,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [
-        { role: "user", content: userMessage },
-      ],
-      temperature: 0.7,
-    });
-
-    const textBlock = response.content.find((block) => block.type === "text");
-    const answer = textBlock?.text || "I'd be happy to help. Could you provide more details?";
-    console.log(`[OpenAssistant] Claude response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-
-    return {
-      answer,
-      intent: "general_assistance",
-      intentClassification: classification,
-      decisionLayerIntent: Intent.GENERAL_HELP,
-      answerContract: actualContract,
-      ssotMode: "none" as SSOTMode,
-      dataSource: "general_knowledge",
-      delegatedToSingleMeeting: false,
-      progressMessage,
-      streamingCompleted: false,
-    };
-  } catch (error) {
-    console.error(`[OpenAssistant] Claude error, falling back to Gemini/OpenAI:`, error);
-
-    const gemini = getGeminiClient();
-    if (gemini) {
-      try {
-        const response = await gemini.models.generateContent({
-          model: GEMINI_MODELS.PRO,
-          contents: [{ role: "user", parts: [{ text: systemPrompt + "\n\nUser: " + userMessage }] }],
-          config: { maxOutputTokens: maxTokens, temperature: 0.7 },
-        });
-        const answer = response.text || "I'd be happy to help. Could you provide more details?";
-        console.log(`[OpenAssistant] Gemini fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-        return {
-          answer, intent: "general_assistance", intentClassification: classification,
-          decisionLayerIntent: Intent.GENERAL_HELP, answerContract: actualContract,
-          ssotMode: "none" as SSOTMode, dataSource: "general_knowledge",
-          delegatedToSingleMeeting: false, progressMessage, streamingCompleted: false,
-        };
-      } catch (geminiError) {
-        console.error(`[OpenAssistant] Gemini fallback also failed:`, geminiError);
-      }
-    }
-
-    const answer = await streamOpenAIResponse(
-      "gpt-4o", systemPrompt, userMessage, context.slackStreaming
-    );
-    console.log(`[OpenAssistant] OpenAI fallback response received in ${Date.now() - startTime}ms (${answer.length} chars)`);
-
-    return {
-      answer,
-      intent: "general_assistance",
-      intentClassification: classification,
-      decisionLayerIntent: Intent.GENERAL_HELP,
-      answerContract: actualContract,
-      ssotMode: "none" as SSOTMode,
-      dataSource: "general_knowledge",
-      delegatedToSingleMeeting: false,
-      progressMessage,
-      streamingCompleted: !!context.slackStreaming,
-    };
-  }
+  return {
+    answer,
+    intent: "general_assistance",
+    intentClassification: classification,
+    decisionLayerIntent: Intent.GENERAL_HELP,
+    answerContract: actualContract,
+    ssotMode: "none" as SSOTMode,
+    dataSource: "general_knowledge",
+    delegatedToSingleMeeting: false,
+    progressMessage,
+    streamingCompleted,
+  };
 }
 
 /**
