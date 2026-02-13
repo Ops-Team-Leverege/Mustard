@@ -251,6 +251,49 @@ export async function handleProposedInterpretationConfirmation(
 }
 
 /**
+ * Handle response to a meeting search + Slack offer (from qa_pairs fallback).
+ * When the bot showed qa_pairs results and offered to search meetings or Slack.
+ * 
+ * - "check slack" / "search slack" → route to Slack search
+ * - Generic affirmative ("yes", "sure") → guide user to specify scope
+ * - Time range in reply → let normal flow handle (Decision Layer will classify correctly)
+ */
+export async function handleMeetingSearchOfferResponse(
+  ctx: ClarificationContext
+): Promise<ClarificationResult> {
+  if (ctx.pendingOffer !== "meeting_search") {
+    return { handled: false };
+  }
+
+  const lowerText = ctx.text.toLowerCase().trim();
+
+  const wantsSlack = /\b(slack|check\s*slack|search\s*slack|internal\s*discussions?)\b/i.test(lowerText);
+
+  if (wantsSlack) {
+    const slackCtx = { ...ctx, pendingOffer: "slack_search" as string | null };
+    return handleSlackSearchOfferResponse(slackCtx);
+  }
+
+  const isGenericAffirmative = /^(yes|yeah|yep|yup|ok|okay|sure|please|go\s*ahead|do\s*it|sounds?\s*good)$/i.test(lowerText);
+
+  if (isGenericAffirmative) {
+    const guideMessage = "Which would you like me to search?\n\n- *Meeting transcripts* — just add a time range, e.g., \"search meetings from the last quarter\"\n- *Slack* — say \"check Slack\" and I'll look for internal discussions";
+
+    if (!ctx.testRun) {
+      await postSlackMessage({
+        channel: ctx.channel,
+        text: guideMessage,
+        thread_ts: ctx.threadTs,
+      });
+    }
+
+    return { handled: true, responseType: "confirmed" };
+  }
+
+  return { handled: false };
+}
+
+/**
  * Handle affirmative response to a Slack search offer.
  * When the bot offered "I can also check Slack..." and the user says yes.
  * Routes through OpenAssistant with a synthetic Decision Layer result to

@@ -43,7 +43,7 @@ import { PROGRESS_MESSAGE_CONSTANTS } from "../config/constants";
 // Extracted handler modules
 import { handleAmbiguity } from "./handlers/ambiguityHandler";
 import { handleBinaryQuestion } from "./handlers/binaryQuestionHandler";
-import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation, handleSlackSearchOfferResponse } from "./handlers/clarificationHandler";
+import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation, handleSlackSearchOfferResponse, handleMeetingSearchOfferResponse } from "./handlers/clarificationHandler";
 import { handleAnswerQuestions } from "./handlers/answerQuestionsHandler";
 import { createProgressManager } from "./context/progressManager";
 import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
@@ -347,6 +347,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
       originalQuestion,
       pendingOffer: pendingOfferFromThread,
     };
+
+    // 8.4.4 MEETING SEARCH OFFER RESPONSE (from qa_pairs fallback)
+    const meetingSearchOfferResult = await handleMeetingSearchOfferResponse(clarificationCtx);
+    if (meetingSearchOfferResult.handled) {
+      clearProgressTimer();
+      return;
+    }
 
     // 8.4.5 SLACK SEARCH OFFER RESPONSE (from pending offer)
     const slackSearchOfferResult = await handleSlackSearchOfferResponse(clarificationCtx);
