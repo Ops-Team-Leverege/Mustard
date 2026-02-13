@@ -1,0 +1,212 @@
+2026-02-13 10:08:33.60
+743e9b18
+User
+Slack payload type: event_callback
+2026-02-13 10:08:33.60
+743e9b18
+User
+Event type: message
+2026-02-13 10:08:33.60
+743e9b18
+User
+6:08:33 PM [express] POST /api/slack/events 200 in 3ms
+2026-02-13 10:08:34.92
+743e9b18
+User
+[SlackSearchHandler] Searching Slack for: "Costco outside cameras"
+2026-02-13 10:08:34.92
+743e9b18
+User
+[SlackSearchHandler] LLM extracted query: "Costco outside cameras" (Searching for discussions about Costco's outside cameras.)
+2026-02-13 10:08:34.92
+743e9b18
+User
+[SlackSearchHandler] Searching Slack for: "Costco outside cameras"
+2026-02-13 10:08:34.92
+743e9b18
+User
+[SlackSearchHandler] LLM extracted query: "Costco outside cameras" (Searching for discussions about Costco's outside cameras.)
+2026-02-13 10:08:35.33
+743e9b18
+User
+[SlackSearchService] Searching for: "Costco outside cameras" (page 1)
+2026-02-13 10:08:35.33
+743e9b18
+User
+[SlackSearchService] Channel filter: must contain [pitcrew]
+2026-02-13 10:08:35.33
+743e9b18
+User
+[SlackSearchService] Channel filter: must contain [pitcrew]
+2026-02-13 10:08:35.33
+743e9b18
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-13 10:08:35.33
+743e9b18
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-13 10:08:35.33
+743e9b18
+User
+[SlackSearchService] Searching for: "Costco outside cameras" (page 1)
+2026-02-13 10:08:42.62
+743e9b18
+User
+[SlackSearchService] Returning 20 messages (100 total, page 1/3)
+2026-02-13 10:08:42.62
+743e9b18
+User
+[SlackSearchService] Filtered: 40 -> 22 messages (channels matching filter)
+2026-02-13 10:08:42.62
+743e9b18
+User
+[SlackSearchService] Filtered: 40 -> 22 messages (channels matching filter)
+2026-02-13 10:08:42.62
+743e9b18
+User
+[SlackSearchService] Returning 20 messages (100 total, page 1/3)
+2026-02-13 10:09:01.32
+743e9b18
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-13 10:09:01.32
+743e9b18
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-13 10:09:01.52
+743e9b18
+User
+[INFO] [30574ba5] Open Assistant response generated {"correlationId":"30574ba5","channel":"D0A7A4R9C04","threadTs":"1771005999.423219","userId":"U082TV42FM0","duration":36396,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":27731}
+2026-02-13 10:09:01.52
+743e9b18
+User
+[INFO] [30574ba5] Open Assistant response generated {"correlationId":"30574ba5","channel":"D0A7A4R9C04","threadTs":"1771005999.423219","userId":"U082TV42FM0","duration":36396,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":27731}
+2026-02-13 10:09:01.52
+743e9b18
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-13 10:09:01.52
+743e9b18
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-13 10:09:01.52
+743e9b18
+User
+[Slack] Pipeline completed in 35700ms, progressMessages=0
+2026-02-13 10:09:01.52
+743e9b18
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-13 10:09:01.52
+743e9b18
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-13 10:09:01.52
+743e9b18
+User
+[Slack] Pipeline completed in 35700ms, progressMessages=0
+2026-02-13 10:09:02.82
+743e9b18
+User
+[Slack] Updated streaming placeholder with final content (2119 chars)
+2026-02-13 10:09:02.82
+743e9b18
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-13 10:09:02.82
+743e9b18
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-13 10:09:02.82
+743e9b18
+User
+[Slack] Updated streaming placeholder with final content (2119 chars)
+2026-02-13 10:09:03.02
+743e9b18
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-13 10:09:03.02
+743e9b18
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-13 10:09:03.02
+743e9b18
+User
+[Slack] Document check complete
+2026-02-13 10:09:03.02
+743e9b18
+User
+[Slack] Document check complete
+2026-02-13 10:09:03.02
+743e9b18
+User
+[DocumentResponse] Document-only mode, skipping message (word count 284 below threshold)
+2026-02-13 10:09:03.02
+743e9b18
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 284, Generate doc: false
+2026-02-13 10:09:03.02
+743e9b18
+User
+[DocumentResponse] Document-only mode, skipping message (word count 284 below threshold)
+2026-02-13 10:09:03.02
+743e9b18
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 284, Generate doc: false
+2026-02-13 10:09:03.22
+743e9b18
+User
+[INFO] [30574ba5] Request completed successfully {"correlationId":"30574ba5","channel":"D0A7A4R9C04","threadTs":"1771005999.423219","userId":"U082TV42FM0","duration":38295,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":2119,"totalTimeMs":35700,"stages":{"meeting_resolution":0,"decision_layer":3514,"handler":27731}}
+2026-02-13 10:09:03.22
+743e9b18
+User
+[INFO] [30574ba5] Request completed successfully {"correlationId":"30574ba5","channel":"D0A7A4R9C04","threadTs":"1771005999.423219","userId":"U082TV42FM0","duration":38295,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":2119,"totalTimeMs":35700,"stages":{"meeting_resolution":0,"decision_layer":3514,"handler":27731}}
+2026-02-13 10:09:03.37
+743e9b18
+User
+[Slack] Received event request
+2026-02-13 10:09:03.37
+743e9b18
+User
+[Slack] Received event request
+2026-02-13 10:09:03.37
+743e9b18
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-13T18:09:03.376Z ==========
+2026-02-13 10:09:03.37
+743e9b18
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-13T18:09:03.376Z ==========
+2026-02-13 10:09:03.37
+743e9b18
+User
+Slack payload type: event_callback
+2026-02-13 10:09:03.37
+743e9b18
+User
+Event type: message
+2026-02-13 10:09:03.37
+743e9b18
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-13 10:09:03.37
+743e9b18
+User
+Slack payload type: event_callback
+2026-02-13 10:09:03.37
+743e9b18
+User
+Event type: message
+2026-02-13 10:09:03.37
+743e9b18
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-13 10:09:03.37
+743e9b18
+User
+6:09:03 PM [express] POST /api/slack/events 200 in 4ms
+2026-02-13 10:09:03.37
+743e9b18
+User
+6:09:03 PM [express] POST /api/slack/events 200 in 4ms
