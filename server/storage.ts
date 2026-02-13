@@ -157,7 +157,7 @@ export interface IStorage {
   getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
 
   // Q&A Pairs - keyword search across all companies (for aggregate topic queries)
-  searchQaPairsByKeyword(keyword: string, limit?: number): Promise<Array<{ company: string; question: string; answer: string | null }>>;
+  searchQaPairsByKeyword(searchTerms: string[], limit?: number): Promise<Array<{ company: string; question: string; answer: string | null }>>;
 
   // Meeting Action Items (read-only artifact, materialized at ingestion)
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
@@ -1155,21 +1155,15 @@ export class MemStorage implements IStorage {
       .map(qa => ({ ...qa, categoryName: null, contactName: null, contactJobTitle: null, transcriptDate: null }));
   }
 
-  async searchQaPairsByKeyword(keyword: string, limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
-    const STOP_WORDS = new Set(["a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during", "before", "after", "about", "between", "out", "up", "down", "and", "but", "or", "nor", "not", "so", "yet", "both", "either", "neither", "each", "every", "all", "any", "few", "more", "most", "other", "some", "such", "no", "only", "own", "same", "than", "too", "very", "just", "because", "if", "when", "while", "how", "what", "which", "who", "whom", "this", "that", "these", "those", "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "it", "its", "they", "them", "their", "people", "saying", "say", "said", "customer", "customers", "feedback", "issues", "issue"]);
-
-    const words = keyword
-      .split(/\s+/)
-      .map(w => w.toLowerCase().replace(/[^a-z0-9]/g, ""))
-      .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
-
-    const searchWords = words.length > 0 ? words : [keyword.toLowerCase()];
+  async searchQaPairsByKeyword(searchTerms: string[], limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
+    const terms = searchTerms.filter(t => t.trim().length > 0).map(t => t.toLowerCase());
+    if (terms.length === 0) return [];
 
     return Array.from(this.qaPairs.values())
       .filter(qa => {
         const q = qa.question.toLowerCase();
         const a = (qa.answer || "").toLowerCase();
-        return searchWords.some(w => q.includes(w) || a.includes(w));
+        return terms.some(t => q.includes(t) || a.includes(t));
       })
       .slice(0, limit)
       .map(qa => ({ company: qa.company || "Unknown", question: qa.question, answer: qa.answer }));
@@ -2521,34 +2515,13 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async searchQaPairsByKeyword(keyword: string, limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
-    const STOP_WORDS = new Set(["a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "to", "of", "in", "for", "on", "with", "at", "by", "from", "as", "into", "through", "during", "before", "after", "about", "between", "out", "up", "down", "and", "but", "or", "nor", "not", "so", "yet", "both", "either", "neither", "each", "every", "all", "any", "few", "more", "most", "other", "some", "such", "no", "only", "own", "same", "than", "too", "very", "just", "because", "if", "when", "while", "how", "what", "which", "who", "whom", "this", "that", "these", "those", "i", "me", "my", "we", "our", "you", "your", "he", "him", "his", "she", "her", "it", "its", "they", "them", "their", "people", "saying", "say", "said", "customer", "customers", "feedback", "issues", "issue"]);
+  async searchQaPairsByKeyword(searchTerms: string[], limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
+    const terms = searchTerms.filter(t => t.trim().length > 0);
+    if (terms.length === 0) return [];
 
-    const words = keyword
-      .split(/\s+/)
-      .map(w => w.toLowerCase().replace(/[^a-z0-9]/g, ""))
-      .filter(w => w.length >= 2 && !STOP_WORDS.has(w));
-
-    if (words.length === 0) {
-      const results = await this.rawQuery(
-        `SELECT c.name AS company, q.question, q.answer
-         FROM qa_pairs q
-         JOIN companies c ON q.company_id = c.id
-         WHERE q.question ILIKE $1 OR q.answer ILIKE $1
-         ORDER BY q.created_at DESC
-         LIMIT $2`,
-        [`%${keyword}%`, limit]
-      );
-      return results.map((r: any) => ({
-        company: r.company as string,
-        question: r.question as string,
-        answer: (r.answer as string) || null,
-      }));
-    }
-
-    const conditions = words.map((_, i) => `(q.question ILIKE $${i + 1} OR q.answer ILIKE $${i + 1})`);
+    const conditions = terms.map((_, i) => `(q.question ILIKE $${i + 1} OR q.answer ILIKE $${i + 1})`);
     const whereClause = conditions.join(" OR ");
-    const params: any[] = words.map(w => `%${w}%`);
+    const params: any[] = terms.map(t => `%${t}%`);
     params.push(limit);
 
     const results = await this.rawQuery(
@@ -2557,7 +2530,7 @@ export class DbStorage implements IStorage {
        JOIN companies c ON q.company_id = c.id
        WHERE ${whereClause}
        ORDER BY q.created_at DESC
-       LIMIT $${words.length + 1}`,
+       LIMIT $${terms.length + 1}`,
       params
     );
     return results.map((r: any) => ({

@@ -712,7 +712,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       } else if (decisionLayerResult.aggregateFallback === "qa_pairs_first") {
         // AGGREGATE FALLBACK: Too many meetings without time range
         const topics = decisionLayerResult.keyTopics || [];
-        const searchTerm = topics.length > 0 ? topics.join(" ") : text;
+        const searchTerms = topics.length > 0 ? topics : [text];
 
         if (decisionLayerResult.userExplicitlyRequestedMeetings) {
           // Refinement 1: User explicitly wants meetings — skip qa_pairs, ask for time range
@@ -726,10 +726,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
         } else {
           // Default: search qa_pairs first, offer meetings as follow-up
           console.log(`[Slack] Aggregate fallback (qa_pairs_first) - searching qa_pairs by topic before meeting search`);
-          console.log(`[Slack] qa_pairs search term: "${searchTerm}"`);
+          console.log(`[Slack] qa_pairs search terms: ${JSON.stringify(searchTerms)}`);
 
           try {
-            const qaPairResults = await storage.searchQaPairsByKeyword(searchTerm, 30);
+            const qaPairResults = await storage.searchQaPairsByKeyword(searchTerms, 30);
             console.log(`[Slack] qa_pairs search returned ${qaPairResults.length} results`);
 
             if (qaPairResults.length > 0) {
@@ -743,7 +743,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
               // Refinement 3: Confidence signaling based on result quality
               const isComprehensive = qaPairResults.length >= 10 && companiesWithResults.length >= 3;
-              const topicLabel = topics.join(", ") || searchTerm;
+              const topicLabel = topics.join(", ") || searchTerms.join(", ");
 
               let formattedAnswer: string;
               if (isComprehensive) {
@@ -773,7 +773,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               pendingOffer = isComprehensive ? "slack_search" : "meeting_search";
               console.log(`[Slack] qa_pairs fallback successful: ${qaPairResults.length} results from ${companiesWithResults.length} companies (comprehensive=${isComprehensive})`);
             } else {
-              responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerm}*.\n\nI can search meeting transcripts if you'd like — just specify a time range (e.g., "from the last quarter").`;
+              responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerms.join(", ")}*.\n\nI can search meeting transcripts if you'd like — just specify a time range (e.g., "from the last quarter").`;
               capabilityName = "qa_pairs_aggregate_empty";
               intentClassification = "multi_meeting_qa_fallback_empty";
               dataSource = "qa_pairs";
