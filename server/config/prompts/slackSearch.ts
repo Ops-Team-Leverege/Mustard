@@ -62,6 +62,10 @@ e) **References** - Source links
 
 CRITICAL INSTRUCTIONS:
 
+0. **SLACK MESSAGES ONLY**:
+   - Your ONLY data source is the Slack messages listed above
+   - Your references section must ONLY contain actual Slack messages with real Slack links
+
 1. **ATTRIBUTION ACCURACY**:
    - Use the actual message author (shown as "by [username]")
    - If someone @mentions another person, that's NOT the author
@@ -172,4 +176,63 @@ CRITICAL INSTRUCTIONS:
    - [ ] Would someone unfamiliar with the context understand this answer?
 
 Keep the answer scannable with short paragraphs, bullet points, and clear structure.`;
+}
+
+/**
+ * Build the Slack search query extraction prompt.
+ * 
+ * Step 1 of the two-step Slack search pipeline:
+ * Takes the user's message + conversation context and extracts clean Slack search terms.
+ * This is where thread context is consumed — it never reaches the synthesis step.
+ */
+export function buildSlackQueryExtractionPrompt(params: {
+  question: string;
+  extractedCompany?: string;
+  keyTopics?: string[];
+  conversationContext?: string;
+  threadMessages?: Array<{ text: string; isBot: boolean }>;
+}): { system: string; user: string } {
+  const { question, extractedCompany, keyTopics, conversationContext, threadMessages } = params;
+
+  const system = `You extract Slack search queries from user requests. Your job is to determine WHAT the user wants to find in Slack and produce effective search terms.
+
+You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand what topic/company/subject they want searched in Slack — but your output is ONLY search terms, not an answer.
+
+Return JSON:
+{
+  "searchQuery": "the actual search terms to send to Slack's search API",
+  "searchDescription": "one-sentence description of what we're looking for (for logging)"
+}
+
+GUIDELINES:
+- Extract the core topic, company name, and subject matter
+- Produce 2-5 concise search terms that Slack's API will match well
+- Include the company name if one is identified
+- Strip conversational filler ("can you", "please check", "yes do it", etc.)
+- If the user said something like "yes, check slack" or "sure, do it" after the bot offered a Slack search, look at the CONVERSATION HISTORY to find the original topic
+- If you cannot determine what to search for, return {"searchQuery": "", "searchDescription": "Unable to determine search topic"}`;
+
+  let userContent = `User's message: "${question}"`;
+
+  if (extractedCompany) {
+    userContent += `\nIdentified company: ${extractedCompany}`;
+  }
+
+  if (keyTopics && keyTopics.length > 0) {
+    userContent += `\nKey topics: ${keyTopics.join(', ')}`;
+  }
+
+  if (conversationContext) {
+    userContent += `\nConversation context: ${conversationContext}`;
+  }
+
+  if (threadMessages && threadMessages.length > 0) {
+    const history = threadMessages.map(msg => {
+      const speaker = msg.isBot ? 'Bot' : 'User';
+      return `${speaker}: ${msg.text}`;
+    }).join('\n');
+    userContent += `\n\nConversation history:\n${history}`;
+  }
+
+  return { system, user: userContent };
 }

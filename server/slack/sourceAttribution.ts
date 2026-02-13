@@ -95,7 +95,7 @@ export function getSourceAttribution(ctx: SourceAttributionContext): string {
   }
 
   if (dataSource === "slack" && SOURCE_ATTRIBUTION_CONFIG.slack_context) {
-    return `\n\n_Source: Slack Thread Context_`;
+    return `\n\n_Source: Slack Messages_`;
   }
 
   if (dataSource === "general_knowledge" && SOURCE_ATTRIBUTION_CONFIG.general_knowledge) {

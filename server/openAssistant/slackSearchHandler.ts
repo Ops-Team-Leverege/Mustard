@@ -1,12 +1,18 @@
 /**
  * Slack Search Handler
  * 
- * Purpose:
- * Handles SLACK_SEARCH intent - searches Slack messages and channels.
- * This is separate from the Slack events integration (server/slack/)
- * which handles incoming webhooks.
+ * Two-step LLM pipeline for Slack search:
  * 
- * This handler searches Slack as a DATA SOURCE, not for receiving events.
+ * Step 1: QUERY EXTRACTION (LLM)
+ *   Input: user message + thread context + Decision Layer fields
+ *   Output: clean Slack search terms
+ *   Purpose: Converts conversational intent into effective search queries
+ *   Thread context is consumed here and NEVER passed further
+ * 
+ * Step 2: SEARCH + SYNTHESIS (Slack API → LLM)
+ *   Input: Slack API results + original question
+ *   Output: synthesized answer with proper attribution
+ *   Purpose: Analyzes ONLY actual Slack messages — no meeting data, no thread context
  * 
  * Layer: Execution Plane (Open Assistant)
  */
@@ -14,18 +20,18 @@
 import { SlackSearchService, type SlackSearchResult, type SlackChannel } from '../services/slackSearchService';
 import { AnswerContract } from '../decisionLayer/answerContracts';
 import type { OpenAssistantResult, IntentClassification } from './types';
-import { getSlackSearchSystemPrompt, buildSlackSearchAnalysisPrompt } from '../config/prompts/slackSearch';
+import { getSlackSearchSystemPrompt, buildSlackSearchAnalysisPrompt, buildSlackQueryExtractionPrompt } from '../config/prompts/slackSearch';
+import { MODEL_ASSIGNMENTS } from '../config/models';
 
 export interface SlackSearchContext {
     question: string;
     contract: AnswerContract;
-    threadContext?: string;
     extractedCompany?: string;
     keyTopics?: string[];
     conversationContext?: string;
+    threadMessages?: Array<{ text: string; isBot: boolean }>;
 }
 
-// Default classification for Slack search results
 function slackClassification(): IntentClassification {
     return {
         intent: "slack_search",
@@ -45,26 +51,21 @@ function slackClassification(): IntentClassification {
 }
 
 export class SlackSearchHandler {
-    /**
-     * Handle Slack search queries.
-     * Routes to appropriate handler based on contract.
-     */
     static async handleSlackSearch(context: SlackSearchContext): Promise<OpenAssistantResult> {
-        const { question, contract, threadContext, extractedCompany, keyTopics, conversationContext } = context;
+        const { question, contract, extractedCompany, keyTopics, conversationContext, threadMessages } = context;
 
-        console.log(`[SlackSearchHandler] Handling ${contract} for: "${question}", hasThreadContext=${!!threadContext}, extractedCompany=${extractedCompany || 'none'}`);
+        console.log(`[SlackSearchHandler] Handling ${contract} for: "${question}", hasThreadMessages=${!!(threadMessages?.length)}, extractedCompany=${extractedCompany || 'none'}`);
 
         try {
             switch (contract) {
                 case AnswerContract.SLACK_MESSAGE_SEARCH:
-                    return await this.handleMessageSearch(question, threadContext, extractedCompany, keyTopics, conversationContext);
+                    return await this.handleMessageSearch(question, extractedCompany, keyTopics, conversationContext, threadMessages);
 
                 case AnswerContract.SLACK_CHANNEL_INFO:
-                    return await this.handleChannelInfo(question);
+                    return await this.handleChannelInfo(question, extractedCompany, keyTopics, conversationContext, threadMessages);
 
                 default:
-                    // Default to message search
-                    return await this.handleMessageSearch(question, threadContext, extractedCompany, keyTopics, conversationContext);
+                    return await this.handleMessageSearch(question, extractedCompany, keyTopics, conversationContext, threadMessages);
             }
         } catch (error) {
             console.error('[SlackSearchHandler] Error:', error);
@@ -83,22 +84,81 @@ export class SlackSearchHandler {
     }
 
     /**
+     * STEP 1: Extract search query using LLM.
+     * 
+     * This is where thread context is consumed — the LLM reads the conversation
+     * history and Decision Layer fields, then outputs clean search terms.
+     * Thread context never reaches Step 2 (synthesis).
+     */
+    private static async extractSearchQuery(
+        question: string,
+        extractedCompany?: string,
+        keyTopics?: string[],
+        conversationContext?: string,
+        threadMessages?: Array<{ text: string; isBot: boolean }>
+    ): Promise<{ searchQuery: string; searchDescription: string }> {
+        const { OpenAI } = await import('openai');
+        const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+
+        const { system, user } = buildSlackQueryExtractionPrompt({
+            question,
+            extractedCompany,
+            keyTopics,
+            conversationContext,
+            threadMessages,
+        });
+
+        try {
+            const response = await openai.chat.completions.create({
+                model: MODEL_ASSIGNMENTS.SLACK_QUERY_EXTRACTION,
+                messages: [
+                    { role: 'system', content: system },
+                    { role: 'user', content: user },
+                ],
+                temperature: 0,
+                response_format: { type: "json_object" },
+            });
+
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+                console.warn('[SlackSearchHandler] LLM query extraction returned empty');
+                return { searchQuery: question, searchDescription: 'Fallback to raw question' };
+            }
+
+            const parsed = JSON.parse(content);
+            const searchQuery = (parsed.searchQuery || '').trim();
+            const searchDescription = parsed.searchDescription || '';
+
+            if (!searchQuery) {
+                console.warn('[SlackSearchHandler] LLM extracted empty query');
+                return { searchQuery: question, searchDescription: 'LLM returned empty query, using raw question' };
+            }
+
+            console.log(`[SlackSearchHandler] LLM extracted query: "${searchQuery}" (${searchDescription})`);
+            return { searchQuery, searchDescription };
+        } catch (error) {
+            console.error('[SlackSearchHandler] Query extraction LLM error:', error);
+            return { searchQuery: question, searchDescription: 'LLM extraction failed, using raw question' };
+        }
+    }
+
+    /**
      * Handle message search queries.
-     * Searches Slack and synthesizes findings into a coherent answer with metadata.
+     * Two-step pipeline: extract query (Step 1) → search + synthesize (Step 2).
      */
     private static async handleMessageSearch(
         question: string,
-        threadContext?: string,
         extractedCompany?: string,
         keyTopics?: string[],
-        conversationContext?: string
+        conversationContext?: string,
+        threadMessages?: Array<{ text: string; isBot: boolean }>
     ): Promise<OpenAssistantResult> {
-        // Build search query using thread context when the question is referential
-        const searchQuery = this.buildContextAwareSearchQuery(question, extractedCompany, keyTopics, conversationContext);
+        const { searchQuery } = await this.extractSearchQuery(
+            question, extractedCompany, keyTopics, conversationContext, threadMessages
+        );
 
-        console.log(`[SlackSearchHandler] Searching for: "${searchQuery}"`);
+        console.log(`[SlackSearchHandler] Searching Slack for: "${searchQuery}"`);
 
-        // Search Slack
         const searchResponse = await SlackSearchService.searchMessages({
             query: searchQuery,
             limit: 20,
@@ -118,10 +178,8 @@ export class SlackSearchHandler {
             };
         }
 
-        // Get unique channels
         const uniqueChannels = new Set(searchResponse.results.map(r => r.channelId));
 
-        // Synthesize findings into a coherent answer with metadata
         const synthesizedAnswer = await this.synthesizeSlackFindings(
             question,
             searchQuery,
@@ -129,7 +187,7 @@ export class SlackSearchHandler {
             searchResponse.totalCount,
             uniqueChannels.size,
             searchResponse.hasMore,
-            threadContext
+            extractedCompany
         );
 
         return {
@@ -138,7 +196,7 @@ export class SlackSearchHandler {
             intent: 'slack_search',
             intentClassification: slackClassification(),
             delegatedToSingleMeeting: false,
-            shouldGenerateDoc: true, // Generate doc with clickable links for references
+            shouldGenerateDoc: true,
             coverage: {
                 messagesSearched: searchResponse.results.length,
                 channelsSearched: uniqueChannels.size,
@@ -154,8 +212,16 @@ export class SlackSearchHandler {
     /**
      * Handle channel info queries.
      */
-    private static async handleChannelInfo(question: string): Promise<OpenAssistantResult> {
-        const searchQuery = this.extractSearchQuery(question);
+    private static async handleChannelInfo(
+        question: string,
+        extractedCompany?: string,
+        keyTopics?: string[],
+        conversationContext?: string,
+        threadMessages?: Array<{ text: string; isBot: boolean }>
+    ): Promise<OpenAssistantResult> {
+        const { searchQuery } = await this.extractSearchQuery(
+            question, extractedCompany, keyTopics, conversationContext, threadMessages
+        );
 
         console.log(`[SlackSearchHandler] Searching channels for: "${searchQuery}"`);
 
@@ -189,8 +255,10 @@ export class SlackSearchHandler {
     }
 
     /**
-     * Synthesize Slack search results into a coherent answer using LLM.
-     * Returns both the synthesized answer AND structured evidence for document generation.
+     * STEP 2: Synthesize Slack search results into a coherent answer using LLM.
+     * 
+     * This step receives ONLY Slack API results and the original question.
+     * No thread context, no meeting data — pure Slack synthesis.
      */
     private static async synthesizeSlackFindings(
         originalQuestion: string,
@@ -199,12 +267,11 @@ export class SlackSearchHandler {
         totalCount: number,
         channelsSearched: number,
         hasMore: boolean,
-        threadContext?: string
+        extractedCompany?: string
     ): Promise<string> {
         const { OpenAI } = await import('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
-        // Group messages by channel for context
         const channelGroups = new Map<string, SlackSearchResult[]>();
         results.forEach(msg => {
             const existing = channelGroups.get(msg.channelName) || [];
@@ -212,7 +279,6 @@ export class SlackSearchHandler {
             channelGroups.set(msg.channelName, existing);
         });
 
-        // Format messages with dates for temporal context
         const messagesContext = results.map((msg, idx) => {
             const date = this.formatSlackTimestamp(msg.timestamp);
             return `[Message ${idx + 1} from #${msg.channelName} by ${msg.username} on ${date}]
@@ -224,9 +290,7 @@ Link: ${msg.permalink || 'N/A'}`;
             .map(([channel, msgs]) => `#${channel} (${msgs.length} messages)`)
             .join(', ');
 
-        // Extract company/entity from the original question for context-aware synthesis
-        const companyMatch = originalQuestion.match(/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b/);
-        const mentionedEntity = companyMatch ? companyMatch[1] : null;
+        const mentionedEntity = extractedCompany || null;
 
         const prompt = buildSlackSearchAnalysisPrompt({
             originalQuestion,
@@ -239,16 +303,11 @@ Link: ${msg.permalink || 'N/A'}`;
             messagesContext,
         });
 
-        // Include thread context in system prompt so LLM understands follow-up references
-        const systemPrompt = threadContext
-            ? `${getSlackSearchSystemPrompt()}\n\n${threadContext}`
-            : getSlackSearchSystemPrompt();
-
         try {
             const response = await openai.chat.completions.create({
-                model: 'gpt-4o-mini',
+                model: MODEL_ASSIGNMENTS.SLACK_SEARCH_SYNTHESIS,
                 messages: [
-                    { role: 'system', content: systemPrompt },
+                    { role: 'system', content: getSlackSearchSystemPrompt() },
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3,
@@ -258,28 +317,20 @@ Link: ${msg.permalink || 'N/A'}`;
             const synthesized = response.choices[0]?.message?.content || '';
 
             if (!synthesized) {
-                // Fallback to simple formatting if LLM fails
                 return this.formatMessageResults(results, searchQuery);
             }
 
             return synthesized;
         } catch (error) {
             console.error('[SlackSearchHandler] Synthesis error:', error);
-            // Fallback to simple formatting
             return this.formatMessageResults(results, searchQuery);
         }
     }
 
-    /**
-     * Format Slack timestamp to readable date.
-     */
     private static formatSlackTimestamp(ts: string): string {
         try {
-            // Slack timestamps are in format "1234567890.123456"
             const timestamp = parseFloat(ts) * 1000;
             const date = new Date(timestamp);
-
-            // Format as "Dec 12, 2025"
             return date.toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
@@ -290,80 +341,12 @@ Link: ${msg.permalink || 'N/A'}`;
         }
     }
 
-    /**
-     * Build a context-aware search query.
-     * When the user's question is referential ("this conversation", "that", "them"),
-     * uses Decision Layer context (extractedCompany, keyTopics, conversationContext)
-     * to build a meaningful search query instead of searching for "this conversation".
-     */
-    private static buildContextAwareSearchQuery(
-        question: string,
-        extractedCompany?: string,
-        keyTopics?: string[],
-        conversationContext?: string
-    ): string {
-        const isReferential =
-            /\b(this|that|the|it|them|those|these)\s+(conversation|discussion|topic|meeting|company|thread|chat|exchange)\b/i.test(question)
-            || /\b(link\s+me|find\s+the|show\s+me|pull\s+up|look\s+up|search\s+for)\b.*\b(conversation|discussion|message|thread|chat|exchange)\b/i.test(question)
-            || /\b(link|find|search|pull\s+up|show)\b.*\b(to|for|about)\s+(this|that|them|it)\b/i.test(question)
-            || /\b(about|regarding|related\s+to)\s+(this|that|them|it|the\s+above)\b/i.test(question);
-
-        if (isReferential && (extractedCompany || (keyTopics && keyTopics.length > 0))) {
-            const parts: string[] = [];
-            if (extractedCompany) parts.push(extractedCompany);
-            if (keyTopics && keyTopics.length > 0) {
-                parts.push(...keyTopics.slice(0, 2));
-            }
-            const contextQuery = parts.join(' ');
-            console.log(`[SlackSearchHandler] Referential query detected, resolved to: "${contextQuery}" (from extractedCompany=${extractedCompany}, keyTopics=${keyTopics?.join(', ')})`);
-            return contextQuery;
-        }
-
-        if (isReferential && conversationContext) {
-            console.log(`[SlackSearchHandler] Referential query detected, using conversationContext: "${conversationContext}"`);
-            return this.extractSearchQuery(conversationContext);
-        }
-
-        return this.extractSearchQuery(question);
-    }
-
-    /**
-     * Extract the actual search query from the user's question.
-     * Removes common prefixes and Slack-specific language.
-     * Preserves company/entity names for better search results.
-     */
-    private static extractSearchQuery(question: string): string {
-        let query = question
-            // Remove common action verbs
-            .replace(/^(check|search|find|look for|show me|get|fetch)\s+/i, '')
-            // Remove Slack-specific language
-            .replace(/\s+(in|from|on)\s+slack$/i, '')
-            .replace(/\s+in\s+#[\w-]+$/i, '')  // Remove "in #channel" at end
-            .replace(/^slack\s+for\s+/i, '')
-            // Remove filler words but keep company names
-            .replace(/\b(someone|anyone)\s+(mentioned|said)\s+/i, '')
-            .replace(/\ba\s+recommended\s+/i, 'recommended ')
-            // Clean up
-            .trim();
-
-        // If query is empty after cleaning, use original question
-        if (!query) {
-            query = question;
-        }
-
-        return query;
-    }
-
-    /**
-     * Format Slack message results for presentation.
-     */
     private static formatMessageResults(results: SlackSearchResult[], query: string): string {
         const lines: string[] = [];
 
         lines.push(`*Slack Messages — "${query}"*`);
         lines.push(`Found ${results.length} message${results.length !== 1 ? 's' : ''}:\n`);
 
-        // Group by channel for better readability
         const byChannel = new Map<string, SlackSearchResult[]>();
         results.forEach(result => {
             const existing = byChannel.get(result.channelName) || [];
@@ -371,11 +354,9 @@ Link: ${msg.permalink || 'N/A'}`;
             byChannel.set(result.channelName, existing);
         });
 
-        // Format each channel's messages
         byChannel.forEach((messages, channelName) => {
             lines.push(`\n*#${channelName}*`);
             messages.forEach((msg) => {
-                // Truncate long messages
                 const text = msg.text.length > 200
                     ? msg.text.substring(0, 200) + '...'
                     : msg.text;
@@ -384,16 +365,13 @@ Link: ${msg.permalink || 'N/A'}`;
                 if (msg.permalink) {
                     lines.push(`  ${msg.permalink}`);
                 }
-                lines.push(''); // Add spacing between messages
+                lines.push('');
             });
         });
 
         return lines.join('\n');
     }
 
-    /**
-     * Format channel results for presentation.
-     */
     private static formatChannelResults(channels: SlackChannel[], query: string): string {
         const lines: string[] = [];
 
@@ -401,7 +379,7 @@ Link: ${msg.permalink || 'N/A'}`;
         lines.push(`Found ${channels.length} channel${channels.length !== 1 ? 's' : ''}:\n`);
 
         channels.forEach((channel, idx) => {
-            lines.push(`${idx + 1}. *#${channel.name}*${channel.isPrivate ? ' 🔒' : ''}`);
+            lines.push(`${idx + 1}. *#${channel.name}*${channel.isPrivate ? ' (private)' : ''}`);
             if (channel.purpose) {
                 lines.push(`   ${channel.purpose}`);
             }

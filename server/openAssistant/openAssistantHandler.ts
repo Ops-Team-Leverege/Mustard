@@ -1650,14 +1650,13 @@ async function handleSlackSearchIntent(
   console.log(`[OpenAssistant] Slack search: contract=${contract}`);
 
   try {
-    const threadContext = buildThreadContextSection(context);
     const result = await SlackSearchHandler.handleSlackSearch({
       question: userMessage,
       contract: contract,
-      threadContext: threadContext || undefined,
       extractedCompany: context.decisionLayerResult?.extractedCompany,
       keyTopics: context.decisionLayerResult?.keyTopics,
       conversationContext: context.decisionLayerResult?.conversationContext,
+      threadMessages: context.threadMessages,
     });
 
     // Map to OpenAssistantResult format
