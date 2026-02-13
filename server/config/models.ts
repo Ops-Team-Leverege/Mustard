@@ -116,8 +116,8 @@ export function getModelDescription(model: LLMModelType): string {
  * This provides explicit documentation for why each task uses a specific model.
  */
 export const MODEL_ASSIGNMENTS = {
-  // Decision Layer / Intent Router - Fast for quick routing decisions
-  INTENT_CLASSIFICATION: LLM_MODELS.FAST_CLASSIFICATION,
+  // Decision Layer / Intent Router - Standard reasoning for better thread context understanding
+  INTENT_CLASSIFICATION: LLM_MODELS.STANDARD_REASONING,
   CONTRACT_SELECTION: LLM_MODELS.FAST_CLASSIFICATION,
   LLM_INTERPRETATION: LLM_MODELS.FAST_CLASSIFICATION,
   AGGREGATE_SPECIFICITY_CHECK: LLM_MODELS.FAST_CLASSIFICATION,
