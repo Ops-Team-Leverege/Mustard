@@ -288,7 +288,7 @@ Respond with JSON: {
   "requiresStyleMatching": true/false,
   "isAmbiguous": true/false,
   "conversationContext": "what is this conversation about?",
-  "keyTopics": ["topic1", "topic2"],
+  "keyTopics": ["searchable_term1", "searchable_term2"],  // Extract the concrete subject terms the user is asking about. These are used for database keyword search. Include the user's actual topic phrases (e.g. "TV issues", "pricing", "warranty"). Do NOT include generic meta-descriptors that aren't part of the user's topic (e.g. don't add "customer feedback" or "opinions" unless the user specifically asked about those). Keep terms short (1-3 words) for better search matching.
   "shouldProceed": true/false,
   "clarificationSuggestion": "specific clarification if ambiguous"
 }

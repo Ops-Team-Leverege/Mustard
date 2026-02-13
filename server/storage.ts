@@ -157,7 +157,7 @@ export interface IStorage {
   getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
 
   // Q&A Pairs - keyword search across all companies (for aggregate topic queries)
-  searchQaPairsByKeyword(searchTerms: string[], limit?: number): Promise<Array<{ company: string; question: string; answer: string | null }>>;
+  searchQaPairsByKeyword(searchTerms: string[], limit?: number): Promise<Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>>;
 
   // Meeting Action Items (read-only artifact, materialized at ingestion)
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
@@ -1155,7 +1155,7 @@ export class MemStorage implements IStorage {
       .map(qa => ({ ...qa, categoryName: null, contactName: null, contactJobTitle: null, transcriptDate: null }));
   }
 
-  async searchQaPairsByKeyword(searchTerms: string[], limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
+  async searchQaPairsByKeyword(searchTerms: string[], limit = 50): Promise<Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>> {
     const terms = searchTerms.filter(t => t.trim().length > 0).map(t => t.toLowerCase());
     if (terms.length === 0) return [];
 
@@ -1166,7 +1166,7 @@ export class MemStorage implements IStorage {
         return terms.some(t => q.includes(t) || a.includes(t));
       })
       .slice(0, limit)
-      .map(qa => ({ company: qa.company || "Unknown", question: qa.question, answer: qa.answer }));
+      .map(qa => ({ company: qa.company || "Unknown", question: qa.question, answer: qa.answer, meetingDate: null }));
   }
 
   async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {
@@ -2515,7 +2515,7 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async searchQaPairsByKeyword(searchTerms: string[], limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
+  async searchQaPairsByKeyword(searchTerms: string[], limit = 50): Promise<Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>> {
     const terms = searchTerms.filter(t => t.trim().length > 0);
     if (terms.length === 0) return [];
 
@@ -2525,9 +2525,10 @@ export class DbStorage implements IStorage {
     params.push(limit);
 
     const results = await this.rawQuery(
-      `SELECT c.name AS company, q.question, q.answer
+      `SELECT c.name AS company, q.question, q.answer, t.meeting_date
        FROM qa_pairs q
        JOIN companies c ON q.company_id = c.id
+       LEFT JOIN transcripts t ON q.transcript_id = t.id
        WHERE ${whereClause}
        ORDER BY q.created_at DESC
        LIMIT $${terms.length + 1}`,
@@ -2537,6 +2538,7 @@ export class DbStorage implements IStorage {
       company: r.company as string,
       question: r.question as string,
       answer: (r.answer as string) || null,
+      meetingDate: r.meeting_date ? new Date(r.meeting_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null,
     }));
   }
 

@@ -755,7 +755,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
               for (const [company, pairs] of Array.from(grouped.entries())) {
                 formattedAnswer += `*${company}:*\n`;
                 for (const pair of pairs.slice(0, 5)) {
-                  formattedAnswer += `  - _${pair.question}_`;
+                  const dateTag = pair.meetingDate ? ` (${pair.meetingDate})` : "";
+                  formattedAnswer += `  - _${pair.question}_${dateTag}`;
                   if (pair.answer) formattedAnswer += `\n    ${pair.answer}`;
                   formattedAnswer += "\n";
                 }
