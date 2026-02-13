@@ -4,7 +4,10 @@
  * Handles follow-up responses to clarification requests:
  * 1. "next_steps_or_summary" - User selects next steps or summary
  * 2. "proposed_interpretation" - User confirms with "yes", "1", etc.
- * 3. "slack_search" - User accepts offer to search Slack after a meeting-based response
+ * 
+ * NOTE: Offer acceptance (Slack search, meeting search) was removed from this handler.
+ * The Decision Layer LLM now handles offer follow-ups naturally via thread context,
+ * enforcing the "Decision Layer as sole authority" principle.
  */
 
 import { postSlackMessage } from "../slackApi";
@@ -250,159 +253,7 @@ export async function handleProposedInterpretationConfirmation(
   };
 }
 
-/**
- * Handle response to a meeting search + Slack offer (from qa_pairs fallback).
- * When the bot showed qa_pairs results and offered to search meetings or Slack.
- * 
- * - "check slack" / "search slack" → route to Slack search
- * - Generic affirmative ("yes", "sure") → guide user to specify scope
- * - Time range in reply → let normal flow handle (Decision Layer will classify correctly)
- */
-export async function handleMeetingSearchOfferResponse(
-  ctx: ClarificationContext
-): Promise<ClarificationResult> {
-  if (ctx.pendingOffer !== "meeting_search") {
-    return { handled: false };
-  }
-
-  const lowerText = ctx.text.toLowerCase().trim();
-
-  const wantsSlack = /\b(slack|check\s*slack|search\s*slack|internal\s*discussions?)\b/i.test(lowerText);
-
-  if (wantsSlack) {
-    const slackCtx = { ...ctx, pendingOffer: "slack_search" as string | null };
-    return handleSlackSearchOfferResponse(slackCtx);
-  }
-
-  const isGenericAffirmative = /^(yes|yeah|yep|yup|ok|okay|sure|please|go\s*ahead|do\s*it|sounds?\s*good)$/i.test(lowerText);
-
-  if (isGenericAffirmative) {
-    const guideMessage = "Which would you like me to search?\n\n- *Meeting transcripts* — just add a time range, e.g., \"search meetings from the last quarter\"\n- *Slack* — say \"check Slack\" and I'll look for internal discussions";
-
-    if (!ctx.testRun) {
-      await postSlackMessage({
-        channel: ctx.channel,
-        text: guideMessage,
-        thread_ts: ctx.threadTs,
-      });
-    }
-
-    return { handled: true, responseType: "confirmed" };
-  }
-
-  return { handled: false };
-}
-
-/**
- * Handle affirmative response to a Slack search offer.
- * When the bot offered "I can also check Slack..." and the user says yes.
- * Routes through OpenAssistant with a synthetic Decision Layer result to
- * maintain the Decision Layer as sole authority for intent/contract selection.
- */
-export async function handleSlackSearchOfferResponse(
-  ctx: ClarificationContext
-): Promise<ClarificationResult> {
-  if (ctx.pendingOffer !== "slack_search") {
-    return { handled: false };
-  }
-
-  const lowerText = ctx.text.toLowerCase().trim();
-
-  const wantsSlackSearch = /\b(check\s*slack|search\s*slack|look\s*(at|in|through)\s*slack|slack\s*(too|as\s*well|also))\b/i.test(lowerText);
-  const isAffirmative = /^(yes|yeah|yep|yup|ok|okay|sure|1|please|do\s*it|go\s*ahead)$/i.test(lowerText) ||
-                        /^(sounds?\s*good|let'?s?\s*do\s*(it|that)|proceed|check\s*it)$/i.test(lowerText);
-
-  if (!wantsSlackSearch && !isAffirmative) {
-    return { handled: false };
-  }
-
-  const searchQuestion = ctx.originalQuestion || ctx.text;
-  console.log(`[Slack] Slack search offer accepted - searching for: "${searchQuestion.substring(0, 100)}..."`);
-
-  try {
-    const syntheticDecisionLayer = {
-      intent: Intent.SLACK_SEARCH,
-      answerContract: AnswerContract.SLACK_MESSAGE_SEARCH,
-      intentDetectionMethod: "pattern" as const,
-      contractSelectionMethod: "default" as const,
-      contextLayers: {
-        product_identity: true,
-        product_ssot: false,
-        single_meeting: false,
-        multi_meeting: false,
-        slack_search: true,
-      },
-      extractedCompany: ctx.companyNameFromContext || undefined,
-    };
-
-    const result = await handleOpenAssistant(searchQuestion, {
-      userId: ctx.userId || undefined,
-      threadId: ctx.threadTs,
-      conversationContext: ctx.companyNameFromContext ? `Company: ${ctx.companyNameFromContext}` : undefined,
-      decisionLayerResult: syntheticDecisionLayer,
-    });
-
-    if (!ctx.testRun) {
-      await postSlackMessage({
-        channel: ctx.channel,
-        text: result.answer,
-        thread_ts: ctx.threadTs,
-      });
-    }
-
-    logInteraction({
-      slackChannelId: ctx.channel,
-      slackThreadId: ctx.threadTs,
-      slackMessageTs: ctx.messageTs,
-      userId: ctx.userId,
-      companyId: ctx.threadContext?.companyId || null,
-      meetingId: ctx.threadContext?.meetingId || null,
-      questionText: searchQuestion,
-      answerText: result.answer,
-      metadata: buildInteractionMetadata(
-        { companyId: ctx.threadContext?.companyId || undefined, meetingId: ctx.threadContext?.meetingId },
-        {
-          entryPoint: "slack",
-          decisionLayer: {
-            intent: Intent.SLACK_SEARCH,
-            intentDetectionMethod: "pattern",
-            contextLayers: syntheticDecisionLayer.contextLayers,
-            answerContract: AnswerContract.SLACK_MESSAGE_SEARCH,
-            contractSelectionMethod: "default",
-          },
-          answerShape: "summary",
-          dataSource: mapLegacyDataSource(result.dataSource),
-          clarificationState: {
-            awaiting: false,
-            resolvedWith: "confirmed" as ClarificationResolution,
-          },
-          testRun: ctx.testRun,
-        }
-      ),
-      testRun: ctx.testRun,
-    });
-
-    return {
-      handled: true,
-      responseType: 'slack_search',
-      meetingId: ctx.threadContext?.meetingId,
-    };
-  } catch (err) {
-    console.error(`[Slack] Failed to execute Slack search from offer:`, err);
-
-    const errorMessage = "I wasn't able to search Slack right now. You can try asking me directly with something like \"search Slack for [topic]\".";
-
-    if (!ctx.testRun) {
-      await postSlackMessage({
-        channel: ctx.channel,
-        text: errorMessage,
-        thread_ts: ctx.threadTs,
-      });
-    }
-
-    return {
-      handled: true,
-      responseType: 'slack_search',
-    };
-  }
-}
+// NOTE: handleMeetingSearchOfferResponse and handleSlackSearchOfferResponse were removed.
+// The Decision Layer LLM now handles offer follow-ups naturally via thread context.
+// When the bot offers "I can also check Slack..." and the user says "sure", the LLM
+// sees the full conversation and classifies intent as SLACK_SEARCH directly.

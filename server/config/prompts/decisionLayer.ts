@@ -319,6 +319,16 @@ FOLLOW - UP MESSAGES:
     - "no, I meant X" → Correction, re - classify based on X
       - "what about for Costco?" → Applying previous task type to a new entity
 
+OFFER ACCEPTANCE (CRITICAL):
+When the bot's previous message offered to search Slack or meeting transcripts, and the user responds affirmatively:
+- Bot said "I can also check Slack..." → User says "yes" / "sure" / "do it" / "check Slack" → SLACK_SEARCH with Contracts: ["SLACK_MESSAGE_SEARCH"]
+- Bot said "I can search meeting transcripts..." → User says "yes" / "sure" / "check meetings" → MULTI_MEETING or SINGLE_MEETING based on scope
+- Bot offered both Slack and meetings → User says "check Slack" → SLACK_SEARCH; User says "check meetings" → MULTI_MEETING
+- Bot offered to search → User says "sure, do it" (generic yes) → Match the specific offer the bot made (if bot offered Slack → SLACK_SEARCH)
+
+The thread history shows what the bot offered. Use it to determine the correct intent when the user gives a short confirmation.
+Preserve any company/topic context from the thread when routing the accepted offer.
+
 INTENT SHIFT IN THREADS (CRITICAL):
 A follow-up message may change intent entirely. The thread provides CONTEXT (company name, topics), but does NOT lock the intent.
 Always reclassify the intent based on the current message. If the user's new message clearly signals a different intent, use that intent — not the thread's original one.

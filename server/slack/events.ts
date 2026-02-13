@@ -45,7 +45,7 @@ import OpenAI from "openai";
 // Extracted handler modules
 import { handleAmbiguity } from "./handlers/ambiguityHandler";
 import { handleBinaryQuestion } from "./handlers/binaryQuestionHandler";
-import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation, handleSlackSearchOfferResponse, handleMeetingSearchOfferResponse } from "./handlers/clarificationHandler";
+import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation } from "./handlers/clarificationHandler";
 import { handleAnswerQuestions } from "./handlers/answerQuestionsHandler";
 import { createProgressManager } from "./context/progressManager";
 import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
@@ -412,19 +412,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
       pendingOffer: pendingOfferFromThread,
     };
 
-    // 8.4.4 MEETING SEARCH OFFER RESPONSE (from qa_pairs fallback)
-    const meetingSearchOfferResult = await handleMeetingSearchOfferResponse(clarificationCtx);
-    if (meetingSearchOfferResult.handled) {
-      clearProgressTimer();
-      return;
-    }
-
-    // 8.4.5 SLACK SEARCH OFFER RESPONSE (from pending offer)
-    const slackSearchOfferResult = await handleSlackSearchOfferResponse(clarificationCtx);
-    if (slackSearchOfferResult.handled) {
-      clearProgressTimer();
-      return;
-    }
+    // 8.4.4-8.4.5 REMOVED: Offer response handlers (handleMeetingSearchOfferResponse, handleSlackSearchOfferResponse)
+    // These intercepted messages before the Decision Layer using regex patterns, violating the
+    // "Decision Layer as sole authority" principle. The Decision Layer LLM already receives full
+    // thread history and can naturally classify "sure, do it" as SLACK_SEARCH when the bot
+    // previously offered Slack search. See Decision Layer prompt follow-up handling.
 
     const nextStepsResult = await handleNextStepsOrSummaryResponse(clarificationCtx);
     if (nextStepsResult.handled) {
