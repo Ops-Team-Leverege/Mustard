@@ -773,7 +773,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               pendingOffer = isComprehensive ? "slack_search" : "meeting_search";
               console.log(`[Slack] qa_pairs fallback successful: ${qaPairResults.length} results from ${companiesWithResults.length} companies (comprehensive=${isComprehensive})`);
             } else {
-              responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerm}*.\n\nI can search through meeting transcripts if you'd like — just let me know a time range (e.g., "from the last quarter") and I'll dig deeper.`;
+              responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerm}*.\n\nI can search meeting transcripts if you'd like — just specify a time range (e.g., "from the last quarter").`;
               capabilityName = "qa_pairs_aggregate_empty";
               intentClassification = "multi_meeting_qa_fallback_empty";
               dataSource = "qa_pairs";
