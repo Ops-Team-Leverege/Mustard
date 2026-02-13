@@ -1,0 +1,214 @@
+2026-02-13 10:57:56.77
+55e15b99
+User
+[DecisionLayer] Contract: SLACK_MESSAGE_SEARCH (llm_proposed)
+2026-02-13 10:57:56.77
+55e15b99
+User
+[IntentClassifier] LLM: intent=SLACK_SEARCH, company=Discount Tire & Service Center, contracts=SLACK_MESSAGE_SEARCH
+2026-02-13 10:57:56.77
+55e15b99
+User
+Will Clarify: false
+2026-02-13 10:57:56.77
+55e15b99
+User
+[Slack] ✅ CONTEXT CHECKPOINT 3 - Decision Layer Result:
+2026-02-13 10:57:56.77
+55e15b99
+User
+- Extracted Company: Discount Tire & Service Center
+2026-02-13 10:57:56.77
+55e15b99
+User
+Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":false,"multi_meeting":false,"slack_search":true}
+2026-02-13 10:57:56.77
+55e15b99
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-13 10:57:57.57
+55e15b99
+User
+[CompanyResolver] Resolved from LLM extraction: Discount Tire & Service Centers
+2026-02-13 10:57:57.57
+55e15b99
+User
+[Slack] Non-meeting intent (SLACK_SEARCH) - skipping meeting resolution
+2026-02-13 10:57:57.67
+55e15b99
+User
+[INFO] [290a4a1d] Decision Layer completed {"correlationId":"290a4a1d","channel":"C0A80S3HJNL","threadTs":"1771008939.500729","userId":"U082TV42FM0","duration":15688,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","method":"llm","duration_ms":12599}
+2026-02-13 10:57:57.67
+55e15b99
+User
+[Slack] Open Assistant mode - intent=SLACK_SEARCH, routing to appropriate handler
+2026-02-13 10:57:58.77
+55e15b99
+User
+[Slack] Streaming placeholder posted with preview mode: ts=1771009078.376829
+2026-02-13 10:57:58.87
+55e15b99
+User
+[SlackSearchHandler] Handling SLACK_MESSAGE_SEARCH for: "Yes check Slack. Look for conversations involving Calum or Credd", hasThreadMessages=true, extractedCompany=Discount Tire & Service Center
+2026-02-13 10:57:58.87
+55e15b99
+User
+[OpenAssistant] Slack search: contract=SLACK_MESSAGE_SEARCH
+2026-02-13 10:57:58.87
+55e15b99
+User
+[OpenAssistant] Evidence source: slack_search (from Decision Layer: SLACK_SEARCH -> SLACK_MESSAGE_SEARCH)
+2026-02-13 10:57:58.87
+55e15b99
+User
+[OpenAssistant] Using full Decision Layer result: intent=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, method=llm
+2026-02-13 10:57:58.87
+55e15b99
+User
+[OpenAssistant] Processing: "Yes check Slack. Look for conversations involving Calum or Credd"
+2026-02-13 10:58:03.79
+55e15b99
+User
+[SlackSearchHandler] Searching Slack for: "Discount Tire & Service Center camera placement Calum Credd" (resolvedQuestion: "What has been discussed in Slack about camera placement at Discount Tire & Service Center involving Calum or Credd?")
+2026-02-13 10:58:03.79
+55e15b99
+User
+[SlackSearchHandler] LLM extracted query: "Discount Tire & Service Center camera placement Calum Credd", resolvedQuestion: "What has been discussed in Slack about camera placement at Discount Tire & Service Center involving Calum or Credd?" (Slack conversations about camera placement at Discount Tire & Service Center involving Calum or Credd)
+2026-02-13 10:58:03.79
+55e15b99
+User
+[SlackSearchHandler] Searching Slack for: "Discount Tire & Service Center camera placement Calum Credd" (resolvedQuestion: "What has been discussed in Slack about camera placement at Discount Tire & Service Center involving Calum or Credd?")
+2026-02-13 10:58:03.79
+55e15b99
+User
+[SlackSearchHandler] LLM extracted query: "Discount Tire & Service Center camera placement Calum Credd", resolvedQuestion: "What has been discussed in Slack about camera placement at Discount Tire & Service Center involving Calum or Credd?" (Slack conversations about camera placement at Discount Tire & Service Center involving Calum or Credd)
+2026-02-13 10:58:04.07
+55e15b99
+User
+[SlackSearchService] Searching for: "Discount Tire & Service Center camera placement Calum Credd" (page 1)
+2026-02-13 10:58:04.07
+55e15b99
+User
+[SlackSearchService] Channel filter: must contain [pitcrew]
+2026-02-13 10:58:04.07
+55e15b99
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-13 10:58:04.07
+55e15b99
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-13 10:58:04.07
+55e15b99
+User
+[SlackSearchService] Searching for: "Discount Tire & Service Center camera placement Calum Credd" (page 1)
+2026-02-13 10:58:06.27
+55e15b99
+User
+[SlackSearchService] Returning 20 messages (3214 total, page 1/81)
+2026-02-13 10:58:06.27
+55e15b99
+User
+[SlackSearchService] Filtered: 40 -> 37 messages (channels matching filter)
+2026-02-13 10:58:06.27
+55e15b99
+User
+[SlackSearchService] Returning 20 messages (3214 total, page 1/81)
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-13 10:58:17.17
+55e15b99
+User
+[INFO] [290a4a1d] Open Assistant response generated {"correlationId":"290a4a1d","channel":"C0A80S3HJNL","threadTs":"1771008939.500729","userId":"U082TV42FM0","duration":35288,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":18401}
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Pipeline completed in 34801ms, progressMessages=0
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-13 10:58:17.17
+55e15b99
+User
+[INFO] [290a4a1d] Open Assistant response generated {"correlationId":"290a4a1d","channel":"C0A80S3HJNL","threadTs":"1771008939.500729","userId":"U082TV42FM0","duration":35288,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":18401}
+2026-02-13 10:58:17.17
+55e15b99
+User
+[Slack] Pipeline completed in 34801ms, progressMessages=0
+2026-02-13 10:58:18.07
+55e15b99
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-13 10:58:18.07
+55e15b99
+User
+[Slack] Updated streaming placeholder with final content (2321 chars)
+2026-02-13 10:58:18.07
+55e15b99
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-13 10:58:18.07
+55e15b99
+User
+[Slack] Updated streaming placeholder with final content (2321 chars)
+2026-02-13 10:58:18.27
+55e15b99
+User
+[DocumentResponse] Document-only mode, skipping message (word count 291 below threshold)
+2026-02-13 10:58:18.27
+55e15b99
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-13 10:58:18.27
+55e15b99
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 291, Generate doc: false
+2026-02-13 10:58:18.27
+55e15b99
+User
+[Slack] Document check complete
+2026-02-13 10:58:18.27
+55e15b99
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 291, Generate doc: false
+2026-02-13 10:58:18.27
+55e15b99
+User
+[DocumentResponse] Document-only mode, skipping message (word count 291 below threshold)
+2026-02-13 10:58:18.27
+55e15b99
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-13 10:58:18.27
+55e15b99
+User
+[Slack] Document check complete
+2026-02-13 10:58:18.27
+55e15b99
+User
+[INFO] [290a4a1d] Request completed successfully {"correlationId":"290a4a1d","channel":"C0A80S3HJNL","threadTs":"1771008939.500729","userId":"U082TV42FM0","duration":36387,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":2321,"totalTimeMs":34801,"stages":{"meeting_resolution":0,"decision_layer":12599,"handler":18401}}
+2026-02-13 10:58:18.27
+55e15b99
+User
+[INFO] [290a4a1d] Request completed successfully {"correlationId":"290a4a1d","channel":"C0A80S3HJNL","threadTs":"1771008939.500729","userId":"U082TV42FM0","duration":36387,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":2321,"totalTimeMs":34801,"stages":{"meeting_resolution":0,"decision_layer":12599,"handler":18401}}
+Wrap
+Colors
