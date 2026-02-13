@@ -143,6 +143,12 @@ export const OFFER_CONSTANTS = {
   EXPIRY_MS: 5 * 60 * 1000,
 } as const;
 
+export const QA_SEARCH_CONSTANTS = {
+  DB_FETCH_LIMIT: 30,
+  MAX_RESULTS_SHOWN: 15,
+  RERANK_CANDIDATE_LIMIT: 30,
+} as const;
+
 export const BATCH_CONSTANTS = {
   /**
    * Default batch size for processing operations.

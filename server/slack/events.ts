@@ -38,7 +38,9 @@ import type { ContextLayers } from "../decisionLayer/contextLayers";
 import type { ContractChainEntry } from "./interactionMetadata";
 import { getProgressMessage, getProgressDelayMs, generatePersonalizedProgressMessage, type ProgressIntentType } from "./progressMessages";
 import { RequestLogger } from "../utils/slackLogger";
-import { PROGRESS_MESSAGE_CONSTANTS } from "../config/constants";
+import { PROGRESS_MESSAGE_CONSTANTS, QA_SEARCH_CONSTANTS } from "../config/constants";
+import { LLM_MODELS } from "../config/models";
+import OpenAI from "openai";
 
 // Extracted handler modules
 import { handleAmbiguity } from "./handlers/ambiguityHandler";
@@ -63,6 +65,50 @@ export interface PipelineTiming {
 
 function cleanMention(text: string): string {
   return text.replace(/^<@\w+>\s*/, "").trim();
+}
+
+async function rerankQaPairsByRelevance(
+  userQuestion: string,
+  results: Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>,
+  limit: number
+): Promise<Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>> {
+  if (results.length <= 1) return results;
+
+  try {
+    const openai = new OpenAI();
+    const candidates = results.slice(0, QA_SEARCH_CONSTANTS.RERANK_CANDIDATE_LIMIT).map((r, i) => 
+      `[${i}] Q: ${r.question}${r.answer ? ` A: ${r.answer.slice(0, 100)}` : ""}`
+    ).join("\n");
+
+    const response = await openai.chat.completions.create({
+      model: LLM_MODELS.FAST_CLASSIFICATION,
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [{
+        role: "system",
+        content: `You are a relevance scorer. Given a user's question and a list of Q&A pairs, return the indices of the most relevant pairs sorted by relevance (most relevant first). Only include pairs that are semantically relevant to what the user is asking about. Return JSON: {"relevant_indices": [0, 3, 7, ...]}`
+      }, {
+        role: "user",
+        content: `User question: "${userQuestion}"\n\nCandidate Q&A pairs:\n${candidates}`
+      }]
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) return results.slice(0, limit);
+
+    const parsed = JSON.parse(content);
+    const indices: number[] = parsed.relevant_indices || [];
+    const reranked = indices
+      .filter(i => i >= 0 && i < results.length)
+      .map(i => results[i])
+      .slice(0, limit);
+
+    console.log(`[Slack] LLM re-ranked ${results.length} candidates → ${reranked.length} relevant results`);
+    return reranked.length > 0 ? reranked : results.slice(0, limit);
+  } catch (err) {
+    console.error(`[Slack] LLM re-ranking failed, falling back to original order:`, err);
+    return results.slice(0, limit);
+  }
 }
 
 /**
@@ -748,15 +794,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
             console.log(`[Slack] qa_pairs search returned ${qaPairResults.length} results`);
 
             if (qaPairResults.length > 0) {
-              // Relevance ranking: sort by number of matching search terms (most relevant first)
-              const rankedResults = [...qaPairResults].sort((a, b) => {
-                const score = (r: typeof a) => {
-                  const text = `${r.question} ${r.answer || ""}`.toLowerCase();
-                  return finalSearchTerms.reduce((count, term) => 
-                    count + (text.includes(term.toLowerCase()) ? 1 : 0), 0);
-                };
-                return score(b) - score(a);
-              });
+              // LLM semantic re-ranking: use gpt-4o-mini to score relevance to the user's actual question
+              const rankedResults = await rerankQaPairsByRelevance(text, qaPairResults, QA_SEARCH_CONSTANTS.MAX_RESULTS_SHOWN);
 
               const companiesWithResults = Array.from(new Set(rankedResults.map(r => r.company)));
               const grouped = new Map<string, typeof rankedResults>();
