@@ -96,7 +96,7 @@ export class SlackSearchHandler {
         keyTopics?: string[],
         conversationContext?: string,
         threadMessages?: Array<{ text: string; isBot: boolean }>
-    ): Promise<{ searchQuery: string; searchDescription: string; resolvedQuestion: string }> {
+    ): Promise<{ searchQuery: string; searchDescription: string; resolvedQuestion: string; sortByOldest: boolean }> {
         const { OpenAI } = await import('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
 
@@ -122,24 +122,25 @@ export class SlackSearchHandler {
             const content = response.choices[0]?.message?.content;
             if (!content) {
                 console.warn('[SlackSearchHandler] LLM query extraction returned empty');
-                return { searchQuery: question, searchDescription: 'Fallback to raw question', resolvedQuestion: question };
+                return { searchQuery: question, searchDescription: 'Fallback to raw question', resolvedQuestion: question, sortByOldest: false };
             }
 
             const parsed = JSON.parse(content);
             const searchQuery = (parsed.searchQuery || '').trim();
             const searchDescription = parsed.searchDescription || '';
             const resolvedQuestion = (parsed.resolvedQuestion || '').trim() || question;
+            const sortByOldest = parsed.sortByOldest === true;
 
             if (!searchQuery) {
                 console.warn('[SlackSearchHandler] LLM extracted empty query');
-                return { searchQuery: question, searchDescription: 'LLM returned empty query, using raw question', resolvedQuestion };
+                return { searchQuery: question, searchDescription: 'LLM returned empty query, using raw question', resolvedQuestion, sortByOldest };
             }
 
-            console.log(`[SlackSearchHandler] LLM extracted query: "${searchQuery}", resolvedQuestion: "${resolvedQuestion}" (${searchDescription})`);
-            return { searchQuery, searchDescription, resolvedQuestion };
+            console.log(`[SlackSearchHandler] LLM extracted query: "${searchQuery}", resolvedQuestion: "${resolvedQuestion}", sortByOldest: ${sortByOldest} (${searchDescription})`);
+            return { searchQuery, searchDescription, resolvedQuestion, sortByOldest };
         } catch (error) {
             console.error('[SlackSearchHandler] Query extraction LLM error:', error);
-            return { searchQuery: question, searchDescription: 'LLM extraction failed, using raw question', resolvedQuestion: question };
+            return { searchQuery: question, searchDescription: 'LLM extraction failed, using raw question', resolvedQuestion: question, sortByOldest: false };
         }
     }
 
@@ -154,15 +155,16 @@ export class SlackSearchHandler {
         conversationContext?: string,
         threadMessages?: Array<{ text: string; isBot: boolean }>
     ): Promise<OpenAssistantResult> {
-        const { searchQuery, resolvedQuestion } = await this.extractSearchQuery(
+        const { searchQuery, resolvedQuestion, sortByOldest } = await this.extractSearchQuery(
             question, extractedCompany, keyTopics, conversationContext, threadMessages
         );
 
-        console.log(`[SlackSearchHandler] Searching Slack for: "${searchQuery}" (resolvedQuestion: "${resolvedQuestion}")`);
+        console.log(`[SlackSearchHandler] Searching Slack for: "${searchQuery}" (resolvedQuestion: "${resolvedQuestion}", sortByOldest: ${sortByOldest})`);
 
         const searchResponse = await SlackSearchService.searchMessages({
             query: searchQuery,
             limit: 20,
+            ...(sortByOldest ? { sort: 'timestamp' as const, sortDir: 'asc' as const } : {}),
         });
 
         if (searchResponse.results.length === 0) {

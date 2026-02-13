@@ -232,8 +232,15 @@ Return JSON:
 {
   "searchQuery": "the actual search terms to send to Slack's search API",
   "searchDescription": "one-sentence description of what we're looking for (for logging)",
-  "resolvedQuestion": "the full, self-contained natural-language question the user is actually asking"
+  "resolvedQuestion": "the full, self-contained natural-language question the user is actually asking",
+  "sortByOldest": false
 }
+
+CRITICAL — sortByOldest:
+- Set to true ONLY when the user explicitly asks for OLDER messages, earlier conversations, or historical context
+- Examples where sortByOldest = true: "find older messages", "any earlier discussions?", "what about older conversations?", "go back further"
+- Examples where sortByOldest = false (default): "check slack", "search for X", "find messages about Y"
+- This controls whether results are sorted by relevance (default) or by date (oldest first)
 
 CRITICAL — resolvedQuestion:
 - This is the REAL question the user is trying to answer, written as a complete standalone sentence
