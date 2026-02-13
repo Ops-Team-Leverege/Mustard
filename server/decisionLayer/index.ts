@@ -282,7 +282,7 @@ export async function runDecisionLayer(
       useAggregateFallback = !specificity.hasTimeRange && meetingCount > MEETING_CONSTANTS.CLARIFICATION_THRESHOLD;
 
       if (useAggregateFallback) {
-        const explicitMeetingPattern = /\b(search|check|look\s+through|scan|review|find\s+in)\s+(all\s+)?(meetings?|transcripts?|calls?|notes?)\b/i;
+        const explicitMeetingPattern = /\b(search|check|look\s+through|scan|review|find\s+in|show\s+me|list|pull\s+up|go\s+through)\s+(all\s+)?(meetings?|transcripts?|calls?|notes?)\b/i;
         userExplicitlyRequestedMeetings = explicitMeetingPattern.test(question);
 
         if (userExplicitlyRequestedMeetings) {
