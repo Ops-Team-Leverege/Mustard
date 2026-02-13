@@ -1,0 +1,98 @@
+Fallback Logic Assessment
+Status: Acceptable with Recommendations ✅
+
+The qa_pairs_first fallback is actually a smart UX pattern:
+
+User asks broad question: "what are people saying about TVs?"
+System recognizes this needs multi-meeting search but lacks scope
+Instead of blocking with "please specify time range", it provides immediate value via qa_pairs
+Then offers to search meetings if user wants deeper analysis
+However, there are still improvements needed:
+
+1. Unclear Intent Signaling
+The current logic doesn't distinguish between:
+
+"what are customers saying about TVs?" → qa_pairs is perfect, show results
+"search all meetings for TV discussions" → user explicitly wants meetings, must ask for time range
+Current Code Issue (line 750 in events.ts):
+
+else if (decisionLayerResult.aggregateFallback === "qa_pairs_first") {
+  // Always searches qa_pairs, even if user said "search meetings"
+Recommendation: Add a flag in Decision Layer result:
+
+{
+  aggregateFallback: "qa_pairs_first",
+  userExplicitlyRequestedMeetings: boolean, // true if they said "search meetings/transcripts"
+}
+Then in the handler:
+
+if (decisionLayerResult.userExplicitlyRequestedMeetings) {
+  // Skip qa_pairs, go straight to asking for time range
+  responseText = "I can search meeting transcripts for TV discussions. What time range should I focus on?\n\n- Last month\n- Last quarter\n- All time";
+} else {
+  // Show qa_pairs first, offer meetings as follow-up
+  const qaPairResults = await storage.searchQaPairsByKeyword(...);
+  // ... existing logic
+}
+2. Confusing Offer Text
+Current (line 817):
+
+responseText += "\n\n_Want me to dig deeper? I can search meeting transcripts if you specify a time range. I can also check Slack..._";
+Problem: "Dig deeper" implies the qa_pairs results are insufficient, even when they're comprehensive.
+
+Better:
+
+if (qaPairResults.length < 5) {
+  // Sparse results - suggest alternatives
+  responseText += "\n\n_This is what I found in Q&A records. For more context, I can search full meeting transcripts (specify a time range) or check Slack for internal discussions._";
+} else {
+  // Good results - offer as optional enhancement
+  responseText += "\n\n_Need more detail? I can also search full meeting transcripts or Slack discussions._";
+}
+3. Missing Confidence Signal
+Users don't know if the qa_pairs results are:
+
+Complete and authoritative
+A quick preview that needs follow-up
+Potentially missing important context
+Recommendation: Add a confidence indicator:
+
+if (qaPairResults.length >= 10 && companiesWithResults.length >= 3) {
+  responseText = `Here's what customers have been asking about *${topics}* (${qaPairResults.length} questions across ${companiesWithResults.length} companies):\n\n`;
+  // Don't offer meeting search - results are comprehensive
+} else if (qaPairResults.length > 0) {
+  responseText = `Here's a quick look at what customers asked about *${topics}* (${qaPairResults.length} questions):\n\n`;
+  // Offer meeting search for more depth
+} else {
+  // Existing empty results handling
+}
+4. Pending Offer State Management
+Current Issue: The pendingOffer: "meeting_search" is stored in interaction metadata, but there's no timeout or expiration.
+
+Scenario:
+
+Bot shows qa_pairs results with offer: "Want me to search meetings?"
+User asks a completely different question
+Bot still thinks there's a pending meeting search offer
+Recommendation: Add offer expiration:
+
+{
+  pendingOffer: "meeting_search",
+  offerExpiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+}
+Then in handleMeetingSearchOfferResponse:
+
+if (ctx.pendingOffer !== "meeting_search" || 
+    (ctx.offerExpiresAt && Date.now() > ctx.offerExpiresAt)) {
+  return { handled: false };
+}
+Updated Verdict
+Fallback Logic: GOOD PATTERN, NEEDS REFINEMENT 🟡
+
+The core idea is solid - provide immediate value while offering deeper search. The issues are:
+
+Doesn't detect when user explicitly wants meetings (not qa_pairs)
+Offer text doesn't adapt to result quality
+No confidence signaling to help users decide if they need more
+Pending offers don't expire
+These are polish issues, not architectural problems. The fallback itself is a smart UX decision.
