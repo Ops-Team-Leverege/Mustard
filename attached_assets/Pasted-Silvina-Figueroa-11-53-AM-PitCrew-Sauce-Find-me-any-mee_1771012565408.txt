@@ -1,0 +1,36 @@
+Silvina Figueroa  [11:53 AM]
+@PitCrew Sauce Find me any meetings with Discount Tire & Service Center where we talked about camera placement, and give me the dates of those meetings
+5 repliesPitCrew Sauce  [11:53 AM]
+Got it, @Silvina Figueroa — looking into it...
+[11:53 AM]On December 9, 2025, camera placement was discussed, specifically regarding a hardwired camera at store 42 that might block a bay when a car is on the lift. Chris Corwin mentioned exploring options for adjusting the camera's vertical angle or elevation.
+"Obviously, I can try to see if there's any more vertical angle to that camera. If there's a way for me to be able to just give you some more elevation to it, um that is an option if that gives us a little bit better angle to what we need." — Chris Corwin
+
+Source: PitCrew Meeting Transcripts (synthesized by Gemini 2.5 Flash)
+
+I can also check Slack for any internal discussions about this — would you like me to? (edited) 
+Silvina Figueroa  [11:54 AM]
+@PitCrew Sauce Yes check Slack. Look for conversations involving Calum or Credd
+PitCrew Sauce  [11:54 AM]
+Let me take a look, @Silvina Figueroa...
+[11:54 AM]For Discount Tire & Service Center (DTSC), camera placement issues have been discussed, particularly involving Calum and Credd.
+
+Why This Answer:
+The discussions focused on camera placement adjustments at DTSC to optimize bay coverage and address performance issues due to current camera angles. This is critical for ensuring accurate service tracking and avoiding blocked views in certain bays.
+
+Key Details:
+- Corey Chang noted that at store 42, DTSC adjusted camera angles but did not move cameras from their installed positions. This resulted in visibility issues for several bays: Bays 3, 6, and 7 are completely blocked when cars are on adjacent lifts, and Bay 2 has partial visibility issues [Message 11].
+- Calum and Credd were involved in discussions about these adjustments, with Calum expressing concerns about convincing DTSC to make significant camera moves. The suggestion was to potentially exclude certain bays from the pilot due to these issues [Message 18].
+- There was also a mention of previous confusion with Chris at DTSC regarding camera adjustments, indicating ongoing communication challenges in implementing the necessary changes [Message 2].
+
+General Context:
+Camera placement is crucial for accurate queue analytics and foot traffic monitoring, typically requiring strategic positioning to avoid obstructions and ensure comprehensive coverage. This is a common challenge in service centers where space and layout can vary significantly.
+
+References:
+- Message 11 from #pitcrew_collaboration by corey.chang (Feb 13, 2026) [Link](https://leverege.slack.com/archives/C08GT0T2YRH/p1770996230136389?thread_ts=1770993788.924149)
+- Message 18 from #pitcrew_collaboration by corey.chang (Feb 13, 2026) [Link](https://leverege.slack.com/archives/C08GT0T2YRH/p1771003469664979?thread_ts=1770993788.924149)
+- Message 2 from #pitcrew_collaboration by calum (Feb 13, 2026) [Link](https://leverege.slack.com/archives/C08GT0T2YRH/p1770993788924149?thread_ts=1770993788.924149)
+
+Searched 3 channels, found 20 messages  
+Confidence: High based on specific discussions involving DTSC camera placement issues.
+
+Source: Slack Messages (edited)
