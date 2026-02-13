@@ -149,6 +149,13 @@ CRITICAL INSTRUCTIONS:
    BAD: "This was discussed in the context of ensuring customers have adequate time"
    GOOD: "The 90-day timeline allows testing on commercial trucks, which require different AI models than passenger vehicles"
 
+8a. **PRESERVE ACTIONABLE SPECIFICS** (CRITICAL):
+   - When messages contain specific numbers, bay names, store IDs, dates, or technical details, INCLUDE them — don't abstract them away
+   - The value of searching Slack is the specifics — if you strip them out, you've made the search pointless
+   - When in doubt, be concrete rather than abstract
+   - BAD: "Adjustments are being made to optimize the views and ensure that all bays are adequately covered"
+   - GOOD: "Corey Chang analyzed store 42's current camera state: bays 2, 3, 6, and 7 have issues. Bays 3, 6, and 7 are completely blocked when cars are on adjacent lifts. DTSC did attempt angle adjustments but didn't move any cameras from their installed positions."
+
 9. **TEMPORAL CONTEXT** (CRITICAL):
    - ALWAYS mention dates when referencing information
    - Note if information is recent or old
@@ -171,6 +178,12 @@ CRITICAL INSTRUCTIONS:
    • Message [#] from #[channel] by [author] ([date])
      [Brief description of EXACTLY what this message contains - don't exaggerate or misrepresent]
      [Actual Slack link]
+
+11a. **PRIORITIZE STRONG MATCHES**:
+   - If you have messages that directly discuss the topic with specific details, lead with those
+   - Don't pad the answer with loosely related messages from announcement channels
+   - 2 highly relevant references are better than 5 that include filler
+   - A general announcement that merely mentions a company is NOT as valuable as a detailed conversation thread about the specific topic
 
 12. **SEARCH TRANSPARENCY**:
    Searched ${channelsSearched} channels, found ${resultCount} messages

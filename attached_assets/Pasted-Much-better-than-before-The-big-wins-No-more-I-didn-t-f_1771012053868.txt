@@ -1,0 +1,27 @@
+Much better than before. The big wins:
+
+No more "I didn't find anything specific" — it correctly identified DTSC-specific camera placement content and led with it
+Message 12 is the right message — that's Corey Chang's bay-by-bay breakdown of camera angle issues at store 42, which is directly what Calum was looking for
+Confidence: High — appropriate given it found direct matches
+
+A few things I'd flag:
+The answer is too vague given what's actually in the messages. It says "camera models and placements are still being adjusted" and "adjustments are being made to optimize the views." But the actual Slack messages contain very specific detail — Corey's analysis that bays 3, 6, and 7 are blocked when adjacent cars are on lifts, that DTSC attempted adjustments but only changed angles without moving cameras, and that half the bays at store 42 will have significant performance issues. That specificity is what makes the Slack search valuable. The synthesis is summarizing too much and losing the actionable detail.
+Message 1 is a weak reference. A general announcement about pilot status from #pitcrew_announcements is loosely related at best. The synthesis should have pulled from the richer threads — like Calum's original question to Credd about whether Chris already made the camera adjustments, or Credd's Nov 21 comment that "the views at 42 are painful." Those are more directly relevant to camera placement at DTSC involving Calum and Credd.
+Missing the historical context. The user asked for conversations involving Calum or Credd. There's a Nov 21 thread where Calum scheduled a camera mapping call with Chris and Credd said he'd join, plus Credd flagging the need for camera adjustments. That history would give a fuller picture.
+So the routing and relevance check are working now — the right fix. The next improvement would be getting the synthesis to be more specific rather than abstracting away the useful details.How would you recommend improving this?11:46 AMThe synthesis prompt already has section 8 ("AVOID VAGUE FILLER") but it's focused on rationale language, not detail language. The LLM is following the structure correctly — Direct Answer → Why → Key Details → References — but it's summarizing where it should be quoting specifics.
+I'd add a new instruction to the synthesis prompt, something like:
+"PRESERVE ACTIONABLE SPECIFICS":
+
+When messages contain specific numbers, bay names, store IDs, dates, or technical details, include them — don't abstract them away
+BAD: "Adjustments are being made to optimize the views and ensure that all bays are adequately covered"
+GOOD: "Corey Chang analyzed store 42's current camera state: bays 2, 3, 6, and 7 have issues. Bays 3, 6, and 7 are completely blocked when cars are on adjacent lifts. DTSC did attempt angle adjustments but didn't move any cameras from their installed positions."
+The value of searching Slack is the specifics — if you strip them out, you've made the search pointless
+When in doubt, be concrete rather than abstract
+
+This pairs with the existing topic relevance check. Right now the prompt tells the LLM what to include (relevant messages) and what to exclude (off-topic messages). This would tell it how to include — preserve the detail instead of flattening it.
+The other thing is the weak Message 1 reference. The prompt already says "ONLY cite messages from the list above" but it doesn't say anything about prioritizing strong matches over weak ones. I'd add to the references section:
+"PRIORITIZE STRONG MATCHES":
+
+If you have messages that directly discuss the topic with specific details, lead with those
+Don't pad the answer with loosely related messages from announcement channels
+2 highly relevant references are better than 5 that include filler
