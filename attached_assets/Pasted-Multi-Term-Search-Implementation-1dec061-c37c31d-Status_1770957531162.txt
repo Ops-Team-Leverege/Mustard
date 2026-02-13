@@ -1,0 +1,96 @@
+Multi-Term Search Implementation (1dec061 + c37c31d)
+Status: CRITICAL BUG 🚨
+
+The Good: Intent & Design
+Smart Idea: Instead of searching for "what are customers saying about TVs" as a single phrase, split it into individual terms: ["what", "are", "customers", "saying", "about", "TVs"] and search for ANY match.
+
+Why This Makes Sense:
+
+User asks: "what are customers saying about TVs?"
+Decision Layer extracts topics: ["TVs", "customer feedback"]
+Old approach: search for "TVs customer feedback" (exact phrase) → misses "TV" or "television"
+New approach: search for ["TVs", "customer", "feedback"] individually → catches more results
+The Bad: SQL Injection Vulnerability 🚨
+DbStorage Implementation (lines 2520-2530):
+
+const conditions = terms.map((_, i) => `(q.question ILIKE ${i + 1} OR q.answer ILIKE ${i + 1})`);
+//                                                          ^^^^^^^^^ MISSING $ SIGN!
+const whereClause = conditions.join(" OR ");
+What's Wrong: The placeholders are missing the $ prefix. This generates invalid SQL:
+
+WHERE (q.question ILIKE 1 OR q.answer ILIKE 1) OR (q.question ILIKE 2 OR q.answer ILIKE 2)
+--                      ^ Should be $1          ^ Should be $1        ^ Should be $2
+Correct Code:
+
+const conditions = terms.map((_, i) => `(q.question ILIKE $${i + 1} OR q.answer ILIKE $${i + 1})`);
+//                                                          ^^                          ^^
+Impact:
+
+This query will fail at runtime with a SQL syntax error
+Every qa_pairs search will crash
+Users will see error messages instead of results
+How This Wasn't Caught:
+
+No tests for the multi-term search
+Likely not tested in production yet
+TypeScript can't catch SQL string errors
+The Bad: LIMIT Placeholder Bug 🚨
+Line 2532:
+
+
+LIMIT ${terms.length + 1}`,
+//    ^^ String interpolation instead of placeholder!
+What's Wrong: The LIMIT should use a placeholder ($N), not string interpolation. This is inconsistent with the parameterized query pattern.
+
+Correct Code:
+
+const results = await this.rawQuery(
+  `SELECT c.name AS company, q.question, q.answer
+   FROM qa_pairs q
+   JOIN companies c ON q.company_id = c.id
+   WHERE ${whereClause}
+   ORDER BY q.created_at DESC
+   LIMIT $${terms.length + 1}`,
+  params
+);
+Impact:
+
+This actually works (string interpolation is valid SQL)
+But it's inconsistent with the parameterized query pattern
+Opens the door to SQL injection if terms.length is ever user-controlled (it's not currently, but bad practice)
+The Ugly: OR Logic May Be Too Broad
+Current Logic:
+
+WHERE (q.question ILIKE '%TV%' OR q.answer ILIKE '%TV%') 
+   OR (q.question ILIKE '%customer%' OR q.answer ILIKE '%customer%')
+   OR (q.question ILIKE '%feedback%' OR q.answer ILIKE '%feedback%')
+Problem: This returns results if ANY term matches. So:
+
+User asks: "what are customers saying about TVs?"
+Topics: ["TVs", "customer", "feedback"]
+Query matches: "What's the customer onboarding process?" (has "customer")
+Result: Irrelevant results about onboarding, not TVs
+Better Approach: Use AND logic for topic terms, OR logic within each term:
+
+WHERE (q.question ILIKE '%TV%' OR q.answer ILIKE '%TV%')
+  AND (q.question ILIKE '%customer%' OR q.answer ILIKE '%customer%')
+  AND (q.question ILIKE '%feedback%' OR q.answer ILIKE '%feedback%')
+Or Even Better: Prioritize the first term (main topic) and make others optional:
+
+WHERE (q.question ILIKE '%TV%' OR q.answer ILIKE '%TV%')  -- Required
+  AND (
+    q.question ILIKE '%customer%' OR q.answer ILIKE '%customer%'
+    OR q.question ILIKE '%feedback%' OR q.answer ILIKE '%feedback%'
+  )  -- At least one supporting term
+The Confusing: MemStorage vs DbStorage Mismatch
+MemStorage (line 1163):
+
+return terms.some(t => q.includes(t) || a.includes(t));
+// Uses .some() = OR logic
+DbStorage (line 2522):
+
+const whereClause = conditions.join(" OR ");
+// Also OR logic
+Good: Both implementations use the same logic (OR).
+
+Bad: OR logic is probably wrong for multi-term topic searches (see above).
