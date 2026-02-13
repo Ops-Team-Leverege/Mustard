@@ -127,8 +127,8 @@ export const MODEL_ASSIGNMENTS = {
   PROGRESS_MESSAGES: LLM_MODELS.FAST_CLASSIFICATION,
   DOCUMENT_TITLE_GENERATION: LLM_MODELS.FAST_CLASSIFICATION,
 
-  // Slack Search - Fast for query extraction, standard for synthesis
-  SLACK_QUERY_EXTRACTION: LLM_MODELS.FAST_CLASSIFICATION,
+  // Slack Search - Standard reasoning for both extraction and synthesis
+  SLACK_QUERY_EXTRACTION: LLM_MODELS.STANDARD_REASONING,
   SLACK_SEARCH_SYNTHESIS: LLM_MODELS.STANDARD_REASONING,
 
   // Semantic Search & RAG - Standard for quality semantic matching
