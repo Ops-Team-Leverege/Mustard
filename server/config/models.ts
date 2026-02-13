@@ -129,7 +129,7 @@ export const MODEL_ASSIGNMENTS = {
 
   // Slack Search - Fast for query extraction, standard for synthesis
   SLACK_QUERY_EXTRACTION: LLM_MODELS.FAST_CLASSIFICATION,
-  SLACK_SEARCH_SYNTHESIS: LLM_MODELS.FAST_CLASSIFICATION,
+  SLACK_SEARCH_SYNTHESIS: LLM_MODELS.STANDARD_REASONING,
 
   // Semantic Search & RAG - Standard for quality semantic matching
   ARTIFACT_SEARCH: LLM_MODELS.STANDARD_REASONING,
