@@ -76,7 +76,11 @@ export function getSourceAttribution(ctx: SourceAttributionContext): string {
     return `\n\n_Source: PitCrew Meeting Transcripts (synthesized by ${model})_`;
   }
 
-  const transcriptSources = ["transcript", "summary", "binary_answer", "qa_pairs", "action_items", "attendees", "meeting_artifacts"];
+  if (dataSource === "qa_pairs" && SOURCE_ATTRIBUTION_CONFIG.transcripts_artifacts) {
+    return `\n\n_Source: Meeting Customer Questions_`;
+  }
+
+  const transcriptSources = ["transcript", "summary", "binary_answer", "action_items", "attendees", "meeting_artifacts"];
   if (dataSource && transcriptSources.includes(dataSource) && SOURCE_ATTRIBUTION_CONFIG.transcripts_artifacts) {
     return `\n\n_Source: PitCrew Meeting Transcripts_`;
   }
