@@ -139,6 +139,10 @@ export const STREAMING = {
   MIN_CONTENT_FOR_UPDATE: 100,
 } as const;
 
+export const OFFER_CONSTANTS = {
+  EXPIRY_MS: 5 * 60 * 1000,
+} as const;
+
 export const BATCH_CONSTANTS = {
   /**
    * Default batch size for processing operations.

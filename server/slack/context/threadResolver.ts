@@ -7,6 +7,7 @@
 
 import { storage } from "../../storage";
 import type { ThreadContext } from "../../mcp/context";
+import { OFFER_CONSTANTS } from "../../config/constants";
 
 export interface ThreadResolutionResult {
   threadContext?: ThreadContext;
@@ -103,11 +104,9 @@ export async function resolveThreadContext(
     const lastResponseType = (contextLayers?.lastResponseType as string) || null;
 
     // Surface pending offer from interaction metadata for follow-up handling
-    // Refinement 4: Expire offers after 5 minutes to prevent stale state
-    const OFFER_EXPIRY_MS = 5 * 60 * 1000;
     let pendingOfferValue = (resolution?.pendingOffer as string) || null;
     const offerTimestamp = (resolution?.offerTimestamp as number) || null;
-    if (pendingOfferValue && offerTimestamp && (Date.now() - offerTimestamp > OFFER_EXPIRY_MS)) {
+    if (pendingOfferValue && offerTimestamp && (Date.now() - offerTimestamp > OFFER_CONSTANTS.EXPIRY_MS)) {
       console.log(`[ThreadResolver] Pending offer "${pendingOfferValue}" expired (age: ${Math.round((Date.now() - offerTimestamp) / 1000)}s)`);
       pendingOfferValue = null;
     }
