@@ -288,7 +288,8 @@ Respond with JSON: {
   "requiresStyleMatching": true/false,
   "isAmbiguous": true/false,
   "conversationContext": "what is this conversation about?",
-  "keyTopics": ["searchable_term1", "searchable_term2"],  // Extract the concrete subject terms the user is asking about. These are used for database keyword search. Include the user's actual topic phrases (e.g. "TV issues", "pricing", "warranty"). Do NOT include generic meta-descriptors that aren't part of the user's topic (e.g. don't add "customer feedback" or "opinions" unless the user specifically asked about those). Keep terms short (1-3 words) for better search matching.
+  "keyTopics": ["topic1", "topic2"],  // The user's actual topic phrases (e.g. "TV issues", "pricing concerns"). Used for display/labeling.
+  "searchKeywords": ["keyword1", "keyword2", "synonym1"],  // Database search terms: include the core nouns from keyTopics PLUS semantic synonyms, related terms, and alternate phrasings that might appear in meeting transcripts. For "TV issues" → ["TV", "display", "screen", "monitor", "troubleshooting"]. For "pricing concerns" → ["pricing", "cost", "price", "budget", "quote"]. Keep each term 1-2 words. Include 3-8 terms total for good coverage.
   "shouldProceed": true/false,
   "clarificationSuggestion": "specific clarification if ambiguous"
 }

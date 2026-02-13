@@ -532,6 +532,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       console.log(`    - Is Ambiguous: ${decisionLayerResult.isAmbiguous ? 'yes' : 'no'}`);
       console.log(`    - Conversation Context: ${decisionLayerResult.conversationContext || 'none'}`);
       console.log(`    - Key Topics: ${decisionLayerResult.keyTopics ? decisionLayerResult.keyTopics.join(', ') : 'none'}`);
+      console.log(`    - Search Keywords: ${decisionLayerResult.searchKeywords ? decisionLayerResult.searchKeywords.join(', ') : 'none'}`);
       console.log(`    - Should Proceed: ${decisionLayerResult.shouldProceed !== false ? 'yes' : 'no'}`);
       console.log(`    - Clarification Suggestion: ${decisionLayerResult.clarificationSuggestion || 'none'}`);
 
@@ -773,21 +774,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
           // Default: search qa_pairs first, offer meetings as follow-up
           console.log(`[Slack] Aggregate fallback (qa_pairs_first) - searching qa_pairs by topic before meeting search`);
 
-          // Expand multi-word topics: search for full phrase + individual words
-          // e.g. "TV issues" → ["TV issues", "TV"] (captures both exact phrase and partial matches)
-          const expandedTerms = new Set<string>();
-          for (const term of searchTerms) {
-            expandedTerms.add(term);
-            const words = term.split(/\s+/).filter(w => w.length > 1);
-            if (words.length > 1) {
-              for (const word of words) {
-                expandedTerms.add(word);
-              }
-            }
-          }
-          const finalSearchTerms = Array.from(expandedTerms);
-          console.log(`[Slack] qa_pairs search terms (original): ${JSON.stringify(searchTerms)}`);
-          console.log(`[Slack] qa_pairs search terms (expanded): ${JSON.stringify(finalSearchTerms)}`);
+          // Use LLM-generated searchKeywords (semantic synonyms) for broad retrieval
+          // Falls back to keyTopics → raw text if searchKeywords not available
+          const llmSearchKeywords = decisionLayerResult.searchKeywords || [];
+          const finalSearchTerms = llmSearchKeywords.length > 0 ? llmSearchKeywords : searchTerms;
+          console.log(`[Slack] qa_pairs search terms (keyTopics): ${JSON.stringify(searchTerms)}`);
+          console.log(`[Slack] qa_pairs search terms (LLM searchKeywords): ${JSON.stringify(llmSearchKeywords)}`);
+          console.log(`[Slack] qa_pairs search terms (final): ${JSON.stringify(finalSearchTerms)}`);
 
           try {
             const qaPairResults = await storage.searchQaPairsByKeyword(finalSearchTerms, 30);
@@ -806,15 +799,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
               }
 
               // Refinement 3: Confidence signaling based on result quality
-              const isComprehensive = qaPairResults.length >= 10 && companiesWithResults.length >= 3;
+              const isComprehensive = rankedResults.length >= 10 && companiesWithResults.length >= 3;
               const topicLabel = topics.join(", ") || searchTerms.join(", ");
               const searchedForLabel = finalSearchTerms.map(t => `"${t}"`).join(", ");
 
               let formattedAnswer: string;
               if (isComprehensive) {
-                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${qaPairResults.length} questions across ${companiesWithResults.length} companies):\n_Searched for: ${searchedForLabel}_\n\n`;
+                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${rankedResults.length} questions across ${companiesWithResults.length} companies):\n_Searched for: ${searchedForLabel}_\n\n`;
               } else {
-                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${qaPairResults.length} ${qaPairResults.length === 1 ? "question" : "questions"}):\n_Searched for: ${searchedForLabel}_\n\n`;
+                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${rankedResults.length} ${rankedResults.length === 1 ? "question" : "questions"}):\n_Searched for: ${searchedForLabel}_\n\n`;
               }
 
               for (const [company, pairs] of Array.from(grouped.entries())) {

@@ -110,6 +110,7 @@ export type IntentClassificationResult = {
   isAmbiguous?: boolean;                           // True if multiple companies mentioned
   conversationContext?: string;                     // What is this conversation about?
   keyTopics?: string[];                            // Key topics being discussed
+  searchKeywords?: string[];                       // LLM-generated database search terms (includes synonyms/related terms)
   shouldProceed?: boolean;                         // Should we proceed without clarification?
   clarificationSuggestion?: string;               // Specific clarification message if ambiguous
   requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
@@ -484,6 +485,7 @@ async function classifyByLLM(
         isAmbiguous: parsed.isAmbiguous || false,
         conversationContext: parsed.conversationContext || undefined,
         keyTopics: parsed.keyTopics || undefined,
+        searchKeywords: parsed.searchKeywords || undefined,
         shouldProceed: parsed.shouldProceed !== false, // Default to true unless explicitly false
         clarificationSuggestion: parsed.clarificationSuggestion || undefined,
         requiresSemantic: parsed.requiresSemantic ?? undefined, // LLM-determined semantic processing flag

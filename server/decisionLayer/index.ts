@@ -112,6 +112,7 @@ export type DecisionLayerResult = {
   isAmbiguous?: boolean;                           // True if multiple companies mentioned
   conversationContext?: string;                     // What is this conversation about?
   keyTopics?: string[];                            // Key topics being discussed
+  searchKeywords?: string[];                       // LLM-generated database search terms (includes synonyms/related terms)
   shouldProceed?: boolean;                         // Should we proceed without clarification?
   clarificationSuggestion?: string;               // Specific clarification message if ambiguous
   requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
@@ -321,6 +322,7 @@ export async function runDecisionLayer(
     isAmbiguous: intentResult.isAmbiguous,
     conversationContext: intentResult.conversationContext,
     keyTopics: intentResult.keyTopics,
+    searchKeywords: intentResult.searchKeywords,
     shouldProceed: intentResult.shouldProceed,
     clarificationSuggestion: intentResult.clarificationSuggestion,
     requiresSemantic: intentResult.requiresSemantic,
