@@ -96,9 +96,21 @@ async function rerankQaPairsByRelevance(
     const content = response.choices[0]?.message?.content;
     if (!content) return results.slice(0, limit);
 
-    const parsed = JSON.parse(content);
-    const indices: number[] = parsed.relevant_indices || [];
-    const reranked = indices
+    let parsed: any;
+    try {
+      parsed = JSON.parse(content);
+    } catch (parseErr) {
+      console.error(`[Slack] LLM re-ranking JSON parse failed:`, parseErr, `Content: ${content}`);
+      return results.slice(0, limit);
+    }
+
+    if (!Array.isArray(parsed.relevant_indices)) {
+      console.warn(`[Slack] LLM re-ranking returned non-array: ${JSON.stringify(parsed)}`);
+      return results.slice(0, limit);
+    }
+
+    const indices: number[] = parsed.relevant_indices;
+    const reranked = [...new Set(indices)]
       .filter(i => i >= 0 && i < results.length)
       .map(i => results[i])
       .slice(0, limit);
