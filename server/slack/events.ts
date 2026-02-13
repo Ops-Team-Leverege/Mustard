@@ -110,7 +110,13 @@ async function rerankQaPairsByRelevance(
     }
 
     const indices: number[] = parsed.relevant_indices;
-    const reranked = [...new Set(indices)]
+    const seen = new Set<number>();
+    const uniqueIndices = indices.filter(i => {
+      if (seen.has(i)) return false;
+      seen.add(i);
+      return true;
+    });
+    const reranked = uniqueIndices
       .filter(i => i >= 0 && i < results.length)
       .map(i => results[i])
       .slice(0, limit);

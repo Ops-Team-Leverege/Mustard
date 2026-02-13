@@ -3,6 +3,7 @@ import type { Category } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "./config/models";
 import { TRANSCRIPT_ANALYZER_SYSTEM_PROMPT, buildTranscriptAnalysisPrompt } from "./config/prompts";
 import { TIMEOUT_CONSTANTS, MEETING_CONSTANTS } from "./config/constants";
+import { parseTranscriptTurns } from "./ingestion/ingestTranscriptChunks";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -45,43 +46,37 @@ export interface AnalysisResult {
   posSystem: POSSystemResult | null;
 }
 
-// Split transcript into chunks at natural boundaries
-function splitTranscriptIntoChunks(transcript: string, maxChunkSize: number = MEETING_CONSTANTS.MAX_CHUNK_SIZE): string[] {
-  // If transcript is small enough, return as single chunk
+function splitTranscriptByTurns(transcript: string, maxChunkSize: number = MEETING_CONSTANTS.MAX_CHUNK_SIZE): string[] {
   if (transcript.length <= maxChunkSize) {
     return [transcript];
   }
 
+  const turns = parseTranscriptTurns(transcript);
+
+  if (turns.length === 0) {
+    return [transcript];
+  }
+
   const chunks: string[] = [];
-  let remainingText = transcript;
+  let currentChunkTurns: string[] = [];
+  let currentLength = 0;
 
-  while (remainingText.length > 0) {
-    if (remainingText.length <= maxChunkSize) {
-      chunks.push(remainingText);
-      break;
+  for (const turn of turns) {
+    const turnText = `${turn.speakerName}: ${turn.content}`;
+    const turnLength = turnText.length + 1;
+
+    if (currentLength + turnLength > maxChunkSize && currentChunkTurns.length > 0) {
+      chunks.push(currentChunkTurns.join("\n"));
+      currentChunkTurns = [];
+      currentLength = 0;
     }
 
-    // Try to split at a paragraph boundary (double newline)
-    let splitIndex = remainingText.lastIndexOf('\n\n', maxChunkSize);
+    currentChunkTurns.push(turnText);
+    currentLength += turnLength;
+  }
 
-    // If no paragraph boundary, try single newline
-    if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
-      splitIndex = remainingText.lastIndexOf('\n', maxChunkSize);
-    }
-
-    // If still no good split point, try a period with space
-    if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
-      splitIndex = remainingText.lastIndexOf('. ', maxChunkSize);
-      if (splitIndex !== -1) splitIndex += 1; // Include the period
-    }
-
-    // If still nothing, just split at maxChunkSize
-    if (splitIndex === -1 || splitIndex < maxChunkSize * 0.7) {
-      splitIndex = maxChunkSize;
-    }
-
-    chunks.push(remainingText.substring(0, splitIndex).trim());
-    remainingText = remainingText.substring(splitIndex).trim();
+  if (currentChunkTurns.length > 0) {
+    chunks.push(currentChunkTurns.join("\n"));
   }
 
   return chunks;
@@ -158,7 +153,7 @@ async function analyzeTranscriptChunk(
 export async function analyzeTranscript(
   input: TranscriptAnalysisInput
 ): Promise<AnalysisResult> {
-  const chunks = splitTranscriptIntoChunks(input.transcript);
+  const chunks = splitTranscriptByTurns(input.transcript);
   const contentType = input.contentType || "transcript";
 
   console.log(`Analyzing ${contentType} in ${chunks.length} chunk(s)...`);
