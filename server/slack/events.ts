@@ -814,12 +814,17 @@ export async function slackEventsHandler(req: Request, res: Response) {
               const isComprehensive = rankedResults.length >= 10 && companiesWithResults.length >= 3;
               const topicLabel = topics.join(", ") || searchTerms.join(", ");
               const searchedForLabel = finalSearchTerms.map(t => `"${t}"`).join(", ");
+              const totalFound = qaPairResults.length;
+              const shownCount = rankedResults.length;
+              const countLabel = shownCount < totalFound
+                ? `${shownCount} most relevant out of ${totalFound} matches`
+                : `${shownCount} ${shownCount === 1 ? "match" : "matches"}`;
 
               let formattedAnswer: string;
               if (isComprehensive) {
-                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${rankedResults.length} questions across ${companiesWithResults.length} companies):\n_Searched for: ${searchedForLabel}_\n\n`;
+                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${countLabel} across ${companiesWithResults.length} companies):\n_Searched for: ${searchedForLabel}_\n\n`;
               } else {
-                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${rankedResults.length} ${rankedResults.length === 1 ? "question" : "questions"}):\n_Searched for: ${searchedForLabel}_\n\n`;
+                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${countLabel}):\n_Searched for: ${searchedForLabel}_\n\n`;
               }
 
               for (const [company, pairs] of Array.from(grouped.entries())) {
