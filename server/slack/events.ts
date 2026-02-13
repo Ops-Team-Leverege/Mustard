@@ -748,9 +748,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
             console.log(`[Slack] qa_pairs search returned ${qaPairResults.length} results`);
 
             if (qaPairResults.length > 0) {
-              const companiesWithResults = Array.from(new Set(qaPairResults.map(r => r.company)));
-              const grouped = new Map<string, typeof qaPairResults>();
-              for (const r of qaPairResults) {
+              // Relevance ranking: sort by number of matching search terms (most relevant first)
+              const rankedResults = [...qaPairResults].sort((a, b) => {
+                const score = (r: typeof a) => {
+                  const text = `${r.question} ${r.answer || ""}`.toLowerCase();
+                  return finalSearchTerms.reduce((count, term) => 
+                    count + (text.includes(term.toLowerCase()) ? 1 : 0), 0);
+                };
+                return score(b) - score(a);
+              });
+
+              const companiesWithResults = Array.from(new Set(rankedResults.map(r => r.company)));
+              const grouped = new Map<string, typeof rankedResults>();
+              for (const r of rankedResults) {
                 const existing = grouped.get(r.company) || [];
                 existing.push(r);
                 grouped.set(r.company, existing);
