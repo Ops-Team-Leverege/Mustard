@@ -46,7 +46,7 @@ export type SingleMeetingResult = {
   intent: "extractive" | "aggregative" | "summary" | "drafting";
   dataSource: "attendees" | "qa_pairs" | "action_items" | "transcript" | "summary" | "semantic" | "not_found" | "clarification" | "binary_answer";
   evidence?: string;
-  pendingOffer?: "summary" | "slack_search";
+  pendingOffer?: "summary" | "slack_search" | "meeting_search";
   semanticAnswerUsed?: boolean;
   semanticConfidence?: "high" | "medium" | "low";
   semanticError?: string;

@@ -156,6 +156,9 @@ export interface IStorage {
   // Q&A Pairs - meeting-scoped lookup (no product required, for bot/Slack pipeline)
   getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
 
+  // Q&A Pairs - keyword search across all companies (for aggregate topic queries)
+  searchQaPairsByKeyword(keyword: string, limit?: number): Promise<Array<{ company: string; question: string; answer: string | null }>>;
+
   // Meeting Action Items (read-only artifact, materialized at ingestion)
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
   createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]>;
@@ -1150,6 +1153,14 @@ export class MemStorage implements IStorage {
     return Array.from(this.qaPairs.values())
       .filter(qa => qa.transcriptId === transcriptId)
       .map(qa => ({ ...qa, categoryName: null, contactName: null, contactJobTitle: null, transcriptDate: null }));
+  }
+
+  async searchQaPairsByKeyword(keyword: string, limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
+    const lower = keyword.toLowerCase();
+    return Array.from(this.qaPairs.values())
+      .filter(qa => qa.question.toLowerCase().includes(lower) || (qa.answer && qa.answer.toLowerCase().includes(lower)))
+      .slice(0, limit)
+      .map(qa => ({ company: qa.company || "Unknown", question: qa.question, answer: qa.answer }));
   }
 
   async getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]> {
@@ -2495,6 +2506,23 @@ export class DbStorage implements IStorage {
       contactName: r.contactName || null,
       contactJobTitle: r.contactJobTitle || null,
       transcriptDate: r.transcriptDate || null,
+    }));
+  }
+
+  async searchQaPairsByKeyword(keyword: string, limit = 50): Promise<Array<{ company: string; question: string; answer: string | null }>> {
+    const results = await this.rawQuery(
+      `SELECT c.name AS company, q.question, q.answer
+       FROM qa_pairs q
+       JOIN companies c ON q.company_id = c.id
+       WHERE q.question ILIKE $1 OR q.answer ILIKE $1
+       ORDER BY q.created_at DESC
+       LIMIT $2`,
+      [`%${keyword}%`, limit]
+    );
+    return results.map((r: any) => ({
+      company: r.company as string,
+      question: r.question as string,
+      answer: (r.answer as string) || null,
     }));
   }
 

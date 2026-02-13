@@ -117,6 +117,7 @@ export type DecisionLayerResult = {
   requiresSemantic?: boolean;                      // LLM-determined: does question need semantic transcript processing?
   requiresProductKnowledge?: boolean;              // LLM-determined: should response be enriched with PitCrew product data from Airtable?
   requiresStyleMatching?: boolean;                 // LLM-determined: should output match PitCrew's existing feature description style?
+  aggregateFallback?: "qa_pairs_first";            // When set, use qa_pairs keyword search before falling back to meeting search
 };
 
 // Backward compatibility alias
@@ -251,6 +252,7 @@ export async function runDecisionLayer(
   // This scope is passed downstream to avoid regex re-detection in meeting resolver
   let scopeInfo: DecisionLayerResult["scope"];
   let scopeNote: string | undefined;
+  let useAggregateFallback = false;
 
   if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question, threadContext);
@@ -275,34 +277,12 @@ export async function runDecisionLayer(
       const meetingCountRows = await storage.rawQuery(`SELECT COUNT(*) as cnt FROM transcripts`);
       const meetingCount = Number(meetingCountRows?.[0]?.cnt) || 0;
 
-      const clarifyMessage = shouldAskForTimeRange(specificity.hasTimeRange, meetingCount);
+      useAggregateFallback = !specificity.hasTimeRange && meetingCount > MEETING_CONSTANTS.CLARIFICATION_THRESHOLD;
 
-      if (clarifyMessage) {
-        console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Requesting Clarification:`);
-        console.log(`  Reason: Too many meetings (${meetingCount}) without time range`);
-        console.log(`  Clarify Message: "${clarifyMessage.substring(0, 100)}..."`);
-
-        return {
-          intent: Intent.CLARIFY,
-          intentDetectionMethod: "aggregate_scope_check",
-          contextLayers: layersMeta.layers,
-          answerContract: contractResult.contract,
-          contractSelectionMethod: contractResult.contractSelectionMethod,
-          clarifyMessage,
-          proposedInterpretation: {
-            intent: intentResult.intent.toString(),
-            contracts: [contractResult.contract.toString()],
-            summary: "Aggregate analysis - awaiting scope",
-          },
-          scope: scopeInfo,
-          extractedCompany: intentResult.extractedCompany,
-          extractedCompanies: intentResult.extractedCompanies,
-          isAmbiguous: intentResult.isAmbiguous,
-          conversationContext: intentResult.conversationContext,
-          keyTopics: intentResult.keyTopics,
-          shouldProceed: intentResult.shouldProceed,
-          clarificationSuggestion: intentResult.clarificationSuggestion,
-        };
+      if (useAggregateFallback) {
+        console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Aggregate Fallback (qa_pairs_first):`);
+        console.log(`  Reason: Too many meetings (${meetingCount}) without time range — will try qa_pairs first`);
+        console.log(`  Key Topics: ${intentResult.keyTopics ? intentResult.keyTopics.join(', ') : 'none'}`);
       }
     }
 
@@ -314,7 +294,7 @@ export async function runDecisionLayer(
     ?.map(c => AnswerContract[c as keyof typeof AnswerContract])
     .filter((c): c is AnswerContract => c !== undefined);
 
-  const finalResult = {
+  const finalResult: DecisionLayerResult = {
     intent: intentResult.intent,
     intentDetectionMethod: intentResult.intentDetectionMethod,
     contextLayers: layersMeta.layers,
@@ -325,7 +305,6 @@ export async function runDecisionLayer(
     proposedInterpretation: intentResult.proposedInterpretation,
     scopeNote,
     scope: scopeInfo,
-    // Semantic context extraction from conversation
     extractedCompany: intentResult.extractedCompany,
     extractedCompanies: intentResult.extractedCompanies,
     isAmbiguous: intentResult.isAmbiguous,
@@ -336,6 +315,7 @@ export async function runDecisionLayer(
     requiresSemantic: intentResult.requiresSemantic,
     requiresProductKnowledge: intentResult.requiresProductKnowledge,
     requiresStyleMatching: intentResult.requiresStyleMatching,
+    ...(useAggregateFallback ? { aggregateFallback: "qa_pairs_first" as const } : {}),
   };
 
   console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);
@@ -345,6 +325,7 @@ export async function runDecisionLayer(
   console.log(`  Requires Semantic: ${finalResult.requiresSemantic ?? 'not set (will default true)'}`);
   console.log(`  Requires Product Knowledge: ${finalResult.requiresProductKnowledge ?? 'not set (will default false)'}`);
   console.log(`  Requires Style Matching: ${finalResult.requiresStyleMatching ?? 'not set (will default false)'}`);
+  console.log(`  Aggregate Fallback: ${finalResult.aggregateFallback || 'none'}`);
   console.log(`  Scope Info: ${scopeInfo ? 'present' : 'none'}`);
   if (scopeNote) console.log(`  Scope Note: ${scopeNote}`);
 
