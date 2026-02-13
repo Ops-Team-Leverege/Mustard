@@ -118,6 +118,7 @@ export type DecisionLayerResult = {
   requiresProductKnowledge?: boolean;              // LLM-determined: should response be enriched with PitCrew product data from Airtable?
   requiresStyleMatching?: boolean;                 // LLM-determined: should output match PitCrew's existing feature description style?
   aggregateFallback?: "qa_pairs_first";            // When set, use qa_pairs keyword search before falling back to meeting search
+  userExplicitlyRequestedMeetings?: boolean;       // True if user's language explicitly references meetings/transcripts (skips qa_pairs)
 };
 
 // Backward compatibility alias
@@ -253,6 +254,7 @@ export async function runDecisionLayer(
   let scopeInfo: DecisionLayerResult["scope"];
   let scopeNote: string | undefined;
   let useAggregateFallback = false;
+  let userExplicitlyRequestedMeetings = false;
 
   if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question, threadContext);
@@ -280,9 +282,18 @@ export async function runDecisionLayer(
       useAggregateFallback = !specificity.hasTimeRange && meetingCount > MEETING_CONSTANTS.CLARIFICATION_THRESHOLD;
 
       if (useAggregateFallback) {
-        console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Aggregate Fallback (qa_pairs_first):`);
-        console.log(`  Reason: Too many meetings (${meetingCount}) without time range — will try qa_pairs first`);
-        console.log(`  Key Topics: ${intentResult.keyTopics ? intentResult.keyTopics.join(', ') : 'none'}`);
+        const explicitMeetingPattern = /\b(search|check|look\s+through|scan|review|find\s+in)\s+(all\s+)?(meetings?|transcripts?|calls?|notes?)\b/i;
+        userExplicitlyRequestedMeetings = explicitMeetingPattern.test(question);
+
+        if (userExplicitlyRequestedMeetings) {
+          console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Aggregate Fallback (qa_pairs_first) with explicit meeting request:`);
+          console.log(`  User said: "${question.substring(0, 100)}"`);
+          console.log(`  Reason: User explicitly referenced meetings/transcripts — will skip qa_pairs, ask for time range`);
+        } else {
+          console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Aggregate Fallback (qa_pairs_first):`);
+          console.log(`  Reason: Too many meetings (${meetingCount}) without time range — will try qa_pairs first`);
+          console.log(`  Key Topics: ${intentResult.keyTopics ? intentResult.keyTopics.join(', ') : 'none'}`);
+        }
       }
     }
 
@@ -315,7 +326,7 @@ export async function runDecisionLayer(
     requiresSemantic: intentResult.requiresSemantic,
     requiresProductKnowledge: intentResult.requiresProductKnowledge,
     requiresStyleMatching: intentResult.requiresStyleMatching,
-    ...(useAggregateFallback ? { aggregateFallback: "qa_pairs_first" as const } : {}),
+    ...(useAggregateFallback ? { aggregateFallback: "qa_pairs_first" as const, userExplicitlyRequestedMeetings } : {}),
   };
 
   console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);

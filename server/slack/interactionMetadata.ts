@@ -121,6 +121,7 @@ export interface InteractionMetadata {
     company_source: ResolutionSource;
     meeting_source: ResolutionSource;
     pendingOffer?: string;
+    offerTimestamp?: number;
   };
 
   evidence_sources?: Array<{
@@ -277,6 +278,7 @@ export function buildInteractionMetadata(
       company_source: execution.companySource || "none",
       meeting_source: execution.meetingSource || "none",
       pendingOffer: execution.pendingOffer,
+      ...(execution.pendingOffer ? { offerTimestamp: Date.now() } : {}),
     },
 
     evidence_sources: execution.evidenceSources,

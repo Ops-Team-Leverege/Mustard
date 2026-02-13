@@ -710,60 +710,83 @@ export async function slackEventsHandler(req: Request, res: Response) {
         });
         console.log(`[Slack] Single-meeting response: intent=${result.intent}, source=${result.dataSource}, pendingOffer=${result.pendingOffer}, semantic=${semanticAnswerUsed ? semanticConfidence : 'N/A'}`);
       } else if (decisionLayerResult.aggregateFallback === "qa_pairs_first") {
-        // AGGREGATE FALLBACK: Too many meetings without time range — search qa_pairs first
-        console.log(`[Slack] Aggregate fallback (qa_pairs_first) - searching qa_pairs by topic before meeting search`);
-
+        // AGGREGATE FALLBACK: Too many meetings without time range
         const topics = decisionLayerResult.keyTopics || [];
         const searchTerm = topics.length > 0 ? topics.join(" ") : text;
-        console.log(`[Slack] qa_pairs search term: "${searchTerm}"`);
 
-        try {
-          const qaPairResults = await storage.searchQaPairsByKeyword(searchTerm, 30);
-          console.log(`[Slack] qa_pairs search returned ${qaPairResults.length} results`);
+        if (decisionLayerResult.userExplicitlyRequestedMeetings) {
+          // Refinement 1: User explicitly wants meetings — skip qa_pairs, ask for time range
+          console.log(`[Slack] Aggregate fallback - user explicitly requested meetings, asking for time range`);
+          const topicLabel = topics.length > 0 ? ` about *${topics.join(", ")}*` : "";
+          responseText = `I can search meeting transcripts${topicLabel}. To keep results focused, what time range should I look at?\n\nFor example: "last month", "last quarter", or "since January"`;
+          capabilityName = "aggregate_time_range_prompt";
+          intentClassification = "multi_meeting_explicit_meetings";
+          dataSource = "none";
+          pendingOffer = "meeting_search";
+        } else {
+          // Default: search qa_pairs first, offer meetings as follow-up
+          console.log(`[Slack] Aggregate fallback (qa_pairs_first) - searching qa_pairs by topic before meeting search`);
+          console.log(`[Slack] qa_pairs search term: "${searchTerm}"`);
 
-          if (qaPairResults.length > 0) {
-            const companiesWithResults = Array.from(new Set(qaPairResults.map(r => r.company)));
-            const grouped = new Map<string, typeof qaPairResults>();
-            for (const r of qaPairResults) {
-              const existing = grouped.get(r.company) || [];
-              existing.push(r);
-              grouped.set(r.company, existing);
-            }
+          try {
+            const qaPairResults = await storage.searchQaPairsByKeyword(searchTerm, 30);
+            console.log(`[Slack] qa_pairs search returned ${qaPairResults.length} results`);
 
-            let formattedAnswer = `Here's what customers have been asking about *${topics.join(", ") || searchTerm}* across ${companiesWithResults.length} ${companiesWithResults.length === 1 ? "company" : "companies"}:\n\n`;
-            for (const [company, pairs] of Array.from(grouped.entries())) {
-              formattedAnswer += `*${company}:*\n`;
-              for (const pair of pairs.slice(0, 5)) {
-                formattedAnswer += `  - _${pair.question}_`;
-                if (pair.answer) formattedAnswer += `\n    ${pair.answer}`;
+            if (qaPairResults.length > 0) {
+              const companiesWithResults = Array.from(new Set(qaPairResults.map(r => r.company)));
+              const grouped = new Map<string, typeof qaPairResults>();
+              for (const r of qaPairResults) {
+                const existing = grouped.get(r.company) || [];
+                existing.push(r);
+                grouped.set(r.company, existing);
+              }
+
+              // Refinement 3: Confidence signaling based on result quality
+              const isComprehensive = qaPairResults.length >= 10 && companiesWithResults.length >= 3;
+              const topicLabel = topics.join(", ") || searchTerm;
+
+              let formattedAnswer: string;
+              if (isComprehensive) {
+                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${qaPairResults.length} questions across ${companiesWithResults.length} companies):\n\n`;
+              } else {
+                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${qaPairResults.length} ${qaPairResults.length === 1 ? "question" : "questions"}):\n\n`;
+              }
+
+              for (const [company, pairs] of Array.from(grouped.entries())) {
+                formattedAnswer += `*${company}:*\n`;
+                for (const pair of pairs.slice(0, 5)) {
+                  formattedAnswer += `  - _${pair.question}_`;
+                  if (pair.answer) formattedAnswer += `\n    ${pair.answer}`;
+                  formattedAnswer += "\n";
+                }
+                if (pairs.length > 5) {
+                  formattedAnswer += `  _...and ${pairs.length - 5} more_\n`;
+                }
                 formattedAnswer += "\n";
               }
-              if (pairs.length > 5) {
-                formattedAnswer += `  _...and ${pairs.length - 5} more_\n`;
-              }
-              formattedAnswer += "\n";
-            }
 
-            responseText = formattedAnswer;
-            capabilityName = "qa_pairs_aggregate";
-            intentClassification = "multi_meeting_qa_fallback";
-            dataSource = "qa_pairs";
-            pendingOffer = "meeting_search";
-            console.log(`[Slack] qa_pairs fallback successful: ${qaPairResults.length} results from ${companiesWithResults.length} companies`);
-          } else {
-            responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerm}*.\n\nI can search through meeting transcripts if you'd like — just let me know a time range (e.g., "from the last quarter") and I'll dig deeper.`;
-            capabilityName = "qa_pairs_aggregate_empty";
-            intentClassification = "multi_meeting_qa_fallback_empty";
-            dataSource = "qa_pairs";
-            pendingOffer = "meeting_search";
-            console.log(`[Slack] qa_pairs fallback returned no results`);
+              responseText = formattedAnswer;
+              capabilityName = "qa_pairs_aggregate";
+              intentClassification = "multi_meeting_qa_fallback";
+              dataSource = "qa_pairs";
+              // Refinement 3: Skip meeting offer for comprehensive results — they already have good coverage
+              pendingOffer = isComprehensive ? "slack_search" : "meeting_search";
+              console.log(`[Slack] qa_pairs fallback successful: ${qaPairResults.length} results from ${companiesWithResults.length} companies (comprehensive=${isComprehensive})`);
+            } else {
+              responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerm}*.\n\nI can search through meeting transcripts if you'd like — just let me know a time range (e.g., "from the last quarter") and I'll dig deeper.`;
+              capabilityName = "qa_pairs_aggregate_empty";
+              intentClassification = "multi_meeting_qa_fallback_empty";
+              dataSource = "qa_pairs";
+              pendingOffer = "meeting_search";
+              console.log(`[Slack] qa_pairs fallback returned no results`);
+            }
+          } catch (err) {
+            console.error(`[Slack] qa_pairs search error:`, err);
+            responseText = `I ran into an issue searching Q&A records. You can try asking about a specific customer or time range and I'll search meeting transcripts directly.`;
+            capabilityName = "qa_pairs_aggregate_error";
+            intentClassification = "multi_meeting_qa_fallback_error";
+            dataSource = "none";
           }
-        } catch (err) {
-          console.error(`[Slack] qa_pairs search error:`, err);
-          responseText = `I ran into an issue searching Q&A records. You can try asking about a specific customer or time range and I'll search meeting transcripts directly.`;
-          capabilityName = "qa_pairs_aggregate_error";
-          intentClassification = "multi_meeting_qa_fallback_error";
-          dataSource = "none";
         }
       } else {
         // All other intents (MULTI_MEETING, PRODUCT_KNOWLEDGE, etc.) → Open Assistant
@@ -917,8 +940,15 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
       // Offer follow-up searches based on response type
       if (pendingOffer === "meeting_search" && responseText && responseText.length > 0) {
-        responseText += "\n\n_Want me to dig deeper? I can search meeting transcripts if you specify a time range (e.g., \"from the last quarter\"). I can also check Slack for any internal discussions._";
-        console.log(`[Slack] Appended meeting_search + slack offer to qa_pairs response`);
+        // Refinement 2: Adapt offer text — don't say "dig deeper" if qa_pairs results were good
+        if (dataSource === "none") {
+          // Explicit meeting request path — no offer text needed, time range prompt already included
+        } else if (dataSource === "qa_pairs" && intentClassification === "multi_meeting_qa_fallback_empty") {
+          // Empty results — offer is already baked into the empty-results message
+        } else {
+          responseText += "\n\n_Need more detail? I can also search full meeting transcripts (just specify a time range) or Slack for internal discussions._";
+        }
+        console.log(`[Slack] Appended meeting_search offer to response`);
       } else {
         const isMeetingBasedResponse = (
           decisionLayerResult.intent === "SINGLE_MEETING" ||

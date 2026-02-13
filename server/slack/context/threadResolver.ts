@@ -103,7 +103,14 @@ export async function resolveThreadContext(
     const lastResponseType = (contextLayers?.lastResponseType as string) || null;
 
     // Surface pending offer from interaction metadata for follow-up handling
-    const pendingOfferValue = (resolution?.pendingOffer as string) || null;
+    // Refinement 4: Expire offers after 5 minutes to prevent stale state
+    const OFFER_EXPIRY_MS = 5 * 60 * 1000;
+    let pendingOfferValue = (resolution?.pendingOffer as string) || null;
+    const offerTimestamp = (resolution?.offerTimestamp as number) || null;
+    if (pendingOfferValue && offerTimestamp && (Date.now() - offerTimestamp > OFFER_EXPIRY_MS)) {
+      console.log(`[ThreadResolver] Pending offer "${pendingOfferValue}" expired (age: ${Math.round((Date.now() - offerTimestamp) / 1000)}s)`);
+      pendingOfferValue = null;
+    }
 
     console.log(`[ThreadResolver] ✅ CONTEXT CHECKPOINT 1 - Thread Resolution:`);
     console.log(`  Thread: ${threadTs}`);
