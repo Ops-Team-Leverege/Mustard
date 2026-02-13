@@ -196,7 +196,7 @@ export function buildSlackQueryExtractionPrompt(params: {
 
   const system = `You extract Slack search queries from user requests. Your job is to determine WHAT the user wants to find in Slack and produce effective search terms.
 
-You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand what topic/company/subject they want searched in Slack — but your output is ONLY search terms, not an answer.
+You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand the FULL topic the user wants searched in Slack — but your output is ONLY search terms, not an answer.
 
 Return JSON:
 {
@@ -204,12 +204,18 @@ Return JSON:
   "searchDescription": "one-sentence description of what we're looking for (for logging)"
 }
 
+CRITICAL — PRESERVE THE FULL TOPIC:
+- The search query MUST capture the COMPLETE subject from the conversation, not just a company name
+- Example: If the conversation was about "does Costco have outside cameras?" and the user says "check slack", the query must be "Costco outside cameras" — NOT just "Costco"
+- Example: If the conversation was about "What POS system does Jiffy Lube use?" and the user says "yes search slack", the query must be "Jiffy Lube POS system" — NOT just "Jiffy Lube"
+- A company name alone is almost NEVER a good search query — always include the specific subject/topic
+
 GUIDELINES:
-- Extract the core topic, company name, and subject matter
-- Produce 2-5 concise search terms that Slack's API will match well
-- Include the company name if one is identified
-- Strip conversational filler ("can you", "please check", "yes do it", etc.)
-- If the user said something like "yes, check slack" or "sure, do it" after the bot offered a Slack search, look at the CONVERSATION HISTORY to find the original topic
+- Combine the company/entity name WITH the specific subject matter into a short phrase
+- Produce a natural search phrase (2-6 words) that captures both WHO and WHAT
+- Strip conversational filler ("can you", "please check", "yes do it", "check slack", etc.)
+- If the user said something like "yes, check slack" or "sure, do it" after the bot offered a Slack search, look at the CONVERSATION HISTORY to find the original question — extract the full topic from that original question
+- If the user's own message already contains a clear search topic, use that directly
 - If you cannot determine what to search for, return {"searchQuery": "", "searchDescription": "Unable to determine search topic"}`;
 
   let userContent = `User's message: "${question}"`;
