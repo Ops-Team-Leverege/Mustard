@@ -211,6 +211,10 @@ export class SlackSearchHandler {
 
     /**
      * Handle channel info queries.
+     * Intentionally uses simple formatting (not LLM synthesis) because channel
+     * listings are structured data — name, purpose, member count — that don't
+     * benefit from LLM interpretation. Step 1 (query extraction) is still used
+     * to resolve referential queries from thread context.
      */
     private static async handleChannelInfo(
         question: string,
