@@ -189,8 +189,14 @@ Keep the answer scannable with short paragraphs, bullet points, and clear struct
  * Build the Slack search query extraction prompt.
  * 
  * Step 1 of the two-step Slack search pipeline:
- * Takes the user's message + conversation context and extracts clean Slack search terms.
- * This is where thread context is consumed — it never reaches the synthesis step.
+ * Takes the user's message + conversation context and extracts:
+ *   1. Clean Slack search terms (searchQuery)
+ *   2. The full resolved question (resolvedQuestion) — for the synthesis step
+ * 
+ * The resolvedQuestion is critical: it bridges the gap between the extraction step
+ * (which has thread context) and the synthesis step (which doesn't). Without it,
+ * a user saying "check slack" results in the synthesis LLM receiving
+ * originalQuestion = "check slack" and having no idea what the user actually wants.
  */
 export function buildSlackQueryExtractionPrompt(params: {
   question: string;
@@ -201,17 +207,33 @@ export function buildSlackQueryExtractionPrompt(params: {
 }): { system: string; user: string } {
   const { question, extractedCompany, keyTopics, conversationContext, threadMessages } = params;
 
-  const system = `You extract Slack search queries from user requests. Your job is to determine WHAT the user wants to find in Slack and produce effective search terms.
+  const system = `You extract Slack search queries from user requests. Your job is to determine WHAT the user wants to find in Slack and produce two things:
+1. Effective search terms for the Slack search API
+2. A resolved natural-language question that captures the user's full intent
 
-You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand the FULL topic the user wants searched in Slack — but your output is ONLY search terms, not an answer.
+You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand the FULL topic the user wants searched in Slack — but your output is ONLY search terms and a resolved question, not an answer.
 
 Return JSON:
 {
   "searchQuery": "the actual search terms to send to Slack's search API",
-  "searchDescription": "one-sentence description of what we're looking for (for logging)"
+  "searchDescription": "one-sentence description of what we're looking for (for logging)",
+  "resolvedQuestion": "the full, self-contained natural-language question the user is actually asking"
 }
 
-CRITICAL — PRESERVE THE FULL TOPIC:
+CRITICAL — resolvedQuestion:
+- This is the REAL question the user is trying to answer, written as a complete standalone sentence
+- It will be shown to another LLM that has NO access to conversation history — so it MUST make sense entirely on its own
+- Rewrite the user's intent as a clear, specific question a human would ask from scratch
+- Include the company/entity name, the specific topic, and any relevant details from the conversation
+- Examples:
+  * User says "yes check slack" after discussing Costco cameras → resolvedQuestion = "Does Costco have outside cameras?"
+  * User says "check slack" after bot answered about Allied Lube TV installation → resolvedQuestion = "What has been discussed in Slack about the TV installation at Allied Lube?"
+  * User says "Not Discount Tire, DTSC. Search for Chris" after discussing camera placement → resolvedQuestion = "Were there any Slack conversations about camera placement for Discount Tire and Service Center (DTSC), particularly involving Chris or Credd?"
+  * User says "search slack for discussions about pricing with Acme" → resolvedQuestion = "What has been discussed in Slack about pricing with Acme?"
+- If the user's own message is already a clear, complete question, use it directly as the resolvedQuestion
+- NEVER return a resolvedQuestion like "check slack" or "yes do it" — always resolve to the actual topic
+
+CRITICAL — searchQuery (PRESERVE THE FULL TOPIC):
 - The search query MUST capture the COMPLETE subject from the conversation, not just a company name
 - Example: If the conversation was about "does Costco have outside cameras?" and the user says "check slack", the query must be "Costco outside cameras" — NOT just "Costco"
 - Example: If the conversation was about "What POS system does Jiffy Lube use?" and the user says "yes search slack", the query must be "Jiffy Lube POS system" — NOT just "Jiffy Lube"
@@ -223,7 +245,7 @@ GUIDELINES:
 - Strip conversational filler ("can you", "please check", "yes do it", "check slack", etc.)
 - If the user said something like "yes, check slack" or "sure, do it" after the bot offered a Slack search, look at the CONVERSATION HISTORY to find the original question — extract the full topic from that original question
 - If the user's own message already contains a clear search topic, use that directly
-- If you cannot determine what to search for, return {"searchQuery": "", "searchDescription": "Unable to determine search topic"}`;
+- If you cannot determine what to search for, return {"searchQuery": "", "searchDescription": "Unable to determine search topic", "resolvedQuestion": ""}`;
 
   let userContent = `User's message: "${question}"`;
 
