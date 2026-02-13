@@ -726,10 +726,25 @@ export async function slackEventsHandler(req: Request, res: Response) {
         } else {
           // Default: search qa_pairs first, offer meetings as follow-up
           console.log(`[Slack] Aggregate fallback (qa_pairs_first) - searching qa_pairs by topic before meeting search`);
-          console.log(`[Slack] qa_pairs search terms: ${JSON.stringify(searchTerms)}`);
+
+          // Expand multi-word topics: search for full phrase + individual words
+          // e.g. "TV issues" → ["TV issues", "TV"] (captures both exact phrase and partial matches)
+          const expandedTerms = new Set<string>();
+          for (const term of searchTerms) {
+            expandedTerms.add(term);
+            const words = term.split(/\s+/).filter(w => w.length > 1);
+            if (words.length > 1) {
+              for (const word of words) {
+                expandedTerms.add(word);
+              }
+            }
+          }
+          const finalSearchTerms = Array.from(expandedTerms);
+          console.log(`[Slack] qa_pairs search terms (original): ${JSON.stringify(searchTerms)}`);
+          console.log(`[Slack] qa_pairs search terms (expanded): ${JSON.stringify(finalSearchTerms)}`);
 
           try {
-            const qaPairResults = await storage.searchQaPairsByKeyword(searchTerms, 30);
+            const qaPairResults = await storage.searchQaPairsByKeyword(finalSearchTerms, 30);
             console.log(`[Slack] qa_pairs search returned ${qaPairResults.length} results`);
 
             if (qaPairResults.length > 0) {
@@ -744,12 +759,13 @@ export async function slackEventsHandler(req: Request, res: Response) {
               // Refinement 3: Confidence signaling based on result quality
               const isComprehensive = qaPairResults.length >= 10 && companiesWithResults.length >= 3;
               const topicLabel = topics.join(", ") || searchTerms.join(", ");
+              const searchedForLabel = finalSearchTerms.map(t => `"${t}"`).join(", ");
 
               let formattedAnswer: string;
               if (isComprehensive) {
-                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${qaPairResults.length} questions across ${companiesWithResults.length} companies):\n\n`;
+                formattedAnswer = `Here's what customers have been asking about *${topicLabel}* (${qaPairResults.length} questions across ${companiesWithResults.length} companies):\n_Searched for: ${searchedForLabel}_\n\n`;
               } else {
-                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${qaPairResults.length} ${qaPairResults.length === 1 ? "question" : "questions"}):\n\n`;
+                formattedAnswer = `Here's a quick look at what customers asked about *${topicLabel}* (${qaPairResults.length} ${qaPairResults.length === 1 ? "question" : "questions"}):\n_Searched for: ${searchedForLabel}_\n\n`;
               }
 
               for (const [company, pairs] of Array.from(grouped.entries())) {
@@ -774,7 +790,8 @@ export async function slackEventsHandler(req: Request, res: Response) {
               pendingOffer = isComprehensive ? "slack_search" : "meeting_search";
               console.log(`[Slack] qa_pairs fallback successful: ${qaPairResults.length} results from ${companiesWithResults.length} companies (comprehensive=${isComprehensive})`);
             } else {
-              responseText = `I searched through customer Q&A records but didn't find anything specifically about *${topics.join(", ") || searchTerms.join(", ")}*.\n\nI can search meeting transcripts if you'd like — just specify a time range (e.g., "from the last quarter").`;
+              const emptySearchedLabel = finalSearchTerms.map(t => `"${t}"`).join(", ");
+              responseText = `I searched through customer Q&A records for ${emptySearchedLabel} but didn't find anything specifically about *${topics.join(", ") || searchTerms.join(", ")}*.\n\nI can search meeting transcripts if you'd like — just specify a time range (e.g., "from the last quarter").`;
               capabilityName = "qa_pairs_aggregate_empty";
               intentClassification = "multi_meeting_qa_fallback_empty";
               dataSource = "qa_pairs";
