@@ -241,6 +241,8 @@ CRITICAL — sortByOldest:
 - Examples where sortByOldest = true: "find older messages", "any earlier discussions?", "what about older conversations?", "go back further"
 - Examples where sortByOldest = false (default): "check slack", "search for X", "find messages about Y"
 - This controls whether results are sorted by relevance (default) or by date (oldest first)
+- IMPORTANT: When sortByOldest is true, make the searchQuery BROADER — drop person names and keep only the core topic (company + subject). Person names narrow Slack's search too much when sorting by timestamp. The resolvedQuestion should still mention the people so the synthesis LLM can highlight their messages.
+  * Example: If the previous search was "DTSC camera placement Calum Corey Redd", and sortByOldest is true, use searchQuery = "DTSC camera placement" (broader) but resolvedQuestion = "What are the older Slack discussions about camera placement at DTSC, particularly involving Calum or Corey Redd?"
 
 CRITICAL — resolvedQuestion:
 - This is the REAL question the user is trying to answer, written as a complete standalone sentence

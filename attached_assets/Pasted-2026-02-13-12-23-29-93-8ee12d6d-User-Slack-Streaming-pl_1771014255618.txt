@@ -1,0 +1,166 @@
+2026-02-13 12:23:29.93
+8ee12d6d
+User
+[Slack] Streaming placeholder posted with preview mode: ts=1771014209.728029
+2026-02-13 12:23:32.83
+8ee12d6d
+User
+[SlackSearchHandler] Searching Slack for: "Discount Tire & Service Center camera placement Calum Corey Redd" (resolvedQuestion: "Can you find older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd?", sortByOldest: true)
+2026-02-13 12:23:32.83
+8ee12d6d
+User
+[SlackSearchHandler] LLM extracted query: "Discount Tire & Service Center camera placement Calum Corey Redd", resolvedQuestion: "Can you find older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd?", sortByOldest: true (Older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd)
+2026-02-13 12:23:32.83
+8ee12d6d
+User
+[SlackSearchHandler] Searching Slack for: "Discount Tire & Service Center camera placement Calum Corey Redd" (resolvedQuestion: "Can you find older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd?", sortByOldest: true)
+2026-02-13 12:23:32.83
+8ee12d6d
+User
+[SlackSearchHandler] LLM extracted query: "Discount Tire & Service Center camera placement Calum Corey Redd", resolvedQuestion: "Can you find older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd?", sortByOldest: true (Older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd)
+2026-02-13 12:23:33.13
+8ee12d6d
+User
+[SlackSearchService] Searching for: "Discount Tire & Service Center camera placement Calum Corey Redd" (page 1)
+2026-02-13 12:23:33.13
+8ee12d6d
+User
+[SlackSearchService] Channel filter: must contain [pitcrew]
+2026-02-13 12:23:33.13
+8ee12d6d
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-13 12:23:33.13
+8ee12d6d
+User
+[SlackSearchService] Channel filter: must contain [pitcrew]
+2026-02-13 12:23:33.13
+8ee12d6d
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-13 12:23:33.13
+8ee12d6d
+User
+[SlackSearchService] Searching for: "Discount Tire & Service Center camera placement Calum Corey Redd" (page 1)
+2026-02-13 12:23:35.83
+8ee12d6d
+User
+[SlackSearchService] Returning 1 messages (1 total, page 1/1)
+2026-02-13 12:23:35.83
+8ee12d6d
+User
+[SlackSearchService] Filtered: 1 -> 1 messages (channels matching filter)
+2026-02-13 12:23:35.83
+8ee12d6d
+User
+[SlackSearchService] Filtered: 1 -> 1 messages (channels matching filter)
+2026-02-13 12:23:35.83
+8ee12d6d
+User
+[SlackSearchService] Returning 1 messages (1 total, page 1/1)
+2026-02-13 12:23:41.93
+8ee12d6d
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-13 12:23:41.93
+8ee12d6d
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-13 12:23:42.03
+8ee12d6d
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-13 12:23:42.03
+8ee12d6d
+User
+[INFO] [2dfd060d] Open Assistant response generated {"correlationId":"2dfd060d","channel":"C0A80S3HJNL","threadTs":"1771014078.439199","userId":"U082TV42FM0","duration":22046,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":12098}
+2026-02-13 12:23:42.03
+8ee12d6d
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-13 12:23:42.03
+8ee12d6d
+User
+[INFO] [2dfd060d] Open Assistant response generated {"correlationId":"2dfd060d","channel":"C0A80S3HJNL","threadTs":"1771014078.439199","userId":"U082TV42FM0","duration":22046,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":12098}
+2026-02-13 12:23:42.13
+8ee12d6d
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-13 12:23:42.13
+8ee12d6d
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-13 12:23:42.13
+8ee12d6d
+User
+[Slack] Pipeline completed in 21900ms, progressMessages=0
+2026-02-13 12:23:42.13
+8ee12d6d
+User
+[Slack] Pipeline completed in 21900ms, progressMessages=0
+2026-02-13 12:23:43.33
+8ee12d6d
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-13 12:23:43.33
+8ee12d6d
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-13 12:23:43.33
+8ee12d6d
+User
+[Slack] Updated streaming placeholder with final content (1493 chars)
+2026-02-13 12:23:43.33
+8ee12d6d
+User
+[Slack] Updated streaming placeholder with final content (1493 chars)
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 212, Generate doc: false
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[DocumentResponse] Document-only mode, skipping message (word count 212 below threshold)
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[Slack] Document check complete
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 212, Generate doc: false
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[DocumentResponse] Document-only mode, skipping message (word count 212 below threshold)
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-13 12:23:44.03
+8ee12d6d
+User
+[Slack] Document check complete
+2026-02-13 12:23:44.13
+8ee12d6d
+User
+[INFO] [2dfd060d] Request completed successfully {"correlationId":"2dfd060d","channel":"C0A80S3HJNL","threadTs":"1771014078.439199","userId":"U082TV42FM0","duration":24147,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":1493,"totalTimeMs":21900,"stages":{"meeting_resolution":0,"decision_layer":6200,"handler":12098}}
+2026-02-13 12:23:44.13
+8ee12d6d
+User
+[INFO] [2dfd060d] Request completed successfully {"correlationId":"2dfd060d","channel":"C0A80S3HJNL","threadTs":"1771014078.439199","userId":"U082TV42FM0","duration":24147,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":1493,"totalTimeMs":21900,"stages":{"meeting_resolution":0,"decision_layer":6200,"handler":12098}}
+2026-02-13 12:23:44.13
+8ee12d6d
+User
+[INFO] [2dfd060d] Request completed successfully {"correlationId":"2dfd060d","channel":"C0A80S3HJNL","threadTs":"1771014078.439199","userId":"U082TV42FM0","duration":24147,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":1493,"totalTimeMs":21900,"stages":{"meeting_resolution":0,"decision_layer":6200,"handler":12098}}
+2026-02-13 12:23:44.13
+8ee12d6d
+User
+[INFO] [2dfd060d] Request completed successfully {"correlationId":"2dfd060d","channel":"C0A80S3HJNL","threadTs":"1771014078.439199","userId":"U082TV42FM0","duration":24147,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":1493,"totalTimeMs":21900,"stages":{"meeting_resolution":0,"decision_layer":6200,"handler":12098}}
+Wrap
+Colors
