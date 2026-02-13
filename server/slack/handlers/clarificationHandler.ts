@@ -308,10 +308,11 @@ export async function handleSlackSearchOfferResponse(
 
   const lowerText = ctx.text.toLowerCase().trim();
 
+  const wantsSlackSearch = /\b(check\s*slack|search\s*slack|look\s*(at|in|through)\s*slack|slack\s*(too|as\s*well|also))\b/i.test(lowerText);
   const isAffirmative = /^(yes|yeah|yep|yup|ok|okay|sure|1|please|do\s*it|go\s*ahead)$/i.test(lowerText) ||
-                        /^(sounds?\s*good|let'?s?\s*do\s*(it|that)|proceed|check\s*(it|slack)|search\s*slack)$/i.test(lowerText);
+                        /^(sounds?\s*good|let'?s?\s*do\s*(it|that)|proceed|check\s*it)$/i.test(lowerText);
 
-  if (!isAffirmative) {
+  if (!wantsSlackSearch && !isAffirmative) {
     return { handled: false };
   }
 
