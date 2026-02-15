@@ -226,7 +226,8 @@ export class SlackSearchHandler {
             searchResponse.totalCount,
             uniqueChannels.size,
             searchResponse.hasMore,
-            extractedCompany
+            extractedCompany,
+            sortByOldest
         );
 
         return {
@@ -310,7 +311,8 @@ export class SlackSearchHandler {
         totalCount: number,
         channelsSearched: number,
         hasMore: boolean,
-        extractedCompany?: string
+        extractedCompany?: string,
+        sortByOldest?: boolean
     ): Promise<string> {
         const { OpenAI } = await import('openai');
         const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
@@ -344,6 +346,7 @@ Link: ${msg.permalink || 'N/A'}`;
             channelSummary,
             hasMore,
             messagesContext,
+            sortByOldest,
         });
 
         try {

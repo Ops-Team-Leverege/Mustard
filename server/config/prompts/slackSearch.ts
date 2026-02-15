@@ -26,6 +26,7 @@ export function buildSlackSearchAnalysisPrompt(params: {
   channelSummary: string;
   hasMore: boolean;
   messagesContext: string;
+  sortByOldest?: boolean;
 }): string {
   const {
     originalQuestion,
@@ -36,6 +37,7 @@ export function buildSlackSearchAnalysisPrompt(params: {
     channelSummary,
     hasMore,
     messagesContext,
+    sortByOldest = false,
   } = params;
 
   return `You are analyzing Slack messages to answer a user's question.
@@ -47,6 +49,7 @@ Search Metadata:
 - Found ${resultCount} messages (${totalCount} total available)
 - Searched ${channelsSearched} channels: ${channelSummary}
 ${hasMore ? '- More results available (showing top 20)' : ''}
+${sortByOldest ? '- Results sorted by date (oldest first) — the user asked to see older/earlier messages' : ''}
 
 Slack Messages (with dates and proper attribution):
 ${messagesContext}
@@ -65,6 +68,13 @@ CRITICAL INSTRUCTIONS:
 0. **SLACK MESSAGES ONLY**:
    - Your ONLY data source is the Slack messages listed above
    - Your references section must ONLY contain actual Slack messages with real Slack links
+${sortByOldest ? `
+0b. **TEMPORAL FRAMING** (CRITICAL — results are sorted oldest first):
+   - The user asked for OLDER messages, so frame your response accordingly
+   - Open with "Here are the earlier Slack conversations about [topic]:" or similar framing that makes it clear these are older messages
+   - Present messages in chronological order (oldest first) and include dates prominently
+   - If these messages predate more recent discussions, say so: "These conversations from [date range] predate the more recent discussions..."
+   - Help the user understand the timeline of how the topic evolved` : ''}
 
 0a. **TOPIC RELEVANCE CHECK** (CRITICAL):
    - Before synthesizing, carefully check each message: does it ACTUALLY discuss the specific topic in the user's question?
