@@ -222,54 +222,58 @@ export function buildSlackQueryExtractionPrompt(params: {
 }): { system: string; user: string } {
   const { question, extractedCompany, keyTopics, conversationContext, threadMessages } = params;
 
-  const system = `You extract Slack search queries from user requests. Your job is to determine WHAT the user wants to find in Slack and produce two things:
-1. Effective search terms for the Slack search API
-2. A resolved natural-language question that captures the user's full intent
+  const system = `You analyze user requests to determine what they want to find in Slack. You extract the structured components of their search intent from their message and conversation context.
 
-You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand the FULL topic the user wants searched in Slack — but your output is ONLY search terms and a resolved question, not an answer.
+You receive the user's message and optionally conversation history from their thread. Use the conversation context to understand the FULL topic — but your output is structured components, not an answer.
 
 Return JSON:
 {
-  "searchQuery": "the actual search terms to send to Slack's search API",
-  "searchDescription": "one-sentence description of what we're looking for (for logging)",
+  "coreTopic": "the main subject (2-4 words, e.g. 'camera placement', 'POS system', 'outside cameras')",
+  "company": "the company/entity name if any (e.g. 'DTSC', 'Costco', 'Jiffy Lube'), or empty string",
+  "people": ["list of person names mentioned as relevant, if any"],
   "resolvedQuestion": "the full, self-contained natural-language question the user is actually asking",
-  "sortByOldest": false
+  "sortByOldest": false,
+  "searchDescription": "one-sentence description of what we're looking for (for logging)"
 }
+
+CRITICAL — coreTopic:
+- This is the SUBJECT of what the user wants to find — the thing being discussed, not the people or company
+- Strip conversational filler ("can you", "please check", "yes do it", "check slack", etc.)
+- NEVER include words like "older", "earlier", "recent", "latest" — those are temporal modifiers, not topics
+- NEVER include person names — those go in the "people" array
+- Examples:
+  * "does Costco have outside cameras?" → coreTopic = "outside cameras"
+  * "check slack for DTSC camera placement discussions with Calum" → coreTopic = "camera placement"
+  * "What POS system does Jiffy Lube use?" → coreTopic = "POS system"
+  * "find older messages" (in a thread about DTSC cameras) → coreTopic = "camera placement"
+
+CRITICAL — company:
+- The company or entity the user is asking about
+- Use the short/common name when possible (e.g. "DTSC" not "Discount Tire & Service Center")
+- If no company is identified, return empty string
+
+CRITICAL — people:
+- Person names the user wants to see messages from or about
+- Only include names explicitly mentioned by the user or clearly relevant from conversation context
+- Return empty array if no specific people are mentioned
 
 CRITICAL — sortByOldest:
 - Set to true ONLY when the user explicitly asks for OLDER messages, earlier conversations, or historical context
-- Examples where sortByOldest = true: "find older messages", "any earlier discussions?", "what about older conversations?", "go back further"
+- Examples where sortByOldest = true: "find older messages", "any earlier discussions?", "what about older conversations?", "go back further", "share the older messages"
 - Examples where sortByOldest = false (default): "check slack", "search for X", "find messages about Y"
-- This controls whether results are sorted by relevance (default) or by date (oldest first)
-- IMPORTANT: When sortByOldest is true, make the searchQuery BROADER — drop person names and keep only the core topic (company + subject). Person names narrow Slack's search too much when sorting by timestamp. The resolvedQuestion should still mention the people so the synthesis LLM can highlight their messages.
-  * Example: If the previous search was "DTSC camera placement Calum Corey Redd", and sortByOldest is true, use searchQuery = "DTSC camera placement" (broader) but resolvedQuestion = "What are the older Slack discussions about camera placement at DTSC, particularly involving Calum or Corey Redd?"
 
 CRITICAL — resolvedQuestion:
 - This is the REAL question the user is trying to answer, written as a complete standalone sentence
 - It will be shown to another LLM that has NO access to conversation history — so it MUST make sense entirely on its own
 - Rewrite the user's intent as a clear, specific question a human would ask from scratch
-- Include the company/entity name, the specific topic, and any relevant details from the conversation
+- Include the company name, the specific topic, and any relevant people from the conversation
 - Examples:
   * User says "yes check slack" after discussing Costco cameras → resolvedQuestion = "Does Costco have outside cameras?"
   * User says "check slack" after bot answered about Allied Lube TV installation → resolvedQuestion = "What has been discussed in Slack about the TV installation at Allied Lube?"
-  * User says "Not Discount Tire, DTSC. Search for Chris" after discussing camera placement → resolvedQuestion = "Were there any Slack conversations about camera placement for Discount Tire and Service Center (DTSC), particularly involving Chris or Credd?"
-  * User says "search slack for discussions about pricing with Acme" → resolvedQuestion = "What has been discussed in Slack about pricing with Acme?"
-- If the user's own message is already a clear, complete question, use it directly as the resolvedQuestion
-- NEVER return a resolvedQuestion like "check slack" or "yes do it" — always resolve to the actual topic
-
-CRITICAL — searchQuery (PRESERVE THE FULL TOPIC):
-- The search query MUST capture the COMPLETE subject from the conversation, not just a company name
-- Example: If the conversation was about "does Costco have outside cameras?" and the user says "check slack", the query must be "Costco outside cameras" — NOT just "Costco"
-- Example: If the conversation was about "What POS system does Jiffy Lube use?" and the user says "yes search slack", the query must be "Jiffy Lube POS system" — NOT just "Jiffy Lube"
-- A company name alone is almost NEVER a good search query — always include the specific subject/topic
-
-GUIDELINES:
-- Combine the company/entity name WITH the specific subject matter into a short phrase
-- Produce a natural search phrase (2-6 words) that captures both WHO and WHAT
-- Strip conversational filler ("can you", "please check", "yes do it", "check slack", etc.)
-- If the user said something like "yes, check slack" or "sure, do it" after the bot offered a Slack search, look at the CONVERSATION HISTORY to find the original question — extract the full topic from that original question
-- If the user's own message already contains a clear search topic, use that directly
-- If you cannot determine what to search for, return {"searchQuery": "", "searchDescription": "Unable to determine search topic", "resolvedQuestion": ""}`;
+  * User says "Not Discount Tire, DTSC. Search for Chris" after discussing camera placement → resolvedQuestion = "Were there any Slack conversations about camera placement at DTSC, particularly involving Chris or Credd?"
+  * User says "could you share the older messages?" in a thread about DTSC camera placement with Calum → resolvedQuestion = "What are the older Slack conversations about camera placement at DTSC, particularly involving Calum or Corey Redd?"
+- If the user's own message is already a clear, complete question, use it directly
+- NEVER return a resolvedQuestion like "check slack" or "yes do it" — always resolve to the actual topic`;
 
   let userContent = `User's message: "${question}"`;
 

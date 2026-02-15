@@ -1,0 +1,63 @@
+@PitCrew Sauce Find me any meetings with Discount Tire & Service Center where we talked about camera placement, and give me the dates of those meetings
+8 repliesPitCrew Sauce  [2:14 PM]
+Got it, @Silvina Figueroa — looking into that...
+[2:14 PM]The meeting on December 9, 2025, included discussions about camera placement. Chris Corwin mentioned challenges with moving a hardwired camera at store 42 and exploring options for adjusting its vertical angle.
+"I don't know if I'm going to be able to move 42, that final camera... Obviously, I can try to see if there's any more vertical angle to that camera." — Chris Corwin
+
+Source: PitCrew Meeting Transcripts (synthesized by Gemini 2.5 Flash)
+
+I can also check Slack for any internal discussions about this — would you like me to? (edited) 
+Silvina Figueroa  [2:30 PM]
+@PitCrew Sauce Yes check Slack. Look for conversations involving Calum or Corey Redd
+PitCrew Sauce  [2:30 PM]
+Happy to help, @Silvina Figueroa...
+[2:31 PM]For Discount Tire & Service Center, camera placement discussions have focused on adjustments needed for optimal bay coverage, specifically at store 42.
+
+Why This Answer:
+The rationale for these adjustments is to ensure accurate service tracking and avoid performance issues due to obstructed camera views. This is crucial for maintaining the effectiveness of the monitoring system and ensuring that all bays are adequately covered without being blocked by vehicles on adjacent lifts.
+
+Key Details:
+- Corey Redd shared a presentation with Chris at Discount Tire & Service Center (DTSC) regarding camera adjustments. Chris was confused as he believed adjustments had already been requested [Message 4].
+- Corey Chang noted that while DTSC attempted to adjust camera angles, they did not move any cameras from their installed positions. This resulted in some bays being blocked when cars are on lifts in adjacent bays [Message 14].
+- Specific issues were identified at store 42: Bays 3, 6, and 7 are completely blocked when cars are on adjacent lifts, and Bay 2 has partial visibility issues [Message 14].
+
+General Context:
+These discussions are part of ongoing efforts to fine-tune camera placements to ensure accurate monitoring and service tracking. This is a common challenge in environments where space and angles can significantly impact camera effectiveness.
+
+References:
+- Message 4 from #pitcrew_collaboration by calum on Feb 13, 2026: Discusses shared presentation and confusion over camera adjustments at DTSC. [Slack Link](https://leverege.slack.com/archives/C08GT0T2YRH/p1770993788924149?thread_ts=1770993788.924149)
+- Message 14 from #pitcrew_collaboration by corey.chang on Feb 13, 2026: Details the specific camera placement issues at store 42 and the partial adjustments made by DTSC. [Slack Link](https://leverege.slack.com/archives/C08GT0T2YRH/p1770996230136389?thread_ts=1770993788.924149)
+
+Searched 3 channels, found 20 messages
+Confidence: High based on specific discussions about camera placement at DTSC.
+
+Source: Slack Messages (edited) 
+Silvina Figueroa  [2:33 PM]
+@PitCrew Sauce could you share the older messages?
+PitCrew Sauce  [2:33 PM]
+Got it, @Silvina Figueroa — looking into that...
+[2:34 PM]For Discount Tire Service Centers, there are no specific Slack messages discussing camera placement involving Calum or Corey Redd.
+
+Why This Answer:
+The search of Slack messages specifically mentioning "Discount Tire Service Centers" did not reveal any discussions about camera placement involving Calum or Corey Redd. The messages found primarily focus on pilot projects and model fine-tuning for Discount Tire Service Centers, without specific reference to camera placement or involvement of the individuals mentioned.
+
+Key Details:
+- Discount Tire Service Centers are mentioned in the context of fine-tuning models before customer access, but not in relation to camera placement or specific personnel involvement.
+- Camera placement is discussed for other companies like Oilex/Grease Monkey and Allied Lube, but not for Discount Tire Service Centers.
+
+General Context:
+Camera placement and security measures are common considerations in pilot projects for various companies, but the specific details and personnel involved can vary based on the company's needs and project scope.
+
+References:
+- Message 1 from #pitcrew_announcements by corey.redd on Feb 6, 2026: Discusses pilot projects and model fine-tuning for Discount Tire Service Centers without mentioning camera placement or specific personnel.
+- Message 2 from #pitcrew_announcements by corey.redd on Feb 13, 2026: Continues discussion on fine-tuning models for Discount Tire Service Centers, with no mention of camera placement or involvement of Calum or Corey Redd.
+
+Search Transparency:
+Searched 1 channel, found 2 messages
+Confidence: High based on source quality and consistency
+
+References:
+- Message 1 from #pitcrew_announcements by corey.redd (Feb 6, 2026): Discusses pilot projects and model fine-tuning for Discount Tire Service Centers. [Slack link](https://leverege.slack.com/archives/C096325AJ3C/p1770411154602629?thread_ts=1770411154.602629)
+- Message 2 from #pitcrew_announcements by corey.redd (Feb 13, 2026): Continues discussion on model fine-tuning for Discount Tire Service Centers. [Slack link](https://leverege.slack.com/archives/C096325AJ3C/p1771009910660229)
+
+Source: Slack Messages (edited)

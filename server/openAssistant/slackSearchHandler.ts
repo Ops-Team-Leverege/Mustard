@@ -84,11 +84,15 @@ export class SlackSearchHandler {
     }
 
     /**
-     * STEP 1: Extract search query using LLM.
+     * STEP 1: Extract structured search intent using LLM.
      * 
-     * This is where thread context is consumed — the LLM reads the conversation
-     * history and Decision Layer fields, then outputs clean search terms.
-     * Thread context never reaches Step 2 (synthesis).
+     * The LLM outputs structured topic components (coreTopic, company, people, sortByOldest).
+     * The handler assembles the actual search query deterministically based on sort mode:
+     *   - Relevance sort: company + coreTopic + people (specific, relevance scoring handles fuzzy matching)
+     *   - Timestamp sort: company + coreTopic only (broad, because Slack AND logic + timestamp sort kills recall)
+     * 
+     * This separation ensures the LLM handles semantic understanding while
+     * the code handles search engineering — no mixed responsibilities.
      */
     private static async extractSearchQuery(
         question: string,
@@ -126,22 +130,54 @@ export class SlackSearchHandler {
             }
 
             const parsed = JSON.parse(content);
-            const searchQuery = (parsed.searchQuery || '').trim();
-            const searchDescription = parsed.searchDescription || '';
+            const coreTopic = (parsed.coreTopic || '').trim();
+            const company = (parsed.company || '').trim();
+            const people: string[] = Array.isArray(parsed.people) ? parsed.people : [];
             const resolvedQuestion = (parsed.resolvedQuestion || '').trim() || question;
             const sortByOldest = parsed.sortByOldest === true;
+            const searchDescription = parsed.searchDescription || '';
+
+            const searchQuery = this.assembleSearchQuery(coreTopic, company, people, sortByOldest);
 
             if (!searchQuery) {
-                console.warn('[SlackSearchHandler] LLM extracted empty query');
-                return { searchQuery: question, searchDescription: 'LLM returned empty query, using raw question', resolvedQuestion, sortByOldest };
+                console.warn('[SlackSearchHandler] Assembled empty query from components');
+                return { searchQuery: question, searchDescription: 'Empty assembled query, using raw question', resolvedQuestion, sortByOldest };
             }
 
-            console.log(`[SlackSearchHandler] LLM extracted query: "${searchQuery}", resolvedQuestion: "${resolvedQuestion}", sortByOldest: ${sortByOldest} (${searchDescription})`);
+            console.log(`[SlackSearchHandler] LLM components: coreTopic="${coreTopic}", company="${company}", people=[${people.join(', ')}], sortByOldest=${sortByOldest}`);
+            console.log(`[SlackSearchHandler] Assembled query: "${searchQuery}", resolvedQuestion: "${resolvedQuestion}" (${searchDescription})`);
             return { searchQuery, searchDescription, resolvedQuestion, sortByOldest };
         } catch (error) {
             console.error('[SlackSearchHandler] Query extraction LLM error:', error);
             return { searchQuery: question, searchDescription: 'LLM extraction failed, using raw question', resolvedQuestion: question, sortByOldest: false };
         }
+    }
+
+    /**
+     * Assemble the actual Slack search query from structured components.
+     * 
+     * Search strategy adapts to sort mode:
+     *   - Relevance sort: include all components (company + topic + people)
+     *     because relevance scoring handles fuzzy matching well
+     *   - Timestamp sort: broad query (company + topic only)
+     *     because Slack AND logic + timestamp sort kills recall with too many terms
+     */
+    private static assembleSearchQuery(
+        coreTopic: string,
+        company: string,
+        people: string[],
+        sortByOldest: boolean
+    ): string {
+        const parts: string[] = [];
+
+        if (company) parts.push(company);
+        if (coreTopic) parts.push(coreTopic);
+
+        if (!sortByOldest && people.length > 0) {
+            parts.push(...people);
+        }
+
+        return parts.join(' ');
     }
 
     /**

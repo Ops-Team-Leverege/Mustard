@@ -1,0 +1,208 @@
+2026-02-15 14:33:58.14
+8ee12d6d
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 4 - Input to Decision Layer:
+2026-02-15 14:33:58.14
+8ee12d6d
+User
+3. Bot: "Got it, <@U082TV42FM0> — looking into that..."
+2026-02-15 14:33:58.14
+8ee12d6d
+User
+Question: "could you share the older messages?"
+2026-02-15 14:33:58.14
+8ee12d6d
+User
+1. Bot: "*For Discount Tire &amp; Service Center, camera placement discussions have focused on adjustments ne..."
+2026-02-15 14:33:58.14
+8ee12d6d
+User
+Thread: 1771193636.744709
+2026-02-15 14:33:58.14
+8ee12d6d
+User
+Last 3 messages:
+2026-02-15 14:33:58.34
+8ee12d6d
+User
+[IntentClassifier] LLM classification with 7 messages of thread context
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Requires Product Knowledge: false
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+[IntentClassifier] LLM: intent=SLACK_SEARCH, company=Discount Tire & Service Center, contracts=SLACK_MESSAGE_SEARCH
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Requires Style Matching: false
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Requires Semantic: false
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Aggregate Fallback: none
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+[AnswerContract] Selected: SLACK_MESSAGE_SEARCH (llm_proposed) - chain: [SLACK_MESSAGE_SEARCH]
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Contract: SLACK_MESSAGE_SEARCH
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+[DecisionLayer] Intent: SLACK_SEARCH (llm)
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+[DecisionLayer] Contract: SLACK_MESSAGE_SEARCH (llm_proposed)
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Will Clarify: false
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Final Intent: SLACK_SEARCH
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+[DecisionLayer] Context Layers: {"product_identity":true,"product_ssot":false,"single_meeting":false,"multi_meeting":false,"slack_search":true}
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:
+2026-02-15 14:34:03.94
+8ee12d6d
+User
+Final Contract: SLACK_MESSAGE_SEARCH
+2026-02-15 14:34:04.24
+8ee12d6d
+User
+- Is Ambiguous: no
+2026-02-15 14:34:04.24
+8ee12d6d
+User
+Semantic Context:
+2026-02-15 14:34:04.24
+8ee12d6d
+User
+- Extracted Company: Discount Tire & Service Center
+2026-02-15 14:34:04.24
+8ee12d6d
+User
+- Extracted Companies: Discount Tire & Service Center
+2026-02-15 14:34:04.24
+8ee12d6d
+User
+- Conversation Context: The user is looking for Slack messages involving Calum or Corey Redd about camera placement at Discount Tire & Service Center.
+2026-02-15 14:34:04.24
+8ee12d6d
+User
+- Key Topics: camera placement, Calum, Corey Redd
+2026-02-15 14:34:08.74
+8ee12d6d
+User
+[Slack] Streaming placeholder posted with preview mode: ts=1771194848.418409
+2026-02-15 14:34:08.74
+8ee12d6d
+User
+[SlackSearchHandler] Handling SLACK_MESSAGE_SEARCH for: "could you share the older messages?", hasThreadMessages=true, extractedCompany=Discount Tire & Service Center
+2026-02-15 14:34:08.74
+8ee12d6d
+User
+[OpenAssistant] Evidence source: slack_search (from Decision Layer: SLACK_SEARCH -> SLACK_MESSAGE_SEARCH)
+2026-02-15 14:34:08.74
+8ee12d6d
+User
+[OpenAssistant] Slack search: contract=SLACK_MESSAGE_SEARCH
+2026-02-15 14:34:08.74
+8ee12d6d
+User
+[OpenAssistant] Using full Decision Layer result: intent=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, method=llm
+2026-02-15 14:34:08.74
+8ee12d6d
+User
+[OpenAssistant] Processing: "could you share the older messages?"
+2026-02-15 14:34:10.94
+8ee12d6d
+User
+[SlackSearchHandler] LLM extracted query: "Discount Tire & Service Center older camera placement discussions Calum Corey Redd", resolvedQuestion: "What older Slack messages discuss camera placement at Discount Tire & Service Center involving Calum or Corey Redd?", sortByOldest: true (Older Slack messages about camera placement at Discount Tire & Service Center involving Calum or Corey Redd)
+2026-02-15 14:34:10.94
+8ee12d6d
+User
+[SlackSearchHandler] Searching Slack for: "Discount Tire & Service Center older camera placement discussions Calum Corey Redd" (resolvedQuestion: "What older Slack messages discuss camera placement at Discount Tire & Service Center involving Calum or Corey Redd?", sortByOldest: true)
+2026-02-15 14:34:11.14
+8ee12d6d
+User
+[SlackSearchService] Channel filter: must contain [pitcrew]
+2026-02-15 14:34:11.14
+8ee12d6d
+User
+[SlackSearchService] Loaded config - channel filter: enabled
+2026-02-15 14:34:11.14
+8ee12d6d
+User
+[SlackSearchService] Searching for: "Discount Tire & Service Center older camera placement discussions Calum Corey Redd" (page 1)
+2026-02-15 14:34:13.34
+8ee12d6d
+User
+[SlackSearchService] Filtered: 9 -> 2 messages (channels matching filter)
+2026-02-15 14:34:13.34
+8ee12d6d
+User
+[SlackSearchService] Returning 2 messages (9 total, page 1/1)
+2026-02-15 14:34:24.94
+8ee12d6d
+User
+[Slack] Skipping operation-specific progress (streaming was used)
+2026-02-15 14:34:25.54
+8ee12d6d
+User
+[INFO] [d95f692c] Open Assistant response generated {"correlationId":"d95f692c","channel":"C0A80S3HJNL","threadTs":"1771193636.744709","userId":"U082TV42FM0","duration":29401,"intent":"slack_search","contract":"SLACK_MESSAGE_SEARCH","delegated":false,"duration_ms":16202}
+2026-02-15 14:34:25.54
+8ee12d6d
+User
+[Slack] Open Assistant response: intent=slack_search, decisionLayer=SLACK_SEARCH, contract=SLACK_MESSAGE_SEARCH, delegated=false
+2026-02-15 14:34:26.14
+8ee12d6d
+User
+[Slack] Document decision: testRun=false, contract=SLACK_MESSAGE_SEARCH, streaming=true, willGenerateDoc=true
+2026-02-15 14:34:26.14
+8ee12d6d
+User
+[Slack] Pipeline completed in 29098ms, progressMessages=0
+2026-02-15 14:34:30.07
+8ee12d6d
+User
+[Slack] Updated streaming placeholder with final content (2190 chars)
+2026-02-15 14:34:30.07
+8ee12d6d
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-15 14:34:30.34
+8ee12d6d
+User
+[DocumentGenerator] Contract "SLACK_MESSAGE_SEARCH" → never generate document (in exclusion list)
+2026-02-15 14:34:30.34
+8ee12d6d
+User
+[DocumentResponse] Contract: SLACK_MESSAGE_SEARCH, Words: 286, Generate doc: false
+2026-02-15 14:34:30.34
+8ee12d6d
+User
+[DocumentResponse] Document-only mode, skipping message (word count 286 below threshold)
+2026-02-15 14:34:30.34
+8ee12d6d
+User
+[Slack] Document check complete
+2026-02-15 14:34:30.34
+8ee12d6d
+User
+[INFO] [d95f692c] Request completed successfully {"correlationId":"d95f692c","channel":"C0A80S3HJNL","threadTs":"1771193636.744709","userId":"U082TV42FM0","duration":34801,"intent":"SLACK_SEARCH","contract":"SLACK_MESSAGE_SEARCH","responseLength":2190,"totalTimeMs":29098,"stages":{"meeting_resolution":0,"decision_layer":6300,"handler":16202}}
