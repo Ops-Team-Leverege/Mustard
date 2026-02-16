@@ -1,7 +1,6 @@
-# PitCrew Documentation
+# System Documentation
 
 **Last Updated**: February 13, 2026  
-**Status**: Production (10 users at Leverege)
 
 ---
 
