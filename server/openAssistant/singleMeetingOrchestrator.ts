@@ -39,8 +39,8 @@ import { AnswerContract } from "../decisionLayer/answerContracts";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
 import {
   buildCustomerQuestionsAssessmentPrompt,
-  getMeetingSummaryFormattingSystemPrompt,
-  buildMeetingSummaryFormattingPrompt,
+  getMeetingSummarySystemPrompt,
+  buildSingleMeetingSummaryPrompt,
   type MeetingSummaryData,
 } from "../config/prompts/singleMeeting";
 import {
@@ -1118,27 +1118,40 @@ Format the email with:
 }
 
 /**
- * Handle summary intent (explicit opt-in only).
+ * Handle summary intent using raw transcript + structured data checklist.
  * 
- * Queries pre-extracted structured data from the database (product insights,
- * Q&A pairs, action items, transcript metadata) and uses the LLM as a
- * FORMATTER — not an analyst. This preserves all deal-critical details
- * that would be lost if an LLM re-summarized the raw transcript.
+ * The LLM reads the raw transcript to produce a comprehensive BD meeting
+ * summary with full narrative context. Pre-extracted structured data
+ * (product insights, Q&A pairs, action items) is provided as a completeness
+ * checklist — the LLM must cover everything in those lists but can also
+ * extract additional details directly from the conversation.
  * 
  * Data sources:
+ * - transcript chunks: raw conversation for full context
  * - transcripts table: status, next steps, attendees, meeting date
- * - product_insights table: features, context, verbatim quotes
- * - qa_pairs table: questions, answers, who asked
- * - meeting_action_items table: actions, owners, deadlines
+ * - product_insights table: features, context, verbatim quotes (checklist)
+ * - qa_pairs table: questions, answers, who asked (checklist)
+ * - meeting_action_items table: actions, owners, deadlines (checklist)
  */
 async function handleSummaryIntent(
   ctx: SingleMeetingContext
 ): Promise<SingleMeetingResult> {
-  const transcript = await storage.getTranscriptById(ctx.meetingId);
+  const [transcript, chunks] = await Promise.all([
+    storage.getTranscriptById(ctx.meetingId),
+    storage.getChunksForTranscript(ctx.meetingId, 100),
+  ]);
 
   if (!transcript) {
     return {
       answer: "I couldn't find any meeting data for this transcript.",
+      intent: "summary",
+      dataSource: "not_found",
+    };
+  }
+
+  if (chunks.length === 0) {
+    return {
+      answer: "I couldn't find any transcript content for this meeting.",
       intent: "summary",
       dataSource: "not_found",
     };
@@ -1181,35 +1194,24 @@ async function handleSummaryIntent(
     })),
   };
 
-  const hasAnyData = summaryData.status ||
-    summaryData.nextSteps ||
-    summaryData.productInsights.length > 0 ||
-    summaryData.qaPairs.length > 0 ||
-    summaryData.actionItems.length > 0;
+  const transcriptText = chunks
+    .map(c => `[${c.speakerName || "Unknown"}]: ${c.content}`)
+    .join("\n\n");
 
-  if (!hasAnyData) {
-    return {
-      answer: `No pre-extracted meeting data found for this ${ctx.companyName} meeting. The transcript may still be processing.`,
-      intent: "summary",
-      dataSource: "not_found",
-    };
-  }
-
-  console.log(`[SingleMeetingOrchestrator] Summary data: ${summaryData.productInsights.length} insights, ${summaryData.qaPairs.length} Q&A pairs, ${summaryData.actionItems.length} action items`);
+  console.log(`[SingleMeetingOrchestrator] Summary: ${chunks.length} chunks, ${summaryData.productInsights.length} insights, ${summaryData.qaPairs.length} Q&A pairs, ${summaryData.actionItems.length} action items`);
 
   const response = await openai.chat.completions.create({
-    model: MODEL_ASSIGNMENTS.MEETING_SUMMARY_FORMATTING,
+    model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,
     messages: [
-      { role: "system", content: getMeetingSummaryFormattingSystemPrompt() },
-      { role: "user", content: buildMeetingSummaryFormattingPrompt(summaryData) },
+      { role: "system", content: getMeetingSummarySystemPrompt() },
+      { role: "user", content: buildSingleMeetingSummaryPrompt(summaryData, transcriptText) },
     ],
-    temperature: 0.2,
   });
 
-  const formatted = response.choices[0]?.message?.content || "Unable to format meeting summary.";
+  const summary = response.choices[0]?.message?.content || "Unable to generate meeting summary.";
 
   return {
-    answer: formatted,
+    answer: summary,
     intent: "summary",
     dataSource: "summary",
   };

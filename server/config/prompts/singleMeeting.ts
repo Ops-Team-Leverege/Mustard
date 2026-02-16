@@ -159,91 +159,117 @@ export type MeetingSummaryData = {
 };
 
 /**
- * System prompt for meeting summary formatting.
+ * System prompt for meeting summary generation.
  * 
- * The LLM's role is FORMATTING AND PRESENTATION ONLY — not analysis.
- * All data has already been extracted and stored during transcript processing.
- * The LLM organizes and presents it clearly for Slack.
+ * The LLM reads the raw transcript to produce a comprehensive BD meeting summary.
+ * Structured data (insights, Q&A, action items) is provided as a completeness
+ * checklist — anything in those lists MUST appear in the summary.
  */
-export function getMeetingSummaryFormattingSystemPrompt(): string {
-  return `You are formatting pre-extracted meeting data for display in Slack. Your role is PRESENTATION ONLY — do not analyze, interpret, or omit any data.
+export function getMeetingSummarySystemPrompt(): string {
+  return `You are a Business Development analyst summarizing a sales/BD meeting transcript for the Leverege team. Your audience is sales leadership and product managers who need to understand the deal landscape.
 
-STRICT RULES:
-- DO NOT omit any Q&A pairs — include every single one
-- DO NOT paraphrase quotes — use them exactly as provided
-- DO NOT add information that is not in the provided data
-- DO NOT invent or infer details beyond what is given
-- DO prioritize and highlight items related to: security, pricing, compliance, business continuity, deal blockers
-- DO group related product insights together logically
-- Use Slack markdown formatting: *bold* for section headers, • for bullets, _italics_ for quotes`;
+YOUR GOAL: Extract every piece of actionable intelligence from this conversation. Generic summaries are useless — specifics win deals.
+
+EXTRACT AND ORGANIZE:
+
+*1. Deal Context & Customer Profile*
+• Who attended (both sides), their roles, and decision-making authority
+• Company size, current operations, number of locations/bays/technicians
+• Current tech stack — what POS, DMS, or inspection systems they use today
+• Where they are in their evaluation/buying journey
+
+*2. Customer Pain Points & Needs*
+• Specific operational problems they described (with verbatim quotes where impactful)
+• What prompted them to take this meeting — the trigger event
+• What metrics or KPIs they care about (car count, ticket time, revenue per bay, etc.)
+
+*3. Product Discussion*
+• Which PitCrew features/capabilities were discussed
+• Customer reactions to specific features — enthusiasm, skepticism, confusion
+• Feature gaps or requests the customer raised
+• Competitive mentions — other vendors they're evaluating or currently using
+
+*4. Pricing, Security & Compliance*
+• Any pricing discussions, budget constraints, or cost expectations
+• Security requirements (data handling, network, compliance standards)
+• Integration requirements or technical constraints
+• Deal blockers or concerns that could stall the deal
+
+*5. Questions & Answers*
+• Every question the customer asked and what answer was given (or left open)
+• Every question our team asked and what the customer revealed
+• Mark unanswered questions clearly
+
+*6. Next Steps & Action Items*
+• Specific commitments made by either side (with owners and deadlines if mentioned)
+• Follow-up meetings, demos, trials, or POC discussions
+• Internal action items for the Leverege team
+
+*7. Deal Assessment*
+• Overall sentiment — how interested/engaged was the customer?
+• Buying signals or warning signs
+• Recommended next moves for our team
+
+FORMATTING RULES:
+- Use Slack markdown: *bold* for section headers, • for bullets, _italics_ for verbatim quotes
+- Include verbatim quotes for key moments — pricing reactions, objections, enthusiasm
+- Be specific: "they have 12 locations with 8-10 bays each" not "multi-location business"
+- If a section has no relevant content from the transcript, omit it entirely
+- DO NOT invent or assume details not present in the transcript`;
 }
 
 /**
- * Build the user prompt for meeting summary formatting.
- * Assembles all pre-extracted structured data into a prompt the LLM formats.
+ * Build the user prompt for meeting summary generation.
+ * Includes raw transcript plus structured data as a completeness checklist.
  */
-export function buildMeetingSummaryFormattingPrompt(data: MeetingSummaryData): string {
-  const insightsSection = data.productInsights.length > 0
-    ? data.productInsights.map((ins, i) =>
-        `  ${i + 1}. Feature: ${ins.feature}\n     Context: ${ins.context}\n     Quote: "${ins.quote}"${ins.categoryName ? `\n     Category: ${ins.categoryName}` : ''}`
-      ).join('\n')
-    : '  (None extracted)';
+export function buildSingleMeetingSummaryPrompt(
+  data: MeetingSummaryData,
+  transcriptText: string
+): string {
+  let completenessChecklist = '';
 
-  const qaSection = data.qaPairs.length > 0
-    ? data.qaPairs.map((qa, i) =>
-        `  ${i + 1}. Asker: ${qa.asker}\n     Question: ${qa.question}\n     Answer: ${qa.answer}`
-      ).join('\n')
-    : '  (None extracted)';
+  if (data.productInsights.length > 0 || data.qaPairs.length > 0 || data.actionItems.length > 0) {
+    completenessChecklist = `\n\n=== COMPLETENESS CHECKLIST ===
+The following items were previously extracted from this transcript. Your summary MUST cover all of them — do not drop any.
 
-  const actionSection = data.actionItems.length > 0
-    ? data.actionItems.map((item, i) =>
-        `  ${i + 1}. Action: ${item.action}\n     Owner: ${item.owner}\n     Deadline: ${item.deadline || 'Not specified'}`
-      ).join('\n')
-    : '  (None extracted)';
+`;
+    if (data.productInsights.length > 0) {
+      completenessChecklist += `PRODUCT INSIGHTS (${data.productInsights.length}):\n`;
+      completenessChecklist += data.productInsights.map((ins, i) =>
+        `  ${i + 1}. ${ins.feature}: ${ins.context}${ins.quote ? ` — _"${ins.quote}"_` : ''}`
+      ).join('\n');
+      completenessChecklist += '\n\n';
+    }
 
-  return `Format this pre-extracted meeting data into a clear, structured Slack message.
+    if (data.qaPairs.length > 0) {
+      completenessChecklist += `Q&A PAIRS (${data.qaPairs.length} — include ALL):\n`;
+      completenessChecklist += data.qaPairs.map((qa, i) =>
+        `  ${i + 1}. [${qa.asker}] Q: ${qa.question}\n     A: ${qa.answer}`
+      ).join('\n');
+      completenessChecklist += '\n\n';
+    }
 
-MEETING METADATA:
-- Company: ${data.companyName}
-- Date: ${data.meetingDate}
-- Status/Takeaways: ${data.status || '(Not available)'}
-- Next Steps: ${data.nextSteps || '(Not available)'}
-- Our Team: ${data.leverageTeam || '(Not available)'}
-- Customer Attendees: ${data.customerNames || '(Not available)'}
+    if (data.actionItems.length > 0) {
+      completenessChecklist += `ACTION ITEMS (${data.actionItems.length}):\n`;
+      completenessChecklist += data.actionItems.map((item, i) =>
+        `  ${i + 1}. ${item.action} (Owner: ${item.owner}${item.deadline ? `, Deadline: ${item.deadline}` : ''})`
+      ).join('\n');
+    }
+  }
 
-PRODUCT INSIGHTS (${data.productInsights.length} total):
-${insightsSection}
+  const metadataHeader = `*Meeting Summary: ${data.companyName} — ${data.meetingDate}*
+${data.leverageTeam ? `Our Team: ${data.leverageTeam}` : ''}
+${data.customerNames ? `Customer Attendees: ${data.customerNames}` : ''}`.trim();
 
-Q&A PAIRS (${data.qaPairs.length} total — include ALL):
-${qaSection}
+  return `Summarize this BD meeting. Start with this header:
 
-ACTION ITEMS (${data.actionItems.length} total):
-${actionSection}
+${metadataHeader}
 
-FORMAT THE OUTPUT AS:
-*Meeting Summary: ${data.companyName} — ${data.meetingDate}*
+${data.status ? `Known status/takeaways: ${data.status}` : ''}
+${data.nextSteps ? `Known next steps: ${data.nextSteps}` : ''}
 
-*Status:* [main takeaways]
-
-*Attendees:*
-• Our team: [names]
-• Customer: [names]
-
-*Next Steps:* [next steps from metadata]
-
----
-
-*Critical Requirements & Concerns:*
-[Product insights related to security, compliance, pricing, business continuity — with verbatim quotes in _italics_]
-
-*Feature Requests & Feedback:*
-[Remaining product insights — with verbatim quotes in _italics_]
-
-*Questions Asked & Answers Given (${data.qaPairs.length}):*
-[ALL Q&A pairs — who asked, question, answer]
-
-*Action Items (${data.actionItems.length}):*
-[All action items with owner and deadline]`;
+=== TRANSCRIPT ===
+${transcriptText}${completenessChecklist}`;
 }
 
 /**
