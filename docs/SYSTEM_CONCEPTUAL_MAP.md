@@ -36,7 +36,7 @@ Slack Bot Integration
 ### **Core Processing Engine**
 ```
 Decision Layer (Intent Router)
-├── Intent Classification (LLM + patterns)
+├── Intent Classification (LLM-based with minimal fast-paths)
 ├── Context Layer Computation
 ├── Answer Contract Selection
 └── Route to Handler
@@ -211,16 +211,32 @@ graph TD
     E -->|SINGLE_MEETING| F[Meeting Resolution]
     E -->|MULTI_MEETING| G[Cross-meeting Search]
     E -->|PRODUCT_KNOWLEDGE| H[Product Database]
-    E -->|CLARIFY| I[Ask for clarification]
-    F --> J[Single Meeting Orchestrator]
-    G --> K[Open Assistant Handler]
-    H --> K
-    J --> L[Generate response with citations]
-    K --> L
-    L --> M[Post to Slack thread]
-    M --> N[Generate document if needed]
-    N --> O[Log interaction for audit]
+    E -->|EXTERNAL_RESEARCH| I[Web Research]
+    E -->|SLACK_SEARCH| J[Slack Channel Search]
+    E -->|GENERAL_HELP| K[General Assistance]
+    E -->|REFUSE| L[Out of Scope Response]
+    E -->|CLARIFY| M[Ask for clarification]
+    F --> N[Single Meeting Orchestrator]
+    G --> O[Open Assistant Handler]
+    H --> O
+    I --> O
+    J --> O
+    K --> O
+    N --> P[Generate response with citations]
+    O --> P
+    L --> P
+    M --> P
+    P --> Q[Post to Slack thread]
+    Q --> R[Generate document if needed]
+    R --> S[Log interaction for audit]
 ```
+
+**Single Meeting Orchestrator** (`server/openAssistant/singleMeetingOrchestrator.ts`):
+- **What it does**: Handles questions scoped to a single meeting with strict behavioral guarantees
+- **Core Invariants**: One thread = one meeting, summaries are opt-in only, no inference or hallucination
+- **Data Access**: Read-only meeting artifacts (attendees, Q&A pairs, action items, transcript chunks)
+- **Search Order**: Attendees → Customer questions → Action items → Transcript snippets
+- **Response Types**: Extractive (specific facts), Aggregative (lists), Summary (explicit opt-in only)
 
 ---
 

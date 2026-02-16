@@ -308,7 +308,7 @@ client/src/
 ### JSON Configuration (`config/`)
 
 #### `capabilities.json`
-**Purpose**: Defines bot capabilities, intents, and examples
+**Purpose**: Defines PitCrew Sauce bot capabilities, intents, and examples
 
 **Structure**:
 ```json
@@ -320,12 +320,16 @@ client/src/
     "SINGLE_MEETING": { ... },
     "MULTI_MEETING": { ... },
     "PRODUCT_KNOWLEDGE": { ... },
-    ...
+    "EXTERNAL_RESEARCH": { ... },
+    "SLACK_SEARCH": { ... },
+    "GENERAL_HELP": { ... },
+    "REFUSE": { ... },
+    "CLARIFY": { ... }
   }
 }
 ```
 
-**When to modify**: Adding new capabilities or changing bot behavior
+**When to modify**: Adding new capabilities or changing PitCrew Sauce bot behavior
 
 #### `acknowledgments.json`
 **Purpose**: Slack acknowledgment messages
@@ -375,20 +379,22 @@ client/src/
 ```
 User Question
     ↓
-Intent Classification (LLM + patterns)
+Intent Classification (LLM-based with minimal fast-path patterns)
+    ↓  (8 intent types: SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE,
+        EXTERNAL_RESEARCH, SLACK_SEARCH, GENERAL_HELP, REFUSE, CLARIFY)
     ↓
-Context Layers (what data to access)
+Context Layers (determines what data to access)
     ↓
-Answer Contract (response format)
+Answer Contract (30+ response formats)
     ↓
-Route to Handler
+Route to Handler (Single Meeting Orchestrator or Open Assistant)
 ```
 
-### AI Processing Pipeline
+### AI Processing Pipeline (Mustard)
 ```
 Transcript Upload
     ↓
-AI Analysis (gpt-4o/gpt-5)
+Mustard: AI Analysis (gpt-4o/gpt-5)
     ↓
 Extract: Insights, Q&A, POS Systems
     ↓
@@ -401,17 +407,19 @@ Action Items
 Store in Database
 ```
 
-### Slack Bot Flow
+**Note**: "Mustard" is the transcript processing system that handles AI analysis and extraction.
+
+### Slack Bot Flow (PitCrew Sauce)
 ```
 @mention in Slack
     ↓
-Verify Signature
+PitCrew Sauce: Verify Signature
     ↓
 Deduplicate Event
     ↓
-Decision Layer
+Decision Layer (Intent Classification)
     ↓
-Handler (Single Meeting / Open Assistant)
+Handler (Single Meeting Orchestrator or Open Assistant)
     ↓
 Generate Response
     ↓
@@ -419,6 +427,8 @@ Post to Slack (with optional document)
     ↓
 Log Interaction
 ```
+
+**Note**: "PitCrew Sauce" is the Slack bot that handles user interactions and queries.
 
 ---
 
