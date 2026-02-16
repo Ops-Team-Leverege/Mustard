@@ -13,9 +13,9 @@
 
 ---
 
-## What is PitCrew?
+## What is Mustard and PitCrew Sauce?
 
-PitCrew is an AI-powered meeting intelligence platform that transforms customer conversations into searchable business insights. Upload a transcript, and the system automatically extracts product feedback, customer questions, and action items.
+Mustard is an AI-powered meeting intelligence platform that transforms customer conversations into searchable business insights. Upload a transcript, and the system automatically extracts product feedback, customer questions, and action items.
 
 **Core Value**: Transforms meeting transcripts into actionable business intelligence  
 **Interfaces**: Web dashboard + Slack bot  
@@ -38,7 +38,7 @@ PitCrew is an AI-powered meeting intelligence platform that transforms customer 
 - ✅ Customer Q&A database
 - ✅ Action item tracking
 - ✅ Company intelligence
-- ✅ Slack bot integration
+- ✅ Slack bot integration -PitCrew Sauce
 - ✅ Document generation
 
 ---
