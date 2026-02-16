@@ -153,8 +153,10 @@ export const MODEL_ASSIGNMENTS = {
 
   // Heavy Analysis - GPT-5 for complex multi-step reasoning
   TRANSCRIPT_ANALYSIS: LLM_MODELS.HEAVY_ANALYSIS,
-  EXECUTIVE_SUMMARY: LLM_MODELS.HEAVY_ANALYSIS,
   COMPLEX_SYNTHESIS: LLM_MODELS.HEAVY_ANALYSIS,
+
+  // Meeting Summary Formatting - Standard reasoning (data already extracted, LLM only formats)
+  MEETING_SUMMARY_FORMATTING: LLM_MODELS.STANDARD_REASONING,
 
   // Semantic Answer - Gemini 2.5 Flash for fast transcript analysis with 1M context
   SEMANTIC_ANSWER_SYNTHESIS: GEMINI_MODELS.FLASH,

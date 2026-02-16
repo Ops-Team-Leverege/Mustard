@@ -130,6 +130,123 @@ RESPOND WITH:
 };
 
 /**
+ * Structured meeting data for the summary formatter.
+ * All fields come from pre-extracted database records — no raw transcript analysis.
+ */
+export type MeetingSummaryData = {
+  companyName: string;
+  meetingDate: string;
+  status: string;
+  nextSteps: string;
+  leverageTeam: string;
+  customerNames: string;
+  productInsights: Array<{
+    feature: string;
+    context: string;
+    quote: string;
+    categoryName?: string | null;
+  }>;
+  qaPairs: Array<{
+    question: string;
+    answer: string;
+    asker: string;
+  }>;
+  actionItems: Array<{
+    action: string;
+    owner: string;
+    deadline: string | null;
+  }>;
+};
+
+/**
+ * System prompt for meeting summary formatting.
+ * 
+ * The LLM's role is FORMATTING AND PRESENTATION ONLY — not analysis.
+ * All data has already been extracted and stored during transcript processing.
+ * The LLM organizes and presents it clearly for Slack.
+ */
+export function getMeetingSummaryFormattingSystemPrompt(): string {
+  return `You are formatting pre-extracted meeting data for display in Slack. Your role is PRESENTATION ONLY — do not analyze, interpret, or omit any data.
+
+STRICT RULES:
+- DO NOT omit any Q&A pairs — include every single one
+- DO NOT paraphrase quotes — use them exactly as provided
+- DO NOT add information that is not in the provided data
+- DO NOT invent or infer details beyond what is given
+- DO prioritize and highlight items related to: security, pricing, compliance, business continuity, deal blockers
+- DO group related product insights together logically
+- Use Slack markdown formatting: *bold* for section headers, • for bullets, _italics_ for quotes`;
+}
+
+/**
+ * Build the user prompt for meeting summary formatting.
+ * Assembles all pre-extracted structured data into a prompt the LLM formats.
+ */
+export function buildMeetingSummaryFormattingPrompt(data: MeetingSummaryData): string {
+  const insightsSection = data.productInsights.length > 0
+    ? data.productInsights.map((ins, i) =>
+        `  ${i + 1}. Feature: ${ins.feature}\n     Context: ${ins.context}\n     Quote: "${ins.quote}"${ins.categoryName ? `\n     Category: ${ins.categoryName}` : ''}`
+      ).join('\n')
+    : '  (None extracted)';
+
+  const qaSection = data.qaPairs.length > 0
+    ? data.qaPairs.map((qa, i) =>
+        `  ${i + 1}. Asker: ${qa.asker}\n     Question: ${qa.question}\n     Answer: ${qa.answer}`
+      ).join('\n')
+    : '  (None extracted)';
+
+  const actionSection = data.actionItems.length > 0
+    ? data.actionItems.map((item, i) =>
+        `  ${i + 1}. Action: ${item.action}\n     Owner: ${item.owner}\n     Deadline: ${item.deadline || 'Not specified'}`
+      ).join('\n')
+    : '  (None extracted)';
+
+  return `Format this pre-extracted meeting data into a clear, structured Slack message.
+
+MEETING METADATA:
+- Company: ${data.companyName}
+- Date: ${data.meetingDate}
+- Status/Takeaways: ${data.status || '(Not available)'}
+- Next Steps: ${data.nextSteps || '(Not available)'}
+- Our Team: ${data.leverageTeam || '(Not available)'}
+- Customer Attendees: ${data.customerNames || '(Not available)'}
+
+PRODUCT INSIGHTS (${data.productInsights.length} total):
+${insightsSection}
+
+Q&A PAIRS (${data.qaPairs.length} total — include ALL):
+${qaSection}
+
+ACTION ITEMS (${data.actionItems.length} total):
+${actionSection}
+
+FORMAT THE OUTPUT AS:
+*Meeting Summary: ${data.companyName} — ${data.meetingDate}*
+
+*Status:* [main takeaways]
+
+*Attendees:*
+• Our team: [names]
+• Customer: [names]
+
+*Next Steps:* [next steps from metadata]
+
+---
+
+*Critical Requirements & Concerns:*
+[Product insights related to security, compliance, pricing, business continuity — with verbatim quotes in _italics_]
+
+*Feature Requests & Feedback:*
+[Remaining product insights — with verbatim quotes in _italics_]
+
+*Questions Asked & Answers Given (${data.qaPairs.length}):*
+[ALL Q&A pairs — who asked, question, answer]
+
+*Action Items (${data.actionItems.length}):*
+[All action items with owner and deadline]`;
+}
+
+/**
  * Build shape-specific system prompt for semantic single meeting answers.
  * Prompts only decide HOW to say it, not WHAT the answer is.
  */

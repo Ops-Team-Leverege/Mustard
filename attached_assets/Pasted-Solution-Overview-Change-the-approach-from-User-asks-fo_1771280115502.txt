@@ -1,0 +1,97 @@
+Solution Overview
+Change the approach from:
+User asks for summary → LLM summarizes raw transcript → Generic summary (loses details)
+To:
+User asks for summary → Query pre-extracted data from database → LLM formats/presents → Rich summary (preserves everything)
+The LLM's role changes from analyst to formatter/presenter.
+
+What Data to Query
+When generating a meeting summary, PitCrew Sauce should retrieve these from the database:
+1. From transcripts table:
+
+main_meeting_takeaways - One-line meeting status
+next_steps - Follow-up actions identified
+leverage_team - Internal attendees (e.g., "Hannah White, Julia Conn, Eric Conn, Steven Lee, Ryan Chacon")
+customer_names - Customer attendees (e.g., "Robert Moyer, Subin Babu Pallichadath Sankarankutty, Adam Walenga, J.J Santos")
+company_name - Company name
+meeting_date - When the meeting occurred
+
+2. From product_insights table (all records for this transcript):
+
+feature - What feature/capability was discussed
+context - Why they want it, what problem it solves
+quote - Verbatim customer quote (MUST be preserved exactly)
+category_id - Can be resolved to category name if needed
+
+3. From qa_pairs table (all records for this transcript):
+
+question - The exact question asked
+answer - The response given
+asker - Who asked the question
+category_id - Topic area
+
+4. From meeting_action_items table (all records for this transcript):
+
+action_text - What needs to be done
+owner_name - Who is responsible
+deadline - When it's due (may be null)
+evidence_quote - Supporting quote from transcript
+confidence - How confident the extraction is (0-1)
+
+
+How the LLM Should Be Used
+The LLM's job is now formatting and presentation only, not analysis.
+Input to LLM:
+
+The structured data retrieved from the database (all 4 queries above)
+Instructions to format it for Slack
+
+LLM Instructions Should Include:
+
+DO NOT omit any Q&A pairs - include every single one
+DO NOT paraphrase quotes - use them exactly as stored
+DO NOT add information that isn't in the provided data
+DO prioritize/highlight items related to: security, pricing, compliance, business continuity, deal blockers
+DO group related items together logically
+
+LLM Temperature:
+
+Use low temperature (0.2-0.3) for consistent formatting
+We want predictable presentation, not creative interpretation
+
+
+Expected Output Structure
+The formatted summary should include these sections:
+**Meeting Summary: [Company Name] - [Date]**
+
+**Status:** [main_meeting_takeaways from transcripts table]
+
+**Next Steps:** [next_steps from transcripts table]
+
+**Attendees:**
+- Our team: [leverage_team]
+- Customer: [customer_names]
+
+---
+
+**Critical Requirements & Concerns:**
+[Product insights related to security, compliance, pricing, business continuity]
+- Include the verbatim quote for each
+
+**Feature Requests & Feedback:**
+[Remaining product insights]
+- Include the verbatim quote for each
+
+**Questions Asked & Answers Given:**
+[ALL qa_pairs - do not skip any]
+For each:
+- Who asked: [asker]
+- Question: [question]
+- Answer: [answer]
+
+**Action Items:**
+[All meeting_action_items]
+For each:
+- Action: [action_text]
+- Owner: [owner_name]
+- Deadline: [deadline or "Not specified"]

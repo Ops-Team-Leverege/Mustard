@@ -37,7 +37,12 @@ import type { MeetingActionItem as DbActionItem } from "@shared/schema";
 import { semanticAnswerSingleMeeting, type SemanticAnswerResult } from "../slack/semanticAnswerSingleMeeting";
 import { AnswerContract } from "../decisionLayer/answerContracts";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
-import { buildCustomerQuestionsAssessmentPrompt } from "../config/prompts/singleMeeting";
+import {
+  buildCustomerQuestionsAssessmentPrompt,
+  getMeetingSummaryFormattingSystemPrompt,
+  buildMeetingSummaryFormattingPrompt,
+  type MeetingSummaryData,
+} from "../config/prompts/singleMeeting";
 import {
   type SingleMeetingContext as SharedSingleMeetingContext,
   type SingleMeetingResult as SharedSingleMeetingResult,
@@ -1114,58 +1119,97 @@ Format the email with:
 
 /**
  * Handle summary intent (explicit opt-in only).
- * Uses GPT-5 for narrative summary generation.
+ * 
+ * Queries pre-extracted structured data from the database (product insights,
+ * Q&A pairs, action items, transcript metadata) and uses the LLM as a
+ * FORMATTER — not an analyst. This preserves all deal-critical details
+ * that would be lost if an LLM re-summarized the raw transcript.
+ * 
+ * Data sources:
+ * - transcripts table: status, next steps, attendees, meeting date
+ * - product_insights table: features, context, verbatim quotes
+ * - qa_pairs table: questions, answers, who asked
+ * - meeting_action_items table: actions, owners, deadlines
  */
 async function handleSummaryIntent(
   ctx: SingleMeetingContext
 ): Promise<SingleMeetingResult> {
-  const chunks = await storage.getChunksForTranscript(ctx.meetingId, 100);
+  const transcript = await storage.getTranscriptById(ctx.meetingId);
 
-  if (chunks.length === 0) {
+  if (!transcript) {
     return {
-      answer: "I couldn't find any transcript content for this meeting.",
+      answer: "I couldn't find any meeting data for this transcript.",
       intent: "summary",
       dataSource: "not_found",
     };
   }
 
-  const transcript = chunks
-    .map(c => `[${c.speakerName || "Unknown"}]: ${c.content}`)
-    .join("\n\n");
+  const product = transcript.product as "PitCrew";
+  const [productInsights, qaPairs, actionItems] = await Promise.all([
+    storage.getProductInsightsByTranscript(product, ctx.meetingId),
+    storage.getQAPairsByTranscript(product, ctx.meetingId),
+    storage.getMeetingActionItemsByTranscript(ctx.meetingId),
+  ]);
+
+  const meetingDateStr = formatMeetingDate(ctx.meetingDate) ||
+    formatMeetingDate(transcript.meetingDate) ||
+    formatMeetingDate(transcript.createdAt) ||
+    "Date not available";
+
+  const summaryData: MeetingSummaryData = {
+    companyName: ctx.companyName,
+    meetingDate: meetingDateStr,
+    status: transcript.mainMeetingTakeaways || "",
+    nextSteps: transcript.nextSteps || "",
+    leverageTeam: transcript.leverageTeam || "",
+    customerNames: transcript.customerNames || "",
+    productInsights: productInsights.map(ins => ({
+      feature: ins.feature,
+      context: ins.context,
+      quote: ins.quote,
+      categoryName: ins.categoryName || null,
+    })),
+    qaPairs: qaPairs.map(qa => ({
+      question: qa.question,
+      answer: qa.answer,
+      asker: qa.asker,
+    })),
+    actionItems: actionItems.map(item => ({
+      action: item.actionText,
+      owner: item.ownerName,
+      deadline: item.deadline,
+    })),
+  };
+
+  const hasAnyData = summaryData.status ||
+    summaryData.nextSteps ||
+    summaryData.productInsights.length > 0 ||
+    summaryData.qaPairs.length > 0 ||
+    summaryData.actionItems.length > 0;
+
+  if (!hasAnyData) {
+    return {
+      answer: `No pre-extracted meeting data found for this ${ctx.companyName} meeting. The transcript may still be processing.`,
+      intent: "summary",
+      dataSource: "not_found",
+    };
+  }
+
+  console.log(`[SingleMeetingOrchestrator] Summary data: ${summaryData.productInsights.length} insights, ${summaryData.qaPairs.length} Q&A pairs, ${summaryData.actionItems.length} action items`);
 
   const response = await openai.chat.completions.create({
-    model: MODEL_ASSIGNMENTS.EXECUTIVE_SUMMARY,
+    model: MODEL_ASSIGNMENTS.MEETING_SUMMARY_FORMATTING,
     messages: [
-      {
-        role: "system",
-        content: `You are summarizing a business meeting transcript for Slack.
-
-Provide a concise summary with these sections:
-*Purpose*
-• One sentence describing the main goal
-
-*Key Topics*
-• Bullet list of main topics discussed
-
-*Decisions & Outcomes*
-• What was decided or agreed upon
-
-*Open Questions*
-• Any unresolved issues or concerns
-
-IMPORTANT: Use Slack formatting - wrap section headers in asterisks for bold (*Purpose*, *Key Topics*, etc). Use • for bullets. Keep it concise.`,
-      },
-      {
-        role: "user",
-        content: `Summarize this meeting transcript:\n\n${transcript.substring(0, 15000)}`,
-      },
+      { role: "system", content: getMeetingSummaryFormattingSystemPrompt() },
+      { role: "user", content: buildMeetingSummaryFormattingPrompt(summaryData) },
     ],
+    temperature: 0.2,
   });
 
-  const summary = response.choices[0]?.message?.content || "Unable to generate summary.";
+  const formatted = response.choices[0]?.message?.content || "Unable to format meeting summary.";
 
   return {
-    answer: `*Meeting Summary (${ctx.companyName})*\n\n${summary}`,
+    answer: formatted,
     intent: "summary",
     dataSource: "summary",
   };
