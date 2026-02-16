@@ -96,7 +96,7 @@ graph TB
     
     Ack --> Decision[Decision Layer:<br/>Intent Classification]
     
-    Decision --> Intent[Intent Classification<br/>LLM-based (gpt-4o)<br/>with minimal fast-paths<br/>8 intent types]
+    Decision --> Intent[Intent Classification<br/>LLM-based with gpt-4o<br/>minimal fast-paths<br/>8 intent types]
     Intent --> Context[Context Layers<br/>Determine data access scope]
     Context --> Contract[Answer Contract<br/>Select response format<br/>30+ contract types]
     
