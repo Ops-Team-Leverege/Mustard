@@ -31,6 +31,7 @@ import {
   type ProductInsightWithCategory,
   type Product,
   PRODUCTS,
+  normalizeProduct,
 } from "@shared/schema";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -425,10 +426,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/user/product", isAuthenticated, async (req: any, res) => {
     try {
-      const { product } = req.body;
+      const { product: productInput } = req.body;
 
-      // Validate product
-      if (!PRODUCTS.includes(product)) {
+      const product = normalizeProduct(productInput);
+      if (!product) {
         throw new ValidationError("Invalid product");
       }
 
@@ -1667,16 +1668,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   offset: pagination offset (default 0)
   app.get("/api/external/transcripts", validateApiKey, async (req: any, res) => {
     try {
-      const product = (req.query.product as Product) || "pitcrew";
+      const productInput = (req.query.product as string) || "PitCrew";
+      const product = normalizeProduct(productInput);
+      if (!product) {
+        return res.status(400).json({ error: `Invalid product. Must be one of: ${PRODUCTS.join(", ")}` });
+      }
       const companyId = req.query.companyId as string | undefined;
       const companyName = req.query.companyName as string | undefined;
       const status = req.query.status as string | undefined;
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
-      
-      if (!PRODUCTS.includes(product)) {
-        return res.status(400).json({ error: `Invalid product. Must be one of: ${PRODUCTS.join(", ")}` });
-      }
       
       let transcripts = await storage.getTranscripts(product);
       
@@ -1722,9 +1723,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/external/transcripts/:id", validateApiKey, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const product = (req.query.product as Product) || "pitcrew";
-      
-      if (!PRODUCTS.includes(product)) {
+      const productInput = (req.query.product as string) || "PitCrew";
+      const product = normalizeProduct(productInput);
+      if (!product) {
         throw new ValidationError(`Invalid product. Must be one of: ${PRODUCTS.join(", ")}`);
       }
       

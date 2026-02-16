@@ -19,6 +19,12 @@ import { z } from "zod";
 export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane"] as const;
 export type Product = typeof PRODUCTS[number];
 
+const PRODUCT_LOOKUP = new Map(PRODUCTS.map(p => [p.toLowerCase(), p]));
+
+export function normalizeProduct(input: string): Product | null {
+  return PRODUCT_LOOKUP.get(input.toLowerCase()) ?? null;
+}
+
 // Processing status types
 export const PROCESSING_STATUSES = ["pending", "processing", "completed", "failed"] as const;
 export type ProcessingStatus = typeof PROCESSING_STATUSES[number];
