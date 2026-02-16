@@ -1,7 +1,7 @@
-# PitCrew System Maintenance Guide
+# Mustard and PitCrew Sauce System Maintenance Guide
 
-**Last Updated**: February 13, 2026  
-**Purpose**: Reference guide for maintaining and understanding the PitCrew system structure
+**Last Updated**: February 15, 2026  
+**Purpose**: Reference guide for maintaining and understanding the system structure
 
 ---
 
@@ -17,7 +17,7 @@
 
 ## System Overview
 
-PitCrew is a meeting intelligence platform that transforms customer conversations into searchable business insights using AI. The system processes transcripts, extracts insights, and makes them accessible via web dashboard and Slack bot.
+Mustard is a meeting intelligence platform that transforms customer conversations into searchable business insights using AI. The system processes transcripts, extracts insights, and makes them accessible via web dashboard and Slack bot -PitCrew Sauce.
 
 **Core Flow**:
 ```
