@@ -127,18 +127,6 @@ See [Visual System Diagrams](VISUAL_SYSTEM_DIAGRAMS.md) for detailed flows.
   - Data flow patterns
   - Production design principles
 
-### Additional Documentation
-- **[security-implementation.md](../security-implementation.md)** - Security controls
-- **[DOCUMENTATION_VALIDATION_REPORT.md](DOCUMENTATION_VALIDATION_REPORT.md)** - Validation results
-- **[DOCUMENTATION_GAP_ANALYSIS_CORRECTED.md](DOCUMENTATION_GAP_ANALYSIS_CORRECTED.md)** - Gap analysis
-
-### Archived Documentation
-See `docs/archive/` for historical documentation:
-- Developer Guide (detailed implementation guide)
-- Maintenance Guide (vibecoding style)
-- Error Handling Guide
-- Various audit and cleanup reports
-
 ---
 
 ## Common Tasks
@@ -176,42 +164,12 @@ ORDER BY created_at DESC LIMIT 10;
 npm run db:push
 # 3. Verify changes
 ```
-
----
-
-## Performance Metrics
-
-- **Transcript Processing**: 30-60 seconds
-- **Slack Response**: 8-20 seconds average
-- **Web UI**: Sub-second operations
-- **Uptime**: 99.9% target
-- **Concurrent Users**: 10 tested, scalable to 25+
-
----
-
-## Production Checklist
-
-- [ ] Environment variables configured
-- [ ] Database migrations applied
-- [ ] Slack webhook configured
-- [ ] Airtable sync configured
-- [ ] SSL certificate valid
-- [ ] Backup system operational
-- [ ] Monitoring enabled
-
 ---
 
 ## Support
 
 ### Troubleshooting
 See [SYSTEM_MAINTENANCE.md](SYSTEM_MAINTENANCE.md#troubleshooting) for common issues and solutions.
-
-### Contact
-- **Development Team**: Internal Leverege team
-- **Documentation**: This repository
-
 ---
 
-**Last Updated**: February 13, 2026  
-**Version**: Production v1.0  
-**Status**: ✅ LIVE
+**Last Updated**: February 15, 2026  
