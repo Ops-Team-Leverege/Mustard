@@ -150,8 +150,8 @@ Return JSON: {"sentiment": "positive" | "negative" | "neutral", "confidence": "h
  * Uses config file first (fast path), then LLM for unknown emojis (slow path).
  */
 async function classifyEmoji(emoji: string): Promise<"positive" | "negative" | "unknown"> {
-    const normalized = emoji.replace(/:/g, "");
-    const baseEmoji = normalized.split("::")[0];
+    const baseEmoji = emoji.replace(/:/g, "").split("skin-tone")[0].replace(/-$/, "");
+    const normalized = baseEmoji;
 
     if (config.emojis.positive.includes(normalized) || config.emojis.positive.includes(baseEmoji)) {
         console.log(`[Feedback] Config classified "${emoji}" as positive`);

@@ -1134,7 +1134,8 @@ Format the email with:
  * - meeting_action_items table: actions, owners, deadlines (checklist)
  */
 async function handleSummaryIntent(
-  ctx: SingleMeetingContext
+  ctx: SingleMeetingContext,
+  userQuestion?: string
 ): Promise<SingleMeetingResult> {
   const [transcript, chunks] = await Promise.all([
     storage.getTranscriptById(ctx.meetingId),
@@ -1175,13 +1176,21 @@ async function handleSummaryIntent(
     .map(c => `[${c.speakerName || "Unknown"}]: ${c.content}`)
     .join("\n\n");
 
-  console.log(`[SingleMeetingOrchestrator] Summary v3: ${chunks.length} chunks, transcript-only extraction`);
+  const isConversationalSummary = userQuestion && !/\b(full\s+report|full\s+debrief|complete\s+record|exhaustive|detailed\s+report)\b/i.test(userQuestion);
+  console.log(`[SingleMeetingOrchestrator] Summary v3: ${chunks.length} chunks, transcript-only extraction, conversational=${isConversationalSummary}`);
+
+  let userPrompt = buildSingleMeetingSummaryPrompt(summaryData, transcriptText);
+
+  if (isConversationalSummary) {
+    userPrompt += `\n\nIMPORTANT — The user asked: "${userQuestion}"
+This is a conversational Slack question, NOT a request for a full exhaustive report. Generate ONLY PART 1 (Executive Summary) — skip PART 2 (Complete Record) entirely. Keep the output focused and concise. Tailor the executive summary to address what the user is specifically asking for.`;
+  }
 
   const response = await openai.chat.completions.create({
     model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,
     messages: [
       { role: "system", content: getMeetingSummarySystemPrompt() },
-      { role: "user", content: buildSingleMeetingSummaryPrompt(summaryData, transcriptText) },
+      { role: "user", content: userPrompt },
     ],
   });
 
@@ -1444,7 +1453,7 @@ export async function handleSingleMeetingQuestion(
     const offerResponse = detectOfferResponse(question);
     if (offerResponse === "accept") {
       console.log(`[SingleMeetingOrchestrator] User accepted pending offer - triggering summary`);
-      return handleSummaryIntent(ctx);
+      return handleSummaryIntent(ctx, question);
     }
     if (offerResponse === "decline") {
       console.log(`[SingleMeetingOrchestrator] User declined pending offer`);
@@ -1593,7 +1602,7 @@ export async function handleSingleMeetingQuestion(
     }
 
     case "summary":
-      const summaryResult = await handleSummaryIntent(ctx);
+      const summaryResult = await handleSummaryIntent(ctx, question);
       return summaryResult;
 
     case "drafting": {

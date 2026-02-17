@@ -1,0 +1,164 @@
+2026-02-17 12:49:19.02
+30f93566
+User
+[SlackAPI] Seeded feedback reactions on 1771361054.055109
+2026-02-17 12:49:19.88
+30f93566
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-17T20:49:19.885Z ==========
+2026-02-17 12:49:19.88
+30f93566
+User
+[Slack] Received event request
+2026-02-17 12:49:19.88
+30f93566
+User
+Event type: reaction_added
+2026-02-17 12:49:19.88
+30f93566
+User
+Slack payload type: event_callback
+2026-02-17 12:49:19.88
+30f93566
+User
+8:49:19 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-17 12:49:20.34
+30f93566
+User
+[Slack] Received event request
+2026-02-17 12:49:20.34
+30f93566
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-17T20:49:20.347Z ==========
+2026-02-17 12:49:20.34
+30f93566
+User
+Slack payload type: event_callback
+2026-02-17 12:49:20.34
+30f93566
+User
+Event type: reaction_added
+2026-02-17 12:49:20.34
+30f93566
+User
+8:49:20 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-17 12:49:21.38
+30f93566
+User
+[Feedback] Reaction added: +1 by U0A704T7THR on message 1771361054.055109
+2026-02-17 12:49:21.38
+30f93566
+User
+[FeatureFlags] Feedback system enabled - database schema is ready
+2026-02-17 12:50:41.68
+30f93566
+User
+Event type: reaction_added
+2026-02-17 12:50:41.68
+30f93566
+User
+[Feedback] Reaction added: -1::skin-tone-2 by U082TV42FM0 on message 1771361054.055109
+2026-02-17 12:50:41.68
+30f93566
+User
+8:50:41 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-17 12:50:41.68
+30f93566
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-17T20:50:41.681Z ==========
+2026-02-17 12:50:41.68
+30f93566
+User
+Slack payload type: event_callback
+2026-02-17 12:50:41.68
+30f93566
+User
+[Slack] Received event request
+2026-02-17 12:50:41.68
+30f93566
+User
+[Feedback] Emoji "-1::skin-tone-2" not in config - using LLM classification
+2026-02-17 12:50:43.28
+30f93566
+User
+[Feedback] Ignoring unknown emoji: -1::skin-tone-2
+2026-02-17 12:50:43.28
+30f93566
+User
+[Feedback] LLM classified "-1skin-tone-2" as neutral (confidence: medium)
+2026-02-17 12:52:13.90
+30f93566
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-17T20:52:13.901Z ==========
+2026-02-17 12:52:13.90
+30f93566
+User
+[Slack] Received event request
+2026-02-17 12:52:13.90
+30f93566
+User
+Event type: reaction_added
+2026-02-17 12:52:13.90
+30f93566
+User
+Slack payload type: event_callback
+2026-02-17 12:52:13.90
+30f93566
+User
+[Feedback] Reaction added: crossed_fingers by ULE381USY on message 1771359336.690319
+2026-02-17 12:52:13.90
+30f93566
+User
+[Feedback] Emoji "crossed_fingers" not in config - using LLM classification
+2026-02-17 12:52:13.90
+30f93566
+User
+8:52:13 PM [express] POST /api/slack/events 200 in 3ms
+2026-02-17 12:52:14.70
+30f93566
+User
+[Feedback] LLM classified "crossed_fingers" as neutral (confidence: medium)
+2026-02-17 12:52:14.70
+30f93566
+User
+[Feedback] Ignoring unknown emoji: crossed_fingers
+2026-02-17 12:52:14.71
+30f93566
+User
+[Slack] Received event request
+2026-02-17 12:52:14.71
+30f93566
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-17T20:52:14.711Z ==========
+2026-02-17 12:52:14.71
+30f93566
+User
+Slack payload type: event_callback
+2026-02-17 12:52:14.71
+30f93566
+User
+Event type: reaction_added
+2026-02-17 12:52:14.71
+30f93566
+User
+[Feedback] Emoji "laughing" not in config - using LLM classification
+2026-02-17 12:52:14.71
+30f93566
+User
+[Feedback] Reaction added: laughing by ULE381USY on message 1771359336.690319
+2026-02-17 12:52:14.71
+30f93566
+User
+8:52:14 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-17 12:52:16.18
+30f93566
+User
+[Feedback] LLM classified "laughing" as positive (confidence: high)
+2026-02-17 12:52:16.18
+30f93566
+User
+[Feedback] Final classification: positive
+2026-02-17 12:52:19.79
+30f93566
+User
+[Feedback] No interaction found for message 1771359336.690319
