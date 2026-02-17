@@ -27,7 +27,7 @@ import { classifyPipelineError } from "../utils/errorHandler";
 import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "./context/meetingResolver";
 import { resolveCompany } from "./context/companyResolver";
-import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource, type ClarificationType, type ClarificationResolution } from "./interactionMetadata";
+import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource } from "./interactionMetadata";
 import { logInteraction, mapLegacyDataSource, mapLegacyArtifactType } from "./logInteraction";
 import { handleOpenAssistant, type OpenAssistantResult } from "../openAssistant";
 import type { SlackStreamingContext } from "../openAssistant/types";
@@ -42,11 +42,9 @@ import { PROGRESS_MESSAGE_CONSTANTS, QA_SEARCH_CONSTANTS } from "../config/const
 import { LLM_MODELS } from "../config/models";
 import OpenAI from "openai";
 
-// Extracted handler modules
-import { handleAmbiguity } from "./handlers/ambiguityHandler";
-import { handleBinaryQuestion } from "./handlers/binaryQuestionHandler";
-import { handleNextStepsOrSummaryResponse, handleProposedInterpretationConfirmation } from "./handlers/clarificationHandler";
-import { handleAnswerQuestions } from "./handlers/answerQuestionsHandler";
+// Legacy handler modules removed — Decision Layer is now sole authority for intent routing.
+// Removed: ambiguityHandler, binaryQuestionHandler, clarificationHandler, answerQuestionsHandler
+// All these cases are now handled by the Decision Layer's LLM-first classification with full thread context.
 import { createProgressManager } from "./context/progressManager";
 import { resolveThreadContext, shouldReuseThreadContext } from "./context/threadResolver";
 import { getSourceAttribution } from "./sourceAttribution";
@@ -374,102 +372,23 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
     };
 
-    // 7.5 EARLY AMBIGUITY DETECTION (preparation/briefing questions)
-    // Extracted to handlers/ambiguityHandler.ts
-    const ambiguityResult = await handleAmbiguity({
-      channel,
-      threadTs,
-      messageTs,
-      text,
-      userId: userId || null,
-      testRun,
-    });
-    if (ambiguityResult.handled) {
-      clearProgressTimer();
-      return; // Stop processing - clarification required
-    }
-
-    // 7.6 EARLY BINARY QUESTION HANDLING (existence checks)
-    // Extracted to handlers/binaryQuestionHandler.ts
-    const binaryResult = await handleBinaryQuestion({
-      channel,
-      threadTs,
-      messageTs,
-      text,
-      userId: userId || null,
-      testRun,
-    });
-    if (binaryResult.handled) {
-      clearProgressTimer();
-      return; // Done - fast path completed
-    }
-
     // 8. Thread context resolution (deterministic follow-up support)
     // Extracted to context/threadResolver.ts
     const threadResolution = await resolveThreadContext(threadTs, text, isReply);
     const threadContext = threadResolution.threadContext;
-    const awaitingClarification = threadResolution.awaitingClarification;
     const companyNameFromContext = threadResolution.companyNameFromContext;
-    const storedProposedInterpretation = threadResolution.storedProposedInterpretation;
-    const originalQuestion = threadResolution.originalQuestion;
-    const lastResponseType = threadResolution.lastResponseType;
 
-    // 8.5 CLARIFICATION RESPONSE HANDLING (fast path)
-    // Extracted to handlers/clarificationHandler.ts
-    const pendingOfferFromThread = threadResolution.pendingOffer;
-
-    const clarificationCtx = {
-      channel,
-      threadTs,
-      messageTs,
-      text,
-      userId: userId || null,
-      testRun,
-      threadContext,
-      awaitingClarification,
-      companyNameFromContext,
-      storedProposedInterpretation,
-      originalQuestion,
-      pendingOffer: pendingOfferFromThread,
-    };
-
-    // 8.4.4-8.4.5 REMOVED: Offer response handlers (handleMeetingSearchOfferResponse, handleSlackSearchOfferResponse)
-    // These intercepted messages before the Decision Layer using regex patterns, violating the
-    // "Decision Layer as sole authority" principle. The Decision Layer LLM already receives full
-    // thread history and can naturally classify "sure, do it" as SLACK_SEARCH when the bot
-    // previously offered Slack search. See Decision Layer prompt follow-up handling.
-
-    const nextStepsResult = await handleNextStepsOrSummaryResponse(clarificationCtx);
-    if (nextStepsResult.handled) {
-      clearProgressTimer();
-      return; // Done - fast path completed
-    }
-
-    // 8.6 PROPOSED INTERPRETATION FOLLOW-UP (for "yes", "1", etc. responses)
-    // Extracted to handlers/clarificationHandler.ts
-    const confirmationResult = await handleProposedInterpretationConfirmation(clarificationCtx);
-    if (confirmationResult.handled) {
-      clearProgressTimer();
-      return; // Done - clarification follow-up completed
-    }
-
-    // 8.7 "ANSWER THOSE QUESTIONS" FOLLOW-UP HANDLING
-    // Extracted to handlers/answerQuestionsHandler.ts
-    const answerQuestionsResult = await handleAnswerQuestions({
-      channel,
-      threadTs,
-      messageTs,
-      text,
-      userId: userId || null,
-      testRun,
-      threadContext: threadContext || null,
-      lastResponseType,
-      companyNameFromContext,
-      clearProgressTimer,
-    });
-    if (answerQuestionsResult.handled) {
-      return; // Done - fast path completed
-    }
+    // LEGACY HANDLERS REMOVED (steps 7.5-8.7):
+    // ambiguityHandler, binaryQuestionHandler, clarificationHandler, answerQuestionsHandler
+    // All previously ran BEFORE the Decision Layer with hardcoded regex patterns, violating
+    // "Decision Layer as sole authority" principle. The Decision Layer LLM now handles:
+    // - Ambiguous prep questions → CLARIFY intent with clarificationSuggestion
+    // - Binary existence questions → SINGLE_MEETING/EXTRACTIVE_FACT with DB lookup
+    // - "next steps" / "summary" follow-ups → SINGLE_MEETING with NEXT_STEPS/MEETING_SUMMARY contracts
+    // - "yes" / "1" confirmations → Follow-up handling via thread context
+    // - "answer those questions" → PRODUCT_KNOWLEDGE with DRAFT_RESPONSE chain
+    // All routed through the same Decision Layer → Open Assistant pipeline with full
+    // prompt version tracking, structured metadata, and consistent logging.
 
     // INTENT-FIRST ARCHITECTURE:
     // Run Decision Layer FIRST to classify intent, then resolve meeting only when needed.
