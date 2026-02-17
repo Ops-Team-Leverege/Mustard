@@ -35,66 +35,76 @@ const PROMPT_TEXT_MAP: Record<keyof PromptVersions, string> = {
 async function main() {
     console.log("Starting prompt versions backfill migration...\n");
 
-    // Step 1: Insert initial prompt versions
-    console.log("Step 1: Creating initial prompt version records...");
-    let insertedCount = 0;
+    try {
+        await storage.rawQuery("BEGIN");
 
-    for (const [promptName, version] of Object.entries(PROMPT_VERSIONS)) {
-        const changeLog = PROMPT_CHANGE_LOG[promptName]?.[0];
-        const promptText = PROMPT_TEXT_MAP[promptName as keyof PromptVersions];
+        console.log("Step 1: Creating initial prompt version records...");
+        let insertedCount = 0;
 
-        try {
-            await storage.insertPromptVersion({
-                promptName,
-                version,
-                promptText,
-                changeReason: changeLog?.reason || "Initial version",
-                changedBy: "system",
-            });
-            console.log(`  ✓ Created ${promptName} v${version}`);
-            insertedCount++;
-        } catch (error: any) {
-            // Ignore duplicate key errors (already exists)
-            if (error.code === "23505" || error.message?.includes("duplicate")) {
-                console.log(`  - ${promptName} v${version} already exists`);
-            } else {
-                console.error(`  ✗ Failed to create ${promptName}:`, error.message);
+        for (const [promptName, version] of Object.entries(PROMPT_VERSIONS)) {
+            const changeLog = PROMPT_CHANGE_LOG[promptName]?.[0];
+            const promptText = PROMPT_TEXT_MAP[promptName as keyof PromptVersions];
+
+            try {
+                await storage.insertPromptVersion({
+                    promptName,
+                    version,
+                    promptText,
+                    changeReason: changeLog?.reason || "Initial version",
+                    changedBy: "system",
+                });
+                console.log(`  ✓ Created ${promptName} v${version}`);
+                insertedCount++;
+            } catch (error: any) {
+                if (error.code === "23505" || error.message?.includes("duplicate")) {
+                    console.log(`  - ${promptName} v${version} already exists`);
+                } else {
+                    throw error;
+                }
             }
         }
+
+        console.log(`\nInserted ${insertedCount} new prompt version records.\n`);
+
+        console.log("Step 2: Backfilling existing interaction_logs...");
+
+        const defaultPromptVersions = {
+            intent_classification: "2026-02-17-001",
+            contract_selection: "2026-02-17-001",
+            answer_generation: "2026-02-17-001",
+        };
+
+        try {
+            const result = await storage.rawQuery(
+                `UPDATE interaction_logs 
+           SET prompt_versions = $1 
+           WHERE prompt_versions IS NULL`,
+                [JSON.stringify(defaultPromptVersions)]
+            );
+
+            console.log(`  ✓ Backfilled ${result.length || 0} interaction records with default prompt versions`);
+        } catch (error: any) {
+            console.error(`  ✗ Failed to backfill interactions:`, error.message);
+        }
+
+        await storage.rawQuery("COMMIT");
+        console.log("\n✅ Migration complete!");
+    } catch (error) {
+        console.error("\n❌ Migration failed, rolling back...");
+        try {
+            await storage.rawQuery("ROLLBACK");
+            console.log("Rollback successful.");
+        } catch (rollbackError) {
+            console.error("Rollback also failed:", rollbackError);
+        }
+        throw error;
     }
 
-    console.log(`\nInserted ${insertedCount} new prompt version records.\n`);
-
-    // Step 2: Backfill existing interaction_logs
-    console.log("Step 2: Backfilling existing interaction_logs...");
-
-    // Default prompt versions for backfill (all interactions before this migration)
-    const defaultPromptVersions = {
-        intent_classification: "2026-02-17-001",
-        contract_selection: "2026-02-17-001",
-        answer_generation: "2026-02-17-001",
-    };
-
-    try {
-        // Update all rows where prompt_versions is null
-        const result = await storage.rawQuery(
-            `UPDATE interaction_logs 
-       SET prompt_versions = $1 
-       WHERE prompt_versions IS NULL`,
-            [JSON.stringify(defaultPromptVersions)]
-        );
-
-        console.log(`  ✓ Backfilled ${result.length || 0} interaction records with default prompt versions`);
-    } catch (error: any) {
-        console.error(`  ✗ Failed to backfill interactions:`, error.message);
-    }
-
-    console.log("\n✅ Migration complete!");
     console.log("\nNext steps:");
     console.log("1. Run 'npm run db:push' to apply schema changes to the database");
     console.log("2. Verify the changes in your database");
     console.log("3. Update Slack app settings to subscribe to 'reaction_added' and 'reaction_removed' events");
-    console.log("4. Test by reacting to a bot message with 👍 or ❌");
+    console.log("4. Test by reacting to a bot message with a configured emoji");
 }
 
 main().catch((error) => {

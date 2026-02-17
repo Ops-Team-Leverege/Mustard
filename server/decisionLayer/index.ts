@@ -44,6 +44,8 @@ import OpenAI from "openai";
 import { AGGREGATE_SPECIFICITY_CHECK_PROMPT } from "../config/prompts";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { storage } from "../storage";
+import { PROMPT_VERSIONS } from "../config/prompts/versions";
+import { PromptVersionTracker } from "../utils/promptVersionTracker";
 
 export {
   Intent,
@@ -120,6 +122,7 @@ export type DecisionLayerResult = {
   requiresStyleMatching?: boolean;                 // LLM-determined: should output match PitCrew's existing feature description style?
   aggregateFallback?: "qa_pairs_first";            // When set, use qa_pairs keyword search before falling back to meeting search
   userExplicitlyRequestedMeetings?: boolean;       // True if user's language explicitly references meetings/transcripts (skips qa_pairs)
+  promptVersions?: Record<string, string>;         // Tracked prompt versions used in this decision
 };
 
 // Backward compatibility alias
@@ -232,7 +235,10 @@ export async function runDecisionLayer(
     });
   }
 
+  const tracker = new PromptVersionTracker();
+
   const intentResult = await classifyIntent(question, threadContext);
+  tracker.track("INTENT_CLASSIFICATION_PROMPT", PROMPT_VERSIONS.INTENT_CLASSIFICATION_PROMPT);
 
   console.log(`[DecisionLayer] Intent: ${intentResult.intent} (${intentResult.intentDetectionMethod})`);
 
@@ -247,6 +253,7 @@ export async function runDecisionLayer(
     layersMeta.layers,
     intentResult.proposedInterpretation?.contracts
   );
+  tracker.track("CONTRACT_SELECTION_PROMPT", PROMPT_VERSIONS.CONTRACT_SELECTION_PROMPT);
 
   console.log(`[DecisionLayer] Contract: ${contractResult.contract} (${contractResult.contractSelectionMethod})`);
 
@@ -259,6 +266,7 @@ export async function runDecisionLayer(
 
   if (intentResult.intent === Intent.MULTI_MEETING) {
     const specificity = await checkAggregateSpecificity(question, threadContext);
+    tracker.track("AGGREGATE_SPECIFICITY_CHECK_PROMPT", PROMPT_VERSIONS.AGGREGATE_SPECIFICITY_CHECK_PROMPT);
 
     const effectiveScopeType = specificity.scopeType === "none" ? "all" : specificity.scopeType;
     const effectiveAllCustomers = effectiveScopeType === "all";
@@ -329,6 +337,7 @@ export async function runDecisionLayer(
     requiresProductKnowledge: intentResult.requiresProductKnowledge,
     requiresStyleMatching: intentResult.requiresStyleMatching,
     ...(useAggregateFallback ? { aggregateFallback: "qa_pairs_first" as const, userExplicitlyRequestedMeetings } : {}),
+    promptVersions: tracker.getVersions() as Record<string, string>,
   };
 
   console.log(`[DecisionLayer] ✅ CONTEXT CHECKPOINT 5 - Final Decision:`);

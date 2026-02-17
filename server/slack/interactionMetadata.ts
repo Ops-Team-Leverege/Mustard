@@ -209,6 +209,7 @@ export function buildInteractionMetadata(
     awaitingClarification?: ClarificationType;
     pendingOffer?: string;
     lastResponseType?: string; // For follow-up context (e.g., "qa_pairs")
+    promptVersions?: Record<string, string>; // Tracked prompt versions from Decision Layer and orchestrators
     testRun?: boolean;
     meetingDetection?: {
       regexResult: boolean;
@@ -284,6 +285,8 @@ export function buildInteractionMetadata(
     },
 
     evidence_sources: execution.evidenceSources,
+
+    prompt_versions: execution.promptVersions,
 
     meeting_detection: execution.meetingDetection ? {
       regex_result: execution.meetingDetection.regexResult,

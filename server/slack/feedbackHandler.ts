@@ -31,11 +31,66 @@ type FeedbackConfig = {
 
 const config = feedbackConfig as FeedbackConfig;
 
+const STORAGE_NOT_SUPPORTED = "not supported";
+const PG_TABLE_NOT_FOUND = "42P01";
+
+const MAX_EMOJI_LENGTH = 100;
+const EMOJI_PATTERN = /^[a-zA-Z0-9_+\-:]+$/;
+
+const emojiClassificationCache = new Map<string, "positive" | "negative" | "unknown">();
+
+const reactionRateLimit = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 10;
+
+function getNotificationChannel(): string {
+    return process.env.SLACK_FEEDBACK_CHANNEL || config.notificationChannel;
+}
+
+function sanitizeEmoji(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (trimmed.length === 0 || trimmed.length > MAX_EMOJI_LENGTH) {
+        return null;
+    }
+    if (!EMOJI_PATTERN.test(trimmed)) {
+        return null;
+    }
+    return trimmed;
+}
+
+function isStorageNotSupported(error: any): boolean {
+    return error?.message?.includes(STORAGE_NOT_SUPPORTED) || error?.code === PG_TABLE_NOT_FOUND;
+}
+
+function checkRateLimit(userId: string): boolean {
+    const now = Date.now();
+    const entry = reactionRateLimit.get(userId);
+
+    if (!entry || now >= entry.resetAt) {
+        reactionRateLimit.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+        return true;
+    }
+
+    if (entry.count >= RATE_LIMIT_MAX) {
+        return false;
+    }
+
+    entry.count++;
+    return true;
+}
+
 /**
  * Classify an emoji using LLM.
  * Fallback for emojis not in the config file.
+ * Results are cached to avoid redundant API calls.
  */
 async function classifyEmojiWithLLM(emoji: string): Promise<"positive" | "negative" | "unknown"> {
+    const cached = emojiClassificationCache.get(emoji);
+    if (cached) {
+        console.log(`[Feedback] Cache hit for emoji "${emoji}": ${cached}`);
+        return cached;
+    }
+
     try {
         const openai = new OpenAI();
 
@@ -70,13 +125,15 @@ Return JSON: {"sentiment": "positive" | "negative" | "neutral", "confidence": "h
 
         console.log(`[Feedback] LLM classified "${emoji}" as ${sentiment} (confidence: ${confidence})`);
 
-        // Only use high/medium confidence classifications
         if (confidence === "low") {
             console.log(`[Feedback] Low confidence classification - treating as unknown`);
+            emojiClassificationCache.set(emoji, "unknown");
             return "unknown";
         }
 
-        return sentiment === "neutral" ? "unknown" : sentiment;
+        const finalSentiment: "positive" | "negative" | "unknown" = sentiment === "neutral" ? "unknown" : sentiment;
+        emojiClassificationCache.set(emoji, finalSentiment);
+        return finalSentiment;
     } catch (error) {
         console.error(`[Feedback] Error classifying emoji with LLM:`, error);
         return "unknown";
@@ -88,10 +145,9 @@ Return JSON: {"sentiment": "positive" | "negative" | "neutral", "confidence": "h
  * Uses config file first (fast path), then LLM for unknown emojis (slow path).
  */
 async function classifyEmoji(emoji: string): Promise<"positive" | "negative" | "unknown"> {
-    const normalized = emoji.replace(/:/g, ""); // Remove colons if present
-    const baseEmoji = normalized.split("::")[0]; // Strip skin-tone variants (e.g., "+1::skin-tone-2" → "+1")
+    const normalized = emoji.replace(/:/g, "");
+    const baseEmoji = normalized.split("::")[0];
 
-    // Fast path: Check config first (try both full and base emoji)
     if (config.emojis.positive.includes(normalized) || config.emojis.positive.includes(baseEmoji)) {
         console.log(`[Feedback] Config classified "${emoji}" as positive`);
         return "positive";
@@ -102,10 +158,9 @@ async function classifyEmoji(emoji: string): Promise<"positive" | "negative" | "
         return "negative";
     }
 
-    // Slow path: Ask LLM for unknown emojis (if enabled)
     if (config.useLLMForUnknownEmojis) {
         console.log(`[Feedback] Emoji "${emoji}" not in config - using LLM classification`);
-        return await classifyEmojiWithLLM(emoji);
+        return await classifyEmojiWithLLM(baseEmoji);
     }
 
     console.log(`[Feedback] Emoji "${emoji}" not in config and LLM disabled - treating as unknown`);
@@ -127,18 +182,27 @@ export async function handleReactionAdded(event: {
     };
 }): Promise<void> {
     try {
-        // Only handle message reactions
         if (event.item.type !== "message") {
             console.log(`[Feedback] Ignoring non-message reaction: ${event.item.type}`);
             return;
         }
 
-        const { user: userId, reaction: emoji, item } = event;
+        const { user: userId, reaction: rawEmoji, item } = event;
         const { channel, ts: messageTs } = item;
+
+        const emoji = sanitizeEmoji(rawEmoji);
+        if (!emoji) {
+            console.warn(`[Feedback] Invalid emoji rejected: length=${rawEmoji.length}`);
+            return;
+        }
+
+        if (!checkRateLimit(userId)) {
+            console.warn(`[Feedback] Rate limit exceeded for user ${userId}`);
+            return;
+        }
 
         console.log(`[Feedback] Reaction added: ${emoji} by ${userId} on message ${messageTs}`);
 
-        // Classify the emoji (async - may use LLM for unknown emojis)
         const sentiment = await classifyEmoji(emoji);
         if (sentiment === "unknown") {
             console.log(`[Feedback] Ignoring unknown emoji: ${emoji}`);
@@ -147,17 +211,15 @@ export async function handleReactionAdded(event: {
 
         console.log(`[Feedback] Final classification: ${sentiment}`);
 
-        // Find the interaction this reaction is for
-        // SAFETY: Catch "not supported" errors from MemStorage
         let interaction;
         try {
             interaction = await storage.getInteractionByMessageTs(messageTs);
         } catch (error: any) {
-            if (error.message?.includes("not supported")) {
+            if (isStorageNotSupported(error)) {
                 console.log(`[Feedback] Storage backend does not support feedback tracking - skipping`);
                 return;
             }
-            throw error; // Re-throw other errors
+            throw error;
         }
 
         if (!interaction) {
@@ -167,13 +229,11 @@ export async function handleReactionAdded(event: {
 
         console.log(`[Feedback] Found interaction: ${interaction.id}`);
 
-        // Check if user already reacted with this emoji (prevent duplicates)
-        // SAFETY: Gracefully handle if duplicate checking not supported
         let alreadyReacted = false;
         try {
             alreadyReacted = await storage.hasUserReacted(interaction.id, userId, emoji);
         } catch (error: any) {
-            if (error.message?.includes("not supported")) {
+            if (isStorageNotSupported(error)) {
                 console.log(`[Feedback] Storage backend does not support duplicate checking - proceeding anyway`);
             } else {
                 throw error;
@@ -185,8 +245,6 @@ export async function handleReactionAdded(event: {
             return;
         }
 
-        // Store the feedback
-        // SAFETY: Catch "not supported" errors to prevent crash
         try {
             await storage.insertInteractionFeedback({
                 interactionId: interaction.id,
@@ -201,20 +259,18 @@ export async function handleReactionAdded(event: {
 
             console.log(`[Feedback] Stored ${sentiment} feedback for interaction ${interaction.id}`);
 
-            // Send notification for negative feedback
             if (sentiment === "negative" && config.notificationSettings.enabled) {
                 await sendNegativeFeedbackNotification(interaction, userId, emoji, channel, messageTs);
             }
         } catch (error: any) {
-            if (error.message?.includes("not supported")) {
-                console.log(`[Feedback] Storage backend does not support feedback tracking - skipping notification`);
+            if (isStorageNotSupported(error)) {
+                console.log(`[Feedback] Storage backend does not support feedback tracking - skipping`);
                 return;
             }
             throw error;
         }
     } catch (error) {
         console.error("[Feedback] Error handling reaction:", error);
-        // Don't re-throw - we don't want a reaction to crash the event handler
     }
 }
 
@@ -229,6 +285,7 @@ async function sendNegativeFeedbackNotification(
     messageTs: string
 ): Promise<void> {
     try {
+        const notificationChannel = getNotificationChannel();
         const threadLink = messageTs
             ? `https://slack.com/archives/${channel}/p${messageTs.replace(".", "")}`
             : null;
@@ -239,7 +296,8 @@ async function sendNegativeFeedbackNotification(
         message += `*Intent:* ${interaction.intent || "unknown"}\n`;
         message += `*Contract:* ${interaction.answerContract || "unknown"}\n\n`;
 
-        message += `*Question:*\n> ${interaction.questionText || "(no question recorded)"}\n\n`;
+        const questionText = interaction.questionText || "(no question recorded)";
+        message += `*Question:*\n> ${questionText.substring(0, 300)}${questionText.length > 300 ? "..." : ""}\n\n`;
 
         const answerText = interaction.answerText || "(no answer recorded)";
         message += `*Answer:*\n> ${answerText.substring(0, 500)}${answerText.length > 500 ? "..." : ""}\n\n`;
@@ -264,11 +322,10 @@ async function sendNegativeFeedbackNotification(
             message += `<${threadLink}|View Thread>`;
         }
 
-        await postSlackMessage({ channel: config.notificationChannel, text: message });
-        console.log(`[Feedback] Sent negative feedback notification to ${config.notificationChannel}`);
+        await postSlackMessage({ channel: notificationChannel, text: message });
+        console.log(`[Feedback] Sent negative feedback notification to ${notificationChannel}`);
     } catch (error) {
         console.error("[Feedback] Error sending notification:", error);
-        // Don't re-throw - notification failure shouldn't crash the handler
     }
 }
 
@@ -286,5 +343,4 @@ export async function handleReactionRemoved(event: {
     };
 }): Promise<void> {
     console.log(`[Feedback] Reaction removed: ${event.reaction} by ${event.user} on message ${event.item.ts}`);
-    // Could implement feedback removal here if needed
 }

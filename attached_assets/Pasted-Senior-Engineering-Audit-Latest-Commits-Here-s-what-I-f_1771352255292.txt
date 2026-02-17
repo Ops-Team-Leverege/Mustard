@@ -1,0 +1,99 @@
+Senior Engineering Audit - Latest Commits
+Here's what I found reviewing the last 10 commits:
+
+🔴 CRITICAL ISSUES
+1. Prompt Version Tracking System is Not Actually Integrated
+
+The entire PromptVersionTracker class is defined but NEVER USED anywhere in the codebase
+No calls to new PromptVersionTracker(), .track(), or .getVersions() exist
+The Decision Layer, Single Meeting Orchestrator, and all LLM-calling code don't track versions
+Result: The prompt_versions field in interaction_logs will always be null/empty
+This is a band-aid documentation system with no actual implementation
+2. Feature Flag System is a Hotfix, Not a Solution
+
+featureFlags.ts checks if tables exist by running SELECT queries and catching errors
+This is symptomatic treatment - the root cause is missing migration orchestration
+Proper solution: Use a migration state table or framework (like Drizzle migrations) to track schema state
+Current approach: Try-catch on production queries to detect schema state
+3. Hardcoded Notification Channel
+
+feedback.json
+ has "notificationChannel": "operations-testing_notifications" hardcoded
+This is use-case specific logic that will break when:
+Running in different environments (dev/staging/prod)
+Different teams want different channels
+Testing in isolation
+Should be environment variable: process.env.SLACK_NOTIFICATION_CHANNEL
+🟡 ARCHITECTURE VIOLATIONS
+4. Feedback System Violates Single Responsibility
+
+feedbackHandler.ts does: emoji classification, LLM calls, storage, AND notifications
+Should be split into:
+EmojiClassifier (classification logic)
+FeedbackRepository (storage)
+FeedbackNotifier (Slack notifications)
+5. Graceful Degradation is Actually Silent Failures
+
+Multiple try-catch blocks with console.log that swallow errors:
+if (error.message?.includes("not supported")) {
+    console.log(`[Feedback] Storage backend does not support...`);
+    return; // SILENTLY FAILS
+}
+Users get no indication their feedback wasn't recorded
+Operators don't get alerts about system degradation
+6. LLM Classification in Hot Path
+
+Unknown emojis trigger OpenAI API call on EVERY reaction
+No caching of emoji classifications
+If someone uses 🎉 100 times, that's 100 API calls
+Should cache: Map<emoji, sentiment> or Redis
+🟠 SECURITY CONCERNS
+7. No Input Validation on Emoji Field
+
+Emoji string from Slack is passed directly to:
+Database (potential injection if not parameterized)
+LLM prompt (potential prompt injection)
+Slack notification (potential XSS if rendered as HTML)
+Should validate: max length, allowed characters, sanitize before use
+8. Missing Rate Limiting
+
+No rate limit on reaction events
+Malicious user could spam reactions to:
+Trigger expensive LLM calls
+Flood notification channel
+Fill database with junk data
+9. Notification Includes Sensitive Data
+
+Notifications expose:
+Full question/answer text (may contain PII)
+User IDs
+Company information
+No redaction or access control on notification channel
+Anyone in operations-testing_notifications sees everything
+🟢 ERROR HANDLING & UX GAPS
+10. No User Feedback on Feedback
+
+When user reacts, they get zero confirmation
+If storage fails, they don't know
+If emoji is ignored (unknown + LLM disabled), they don't know
+Should: React with ✅ or ❌ to acknowledge
+11. Migration Script Has No Rollback
+
+backfillPromptVersions.ts modifies data but can't be undone
+If it fails halfway, database is in inconsistent state
+Should: Use transactions or provide rollback script
+12. Duplicate Reaction Prevention is Weak
+
+Uses onConflictDoNothing() in database
+But if hasUserReacted() check fails (not supported), duplicates can occur
+Should: Handle at application level with proper error handling
+🔵 CODE QUALITY ISSUES
+13. Magic Strings Everywhere
+
+"not supported", "does not exist", error code "42P01" hardcoded
+Should: Define error constants or use error types
+14. Inconsistent Error Handling Patterns
+
+Some functions throw, some return null, some log and continue
+Makes it impossible to know what to expect
+Should: Define error handling strategy and document it

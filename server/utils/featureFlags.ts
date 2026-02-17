@@ -6,6 +6,8 @@
 
 import { storage } from "../storage";
 
+const PG_TABLE_NOT_FOUND = "42P01";
+
 let feedbackSystemEnabled: boolean | null = null;
 
 /**
@@ -42,7 +44,7 @@ export async function isFeedbackSystemEnabled(): Promise<boolean> {
         return true;
     } catch (error: any) {
         // If tables don't exist, disable the feature
-        if (error.message?.includes("does not exist") || error.code === "42P01") {
+        if (error.message?.includes("does not exist") || error.code === PG_TABLE_NOT_FOUND) {
             console.log("[FeatureFlags] Feedback system disabled - database migration not yet applied");
             console.log("[FeatureFlags] Run 'npm run db:push' and 'tsx server/migrations/backfillPromptVersions.ts' to enable");
             feedbackSystemEnabled = false;

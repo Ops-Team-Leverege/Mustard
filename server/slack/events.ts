@@ -1229,6 +1229,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               semanticConfidence,
               pendingOffer,
               lastResponseType: dataSource, // Track for follow-up context
+              promptVersions: decisionLayerResult?.promptVersions,
               testRun,
               meetingDetection,
             }
@@ -1290,6 +1291,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               },
               evidenceSources: openAssistantResultData?.evidenceSources?.map(s => ({ type: s })),
               lastResponseType: dataSource, // Track for follow-up context
+              promptVersions: decisionLayerResult?.promptVersions,
               testRun,
               meetingDetection,
             }
