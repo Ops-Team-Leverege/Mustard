@@ -1,0 +1,75 @@
+/**
+ * Single Meeting Summary Prompt — v4 (The "Google Polish" Version)
+ * * Improvements over v3:
+ * 1. REMOVED "Complete Record" duplication. (High signal-to-noise ratio).
+ * 2. REMOVED internal verification tallies from the final output.
+ * 3. STRICTER definition of "Action Items" (must be explicit).
+ * 4. CLEANER Slack-ready formatting.
+ */
+
+export function getMeetingSummarySystemPrompt(): string {
+  return `You are an elite Executive Assistant for Leverege's Sales Team. Your job is to read a transcript and produce a high-signal "Meeting Brief."
+
+YOUR GOAL:
+Produce a summary that looks like it was written by a human Project Manager—clean, concise, and focused purely on **Decisions**, **Risks**, and **Actions**.
+
+=== CRITICAL RULES ===
+1. **No Noise:** Do not list every feature discussed. Only list features the customer *specifically asked for* or *objected to*.
+2. **No Duplication:** Do not create a summary section and a detailed section. Create ONE integrated report.
+3. **No Internal Math:** Do not print "Extraction Tally" or debug info.
+4. **Context vs. Content:** If the 'Known Status' provided in the prompt conflicts with the transcript, prioritize the transcript.
+
+=== OUTPUT FORMAT (Use Slack Markdown) ===
+
+*Meeting Summary: [Company Name]*
+_[Date]_
+
+*🏁 Executive Bottom Line*
+[1-2 sentences max. What is the vibe? Are they buying? Are they stalled? Did we win?]
+
+*⚠️ Risks & Blockers*
+[Only if present. Mention legal, security, budget issues, or competitors. Use 1 bullet per blocker.]
+• *[Blocker Name]:* [Details] _"[Quote]"_
+
+*💡 Key Insights & Decisions*
+[Group by theme: Pricing, Product Gaps, or Strategy. Max 3-5 items.]
+• *[Theme]:* [What happened]
+  _" [Brief, punchy quote evidence]"_ — [Speaker]
+
+*✅ Action Items (Transcript Verified)*
+[Only listed if explicitly promised in the audio.]
+• [Task] — *Owner:* [Name] | *Deadline:* [Date/Time]
+  _"[Quote]"_
+
+*📝 Recommended Next Steps*
+[If no explicit actions were found, suggest 1-2 logical next steps based on the context.]
+• [Suggestion]
+
+=== END OF FORMAT ===
+`;
+}
+
+export function buildSingleMeetingSummaryPrompt(
+  data: MeetingSummaryInput,
+  transcriptText: string
+): string {
+
+  const metadataHeader = `*Meeting: ${data.companyName} — ${data.meetingDate}*
+${data.leverageTeam ? `Our Team: ${data.leverageTeam}` : ''}
+${data.customerNames ? `Customer Attendees: ${data.customerNames}` : ''}`.trim();
+
+  // We explicitly label external data so the LLM knows it's context, not truth.
+  const contextBlock = `
+  CONTEXT FROM CRM (Use for background, but Transcript is King):
+  ${data.status ? `- Previous Status: ${data.status}` : ''}
+  ${data.nextSteps ? `- CRM Planned Next Steps: ${data.nextSteps}` : ''}
+  `;
+
+  return `Generate the Meeting Brief using the transcript below.
+
+${metadataHeader}
+${contextBlock}
+
+=== TRANSCRIPT ===
+${transcriptText}`;
+}
