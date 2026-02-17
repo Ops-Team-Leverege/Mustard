@@ -1,0 +1,96 @@
+🔴 CRITICAL ISSUE FOUND
+❌ Inconsistent Field Naming
+
+Problem: Mixed use of promptVersions vs prompt_versions
+
+Evidence:
+
+// Most handlers use camelCase (correct):
+promptVersions: {
+  CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: ...
+}
+
+// But 2 handlers use snake_case (wrong):
+prompt_versions: {  // ❌ Line 506 (drafting)
+  PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: ...
+}
+
+prompt_versions: {  // ❌ Line 649 (KB-assisted)
+  RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: ...
+}
+Impact: HIGH
+
+Database schema uses prompt_versions (snake_case)
+TypeScript types use promptVersions (camelCase)
+Inconsistency will cause:
+Some prompt versions not logged to database
+Type errors if strict typing enabled
+Confusion for developers
+Root Cause: The commit changed prompt_versions → promptVersions in most places but missed 2 locations.
+
+Locations:
+
+Line 506: handleDraftingIntent return statement
+Line 649: generateKBAssistedCustomerQuestionAnswers return statement
+Fix Required:
+
+// Line 506 - Change:
+prompt_versions: {
+  PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: PROMPT_VERSIONS.PRODUCT_KNOWLEDGE_DRAFTING_PROMPT
+}
+
+// To:
+promptVersions: {
+  PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: PROMPT_VERSIONS.PRODUCT_KNOWLEDGE_DRAFTING_PROMPT
+}
+
+// Line 649 - Change:
+prompt_versions: {
+  RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+}
+
+// To:
+promptVersions: {
+  RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+}
+🟡 SECONDARY ISSUE
+⚠️ Missing Prompt Version: PRODUCT_KNOWLEDGE_DRAFTING_PROMPT
+
+Problem: Handler references a prompt version that doesn't exist in versions.ts
+
+// handlers.ts line 507
+PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: PROMPT_VERSIONS.PRODUCT_KNOWLEDGE_DRAFTING_PROMPT
+Check:
+
+Searched workspace
+Checking if PRODUCT_KNOWLEDGE_DRAFTING_PROMPT exists in versions
+Confirmed: The prompt version doesn't exist!
+
+Impact: CRITICAL
+
+Runtime error when drafting handler is called
+PROMPT_VERSIONS.PRODUCT_KNOWLEDGE_DRAFTING_PROMPT will be undefined
+Will crash or log undefined as version
+Fix Required:
+
+Add to 
+versions.ts
+:
+
+export const PROMPT_VERSIONS: PromptVersions = {
+  // ... existing prompts
+  PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: "2026-02-17-001",
+};
+
+export const PROMPT_CHANGE_LOG: Record<string, Array<...>> = {
+  // ... existing logs
+  PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: [
+    { version: "2026-02-17-001", reason: "Initial version for email drafting", date: "2026-02-17" }
+  ],
+};
+And add to the PromptVersions type:
+
+export type PromptVersions = {
+  // ... existing types
+  PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: string;
+};

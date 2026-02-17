@@ -32,6 +32,7 @@ export type PromptVersions = {
 
     // Extraction Prompts
     CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: string;
+    PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: string;
 };
 
 /**
@@ -60,6 +61,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
 
     // Extraction - Initial versions
     CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: "2026-02-17-001",
+    PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: "2026-02-17-001",
 };
 
 /**
@@ -104,6 +106,9 @@ export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: 
     ],
     CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: [
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
+    ],
+    PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: [
+        { version: "2026-02-17-001", reason: "Initial version for email drafting", date: "2026-02-17" }
     ],
 };
 
