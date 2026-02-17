@@ -7,6 +7,8 @@
             "heavy_check_mark"
         ],
         "negative": [
+            "thumbsdown",
+            "-1",
             "x",
             "heavy_multiplication_x",
             "cross_mark",

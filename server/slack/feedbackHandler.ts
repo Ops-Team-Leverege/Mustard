@@ -9,7 +9,7 @@
  */
 
 import { storage } from "../storage";
-import { postSlackMessage, addSlackReaction } from "./slackApi";
+import { postSlackMessage, addSlackReaction, getBotUserId } from "./slackApi";
 import feedbackConfig from "../../config/feedback.json";
 import OpenAI from "openai";
 import { LLM_MODELS } from "../config/models";
@@ -202,6 +202,12 @@ export async function handleReactionAdded(event: {
         }
 
         console.log(`[Feedback] Reaction added: ${emoji} by ${userId} on message ${messageTs}`);
+
+        const botUserId = await getBotUserId();
+        if (botUserId && userId === botUserId) {
+            console.log(`[Feedback] Ignoring bot's own reaction (seeded feedback emoji)`);
+            return;
+        }
 
         const sentiment = await classifyEmoji(emoji);
         if (sentiment === "unknown") {

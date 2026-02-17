@@ -81,6 +81,49 @@ export async function addSlackReaction(channel: string, timestamp: string, emoji
   }
 }
 
+let cachedBotUserId: string | null = null;
+
+export async function getBotUserId(): Promise<string | null> {
+  if (cachedBotUserId) return cachedBotUserId;
+
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) return null;
+
+  try {
+    const response = await fetch("https://slack.com/api/auth.test", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json; charset=utf-8",
+      },
+    });
+
+    const data = (await response.json()) as { ok: boolean; user_id?: string; error?: string };
+    if (data.ok && data.user_id) {
+      cachedBotUserId = data.user_id;
+      console.log(`[SlackAPI] Cached bot user ID: ${cachedBotUserId}`);
+      return cachedBotUserId;
+    }
+    console.warn(`[SlackAPI] auth.test failed: ${data.error}`);
+    return null;
+  } catch (error) {
+    console.error(`[SlackAPI] Failed to get bot user ID:`, error);
+    return null;
+  }
+}
+
+export async function seedFeedbackReactions(channel: string, messageTs: string): Promise<void> {
+  try {
+    await Promise.all([
+      addSlackReaction(channel, messageTs, "+1"),
+      addSlackReaction(channel, messageTs, "-1"),
+    ]);
+    console.log(`[SlackAPI] Seeded feedback reactions on ${messageTs}`);
+  } catch (error) {
+    console.warn(`[SlackAPI] Failed to seed feedback reactions:`, error);
+  }
+}
+
 type UploadFileParams = {
   channel: string;
   thread_ts?: string;
