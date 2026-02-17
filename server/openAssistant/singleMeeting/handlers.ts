@@ -1,3 +1,4 @@
+import { PROMPT_VERSIONS } from "../../config/prompts/versions";
 import { MODEL_ASSIGNMENTS } from "../../config/models";
 import { storage } from "../../storage";
 import { OpenAI } from "openai";
@@ -84,6 +85,9 @@ export async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "qa_pairs",
+      prompt_versions: {
+        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
+      }
     };
   }
 
@@ -113,6 +117,9 @@ export async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "attendees",
+      prompt_versions: {
+        RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+      }
     };
   }
 
@@ -146,6 +153,9 @@ export async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "action_items",
+      prompt_versions: {
+        RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT
+      }
     };
   }
 
@@ -229,6 +239,9 @@ export async function handleExtractiveIntent(
       intent: "extractive",
       dataSource: "qa_pairs",
       evidence: match.questionText,
+      prompt_versions: {
+        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
+      }
     };
   }
 
@@ -309,6 +322,9 @@ export async function handleAggregativeIntent(
       answer: lines.join("\n"),
       intent: "aggregative",
       dataSource: "qa_pairs",
+      prompt_versions: {
+        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
+      }
     };
   }
 
@@ -358,6 +374,9 @@ export async function handleAggregativeIntent(
       answer: lines.join("\n"),
       intent: "aggregative",
       dataSource: "action_items",
+      prompt_versions: {
+        RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT
+      }
     };
   }
 
@@ -485,8 +504,7 @@ Format the email with:
 }
 
 export async function handleSummaryIntent(
-  ctx: SingleMeetingContext,
-  userQuestion?: string
+  ctx: SingleMeetingContext
 ): Promise<SingleMeetingResult> {
   const [transcript, chunks] = await Promise.all([
     storage.getTranscriptById(ctx.meetingId),
@@ -545,6 +563,9 @@ export async function handleSummaryIntent(
     answer: summary,
     intent: "summary",
     dataSource: "summary",
+    promptVersions: {
+      RAG_MEETING_SUMMARY_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_MEETING_SUMMARY_SYSTEM_PROMPT
+    }
   };
 }
 
@@ -619,6 +640,9 @@ export async function generateKBAssistedCustomerQuestionAnswers(
       intent: "extractive",
       dataSource: "qa_pairs",
       progressMessage,
+      promptVersions: {
+        RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+      }
     };
   } catch (err) {
     console.error(`[SingleMeeting] LLM error in KB-assisted answers:`, err);

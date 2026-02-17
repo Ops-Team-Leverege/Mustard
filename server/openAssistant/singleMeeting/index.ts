@@ -127,7 +127,7 @@ export async function executeSingleMeetingContract(
     }
 
     case AnswerContract.MEETING_SUMMARY:
-      return handleSummaryIntent(ctx, question);
+      return handleSummaryIntent(ctx);
 
     case AnswerContract.DRAFT_EMAIL:
     case AnswerContract.DRAFT_RESPONSE:
