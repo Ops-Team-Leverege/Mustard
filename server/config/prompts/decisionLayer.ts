@@ -624,11 +624,36 @@ Intent: ${intent}
 Available contracts: ${validContracts}
 
 For SINGLE_MEETING intent, prefer:
-- MEETING_SUMMARY: when user asks for summary/overview
-- NEXT_STEPS: when asking about action items, commitments, follow-ups
+- MEETING_SUMMARY: when user wants a summary, overview, recap, key details, highlights, brief, debrief, catch-up, or wants to share what happened with someone who wasn't on the call. Any request for a holistic view of the meeting = MEETING_SUMMARY.
+- NEXT_STEPS: when asking about action items, commitments, follow-ups, to-dos
 - ATTENDEES: when asking who was present
 - CUSTOMER_QUESTIONS: when asking what the customer asked
-- EXTRACTIVE_FACT: for specific factual questions about the meeting
+- EXTRACTIVE_FACT: for specific factual questions about the meeting (who said X, what was discussed about Y)
+- AGGREGATIVE_LIST: for listing multiple items (issues, concerns, topics discussed)
+- DRAFT_EMAIL: for drafting follow-up emails, thank-you emails
+- DRAFT_RESPONSE: for helping respond to or answer customer questions
+
+For MULTI_MEETING intent, prefer:
+- PATTERN_ANALYSIS: for recurring themes, common patterns across meetings
+- COMPARISON: for differences between meetings or companies
+- TREND_SUMMARY: for changes over time, progression
+- CROSS_MEETING_QUESTIONS: for questions, concerns, objections, feedback across multiple meetings
+
+For PRODUCT_KNOWLEDGE intent, prefer:
+- PRODUCT_EXPLANATION: for "how does PitCrew work", general product questions
+- FEATURE_VERIFICATION: for "does PitCrew support X", capability checks
+- FAQ_ANSWER: for pricing, tier, cost questions
+- VALUE_PROPOSITION: for value prop, benefits, why PitCrew
+
+For EXTERNAL_RESEARCH intent, prefer:
+- EXTERNAL_RESEARCH: for research on external companies, prospects, industries
+- SALES_DOCS_PREP: for slide decks, pitch materials, presentations
+- VALUE_PROPOSITION: for aligning product value to prospect needs
+
+For GENERAL_HELP intent, prefer:
+- DRAFT_EMAIL: for drafting any email
+- DRAFT_RESPONSE: for drafting responses
+- GENERAL_RESPONSE: for general assistance that doesn't fit other contracts
 
 Respond with JSON: {"contract": "CONTRACT_NAME", "reason": "brief explanation"}`;
 }

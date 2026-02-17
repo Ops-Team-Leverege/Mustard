@@ -1013,96 +1013,23 @@ function selectContractByKeyword(
   }
 
   if (intent === Intent.SINGLE_MEETING) {
-    for (const [keyword, contract] of Object.entries(SINGLE_MEETING_CONTRACT_KEYWORDS)) {
-      if (lower.includes(keyword)) {
-        return {
-          contract,
-          contractSelectionMethod: "keyword",
-          constraints: CONTRACT_CONSTRAINTS[contract],
-        };
-      }
-    }
-    return {
-      contract: AnswerContract.EXTRACTIVE_FACT,
-      contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.EXTRACTIVE_FACT],
-    };
+    return null;
   }
 
   if (intent === Intent.MULTI_MEETING) {
-    // Use dedicated MULTI_MEETING keywords for cross-meeting analysis
-    for (const [keyword, contract] of Object.entries(MULTI_MEETING_CONTRACT_KEYWORDS)) {
-      if (lower.includes(keyword)) {
-        return {
-          contract,
-          contractSelectionMethod: "keyword",
-          constraints: CONTRACT_CONSTRAINTS[contract],
-        };
-      }
-    }
-    // Default to PATTERN_ANALYSIS for general cross-meeting queries
-    return {
-      contract: AnswerContract.PATTERN_ANALYSIS,
-      contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.PATTERN_ANALYSIS],
-    };
+    return null;
   }
 
   if (intent === Intent.PRODUCT_KNOWLEDGE) {
-    for (const [keyword, contract] of Object.entries(PRODUCT_KNOWLEDGE_CONTRACT_KEYWORDS)) {
-      if (lower.includes(keyword)) {
-        return {
-          contract,
-          contractSelectionMethod: "keyword",
-          constraints: CONTRACT_CONSTRAINTS[contract],
-        };
-      }
-    }
-    return {
-      contract: AnswerContract.PRODUCT_EXPLANATION,
-      contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.PRODUCT_EXPLANATION],
-    };
+    return null;
   }
 
   if (intent === Intent.EXTERNAL_RESEARCH) {
-    // Check for slide deck / pitch deck keywords
-    if (lower.includes("slide") || lower.includes("deck") || lower.includes("pitch")) {
-      return {
-        contract: AnswerContract.SALES_DOCS_PREP,
-        contractSelectionMethod: "keyword",
-        constraints: CONTRACT_CONSTRAINTS[AnswerContract.SALES_DOCS_PREP],
-      };
-    }
-    if (lower.includes("value prop")) {
-      return {
-        contract: AnswerContract.VALUE_PROPOSITION,
-        contractSelectionMethod: "keyword",
-        constraints: CONTRACT_CONSTRAINTS[AnswerContract.VALUE_PROPOSITION],
-      };
-    }
-    return {
-      contract: AnswerContract.EXTERNAL_RESEARCH,
-      contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.EXTERNAL_RESEARCH],
-    };
+    return null;
   }
 
   if (intent === Intent.GENERAL_HELP) {
-    for (const [keyword, contract] of Object.entries(GENERAL_CONTRACT_KEYWORDS)) {
-      if (lower.includes(keyword)) {
-        return {
-          contract,
-          contractSelectionMethod: "keyword",
-          constraints: CONTRACT_CONSTRAINTS[contract],
-        };
-      }
-    }
-    return {
-      contract: AnswerContract.GENERAL_RESPONSE,
-      contractSelectionMethod: "default",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.GENERAL_RESPONSE],
-    };
+    return null;
   }
 
   return null;
@@ -1186,7 +1113,7 @@ export async function selectAnswerContract(
     }
   }
 
-  // Keyword fallback: Only used when LLM didn't propose contracts (e.g., legacy paths or absolute certainties)
+  // Safety check: REFUSE patterns are checked deterministically (no LLM needed for safety)
   const keywordResult = selectContractByKeyword(question, intent, layers);
 
   if (keywordResult) {
@@ -1194,7 +1121,7 @@ export async function selectAnswerContract(
     return keywordResult;
   }
 
-  // LLM classification fallback: If no LLM-proposed contracts and no keyword match
-  console.log(`[AnswerContract] No LLM proposal or keyword match, using LLM classification fallback`);
+  // LLM-FIRST contract selection: LLM decides the contract based on semantic understanding
+  console.log(`[AnswerContract] LLM contract selection for intent=${intent}`);
   return selectContractByLLM(question, intent, layers);
 }
