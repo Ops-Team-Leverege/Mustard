@@ -89,14 +89,15 @@ Return JSON: {"sentiment": "positive" | "negative" | "neutral", "confidence": "h
  */
 async function classifyEmoji(emoji: string): Promise<"positive" | "negative" | "unknown"> {
     const normalized = emoji.replace(/:/g, ""); // Remove colons if present
+    const baseEmoji = normalized.split("::")[0]; // Strip skin-tone variants (e.g., "+1::skin-tone-2" → "+1")
 
-    // Fast path: Check config first
-    if (config.emojis.positive.includes(normalized)) {
+    // Fast path: Check config first (try both full and base emoji)
+    if (config.emojis.positive.includes(normalized) || config.emojis.positive.includes(baseEmoji)) {
         console.log(`[Feedback] Config classified "${emoji}" as positive`);
         return "positive";
     }
 
-    if (config.emojis.negative.includes(normalized)) {
+    if (config.emojis.negative.includes(normalized) || config.emojis.negative.includes(baseEmoji)) {
         console.log(`[Feedback] Config classified "${emoji}" as negative`);
         return "negative";
     }
@@ -228,23 +229,26 @@ async function sendNegativeFeedbackNotification(
     messageTs: string
 ): Promise<void> {
     try {
-        const threadLink = `https://slack.com/archives/${channel}/p${messageTs.replace(".", "")}`;
+        const threadLink = messageTs
+            ? `https://slack.com/archives/${channel}/p${messageTs.replace(".", "")}`
+            : null;
 
-        let message = `🚨 *Negative Feedback Received*\n\n`;
+        let message = `*Negative Feedback Received*\n\n`;
         message += `*User:* <@${userId}>\n`;
         message += `*Reaction:* :${emoji}:\n`;
         message += `*Intent:* ${interaction.intent || "unknown"}\n`;
         message += `*Contract:* ${interaction.answerContract || "unknown"}\n\n`;
 
-        message += `*Question:*\n> ${interaction.questionText}\n\n`;
+        message += `*Question:*\n> ${interaction.questionText || "(no question recorded)"}\n\n`;
 
-        message += `*Answer:*\n> ${interaction.answerText?.substring(0, 500)}${interaction.answerText?.length > 500 ? "..." : ""}\n\n`;
+        const answerText = interaction.answerText || "(no answer recorded)";
+        message += `*Answer:*\n> ${answerText.substring(0, 500)}${answerText.length > 500 ? "..." : ""}\n\n`;
 
         if (config.notificationSettings.includePromptVersions && interaction.promptVersions) {
             message += `*Prompt Versions:*\n`;
             const versions = interaction.promptVersions as Record<string, string>;
             for (const [promptName, version] of Object.entries(versions)) {
-                message += `• ${promptName}: \`${version}\`\n`;
+                message += `- ${promptName}: \`${version}\`\n`;
             }
             message += `\n`;
         }
@@ -256,11 +260,11 @@ async function sendNegativeFeedbackNotification(
             }
         }
 
-        if (config.notificationSettings.includeThreadLink) {
+        if (config.notificationSettings.includeThreadLink && threadLink) {
             message += `<${threadLink}|View Thread>`;
         }
 
-        await postSlackMessage(config.notificationChannel, message);
+        await postSlackMessage({ channel: config.notificationChannel, text: message });
         console.log(`[Feedback] Sent negative feedback notification to ${config.notificationChannel}`);
     } catch (error) {
         console.error("[Feedback] Error sending notification:", error);
