@@ -181,7 +181,7 @@ _[Date]_
   _"[Brief, punchy quote evidence]"_ — [Speaker]
 
 *Action Items (Transcript Verified)*
-[Only listed if explicitly promised in the audio.]
+[Only listed if explicitly promised in the transcript.]
 • [Task] — *Owner:* [Name] | *Deadline:* [Date/Time]
   _"[Quote]"_
 
