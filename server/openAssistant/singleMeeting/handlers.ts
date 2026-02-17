@@ -503,7 +503,7 @@ Format the email with:
     answer: `Here's a draft follow-up email for ${ctx.companyName}${dateSuffix}:\n\n${draft}`,
     intent: "drafting",
     dataSource: "qa_pairs",
-    prompt_versions: {
+    promptVersions: {
       PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: PROMPT_VERSIONS.PRODUCT_KNOWLEDGE_DRAFTING_PROMPT
     }
   };
@@ -646,7 +646,7 @@ export async function generateKBAssistedCustomerQuestionAnswers(
       intent: "extractive",
       dataSource: "qa_pairs",
       progressMessage,
-      prompt_versions: {
+      promptVersions: {
         RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
       }
     };
