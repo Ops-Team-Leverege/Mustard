@@ -23,7 +23,7 @@ import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts"
 import { MODEL_ASSIGNMENTS, getModelDescription, TOKEN_LIMITS } from "../config/models";
 import { TIMEOUT_CONSTANTS, CONTENT_LIMITS } from "../config/constants";
 import { isCapabilityQuestion, getCapabilitiesPrompt, AMBIENT_PRODUCT_CONTEXT } from "../config/prompts/system";
-import { buildGeneralAssistancePrompt, buildProductKnowledgePrompt, buildProductStrategySynthesisPrompt, buildProductStyleWritingPrompt } from "../config/prompts/generalHelp";
+import { buildGeneralAssistancePrompt, buildProductKnowledgePrompt } from "../config/prompts/generalHelp";
 
 import {
   type EvidenceSource,
@@ -37,6 +37,7 @@ import {
 import { streamOpenAIResponse } from "./streamingHelper";
 import { findRelevantMeetings, searchAcrossMeetings, type ScopeOverride } from "./meetingResolver";
 import { executeContractChain } from "./contractExecutor";
+import { executeChainContinuation } from "./chainContinuation";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
 import { getMeetingNotFoundMessage } from "../utils/notFoundMessages";
 import { GoogleGenAI } from "@google/genai";
@@ -703,10 +704,8 @@ async function handleMeetingDataIntent(
       throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
     }
 
-    // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
 
-    // Pass the primary contract and LLM-determined semantic flag to the orchestrator
     const singleMeetingResult = await executeSingleMeetingContract(
       context.resolvedMeeting,
       userMessage,
@@ -714,8 +713,22 @@ async function handleMeetingDataIntent(
       context.decisionLayerResult?.requiresSemantic
     );
 
+    let finalAnswer = singleMeetingResult.answer;
+    if (contractChain.length > 1) {
+      const continuation = await executeChainContinuation({
+        userMessage,
+        primaryOutput: singleMeetingResult.answer,
+        remainingContracts: contractChain.slice(1),
+        meetingContext: {
+          companyName: context.resolvedMeeting.companyName,
+          meetingDate: context.resolvedMeeting.meetingDate,
+        },
+      });
+      finalAnswer = continuation.finalOutput;
+    }
+
     return {
-      answer: singleMeetingResult.answer,
+      answer: finalAnswer,
       intent: "meeting_data",
       intentClassification: classification,
       decisionLayerIntent: Intent.SINGLE_MEETING,
@@ -765,16 +778,18 @@ async function handleMeetingDataIntent(
     let primaryContract: AnswerContract;
     let contractChain: AnswerContract[];
 
-    if (contract) {
+    if (dlContractChain && dlContractChain.length > 0) {
+      primaryContract = dlContractChain[0];
+      contractChain = dlContractChain;
+      console.log(`[OpenAssistant] Using DL-provided chain: [${dlContractChain.join(" → ")}]`);
+    } else if (contract) {
       primaryContract = contract;
       contractChain = [contract];
       console.log(`[OpenAssistant] Using DL-provided contract: ${contract}`);
     } else {
-      // This should never happen - Decision Layer always provides a contract
       throw new Error('[OpenAssistant] Decision Layer must provide answerContract');
     }
 
-    // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
 
     const singleMeetingResult = await executeSingleMeetingContract(
@@ -784,8 +799,22 @@ async function handleMeetingDataIntent(
       context.decisionLayerResult?.requiresSemantic
     );
 
+    let finalAnswer = singleMeetingResult.answer;
+    if (contractChain.length > 1) {
+      const continuation = await executeChainContinuation({
+        userMessage,
+        primaryOutput: singleMeetingResult.answer,
+        remainingContracts: contractChain.slice(1),
+        meetingContext: {
+          companyName: meeting.companyName,
+          meetingDate: meeting.meetingDate,
+        },
+      });
+      finalAnswer = continuation.finalOutput;
+    }
+
     return {
-      answer: singleMeetingResult.answer,
+      answer: finalAnswer,
       intent: "meeting_data",
       intentClassification: classification,
       decisionLayerIntent: Intent.SINGLE_MEETING,
@@ -1005,7 +1034,7 @@ async function handleProductKnowledgeIntent(
   context: OpenAssistantContext,
   classification: IntentClassification,
   contract?: AnswerContract,
-  _dlContractChain?: AnswerContract[]  // Reserved for future chain support
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to product knowledge path${contract ? ` (CP contract: ${contract})` : ''}`);
 
@@ -1080,18 +1109,31 @@ async function handleProductKnowledgeIntent(
     answer = await getProductKnowledgeResponse(userMessage, productDataPrompt, hasProductData, context.slackStreaming, enrichedContext);
   }
 
+  const contractChain = dlContractChain && dlContractChain.length > 0 ? dlContractChain : [actualContract];
+
+  let finalAnswer = answer;
+  if (contractChain.length > 1) {
+    const continuation = await executeChainContinuation({
+      userMessage,
+      primaryOutput: answer,
+      remainingContracts: contractChain.slice(1),
+    });
+    finalAnswer = continuation.finalOutput;
+  }
+
   return {
-    answer,
+    answer: finalAnswer,
     intent: "meeting_data",
     intentClassification: classification,
     decisionLayerIntent: Intent.PRODUCT_KNOWLEDGE,
     answerContract: actualContract,
+    answerContractChain: contractChain.length > 1 ? contractChain : undefined,
     ssotMode: hasProductData ? "authoritative" : "descriptive",
     dataSource: "product_ssot",
     delegatedToSingleMeeting: false,
     evidenceSources: hasProductData ? tablesWithData : undefined,
     progressMessage,
-    streamingCompleted: !!context.slackStreaming, // Handler streams when context provided
+    streamingCompleted: !!context.slackStreaming,
   };
 }
 
@@ -1116,19 +1158,13 @@ async function handleExternalResearchIntent(
 
   console.log(`[OpenAssistant] External research for: ${companyName || 'unknown company'}`);
 
-  // LLM-determined flags from Decision Layer (replaces regex-based detection)
-  const chainIncludesSalesDocsPrep = dlContractChain?.includes(AnswerContract.SALES_DOCS_PREP) ?? false;
-  const needsProductKnowledge = context.decisionLayerResult?.requiresProductKnowledge ?? false;
-  const needsStyleMatching = context.decisionLayerResult?.requiresStyleMatching ?? chainIncludesSalesDocsPrep;
+  const contractChain = dlContractChain && dlContractChain.length > 0 ? dlContractChain : [actualContract];
+  const primaryContract = contractChain[0];
 
-  console.log(`[OpenAssistant] LLM-determined: productKnowledge=${needsProductKnowledge}, styleMatching=${needsStyleMatching}, chainSalesDocsPrep=${chainIncludesSalesDocsPrep}`);
+  console.log(`[OpenAssistant] Contract chain: [${contractChain.join(" → ")}]`);
 
-  // Generate personalized progress message
-  console.log(`[OpenAssistant] Generating progress message...`);
   const progressMessage = await generatePersonalizedProgress(userMessage, 'research');
-  console.log(`[OpenAssistant] Progress message ready (${Date.now() - startTime}ms)`);
 
-  // Update streaming placeholder with progress message BEFORE starting research
   if (context.slackStreaming && progressMessage) {
     try {
       const { updateSlackMessage } = await import("../slack/slackApi");
@@ -1137,21 +1173,17 @@ async function handleExternalResearchIntent(
         ts: context.slackStreaming.messageTs,
         text: progressMessage,
       });
-      console.log(`[OpenAssistant] Updated streaming placeholder with progress message`);
     } catch (updateError) {
       console.error(`[OpenAssistant] Failed to update streaming placeholder with progress:`, updateError);
     }
   }
 
-  // Build thread context for conversation continuity
   const threadContext = buildThreadContextSection(context);
 
-  // Perform the research
-  console.log(`[OpenAssistant] Calling performExternalResearch...`);
   const researchResult = await performExternalResearch(
     userMessage,
     companyName,
-    null, // topic derived from message
+    null,
     threadContext || undefined
   );
   console.log(`[OpenAssistant] Research complete (${Date.now() - startTime}ms), answer length: ${researchResult.answer?.length || 0}`);
@@ -1168,209 +1200,36 @@ async function handleExternalResearchIntent(
     };
   }
 
-  // Style matching takes priority over product knowledge enrichment
-  if (chainIncludesSalesDocsPrep) {
-    console.log(`[OpenAssistant] Contract chain includes SALES_DOCS_PREP - prioritizing style matching`);
-  }
-
-  // Style-matched output: chain product knowledge for style examples
-  if (needsStyleMatching) {
-    console.log(`[OpenAssistant] Chaining product knowledge for style matching...`);
-    try {
-      // Pass true if this is from contract chain (user explicitly asked for research + writing)
-      const styledOutput = await chainProductStyleWriting(userMessage, researchResult.answer, context, chainIncludesSalesDocsPrep);
-      const sourcesSection = researchResult.citations.length > 0
-        ? formatCitationsForDisplay(researchResult.citations)
-        : "";
-
-      return {
-        answer: styledOutput + sourcesSection,
-        intent: "external_research",
-        intentClassification: classification,
-        decisionLayerIntent: Intent.EXTERNAL_RESEARCH,
-        answerContract: actualContract,
-        dataSource: "product_ssot",
-        delegatedToSingleMeeting: false,
-        evidenceSources: researchResult.citations.map(c => c.source),
-        progressMessage,
-        shouldGenerateDoc: chainIncludesSalesDocsPrep, // Generate doc when research + writing requested
-      };
-    } catch (styleError) {
-      console.error(`[OpenAssistant] Style chaining failed, returning raw research:`, styleError);
-      // Fall through to product knowledge enrichment or raw research
-    }
-  }
-
-  // If user is asking about PitCrew (value props, features, etc.) but NOT style matching,
-  // enrich with internal product knowledge
-  if (needsProductKnowledge && !needsStyleMatching) {
-    console.log(`[OpenAssistant] Chaining product knowledge for PitCrew context enrichment...`);
-    try {
-      const enrichedOutput = await chainProductKnowledgeEnrichment(userMessage, researchResult.answer, context);
-      const sourcesSection = researchResult.citations.length > 0
-        ? formatCitationsForDisplay(researchResult.citations)
-        : "";
-
-      return {
-        answer: enrichedOutput + (sourcesSection ? "\n\n" + sourcesSection : ""),
-        intent: "external_research",
-        intentClassification: classification,
-        decisionLayerIntent: Intent.EXTERNAL_RESEARCH,
-        answerContract: actualContract,
-        dataSource: "product_ssot",
-        delegatedToSingleMeeting: false,
-        evidenceSources: ["PitCrew Product Database (Airtable)", ...researchResult.citations.map(c => c.source)],
-        progressMessage,
-      };
-    } catch (pkError) {
-      console.error(`[OpenAssistant] Product knowledge enrichment failed, falling back:`, pkError);
-      // Fall through to return raw research
-    }
-  }
-
-  // Include sources in the response
   const sourcesSection = researchResult.citations.length > 0
     ? formatCitationsForDisplay(researchResult.citations)
     : "";
 
+  let finalAnswer = researchResult.answer;
+
+  if (contractChain.length > 1) {
+    const continuation = await executeChainContinuation({
+      userMessage,
+      primaryOutput: researchResult.answer,
+      remainingContracts: contractChain.slice(1),
+    });
+    finalAnswer = continuation.finalOutput;
+  }
+
+  const hasSalesDocsPrep = contractChain.includes(AnswerContract.SALES_DOCS_PREP);
+
   return {
-    answer: researchResult.answer + sourcesSection,
+    answer: finalAnswer + sourcesSection,
     intent: "external_research",
     intentClassification: classification,
     decisionLayerIntent: Intent.EXTERNAL_RESEARCH,
-    answerContract: actualContract,
+    answerContract: primaryContract,
+    answerContractChain: contractChain.length > 1 ? contractChain : undefined,
     dataSource: "external_research",
     delegatedToSingleMeeting: false,
     evidenceSources: researchResult.citations.map(c => c.source),
     progressMessage,
+    shouldGenerateDoc: hasSalesDocsPrep,
   };
-}
-
-/**
- * Chain product knowledge to enrich external research results with
- * internal PitCrew product data from Airtable.
- * 
- * The Decision Layer determines when this is needed via the `requiresProductKnowledge`
- * flag in IntentClassificationResult. This function executes the enrichment step,
- * making a second LLM call to synthesize external research with internal product
- * knowledge from Airtable.
- */
-async function chainProductKnowledgeEnrichment(
-  originalRequest: string,
-  researchContent: string,
-  context: OpenAssistantContext
-): Promise<string> {
-  const { getProductKnowledgePrompt } = await import("../airtable/productData");
-
-  // Fetch product knowledge from Airtable SSOT
-  const snapshotResult = await getProductKnowledgePrompt();
-
-  console.log(`[OpenAssistant] Product knowledge enrichment - SSOT length: ${snapshotResult.promptText.length} chars`);
-
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-
-  const threadContext = buildThreadContextSection(context);
-  const systemContent = buildProductStrategySynthesisPrompt({
-    productKnowledge: snapshotResult.promptText,
-    originalRequest,
-    researchContent,
-  });
-
-  const response = await openai.chat.completions.create({
-    model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
-    messages: [
-      {
-        role: "system",
-        content: threadContext ? `${systemContent}\n\n${threadContext}` : systemContent,
-      },
-      {
-        role: "user",
-        content: `Original Request: ${originalRequest}
-
-External Research Results:
-${researchContent}
-
-Please synthesize this research with PitCrew's product capabilities to provide strategic recommendations.`
-      }
-    ],
-    temperature: 0.7,
-    max_tokens: 2000,
-  });
-
-  return response.choices[0]?.message?.content || researchContent;
-}
-
-/**
- * Chain product knowledge to generate styled output that matches existing
- * feature descriptions in tone and format.
- * @param fromResearchChain - true if this follows EXTERNAL_RESEARCH in contract chain (user explicitly asked for research + writing)
- */
-async function chainProductStyleWriting(
-  originalRequest: string,
-  researchContent: string,
-  context: OpenAssistantContext,
-  fromResearchChain: boolean = false
-): Promise<string> {
-  const startTime = Date.now();
-
-  const { getProductKnowledgePrompt } = await import("../airtable/productData");
-
-  // Fetch existing feature descriptions as style examples (cached daily)
-  const snapshotResult = await getProductKnowledgePrompt();
-  console.log(`[OpenAssistant] Product knowledge from cache (${Date.now() - startTime}ms)`);
-
-  // Extract just the features section for style reference
-  // Matches "=== Current Product Features (Available Now) ===" or "=== Roadmap Features (Planned/In Development) ==="
-  // Sections are separated by \n\n
-  const featuresMatch = snapshotResult.promptText.match(/=== (?:Current Product |Roadmap )?Features[^\n]*\n[\s\S]*?(?=\n\n===|$)/);
-  const featureExamples = featuresMatch ? featuresMatch[0].slice(0, 2000) : "";
-
-  console.log(`[OpenAssistant] Style matching - feature examples length: ${featureExamples.length} chars`);
-
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
-  const threadContext = buildThreadContextSection(context);
-
-  console.log(`[OpenAssistant] Calling OpenAI for style-matched writing (fromResearchChain: ${fromResearchChain})...`);
-
-  const styleSystemPrompt = buildProductStyleWritingPrompt({
-    featureExamples,
-    researchContent,
-    fromResearchChain,
-  });
-
-  const response = await Promise.race([
-    openai.chat.completions.create({
-      model: MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE,
-      messages: [
-        {
-          role: "system",
-          content: threadContext ? `${styleSystemPrompt}\n\n${threadContext}` : styleSystemPrompt,
-        },
-        {
-          role: "user",
-          content: originalRequest,
-        },
-      ],
-      temperature: 0.3,
-      max_tokens: 800,
-    }),
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('OpenAI timeout after 60s')), 60000))
-  ]);
-
-  console.log(`[OpenAssistant] Style matching OpenAI call complete (${Date.now() - startTime}ms)`);
-
-  // Validate the OpenAI response
-  const styledContent = response.choices[0]?.message?.content?.trim();
-
-  if (!styledContent || styledContent.length < 50) {
-    console.error(`[OpenAssistant] Style matching produced invalid response: "${styledContent || '(empty)'}"`);
-    console.error(`[OpenAssistant] Feature examples length: ${featureExamples.length} chars`);
-    console.error(`[OpenAssistant] Research content length: ${researchContent.length} chars`);
-    throw new Error(`Style matching failed - OpenAI returned invalid response (${styledContent?.length || 0} chars)`);
-  }
-
-  console.log(`[OpenAssistant] Style matching produced valid output (${styledContent.length} chars)`);
-  return styledContent;
 }
 
 /**
@@ -1517,7 +1376,7 @@ async function handleGeneralAssistanceIntent(
   context: OpenAssistantContext,
   classification: IntentClassification,
   contract?: AnswerContract,
-  _dlContractChain?: AnswerContract[]  // Reserved for future chain support
+  dlContractChain?: AnswerContract[]
 ): Promise<OpenAssistantResult> {
   console.log(`[OpenAssistant] Routing to general assistance path${contract ? ` (CP contract: ${contract})` : ''}`);
 
@@ -1619,12 +1478,25 @@ Use this context to align suggestions with PitCrew's terminology and value propo
     startTime,
   );
 
+  const contractChain = dlContractChain && dlContractChain.length > 0 ? dlContractChain : [actualContract];
+
+  let finalAnswer = answer;
+  if (contractChain.length > 1) {
+    const continuation = await executeChainContinuation({
+      userMessage,
+      primaryOutput: answer,
+      remainingContracts: contractChain.slice(1),
+    });
+    finalAnswer = continuation.finalOutput;
+  }
+
   return {
-    answer,
+    answer: finalAnswer,
     intent: "general_assistance",
     intentClassification: classification,
     decisionLayerIntent: Intent.GENERAL_HELP,
     answerContract: actualContract,
+    answerContractChain: contractChain.length > 1 ? contractChain : undefined,
     ssotMode: "none" as SSOTMode,
     dataSource: "general_knowledge",
     delegatedToSingleMeeting: false,

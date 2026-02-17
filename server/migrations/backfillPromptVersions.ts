@@ -30,6 +30,7 @@ const PROMPT_TEXT_MAP: Record<keyof PromptVersions, string> = {
     TRANSCRIPT_ANALYZER_SYSTEM_PROMPT: transcriptPrompts.TRANSCRIPT_ANALYZER_SYSTEM_PROMPT,
     MCP_ROUTING_PROMPT: externalPrompts.MCP_ROUTING_PROMPT,
     CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: extractionPrompts.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT,
+    PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: "generateKBAssistedCustomerQuestionAnswers(shape)",
 };
 
 async function main() {

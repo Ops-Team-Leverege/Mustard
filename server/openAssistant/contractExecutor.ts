@@ -519,38 +519,6 @@ function getContractPrompt(contract: AnswerContract, previousContext: string, co
 }
 
 /**
- * Select appropriate contract for MULTI_MEETING queries.
- * Uses keyword-first deterministic matching.
- * 
- * IMPORTANT: Keywords are used only to infer the analytical task
- * (e.g., comparison vs pattern), not to create new intent categories
- * or topic-specific contracts.
- * 
- * This is task inference within a fixed intent, not intent classification.
- */
-export function selectMultiMeetingContract(userMessage: string): AnswerContract {
-  const msg = userMessage.toLowerCase();
-  
-  if (/pattern|recurring|common|theme|frequently|often|always/i.test(msg)) {
-    return AnswerContract.PATTERN_ANALYSIS;
-  }
-  
-  if (/compare|difference|differ|contrast|versus|vs\.?|between/i.test(msg)) {
-    return AnswerContract.COMPARISON;
-  }
-  
-  if (/trend|over time|change|evolving|growing|declining|progression/i.test(msg)) {
-    return AnswerContract.TREND_SUMMARY;
-  }
-  
-  if (/questions|asked|concerns|issues|objections/i.test(msg)) {
-    return AnswerContract.CROSS_MEETING_QUESTIONS;
-  }
-  
-  return AnswerContract.PATTERN_ANALYSIS;
-}
-
-/**
  * Synthesize raw excerpts into structured analysis using LLM.
  * 
  * This is the key step that transforms raw transcript excerpts into

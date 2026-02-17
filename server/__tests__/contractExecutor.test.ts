@@ -2,10 +2,8 @@
  * Unit Tests: Execution Layer - Contract Executor
  * 
  * These tests verify the Contract Executor (server/openAssistant/contractExecutor.ts):
- * - Contract selection based on user message keywords
  * - Contract header generation
  * - Coverage qualification logic
- * - Orchestrator intent to contract mapping
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -36,84 +34,6 @@ vi.mock('../storage', () => ({
 vi.mock('./meetingResolver', () => ({
   searchAcrossMeetings: vi.fn().mockResolvedValue('Mock search results'),
 }));
-
-describe('Contract Selection', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  describe('selectMultiMeetingContract', () => {
-    it('selects PATTERN_ANALYSIS for pattern-related queries', async () => {
-      const { selectMultiMeetingContract } = await import('../openAssistant/contractExecutor');
-      const { AnswerContract } = await import('../decisionLayer/answerContracts');
-      
-      expect(selectMultiMeetingContract('What are the common themes?'))
-        .toBe(AnswerContract.PATTERN_ANALYSIS);
-      expect(selectMultiMeetingContract('What patterns do you see?'))
-        .toBe(AnswerContract.PATTERN_ANALYSIS);
-      expect(selectMultiMeetingContract('What comes up frequently?'))
-        .toBe(AnswerContract.PATTERN_ANALYSIS);
-      expect(selectMultiMeetingContract('What do they always ask about?'))
-        .toBe(AnswerContract.PATTERN_ANALYSIS);
-    });
-
-    it('selects COMPARISON for comparison queries', async () => {
-      const { selectMultiMeetingContract } = await import('../openAssistant/contractExecutor');
-      const { AnswerContract } = await import('../decisionLayer/answerContracts');
-      
-      expect(selectMultiMeetingContract('Compare ACE and Discount Tire'))
-        .toBe(AnswerContract.COMPARISON);
-      expect(selectMultiMeetingContract('What is the difference between these meetings?'))
-        .toBe(AnswerContract.COMPARISON);
-      expect(selectMultiMeetingContract('Show me the contrast between them'))
-        .toBe(AnswerContract.COMPARISON);
-      expect(selectMultiMeetingContract('Company A vs Company B'))
-        .toBe(AnswerContract.COMPARISON);
-    });
-
-    it('selects TREND_SUMMARY for trend-related queries', async () => {
-      const { selectMultiMeetingContract } = await import('../openAssistant/contractExecutor');
-      const { AnswerContract } = await import('../decisionLayer/answerContracts');
-      
-      expect(selectMultiMeetingContract('What is the trend over time?'))
-        .toBe(AnswerContract.TREND_SUMMARY);
-      expect(selectMultiMeetingContract('How has this changed?'))
-        .toBe(AnswerContract.TREND_SUMMARY);
-      expect(selectMultiMeetingContract('Is interest growing or declining?'))
-        .toBe(AnswerContract.TREND_SUMMARY);
-      expect(selectMultiMeetingContract('Show me the progression'))
-        .toBe(AnswerContract.TREND_SUMMARY);
-    });
-
-    it('selects CROSS_MEETING_QUESTIONS for question-related queries', async () => {
-      const { selectMultiMeetingContract } = await import('../openAssistant/contractExecutor');
-      const { AnswerContract } = await import('../decisionLayer/answerContracts');
-      
-      expect(selectMultiMeetingContract('What questions did customers ask?'))
-        .toBe(AnswerContract.CROSS_MEETING_QUESTIONS);
-      expect(selectMultiMeetingContract('Show me concerns from meetings'))
-        .toBe(AnswerContract.CROSS_MEETING_QUESTIONS);
-      expect(selectMultiMeetingContract('What issues came up?'))
-        .toBe(AnswerContract.CROSS_MEETING_QUESTIONS);
-      expect(selectMultiMeetingContract('List the objections'))
-        .toBe(AnswerContract.CROSS_MEETING_QUESTIONS);
-    });
-
-    it('defaults to PATTERN_ANALYSIS for unmatched queries', async () => {
-      const { selectMultiMeetingContract } = await import('../openAssistant/contractExecutor');
-      const { AnswerContract } = await import('../decisionLayer/answerContracts');
-      
-      expect(selectMultiMeetingContract('Tell me about the meetings'))
-        .toBe(AnswerContract.PATTERN_ANALYSIS);
-      expect(selectMultiMeetingContract('What happened?'))
-        .toBe(AnswerContract.PATTERN_ANALYSIS);
-    });
-  });
-});
 
 describe('Contract Header Generation', () => {
   beforeEach(() => {
