@@ -215,6 +215,16 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     // 5. Handle reaction events (for feedback)
     if (event?.type === "reaction_added" || event?.type === "reaction_removed") {
+      // Check if feedback system is enabled (tables exist)
+      const { isFeedbackSystemEnabled } = await import("../utils/featureFlags");
+      const feedbackEnabled = await isFeedbackSystemEnabled();
+
+      if (!feedbackEnabled) {
+        console.log("[Slack] Feedback system not enabled - skipping reaction event");
+        console.log("[Slack] Run database migration to enable: npm run db:push && tsx server/migrations/backfillPromptVersions.ts");
+        return;
+      }
+
       const { handleReactionAdded, handleReactionRemoved } = await import("./feedbackHandler");
       if (event.type === "reaction_added") {
         await handleReactionAdded(event);

@@ -13,6 +13,7 @@
             "no_entry"
         ]
     },
+    "useLLMForUnknownEmojis": true,
     "notificationChannel": "operations-testing_notifications",
     "notificationSettings": {
         "enabled": true,

@@ -38,6 +38,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Check Slack configuration for feedback system
+  const { checkSlackFeedbackConfiguration } = await import("./utils/slackConfigCheck");
+  checkSlackFeedbackConfiguration();
+
   // Register Slack routes FIRST (before express.json) to preserve raw body for signature verification
   registerSlackRoutes(app);
   console.log("Slack routes registered at /api/slack/events");
