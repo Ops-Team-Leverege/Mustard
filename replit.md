@@ -63,6 +63,55 @@ When modifying any LLM prompt in the system, follow these steps in order:
 
 **Important:** If adding a brand new prompt (not just editing an existing one), also add its name to the `PromptVersions` type in `versions.ts` and add its text mapping in `backfillPromptVersions.ts`.
 
+### Database Schema for Prompt Version Control & Feedback
+The prompt version control and feedback system requires three database objects. These are already created in production, but if the database is ever reset or rebuilt, apply them:
+
+1. **`prompt_versions` table** — stores full prompt text for each version for auditability.
+2. **`interaction_feedback` table** — stores Slack reaction feedback (positive/negative) linked to interactions.
+3. **`prompt_versions` column on `interaction_logs`** — JSONB column tracking which prompt versions were used per interaction.
+4. **Index `interaction_logs_message_ts_idx`** — enables fast reaction-to-interaction lookup.
+
+**How to apply:** Run `npm run db:push` to sync the Drizzle schema (`shared/schema.ts`) to the database. If the interactive prompt gets stuck, create the objects directly via SQL:
+```sql
+-- prompt_versions table
+CREATE TABLE IF NOT EXISTS prompt_versions (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  prompt_name VARCHAR NOT NULL,
+  version VARCHAR NOT NULL,
+  prompt_text TEXT NOT NULL,
+  change_reason TEXT,
+  changed_by VARCHAR
+);
+CREATE UNIQUE INDEX IF NOT EXISTS prompt_versions_name_version_idx ON prompt_versions (prompt_name, version);
+
+-- interaction_feedback table
+CREATE TABLE IF NOT EXISTS interaction_feedback (
+  id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  interaction_id VARCHAR NOT NULL,
+  slack_message_ts VARCHAR NOT NULL,
+  user_id VARCHAR NOT NULL,
+  emoji VARCHAR NOT NULL,
+  sentiment VARCHAR NOT NULL,
+  intent VARCHAR,
+  answer_contract VARCHAR,
+  prompt_versions JSONB
+);
+CREATE UNIQUE INDEX IF NOT EXISTS interaction_feedback_unique_reaction ON interaction_feedback (interaction_id, user_id, emoji);
+
+-- prompt_versions column on interaction_logs
+ALTER TABLE interaction_logs ADD COLUMN IF NOT EXISTS prompt_versions JSONB;
+CREATE INDEX IF NOT EXISTS interaction_logs_message_ts_idx ON interaction_logs (slack_message_ts);
+```
+
+After creating the tables, run the backfill migration to seed prompt version records:
+```
+npx tsx server/migrations/backfillPromptVersions.ts
+```
+
+**Verification:** The feature flag in `server/utils/featureFlags.ts` automatically checks if these tables exist at runtime. If they don't, the feedback system gracefully disables itself without crashing.
+
 ## External Dependencies
 
 ### AI Services
