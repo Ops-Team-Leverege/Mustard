@@ -41,7 +41,7 @@ import {
   buildCustomerQuestionsAssessmentPrompt,
   getMeetingSummarySystemPrompt,
   buildSingleMeetingSummaryPrompt,
-  type MeetingSummaryData,
+  type MeetingSummaryInput,
 } from "../config/prompts/singleMeeting";
 import {
   type SingleMeetingContext as SharedSingleMeetingContext,
@@ -1157,48 +1157,25 @@ async function handleSummaryIntent(
     };
   }
 
-  const product = transcript.product as "PitCrew";
-  const [productInsights, qaPairs, actionItems] = await Promise.all([
-    storage.getProductInsightsByTranscript(product, ctx.meetingId),
-    storage.getQAPairsByTranscript(product, ctx.meetingId),
-    storage.getMeetingActionItemsByTranscript(ctx.meetingId),
-  ]);
-
   const meetingDateStr = formatMeetingDate(ctx.meetingDate) ||
     formatMeetingDate(transcript.meetingDate) ||
     formatMeetingDate(transcript.createdAt) ||
     "Date not available";
 
-  const summaryData: MeetingSummaryData = {
+  const summaryData: MeetingSummaryInput = {
     companyName: ctx.companyName,
     meetingDate: meetingDateStr,
-    status: transcript.mainMeetingTakeaways || "",
-    nextSteps: transcript.nextSteps || "",
-    leverageTeam: transcript.leverageTeam || "",
-    customerNames: transcript.customerNames || "",
-    productInsights: productInsights.map(ins => ({
-      feature: ins.feature,
-      context: ins.context,
-      quote: ins.quote,
-      categoryName: ins.categoryName || null,
-    })),
-    qaPairs: qaPairs.map(qa => ({
-      question: qa.question,
-      answer: qa.answer,
-      asker: qa.asker,
-    })),
-    actionItems: actionItems.map(item => ({
-      action: item.actionText,
-      owner: item.ownerName,
-      deadline: item.deadline,
-    })),
+    status: transcript.mainMeetingTakeaways || undefined,
+    nextSteps: transcript.nextSteps || undefined,
+    leverageTeam: transcript.leverageTeam || undefined,
+    customerNames: transcript.customerNames || undefined,
   };
 
   const transcriptText = chunks
     .map(c => `[${c.speakerName || "Unknown"}]: ${c.content}`)
     .join("\n\n");
 
-  console.log(`[SingleMeetingOrchestrator] Summary: ${chunks.length} chunks, ${summaryData.productInsights.length} insights, ${summaryData.qaPairs.length} Q&A pairs, ${summaryData.actionItems.length} action items`);
+  console.log(`[SingleMeetingOrchestrator] Summary v3: ${chunks.length} chunks, transcript-only extraction`);
 
   const response = await openai.chat.completions.create({
     model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,

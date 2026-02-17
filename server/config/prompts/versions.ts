@@ -49,7 +49,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
     SEMANTIC_ANSWER_PROMPT: "2026-02-17-001",
 
     // Transcript Analysis - Initial versions
-    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-17-001",
+    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-17-002",
     RAG_QUOTE_SELECTION_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_ACTION_ITEMS_SYSTEM_PROMPT: "2026-02-17-001",
@@ -83,6 +83,7 @@ export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: 
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
     ],
     RAG_MEETING_SUMMARY_SYSTEM_PROMPT: [
+        { version: "2026-02-17-002", reason: "v3 rewrite: 10-category exhaustive extraction (A-J), two-part output (Executive Summary + Complete Record), self-verification tally, verbatim-only quotes, no pre-extracted data dependency", date: "2026-02-17" },
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
     ],
     RAG_QUOTE_SELECTION_SYSTEM_PROMPT: [
