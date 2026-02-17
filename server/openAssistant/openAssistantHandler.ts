@@ -36,7 +36,7 @@ import {
 } from "./types";
 import { streamOpenAIResponse } from "./streamingHelper";
 import { findRelevantMeetings, searchAcrossMeetings, type ScopeOverride } from "./meetingResolver";
-import { executeContractChain, mapOrchestratorIntentToContract } from "./contractExecutor";
+import { executeContractChain } from "./contractExecutor";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt, getProductKnowledgePrompt } from "../airtable/productData";
 import { getMeetingNotFoundMessage } from "../utils/notFoundMessages";
 import { GoogleGenAI } from "@google/genai";

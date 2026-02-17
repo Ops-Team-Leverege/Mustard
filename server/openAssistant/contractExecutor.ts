@@ -551,29 +551,6 @@ export function selectMultiMeetingContract(userMessage: string): AnswerContract 
 }
 
 /**
- * Map SingleMeetingOrchestrator's internal intent to an AnswerContract.
- * 
- * The orchestrator has its own intent classification (extractive/aggregative/summary)
- * which we map to the appropriate contract. The chain's primary contract is used
- * as a fallback if the orchestrator intent doesn't map directly.
- */
-export function mapOrchestratorIntentToContract(
-  orchestratorIntent: "extractive" | "aggregative" | "summary",
-  chainPrimaryContract: AnswerContract
-): AnswerContract {
-  switch (orchestratorIntent) {
-    case "extractive":
-      return AnswerContract.EXTRACTIVE_FACT;
-    case "aggregative":
-      return AnswerContract.AGGREGATIVE_LIST;
-    case "summary":
-      return AnswerContract.MEETING_SUMMARY;
-    default:
-      return chainPrimaryContract;
-  }
-}
-
-/**
  * Synthesize raw excerpts into structured analysis using LLM.
  * 
  * This is the key step that transforms raw transcript excerpts into

@@ -17,17 +17,14 @@
  * - Semantic Layer (Summary Only): meeting_summaries, GPT-5 (explicit opt-in)
  * - Extended Search (Blocked): searchQuestions, searchCompanyFeedback, etc.
  * 
- * IMPORTANT: Intent Classification Authority
- * The Intent Router (server/decisionLayer/intent.ts) is the SOLE authority for intent classification.
- * This orchestrator receives contracts from the Decision Layer and executes them verbatim.
- * 
- * Internal routing (extractive/aggregative/summary) is derived from Decision Layer contracts:
- * - EXTRACTIVE_FACT, ATTENDEES, CUSTOMER_QUESTIONS, NEXT_STEPS → extractive handler
- * - AGGREGATIVE_LIST → aggregative handler
- * - MEETING_SUMMARY → summary handler
- * 
- * Legacy internal classification is retained for backward compatibility with direct Slack calls
- * but should be migrated to Decision Layer routing.
+ * IMPORTANT: Contract Execution Authority
+ * The Decision Layer (server/decisionLayer/) is the SOLE authority for intent classification
+ * and contract selection. This orchestrator routes directly on AnswerContract values:
+ * - EXTRACTIVE_FACT, ATTENDEES, CUSTOMER_QUESTIONS, NEXT_STEPS → extractive processing
+ * - AGGREGATIVE_LIST → aggregative processing
+ * - MEETING_SUMMARY → summary generation
+ * - DRAFT_EMAIL, DRAFT_RESPONSE → drafting
+ * - Unknown contracts → logged and refused with uncertainty response
  */
 
 import { MODEL_ASSIGNMENTS } from "../config/models";
@@ -70,16 +67,6 @@ type OrchestratorActionItem = {
   isPrimary: boolean;
 };
 
-/**
- * Internal handler routing type.
- * 
- * Maps Answer Contracts from Decision Layer to internal implementation handlers.
- * This is an internal detail - external callers work with Answer Contracts only.
- * 
- * NOTE: This is NOT intent classification. The Decision Layer has already classified
- * intent and selected a contract. This type just routes to the right internal handler.
- */
-type InternalHandlerType = "extractive" | "aggregative" | "summary" | "drafting";
 
 const UNCERTAINTY_RESPONSE = `I don't see this explicitly mentioned in the meeting.
 If you say "yes", I'll share a brief meeting summary.`;
@@ -1396,47 +1383,24 @@ async function generateKBAssistedCustomerQuestionAnswers(
   }
 }
 
-/**
- * Derive internal handler type from Decision Layer contract.
- * 
- * When a contract is provided by the Decision Layer, we skip the deprecated
- * internal classification and directly route to the appropriate handler.
- */
-function deriveHandlerFromContract(contract: AnswerContract): InternalHandlerType {
-  switch (contract) {
-    case AnswerContract.EXTRACTIVE_FACT:
-    case AnswerContract.ATTENDEES:
-    case AnswerContract.CUSTOMER_QUESTIONS:
-    case AnswerContract.NEXT_STEPS:
-      return "extractive";
-    case AnswerContract.AGGREGATIVE_LIST:
-      return "aggregative";
-    case AnswerContract.MEETING_SUMMARY:
-      return "summary";
-    case AnswerContract.DRAFT_EMAIL:
-    case AnswerContract.DRAFT_RESPONSE:
-      return "drafting";
-    default:
-      return "extractive";
-  }
-}
 
 /**
  * Main orchestrator entry point.
  * 
- * Routes to appropriate handler based on Decision Layer contract or internal classification.
+ * Routes directly on Decision Layer contracts — no intermediate handler abstraction.
+ * The Decision Layer is the sole authority for contract selection.
  * 
  * Processing Flow:
  * 1. Check for offer responses (if pending)
- * 2. Derive handler type from contract OR use deprecated classification
- * 3. Try artifact deterministic lookup
- * 4. If artifacts fail AND question is semantic → use LLM semantic answer (Step 6)
+ * 2. Route directly on contract
+ * 3. Try artifact deterministic lookup (extractive contracts)
+ * 4. If artifacts fail AND question is semantic → use LLM semantic answer
  * 5. If still no answer → return uncertainty with offer
  * 
  * @param ctx - Single meeting context (meetingId, companyName, meetingDate)
  * @param question - User's question text
  * @param hasPendingOffer - Whether the previous interaction offered a summary (from interaction_logs)
- * @param contract - Optional Decision Layer contract. When provided, skips deprecated internal classification.
+ * @param contract - Decision Layer contract. Required — Decision Layer is sole authority.
  */
 export async function handleSingleMeetingQuestion(
   ctx: SingleMeetingContext,
@@ -1448,7 +1412,6 @@ export async function handleSingleMeetingQuestion(
   console.log(`[SingleMeetingOrchestrator] Processing question for meeting ${ctx.meetingId}`);
   console.log(`[SingleMeetingOrchestrator] Question: "${question.substring(0, 100)}..." | pendingOffer: ${hasPendingOffer}`);
 
-  // Check for offer responses first (only if there's a pending offer)
   if (hasPendingOffer) {
     const offerResponse = detectOfferResponse(question);
     if (offerResponse === "accept") {
@@ -1465,19 +1428,17 @@ export async function handleSingleMeetingQuestion(
     }
   }
 
-  // STEP 0a: AMBIGUITY CHECK - Before classifying, check if question is ambiguous
   const ambiguity = detectAmbiguity(question);
   if (ambiguity.isAmbiguous) {
     console.log(`[SingleMeetingOrchestrator] AMBIGUITY DETECTED - returning clarification prompt`);
     return {
       answer: ambiguity.clarificationPrompt!,
-      intent: "extractive", // Default intent for tracking
+      intent: "extractive",
       dataSource: "clarification",
       isClarificationRequest: true,
     };
   }
 
-  // STEP 0b: BINARY QUESTION CHECK - Detect yes/no questions
   const isBinary = isBinaryQuestion(question);
   if (isBinary) {
     console.log(`[SingleMeetingOrchestrator] BINARY QUESTION DETECTED - will answer yes/no first`);
@@ -1485,48 +1446,36 @@ export async function handleSingleMeetingQuestion(
     if (binaryResult) {
       return binaryResult;
     }
-    // If handleBinaryQuestion returns null, fall through to normal processing
   }
 
-  // Derive handler type from Decision Layer contract (required - Decision Layer is sole authority)
   if (!contract) {
     console.error(`[SingleMeetingOrchestrator] ERROR: No contract provided. Decision Layer must provide a contract for all requests.`);
-    // Fallback to EXTRACTIVE_FACT as safe default
     contract = AnswerContract.EXTRACTIVE_FACT;
   }
-  const handlerType: InternalHandlerType = deriveHandlerFromContract(contract);
-  console.log(`[SingleMeetingOrchestrator] Using Decision Layer contract: ${contract} → handler: ${handlerType}`);
 
-  const isSemantic = requiresSemantic ?? true; // LLM-determined; default true for safety (artifact-complete contracts have their own guard)
-  console.log(`[SingleMeetingOrchestrator] VERSION=2026-02-10-v1 | handlerType: ${handlerType} | isSemantic: ${isSemantic} (source: ${requiresSemantic !== undefined ? 'decision-layer' : 'default'}) | isBinary: ${isBinary} | hasContract: ${!!contract}`);
+  const isSemantic = requiresSemantic ?? true;
+  console.log(`[SingleMeetingOrchestrator] VERSION=2026-02-17-v1 | contract: ${contract} | isSemantic: ${isSemantic} (source: ${requiresSemantic !== undefined ? 'decision-layer' : 'default'}) | isBinary: ${isBinary}`);
 
-  switch (handlerType) {
-    case "extractive": {
+  switch (contract) {
+    case AnswerContract.EXTRACTIVE_FACT:
+    case AnswerContract.ATTENDEES:
+    case AnswerContract.CUSTOMER_QUESTIONS:
+    case AnswerContract.NEXT_STEPS: {
       const result = await handleExtractiveIntent(ctx, question, contract);
 
-      // STEP 6: Determine if LLM judgment is needed
-      // Contract-aware semantic processing:
-      // - NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS with artifacts → return artifacts directly
-      //   (even if question uses "should mention" phrasing - it's just asking for the data)
-      // - Other semantic questions without artifacts → LLM fallback
-      // - True filtering questions (e.g., "which action items about cameras") → LLM filtering
       let semanticError: string | undefined;
 
-      // Contracts where artifacts are the complete answer (no LLM filtering needed)
       const artifactCompleteContracts = [
         AnswerContract.NEXT_STEPS,
         AnswerContract.ATTENDEES,
         AnswerContract.CUSTOMER_QUESTIONS,
       ];
-      // Check for actual structured artifacts, not transcript fallback
       const artifactDataSources = ["action_items", "attendees", "qa_pairs"];
       const hasArtifacts = artifactDataSources.includes(result.dataSource);
-      const isArtifactComplete = contract && artifactCompleteContracts.includes(contract);
+      const isArtifactComplete = artifactCompleteContracts.includes(contract);
 
-      // Skip LLM if contract provides complete answer with artifacts
-      // Only use LLM when: (1) no artifacts found, OR (2) semantic + not an artifact-complete contract
       const needsLLMJudgment = isSemantic && !(isArtifactComplete && hasArtifacts);
-      console.log(`[SingleMeetingOrchestrator] LLM judgment decision: isSemantic=${isSemantic}, isArtifactComplete=${isArtifactComplete}, hasArtifacts=${hasArtifacts}, needsLLMJudgment=${needsLLMJudgment}`);
+      console.log(`[SingleMeetingOrchestrator] LLM judgment decision: contract=${contract}, isSemantic=${isSemantic}, isArtifactComplete=${isArtifactComplete}, hasArtifacts=${hasArtifacts}, needsLLMJudgment=${needsLLMJudgment}`);
 
       if (needsLLMJudgment) {
         const reason = result.dataSource === "not_found" ? "artifacts not found" : "judgment question requires filtering";
@@ -1556,18 +1505,16 @@ export async function handleSingleMeetingQuestion(
         console.log(`[SingleMeetingOrchestrator] Non-semantic question: returning artifacts directly`);
       }
 
-      // If still not found, offer summary
       if (result.dataSource === "not_found") {
         return { ...result, pendingOffer: "summary", semanticError };
       }
       return { ...result, semanticError };
     }
 
-    case "aggregative": {
+    case AnswerContract.AGGREGATIVE_LIST: {
       const result = await handleAggregativeIntent(ctx, question);
       let aggSemanticError: string | undefined;
 
-      // STEP 6: Semantic questions need LLM judgment (same logic as extractive)
       if (isSemantic) {
         const reason = result.dataSource === "not_found" ? "artifacts not found" : "judgment question requires filtering";
         console.log(`[SingleMeetingOrchestrator] Semantic processing (aggregative): ${reason}`);
@@ -1590,27 +1537,24 @@ export async function handleSingleMeetingQuestion(
           const errorMsg = err instanceof Error ? err.message : String(err);
           console.error(`[SingleMeetingOrchestrator] Semantic answer failed (aggregative): ${errorMsg}`);
           aggSemanticError = errorMsg;
-          // Fall through to uncertainty response
         }
       }
 
-      // If still not found, offer summary
       if (result.dataSource === "not_found") {
         return { ...result, pendingOffer: "summary", semanticError: aggSemanticError };
       }
       return { ...result, semanticError: aggSemanticError };
     }
 
-    case "summary":
-      const summaryResult = await handleSummaryIntent(ctx, question);
-      return summaryResult;
+    case AnswerContract.MEETING_SUMMARY:
+      return handleSummaryIntent(ctx, question);
 
-    case "drafting": {
-      const draftResult = await handleDraftingIntent(ctx, question, contract);
-      return draftResult;
-    }
+    case AnswerContract.DRAFT_EMAIL:
+    case AnswerContract.DRAFT_RESPONSE:
+      return handleDraftingIntent(ctx, question, contract);
 
     default:
+      console.error(`[SingleMeetingOrchestrator] Unknown contract "${contract}" — refusing to execute. Decision Layer should not route unrecognized contracts here.`);
       return {
         answer: UNCERTAINTY_RESPONSE,
         intent: "extractive",
