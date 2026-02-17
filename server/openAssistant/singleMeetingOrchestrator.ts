@@ -1163,15 +1163,9 @@ async function handleSummaryIntent(
     .map(c => `[${c.speakerName || "Unknown"}]: ${c.content}`)
     .join("\n\n");
 
-  const isConversationalSummary = userQuestion && !/\b(full\s+report|full\s+debrief|complete\s+record|exhaustive|detailed\s+report)\b/i.test(userQuestion);
-  console.log(`[SingleMeetingOrchestrator] Summary v4: ${chunks.length} chunks, transcript-only extraction, conversational=${isConversationalSummary}`);
+  console.log(`[SingleMeetingOrchestrator] Summary v4: ${chunks.length} chunks, transcript-only extraction`);
 
-  let userPrompt = buildSingleMeetingSummaryPrompt(summaryData, transcriptText);
-
-  if (isConversationalSummary) {
-    userPrompt += `\n\nIMPORTANT — The user asked: "${userQuestion}"
-This is a conversational Slack question, NOT a request for a full report. Keep the Meeting Brief focused and concise. Tailor the output to address what the user is specifically asking for.`;
-  }
+  const userPrompt = buildSingleMeetingSummaryPrompt(summaryData, transcriptText);
 
   const response = await openai.chat.completions.create({
     model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,
