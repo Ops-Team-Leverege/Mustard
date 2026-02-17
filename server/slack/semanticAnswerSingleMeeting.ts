@@ -148,6 +148,8 @@ interface MeetingContext {
   qaPairs: QAPairWithCategory[];
   actionItems: MeetingActionItem[];
   transcriptChunks: TranscriptChunk[];
+  ingestionTakeaways?: string | null;
+  ingestionNextSteps?: string | null;
 }
 
 // buildSystemPrompt and GLOBAL_DONOT_RULES moved to config/prompts/singleMeeting.ts
@@ -166,6 +168,16 @@ function buildContextWindow(ctx: MeetingContext): string {
   const dateSuffix = ctx.meetingDate ? ` (${formatMeetingDate(ctx.meetingDate)})` : "";
 
   sections.push(`# Meeting with ${ctx.companyName}${dateSuffix}`);
+
+  if (ctx.ingestionTakeaways || ctx.ingestionNextSteps) {
+    sections.push(`\n## Ingestion-Time Notes (Added by Uploader)`);
+    if (ctx.ingestionTakeaways) {
+      sections.push(`Main Takeaways: ${ctx.ingestionTakeaways}`);
+    }
+    if (ctx.ingestionNextSteps) {
+      sections.push(`Next Steps: ${ctx.ingestionNextSteps}`);
+    }
+  }
 
   if (ctx.leverageTeam.length > 0 || ctx.customerNames.length > 0) {
     sections.push(`\n## Attendees`);
@@ -283,6 +295,8 @@ export async function semanticAnswerSingleMeeting(
     qaPairs,
     actionItems,
     transcriptChunks: chunks,
+    ingestionTakeaways: transcript.mainMeetingTakeaways,
+    ingestionNextSteps: transcript.nextSteps,
   };
 
   const contextWindow = buildContextWindow(context);

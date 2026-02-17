@@ -123,10 +123,26 @@ ANSWER FORMAT: Summary
 The user explicitly requested a summary.
 
 RESPOND WITH:
-- A concise summary of the meeting
+- A concise summary of the meeting formatted as a Meeting Brief
 - Do not introduce new facts
 - Clearly label it as a summary
-- Focus on key points, decisions, and outcomes`,
+- Focus on key points, decisions, and outcomes
+
+FORMAT:
+*Meeting Summary: [Company Name]*
+_[Date]_
+
+*Executive Bottom Line*
+[1-2 sentences]
+
+*Risks & Blockers*
+[Bulleted list if any]
+
+*Key Insights & Decisions*
+[Bulleted list]
+
+*Action Items*
+[Bulleted list]`,
 };
 
 /**
