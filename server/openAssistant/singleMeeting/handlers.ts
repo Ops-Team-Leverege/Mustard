@@ -85,7 +85,7 @@ export async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "qa_pairs",
-      prompt_versions: {
+      promptVersions: {
         CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
       }
     };
@@ -117,7 +117,7 @@ export async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "attendees",
-      prompt_versions: {
+      promptVersions: {
         RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
       }
     };
@@ -153,7 +153,7 @@ export async function handleExtractiveIntent(
       answer: lines.join("\n"),
       intent: "extractive",
       dataSource: "action_items",
-      prompt_versions: {
+      promptVersions: {
         RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT
       }
     };
@@ -239,7 +239,7 @@ export async function handleExtractiveIntent(
       intent: "extractive",
       dataSource: "qa_pairs",
       evidence: match.questionText,
-      prompt_versions: {
+      promptVersions: {
         CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
       }
     };
@@ -322,7 +322,7 @@ export async function handleAggregativeIntent(
       answer: lines.join("\n"),
       intent: "aggregative",
       dataSource: "qa_pairs",
-      prompt_versions: {
+      promptVersions: {
         CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
       }
     };
@@ -356,6 +356,9 @@ export async function handleAggregativeIntent(
       answer: lines.join("\n"),
       intent: "aggregative",
       dataSource: "qa_pairs",
+      promptVersions: {
+        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
+      }
     };
   }
 
@@ -374,7 +377,7 @@ export async function handleAggregativeIntent(
       answer: lines.join("\n"),
       intent: "aggregative",
       dataSource: "action_items",
-      prompt_versions: {
+      promptVersions: {
         RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT
       }
     };
@@ -500,6 +503,9 @@ Format the email with:
     answer: `Here's a draft follow-up email for ${ctx.companyName}${dateSuffix}:\n\n${draft}`,
     intent: "drafting",
     dataSource: "qa_pairs",
+    prompt_versions: {
+      PRODUCT_KNOWLEDGE_DRAFTING_PROMPT: PROMPT_VERSIONS.PRODUCT_KNOWLEDGE_DRAFTING_PROMPT
+    }
   };
 }
 
@@ -640,7 +646,7 @@ export async function generateKBAssistedCustomerQuestionAnswers(
       intent: "extractive",
       dataSource: "qa_pairs",
       progressMessage,
-      promptVersions: {
+      prompt_versions: {
         RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
       }
     };
