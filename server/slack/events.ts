@@ -18,6 +18,7 @@
 import type { Request, Response } from "express";
 import { verifySlackSignature } from "./verify";
 import { postSlackMessage, fetchThreadHistory, seedFeedbackReactions } from "./slackApi";
+import { isSeedReactionsEnabled } from "./feedbackHandler";
 import { sendResponseWithDocumentSupport } from "../services/documentResponse";
 import { generateAckWithMention, generateAck } from "./acknowledgments";
 import { createMCP, type MCPResult } from "../mcp/toolRouter";
@@ -1109,7 +1110,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
 
       const isRealSlackTs = !testRun && botReply.ts && /^\d+\.\d+$/.test(botReply.ts);
-      if (isRealSlackTs) {
+      if (isRealSlackTs && isSeedReactionsEnabled()) {
         seedFeedbackReactions(channel, botReply.ts).catch(err =>
           console.warn(`[Slack] Failed to seed feedback reactions:`, err)
         );

@@ -20,6 +20,7 @@ type FeedbackConfig = {
         negative: string[];
     };
     useLLMForUnknownEmojis: boolean;
+    seedReactions: boolean;
     notificationChannel: string;
     notificationSettings: {
         enabled: boolean;
@@ -28,6 +29,10 @@ type FeedbackConfig = {
         includeEvidenceSources: boolean;
     };
 };
+
+export function isSeedReactionsEnabled(): boolean {
+    return config.seedReactions === true;
+}
 
 const config = feedbackConfig as FeedbackConfig;
 

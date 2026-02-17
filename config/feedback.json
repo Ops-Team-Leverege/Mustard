@@ -16,6 +16,7 @@
         ]
     },
     "useLLMForUnknownEmojis": true,
+    "seedReactions": true,
     "notificationChannel": "operations-testing_notifications",
     "notificationSettings": {
         "enabled": true,
