@@ -140,6 +140,8 @@ export type MeetingSummaryInput = {
   nextSteps?: string;
   leverageTeam?: string;
   customerNames?: string;
+  ingestionTakeaways?: string;
+  ingestionNextSteps?: string;
 };
 
 /**
@@ -210,6 +212,10 @@ ${data.customerNames ? `Customer Attendees: ${data.customerNames}` : ''}`.trim()
 CONTEXT FROM CRM (Use for background, but Transcript is King):
 ${data.status ? `- Previous Status: ${data.status}` : ''}
 ${data.nextSteps ? `- CRM Planned Next Steps: ${data.nextSteps}` : ''}
+
+INGESTION-TIME NOTES (Notes made by the person who uploaded this meeting):
+${data.ingestionTakeaways ? `- Main Meeting Takeaways: ${data.ingestionTakeaways}` : ''}
+${data.ingestionNextSteps ? `- Next Steps: ${data.ingestionNextSteps}` : ''}
 `.trim();
 
   return `Generate the Meeting Brief using the transcript below.

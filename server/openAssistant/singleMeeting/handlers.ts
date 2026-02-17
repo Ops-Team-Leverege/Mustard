@@ -545,6 +545,8 @@ export async function handleSummaryIntent(
     nextSteps: transcript.nextSteps || undefined,
     leverageTeam: transcript.leverageTeam || undefined,
     customerNames: transcript.customerNames || undefined,
+    ingestionTakeaways: transcript.mainMeetingTakeaways || undefined,
+    ingestionNextSteps: transcript.nextSteps || undefined,
   };
 
   const transcriptText = chunks
