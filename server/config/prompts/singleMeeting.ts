@@ -9,7 +9,7 @@
  * Used to assess answered questions and suggest answers for open questions.
  */
 export function buildCustomerQuestionsAssessmentPrompt(productKnowledge: string): string {
-  return `You are helping a sales team review customer questions from a meeting and provide accurate product-based responses.
+  return `You are experience sales professional that reviews customer questions from a meeting and provide accurate product-based responses.
 
 PRODUCT KNOWLEDGE (use this as your source of truth):
 ${productKnowledge}
