@@ -42,6 +42,27 @@ The LLM can propose multiple contracts for multi-step requests, executed sequent
 ### Key Architectural Improvements
 The system has seen significant advancements including coordinated progress message handling, a flexible markdown formatting system, a follow-up detection service, database-backed deduplication, and product knowledge enrichment. All LLM prompts are centralized and typed. Thread context preservation and aggregate specificity checks prevent redundant clarification. Contract-aware semantic processing ensures consistent output, and `customer_questions` table has been removed in favor of `qa_pairs`. LLM-determined flags (`requiresSemantic`, `requiresProductKnowledge`, `requiresStyleMatching`) have replaced brittle regex-based detection for semantic processing, product knowledge, and style matching. Legacy intents like `DOCUMENT_SEARCH/DOCUMENT_ANSWER` have been removed. All intent handlers consistently pass thread context to LLM calls. A unified General Help fallback chain uses multiple LLMs. A multi-source search pattern offers Slack search after meeting-based responses. Customer-specific deployment routing prioritizes `SINGLE_MEETING` for relevant queries. An aggregate fallback mechanism (`qa_pairs_first`) addresses broad queries by searching `qa_pairs` first, with adaptive offers for meeting searches and explicit meeting detection. Offers have expiration times to prevent stale interactions.
 
+### Prompt Update Procedure
+When modifying any LLM prompt in the system, follow these steps in order:
+
+1. **Edit the prompt text** in the appropriate file under `server/config/prompts/` (e.g., `decisionLayer.ts`, `transcript.ts`, `singleMeeting.ts`, `external.ts`, `extraction.ts`).
+2. **Bump the version** in `server/config/prompts/versions.ts`:
+   - Update the version string in `PROMPT_VERSIONS` for the changed prompt (use `getNextVersion()` helper or manually increment: `YYYY-MM-DD-NNN`).
+   - Add a new entry to `PROMPT_CHANGE_LOG` with the version, reason for change, and date.
+3. **Insert the new version into the database** by running: `npx tsx server/migrations/backfillPromptVersions.ts` (this records the full prompt text in `prompt_versions` table for auditability).
+4. **Verify** that the prompt is being tracked during interactions — the `PromptVersionTracker` (`server/utils/promptVersionTracker.ts`) accumulates versions used per interaction and stores them in `interaction_logs.prompt_versions`.
+
+**Key files:**
+- Prompt text: `server/config/prompts/*.ts`
+- Version registry: `server/config/prompts/versions.ts`
+- Version tracker: `server/utils/promptVersionTracker.ts`
+- Backfill migration: `server/migrations/backfillPromptVersions.ts`
+- Feature flag (safety gate): `server/utils/featureFlags.ts`
+- Feedback handler (reactions): `server/slack/feedbackHandler.ts`
+- Feedback config (emoji lists): `config/feedback.json`
+
+**Important:** If adding a brand new prompt (not just editing an existing one), also add its name to the `PromptVersions` type in `versions.ts` and add its text mapping in `backfillPromptVersions.ts`.
+
 ## External Dependencies
 
 ### AI Services
