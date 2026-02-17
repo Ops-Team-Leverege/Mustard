@@ -16,7 +16,7 @@
 
 import { OpenAI } from "openai";
 import { performExternalResearch, formatCitationsForDisplay, type ResearchResult } from "./externalResearch";
-import { handleSingleMeetingQuestion, type SingleMeetingContext, type SingleMeetingResult } from "./singleMeetingOrchestrator";
+import { executeSingleMeetingContract, type SingleMeetingContext, type SingleMeetingResult } from "./singleMeeting";
 import { SlackSearchHandler } from "./slackSearchHandler";
 import { Intent, type IntentClassificationResult } from "../decisionLayer/intent";
 import { AnswerContract, type SSOTMode } from "../decisionLayer/answerContracts";
@@ -707,10 +707,9 @@ async function handleMeetingDataIntent(
     const chainProgress = generateContractChainProgress(contractChain);
 
     // Pass the primary contract and LLM-determined semantic flag to the orchestrator
-    const singleMeetingResult = await handleSingleMeetingQuestion(
+    const singleMeetingResult = await executeSingleMeetingContract(
       context.resolvedMeeting,
       userMessage,
-      false,
       primaryContract,
       context.decisionLayerResult?.requiresSemantic
     );
@@ -778,11 +777,9 @@ async function handleMeetingDataIntent(
     // Generate progress message for multi-step contract chains
     const chainProgress = generateContractChainProgress(contractChain);
 
-    // Pass the primary contract and LLM-determined semantic flag to the orchestrator
-    const singleMeetingResult = await handleSingleMeetingQuestion(
+    const singleMeetingResult = await executeSingleMeetingContract(
       meeting,
       userMessage,
-      false,
       primaryContract,
       context.decisionLayerResult?.requiresSemantic
     );
@@ -913,10 +910,9 @@ async function handleMultiMeetingIntent(
 
     const chainProgress = generateContractChainProgress(contractChain);
 
-    const singleMeetingResult = await handleSingleMeetingQuestion(
+    const singleMeetingResult = await executeSingleMeetingContract(
       meeting,
       userMessage,
-      false,
       primaryContract,
       context.decisionLayerResult?.requiresSemantic
     );

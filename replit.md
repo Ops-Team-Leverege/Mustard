@@ -24,8 +24,8 @@ The system employs **true LLM-FIRST classification** for intent routing, primari
 
 **Key Components:**
 -   **Intent Router**: Classifies user intent using LLM semantic understanding.
--   **Orchestrator**: Manages flow and selects answer contracts.
--   **Execution Layer**: Executes contracts deterministically.
+-   **Contract Selection**: Decision Layer selects answer contracts.
+-   **Execution Layer**: Executes contracts deterministically via `server/openAssistant/singleMeeting/` module.
 
 **Routing Flow:**
 The Intent Router classifies intent, the Orchestrator computes context layers and selects an answer contract, and the Execution Layer executes the contract chain. Contract chains are dynamically built based on user messages.
@@ -47,6 +47,8 @@ The system has seen significant advancements including coordinated progress mess
 **Full-Pipeline Prompt Version Tracking (2026-02-17):** Prompt version tracking expanded from Decision Layer only (~20% coverage) to all LLM call sites (~100%). Each downstream function now returns `promptVersions` in its result, merged at the logging point in `events.ts` via `mergePromptVersionRecords()`. Tracked prompts: Decision Layer (INTENT_CLASSIFICATION_PROMPT, CONTRACT_SELECTION_PROMPT), RAG Composer (RAG_MEETING_SUMMARY_SYSTEM_PROMPT, RAG_QUOTE_SELECTION_SYSTEM_PROMPT, RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT, RAG_ACTION_ITEMS_SYSTEM_PROMPT), Semantic Answer (SEMANTIC_ANSWER_PROMPT), MCP Routing (MCP_ROUTING_PROMPT). Architecture uses "return-and-merge" pattern — no tracker threading through function signatures.
 
 **Feedback Reaction Seeding (2026-02-17):** Every bot response now gets thumbs-up (+1) and thumbs-down (-1) reactions seeded automatically, mimicking Claude-style inline feedback. Users click the existing reactions to give feedback. The bot's own seeded reactions are filtered out via `getBotUserId()` (cached `auth.test` call). `seedFeedbackReactions()` in `server/slack/slackApi.ts` handles seeding. Feedback config (`config/feedback.json`) updated to include `thumbsdown`/`-1` in negative emojis. Requires `reactions:write` bot token scope.
+
+**Orchestrator Removal (2026-02-17):** The monolithic `singleMeetingOrchestrator.ts` (~1560 lines) has been decomposed into `server/openAssistant/singleMeeting/` module with three files: `helpers.ts` (data-fetching functions: lookupQAPairs, getMeetingAttendees, getMeetingActionItems, searchTranscriptSnippets, etc.), `handlers.ts` (contract handlers: handleExtractiveIntent, handleAggregativeIntent, handleSummaryIntent, handleDraftingIntent, generateKBAssistedCustomerQuestionAnswers), and `index.ts` (thin `executeSingleMeetingContract()` dispatcher). Dead regex pre-checks removed: `detectAmbiguity`, `isBinaryQuestion`, `detectOfferResponse`, `isAttendeeQuestion`, `isActionItemQuestion`, `handleBinaryQuestion`. Contract-only routing enforced — handler functions now route exclusively on `AnswerContract` values from the Decision Layer, with no regex fallbacks. The `hasPendingOffer` parameter has been dropped from all call sites.
 
 ### Prompt Update Procedure
 When modifying any LLM prompt in the system, follow these steps in order:

@@ -25,7 +25,7 @@ import { createMCP, type MCPResult } from "../mcp/toolRouter";
 import { makeMCPContext, type ThreadContext } from "../mcp/context";
 import { storage } from "../storage";
 import { classifyPipelineError } from "../utils/errorHandler";
-import { handleSingleMeetingQuestion, type SingleMeetingContext } from "../openAssistant/singleMeetingOrchestrator";
+import { executeSingleMeetingContract, type SingleMeetingContext } from "../openAssistant/singleMeeting";
 import { resolveMeetingFromSlackMessage, hasTemporalMeetingReference } from "./context/meetingResolver";
 import { resolveCompany } from "./context/companyResolver";
 import { buildInteractionMetadata, type EntryPoint, type LegacyIntent, type AnswerShape, type DataSource, type MeetingArtifactType, type LlmPurpose, type ResolutionSource } from "./interactionMetadata";
@@ -657,20 +657,9 @@ export async function slackEventsHandler(req: Request, res: Response) {
       }
       // STEP 4: Route based on classified intent
       else if (decisionLayerResult.intent === "SINGLE_MEETING" && resolvedMeeting) {
-        // SINGLE_MEETING intent with resolved meeting → use SingleMeetingOrchestrator
+        // SINGLE_MEETING intent with resolved meeting → execute contract directly
         usedSingleMeetingMode = true;
         console.log(`[Slack] Single-meeting mode activated for meeting ${resolvedMeeting.meetingId} (${resolvedMeeting.companyName})`);
-
-        // Check for pending summary offer from last interaction in this thread
-        let hasPendingOffer = false;
-        if (threadTs) {
-          const lastInteraction = await storage.getLastInteractionByThread(threadTs);
-          if (lastInteraction) {
-            const resolution = lastInteraction.resolution as Record<string, unknown> | null;
-            hasPendingOffer = resolution?.pendingOffer === "summary";
-            console.log(`[Slack] Thread has pending offer: ${hasPendingOffer}`);
-          }
-        }
 
         const singleMeetingContext: SingleMeetingContext = {
           meetingId: resolvedMeeting.meetingId,
@@ -681,7 +670,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
         logger.startStage('single_meeting');
         // Pass Decision Layer contract to enforce single authority for intent classification
-        const result = await handleSingleMeetingQuestion(singleMeetingContext, text, hasPendingOffer, decisionLayerResult.answerContract, decisionLayerResult.requiresSemantic);
+        const result = await executeSingleMeetingContract(singleMeetingContext, text, decisionLayerResult.answerContract, decisionLayerResult.requiresSemantic);
         smDuration = logger.endStage('single_meeting');
 
         // Add note about auto-selection if we picked the most recent meeting automatically
