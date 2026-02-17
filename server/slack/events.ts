@@ -76,7 +76,7 @@ async function rerankQaPairsByRelevance(
 
   try {
     const openai = new OpenAI();
-    const candidates = results.slice(0, QA_SEARCH_CONSTANTS.RERANK_CANDIDATE_LIMIT).map((r, i) => 
+    const candidates = results.slice(0, QA_SEARCH_CONSTANTS.RERANK_CANDIDATE_LIMIT).map((r, i) =>
       `[${i}] Q: ${r.question}${r.answer ? ` A: ${r.answer.slice(0, 100)}` : ""}`
     ).join("\n");
 
@@ -213,7 +213,18 @@ export async function slackEventsHandler(req: Request, res: Response) {
     const event = payload.event;
     console.log("Event type:", event?.type);
 
-    // 5. Handle app_mention events AND direct messages (DMs)
+    // 5. Handle reaction events (for feedback)
+    if (event?.type === "reaction_added" || event?.type === "reaction_removed") {
+      const { handleReactionAdded, handleReactionRemoved } = await import("./feedbackHandler");
+      if (event.type === "reaction_added") {
+        await handleReactionAdded(event);
+      } else {
+        await handleReactionRemoved(event);
+      }
+      return;
+    }
+
+    // 6. Handle app_mention events AND direct messages (DMs)
     // - app_mention: Bot was @mentioned in a channel
     // - message: Could be a DM (channel_type: "im") or other message
     // Test runs bypass this check to allow automated testing
@@ -257,7 +268,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
     // For thread replies, use thread_ts (parent message); otherwise use ts (this message starts a thread)
     const threadTs = String(event.thread_ts || event.ts);
 
-    // 6. Dedupe events using robust deduplication
+    // 7. Dedupe events using robust deduplication
     // Uses event_id, client_msg_id, AND message timestamp for reliable duplicate detection
     const eventId = String(payload.event_id || "");
     const clientMsgId = event?.client_msg_id as string | undefined;
@@ -292,7 +303,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
 
     console.log(`Processing: "${text}" in channel ${channel} (isReply=${isReply})`);
 
-    // 7. Send immediate acknowledgment (UX improvement - reduces perceived latency)
+    // 8. Send immediate acknowledgment (UX improvement - reduces perceived latency)
     // Skip Slack API calls in test mode to avoid errors with fake channels
     // Uses general acknowledgments with icons
     const ackMessage = userId

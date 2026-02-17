@@ -32,6 +32,10 @@ import {
   type InsertMeetingSummary,
   type InteractionLog,
   type InsertInteractionLog,
+  type PromptVersion,
+  type InsertPromptVersion,
+  type InteractionFeedback,
+  type InsertInteractionFeedback,
   type MeetingActionItem,
   type InsertMeetingActionItem,
   transcripts as transcriptsTable,
@@ -47,6 +51,8 @@ import {
   transcriptChunks as transcriptChunksTable,
   meetingSummaries as meetingSummariesTable,
   interactionLogs as interactionLogsTable,
+  promptVersions as promptVersionsTable,
+  interactionFeedback as interactionFeedbackTable,
   meetingActionItems as meetingActionItemsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
@@ -65,7 +71,7 @@ export interface IStorage {
   updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
   updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined>;
   deleteTranscript(id: string): Promise<boolean>;
-  
+
   // Raw query for MCP
   rawQuery(sql: string, params?: any[]): Promise<any[]>;
 
@@ -152,6 +158,18 @@ export interface IStorage {
   // Interaction Logs (for auditability/evaluation, NOT LLM input)
   insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
   getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null>;
+  getInteractionByMessageTs(slackMessageTs: string): Promise<InteractionLog | null>;
+
+  // Prompt Versions (for tracking prompt evolution)
+  insertPromptVersion(version: { promptName: string; version: string; promptText: string; changeReason?: string; changedBy?: string }): Promise<void>;
+  getPromptVersion(promptName: string, version: string): Promise<{ promptName: string; version: string; promptText: string; changeReason: string | null; changedBy: string | null } | null>;
+  getPromptHistory(promptName: string): Promise<Array<{ version: string; promptText: string; changeReason: string | null; createdAt: Date }>>;
+
+  // Interaction Feedback (for user reactions)
+  insertInteractionFeedback(feedback: { interactionId: string; slackMessageTs: string; userId: string; emoji: string; sentiment: string; intent?: string | null; answerContract?: string | null; promptVersions?: any }): Promise<void>;
+  getFeedbackByInteraction(interactionId: string): Promise<Array<{ userId: string; emoji: string; sentiment: string; createdAt: Date }>>;
+  getFeedbackByMessageTs(slackMessageTs: string): Promise<Array<{ interactionId: string; userId: string; emoji: string; sentiment: string }>>;
+  hasUserReacted(interactionId: string, userId: string, emoji: string): Promise<boolean>;
 
   // Q&A Pairs - meeting-scoped lookup (no product required, for bot/Slack pipeline)
   getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
@@ -184,7 +202,7 @@ export class MemStorage implements IStorage {
     this.companies = new Map();
     this.contacts = new Map();
     this.users = new Map();
-    
+
     // Initialize with default categories for PitCrew
     const defaultCategories = [
       { name: 'Analytics', description: 'Reporting, dashboards, data visualization, and business intelligence features' },
@@ -212,7 +230,7 @@ export class MemStorage implements IStorage {
   async getTranscripts(product: Product): Promise<Transcript[]> {
     return Array.from(this.transcripts.values())
       .filter(t => t.product === product)
-      .sort((a, b) => 
+      .sort((a, b) =>
         b.createdAt.getTime() - a.createdAt.getTime()
       );
   }
@@ -237,7 +255,7 @@ export class MemStorage implements IStorage {
         meetingDate = insertTranscript.meetingDate as Date;
       }
     }
-    
+
     const transcript: Transcript = {
       ...insertTranscript,
       name: insertTranscript.name ?? null,
@@ -270,9 +288,9 @@ export class MemStorage implements IStorage {
   async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
-    
-    const updated = { 
-      ...transcript, 
+
+    const updated = {
+      ...transcript,
       ...(updates.name !== undefined && { name: updates.name }),
       ...(updates.createdAt !== undefined && { createdAt: updates.createdAt }),
       ...(updates.mainMeetingTakeaways !== undefined && { mainMeetingTakeaways: updates.mainMeetingTakeaways }),
@@ -287,10 +305,10 @@ export class MemStorage implements IStorage {
   async updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
-    
+
     const now = new Date();
     let updated: Transcript;
-    
+
     if (status === "pending") {
       updated = {
         ...transcript,
@@ -325,7 +343,7 @@ export class MemStorage implements IStorage {
         processingError: error ?? "Processing failed",
       };
     }
-    
+
     this.transcripts.set(id, updated);
     return updated;
   }
@@ -333,19 +351,19 @@ export class MemStorage implements IStorage {
   async updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined> {
     const transcript = this.transcripts.get(id);
     if (!transcript) return undefined;
-    
+
     const updated = {
       ...transcript,
       processingStep: step,
     };
-    
+
     this.transcripts.set(id, updated);
     return updated;
   }
 
   async deleteTranscript(id: string): Promise<boolean> {
     const deleted = this.transcripts.delete(id);
-    
+
     if (deleted) {
       // Cascade delete: remove all insights and Q&A pairs linked to this transcript
       const insightEntries = Array.from(this.productInsights.entries());
@@ -354,7 +372,7 @@ export class MemStorage implements IStorage {
           this.productInsights.delete(insightId);
         }
       }
-      
+
       const qaPairEntries = Array.from(this.qaPairs.entries());
       for (const [qaPairId, qaPair] of qaPairEntries) {
         if (qaPair.transcriptId === id) {
@@ -362,7 +380,7 @@ export class MemStorage implements IStorage {
         }
       }
     }
-    
+
     return deleted;
   }
 
@@ -400,12 +418,12 @@ export class MemStorage implements IStorage {
     if (insertInsight.transcriptId && !this.transcripts.has(insertInsight.transcriptId)) {
       throw new Error(`Transcript ${insertInsight.transcriptId} not found`);
     }
-    
+
     // Validate category exists if provided
     if (insertInsight.categoryId && !this.categories.has(insertInsight.categoryId)) {
       throw new Error(`Category ${insertInsight.categoryId} not found`);
     }
-    
+
     const id = randomUUID();
     const insight: ProductInsight = {
       ...insertInsight,
@@ -430,7 +448,7 @@ export class MemStorage implements IStorage {
         throw new Error(`Category ${insertInsight.categoryId} not found`);
       }
     }
-    
+
     // All validated, now create
     const insights: ProductInsight[] = insertInsights.map(insertInsight => {
       const id = randomUUID();
@@ -452,7 +470,7 @@ export class MemStorage implements IStorage {
   async updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined> {
     const insight = this.productInsights.get(id);
     if (!insight) return undefined;
-    
+
     const updated: ProductInsight = {
       ...insight,
       feature,
@@ -472,11 +490,11 @@ export class MemStorage implements IStorage {
   async assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean> {
     const insight = this.productInsights.get(insightId);
     if (!insight) return false;
-    
+
     if (categoryId && !this.categories.has(categoryId)) {
       throw new Error(`Category ${categoryId} not found`);
     }
-    
+
     this.productInsights.set(insightId, {
       ...insight,
       categoryId,
@@ -488,7 +506,7 @@ export class MemStorage implements IStorage {
     if (categoryId && !this.categories.has(categoryId)) {
       throw new Error(`Category ${categoryId} not found`);
     }
-    
+
     for (const insightId of insightIds) {
       const insight = this.productInsights.get(insightId);
       if (insight) {
@@ -532,7 +550,7 @@ export class MemStorage implements IStorage {
     if (insertQAPair.transcriptId && !this.transcripts.has(insertQAPair.transcriptId)) {
       throw new Error(`Transcript ${insertQAPair.transcriptId} not found`);
     }
-    
+
     const id = randomUUID();
     const qaPair: QAPair = {
       ...insertQAPair,
@@ -555,7 +573,7 @@ export class MemStorage implements IStorage {
         throw new Error(`Transcript ${insertQAPair.transcriptId} not found`);
       }
     }
-    
+
     // All validated, now create
     const qaPairs: QAPair[] = insertQAPairs.map(insertQAPair => {
       const id = randomUUID();
@@ -578,7 +596,7 @@ export class MemStorage implements IStorage {
   async toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined> {
     const qaPair = this.qaPairs.get(id);
     if (!qaPair) return undefined;
-    
+
     const updated: QAPair = {
       ...qaPair,
       isStarred,
@@ -590,7 +608,7 @@ export class MemStorage implements IStorage {
   async updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined> {
     const qaPair = this.qaPairs.get(id);
     if (!qaPair) return undefined;
-    
+
     const updated: QAPair = {
       ...qaPair,
       question,
@@ -611,11 +629,11 @@ export class MemStorage implements IStorage {
   async assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean> {
     const qaPair = this.qaPairs.get(qaPairId);
     if (!qaPair) return false;
-    
+
     if (categoryId && !this.categories.has(categoryId)) {
       throw new Error(`Category ${categoryId} not found`);
     }
-    
+
     this.qaPairs.set(qaPairId, {
       ...qaPair,
       categoryId,
@@ -626,7 +644,7 @@ export class MemStorage implements IStorage {
   async getQAPairsByCompany(product: Product, companyId: string): Promise<QAPairWithCategory[]> {
     const qaPairs = Array.from(this.qaPairs.values())
       .filter(qa => qa.product === product && qa.companyId === companyId);
-    
+
     return qaPairs.map(qa => {
       const category = qa.categoryId ? this.categories.get(qa.categoryId) : null;
       const contact = qa.contactId ? this.contacts.get(qa.contactId) : null;
@@ -645,7 +663,7 @@ export class MemStorage implements IStorage {
   async getCategories(product: Product): Promise<Category[]> {
     return Array.from(this.categories.values())
       .filter(c => c.product === product)
-      .sort((a, b) => 
+      .sort((a, b) =>
         a.name.localeCompare(b.name)
       );
   }
@@ -663,7 +681,7 @@ export class MemStorage implements IStorage {
     if (existing) {
       throw new Error(`Category "${insertCategory.name}" already exists`);
     }
-    
+
     const id = randomUUID();
     const category: Category = {
       ...insertCategory,
@@ -678,7 +696,7 @@ export class MemStorage implements IStorage {
   async updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined> {
     const category = this.categories.get(id);
     if (!category) return undefined;
-    
+
     // Check for duplicate name (excluding current category)
     const existing = Array.from(this.categories.values()).find(
       c => c.id !== id && c.name.toLowerCase() === name.toLowerCase()
@@ -686,7 +704,7 @@ export class MemStorage implements IStorage {
     if (existing) {
       throw new Error(`Category "${name}" already exists`);
     }
-    
+
     const updated: Category = {
       ...category,
       name,
@@ -698,7 +716,7 @@ export class MemStorage implements IStorage {
 
   async deleteCategory(id: string): Promise<boolean> {
     const deleted = this.categories.delete(id);
-    
+
     if (deleted) {
       // Null out categoryId for all insights that reference this category
       const entries = Array.from(this.productInsights.entries());
@@ -710,7 +728,7 @@ export class MemStorage implements IStorage {
           });
         }
       }
-      
+
       // Null out categoryId for all features that reference this category
       const featureEntries = Array.from(this.features.entries());
       for (const [featureId, feature] of featureEntries) {
@@ -722,7 +740,7 @@ export class MemStorage implements IStorage {
         }
       }
     }
-    
+
     return deleted;
   }
 
@@ -763,7 +781,7 @@ export class MemStorage implements IStorage {
   async updateFeature(id: string, name: string, description?: string | null, value?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null, releaseDate?: Date | null): Promise<Feature | undefined> {
     const feature = this.features.get(id);
     if (!feature) return undefined;
-    
+
     const updated: Feature = {
       ...feature,
       name,
@@ -786,7 +804,7 @@ export class MemStorage implements IStorage {
   async getCompanies(product: Product): Promise<Company[]> {
     return Array.from(this.companies.values())
       .filter(c => c.product === product)
-      .sort((a, b) => 
+      .sort((a, b) =>
         a.name.localeCompare(b.name)
       );
   }
@@ -802,7 +820,7 @@ export class MemStorage implements IStorage {
 
   async getCompanyByName(product: Product, name: string): Promise<Company | undefined> {
     const nameLower = name.toLowerCase().trim();
-    return Array.from(this.companies.values()).find(c => 
+    return Array.from(this.companies.values()).find(c =>
       c.product === product && c.name.toLowerCase().trim() === nameLower
     );
   }
@@ -815,7 +833,7 @@ export class MemStorage implements IStorage {
     if (existingSlug) {
       throw new Error(`Company with slug "${insertCompany.slug}" already exists`);
     }
-    
+
     const id = randomUUID();
     const company: Company = {
       ...insertCompany,
@@ -835,7 +853,7 @@ export class MemStorage implements IStorage {
   async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined> {
     const company = this.companies.get(id);
     if (!company) return undefined;
-    
+
     const updated: Company = {
       ...company,
       name,
@@ -860,7 +878,7 @@ export class MemStorage implements IStorage {
         this.productInsights.set(insight.id, { ...insight, company: newName });
       }
     }
-    
+
     for (const qaPair of Array.from(this.qaPairs.values())) {
       if (qaPair.companyId === companyId) {
         this.qaPairs.set(qaPair.id, { ...qaPair, company: newName });
@@ -879,9 +897,9 @@ export class MemStorage implements IStorage {
 
     // Get insights - both by legacy company field and new companyId
     const insights = Array.from(this.productInsights.values())
-      .filter(i => 
-        i.product === product && (i.companyId === company.id || 
-        i.company.toLowerCase() === company.name.toLowerCase())
+      .filter(i =>
+        i.product === product && (i.companyId === company.id ||
+          i.company.toLowerCase() === company.name.toLowerCase())
       )
       .map(i => {
         const enriched = this.enrichInsightWithCategory(i);
@@ -893,9 +911,9 @@ export class MemStorage implements IStorage {
 
     // Get Q&A pairs - both by legacy company field and new companyId
     const qaPairs = Array.from(this.qaPairs.values())
-      .filter(qa => 
-        qa.product === product && (qa.companyId === company.id || 
-        qa.company.toLowerCase() === company.name.toLowerCase())
+      .filter(qa =>
+        qa.product === product && (qa.companyId === company.id ||
+          qa.company.toLowerCase() === company.name.toLowerCase())
       )
       .map(qa => {
         const enriched = this.enrichQAPairWithCategory(qa);
@@ -943,9 +961,9 @@ export class MemStorage implements IStorage {
     const contact = this.contacts.get(id);
     if (!contact) return undefined;
 
-    const updated = { 
-      ...contact, 
-      name, 
+    const updated = {
+      ...contact,
+      name,
       nameInTranscript: nameInTranscript !== undefined ? (nameInTranscript ?? null) : contact.nameInTranscript,
       jobTitle: jobTitle !== undefined ? (jobTitle ?? null) : contact.jobTitle
     };
@@ -959,7 +977,7 @@ export class MemStorage implements IStorage {
 
   async mergeDuplicateContacts(product: Product, companyId: string): Promise<{ merged: number; kept: number }> {
     const contacts = await this.getContactsByCompany(product, companyId);
-    
+
     // Group contacts by normalized name (case-insensitive)
     const contactGroups = new Map<string, Contact[]>();
     contacts.forEach(contact => {
@@ -969,10 +987,10 @@ export class MemStorage implements IStorage {
       }
       contactGroups.get(normalizedName)!.push(contact);
     });
-    
+
     let mergedCount = 0;
     let keptCount = 0;
-    
+
     // For each group with duplicates, merge them
     for (const [, group] of Array.from(contactGroups.entries())) {
       if (group.length > 1) {
@@ -980,11 +998,11 @@ export class MemStorage implements IStorage {
         group.sort((a: Contact, b: Contact) => a.createdAt.getTime() - b.createdAt.getTime());
         const keepContact = group[0];
         const duplicates = group.slice(1);
-        
+
         // Reconcile metadata: prefer non-null values, with newer values taking precedence
         let reconciledJobTitle = keepContact.jobTitle;
         let reconciledNameInTranscript = keepContact.nameInTranscript;
-        
+
         for (const duplicate of duplicates) {
           // Prefer newer non-null values (duplicates are sorted oldest to newest)
           if (duplicate.jobTitle) {
@@ -994,7 +1012,7 @@ export class MemStorage implements IStorage {
             reconciledNameInTranscript = duplicate.nameInTranscript;
           }
         }
-        
+
         // Update the kept contact with reconciled metadata if anything changed
         if (reconciledJobTitle !== keepContact.jobTitle || reconciledNameInTranscript !== keepContact.nameInTranscript) {
           this.contacts.set(keepContact.id, {
@@ -1003,7 +1021,7 @@ export class MemStorage implements IStorage {
             nameInTranscript: reconciledNameInTranscript,
           });
         }
-        
+
         // Update all Q&A pairs that reference duplicates to point to the kept contact
         for (const duplicate of duplicates) {
           for (const [qaId, qa] of Array.from(this.qaPairs.entries())) {
@@ -1011,16 +1029,16 @@ export class MemStorage implements IStorage {
               this.qaPairs.set(qaId, { ...qa, contactId: keepContact.id });
             }
           }
-          
+
           // Delete the duplicate contact
           this.contacts.delete(duplicate.id);
           mergedCount++;
         }
-        
+
         keptCount++;
       }
     }
-    
+
     return { merged: mergedCount, kept: keptCount };
   }
 
@@ -1032,7 +1050,7 @@ export class MemStorage implements IStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
     const now = new Date();
     const existingUser = this.users.get(userData.id!);
-    
+
     const user: User = {
       id: userData.id || randomUUID(),
       email: userData.email || null,
@@ -1043,7 +1061,7 @@ export class MemStorage implements IStorage {
       createdAt: existingUser?.createdAt || now,
       updatedAt: now,
     };
-    
+
     this.users.set(user.id, user);
     return user;
   }
@@ -1051,7 +1069,7 @@ export class MemStorage implements IStorage {
   async updateUserProduct(userId: string, product: Product): Promise<User | undefined> {
     const user = this.users.get(userId);
     if (!user) return undefined;
-    
+
     const updated = {
       ...user,
       currentProduct: product,
@@ -1149,6 +1167,38 @@ export class MemStorage implements IStorage {
     throw new Error("MemStorage not supported for Interaction Logs");
   }
 
+  async getInteractionByMessageTs(slackMessageTs: string): Promise<InteractionLog | null> {
+    throw new Error("MemStorage not supported for Interaction Logs");
+  }
+
+  async insertPromptVersion(version: { promptName: string; version: string; promptText: string; changeReason?: string; changedBy?: string }): Promise<void> {
+    throw new Error("MemStorage not supported for Prompt Versions");
+  }
+
+  async getPromptVersion(promptName: string, version: string): Promise<{ promptName: string; version: string; promptText: string; changeReason: string | null; changedBy: string | null } | null> {
+    throw new Error("MemStorage not supported for Prompt Versions");
+  }
+
+  async getPromptHistory(promptName: string): Promise<Array<{ version: string; promptText: string; changeReason: string | null; createdAt: Date }>> {
+    throw new Error("MemStorage not supported for Prompt Versions");
+  }
+
+  async insertInteractionFeedback(feedback: { interactionId: string; slackMessageTs: string; userId: string; emoji: string; sentiment: string; intent?: string | null; answerContract?: string | null; promptVersions?: any }): Promise<void> {
+    throw new Error("MemStorage not supported for Interaction Feedback");
+  }
+
+  async getFeedbackByInteraction(interactionId: string): Promise<Array<{ userId: string; emoji: string; sentiment: string; createdAt: Date }>> {
+    throw new Error("MemStorage not supported for Interaction Feedback");
+  }
+
+  async getFeedbackByMessageTs(slackMessageTs: string): Promise<Array<{ interactionId: string; userId: string; emoji: string; sentiment: string }>> {
+    throw new Error("MemStorage not supported for Interaction Feedback");
+  }
+
+  async hasUserReacted(interactionId: string, userId: string, emoji: string): Promise<boolean> {
+    throw new Error("MemStorage not supported for Interaction Feedback");
+  }
+
   async getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]> {
     return Array.from(this.qaPairs.values())
       .filter(qa => qa.transcriptId === transcriptId)
@@ -1190,10 +1240,10 @@ export class DbStorage implements IStorage {
     if (!process.env.DATABASE_URL) {
       throw new Error("DATABASE_URL is not set");
     }
-    this.queryClient = neon(process.env.DATABASE_URL);  
+    this.queryClient = neon(process.env.DATABASE_URL);
     this.db = drizzle(this.queryClient);
   }
-  
+
   // Method for MCP capabilities
   async rawQuery(sql: string, params?: any[]): Promise<any[]> {
     const result = await this.queryClient(sql, params ?? []);
@@ -1230,13 +1280,13 @@ export class DbStorage implements IStorage {
 
   async createTranscript(insertTranscript: InsertTranscript): Promise<Transcript> {
     const { customers, serviceTags, meetingDate, createdAt, ...dbFields } = insertTranscript;
-    
+
     const dbValues: typeof transcriptsTable.$inferInsert = {
       ...dbFields,
       meetingDate: meetingDate ? new Date(meetingDate) : null,
       createdAt: createdAt ? new Date(createdAt as string) : undefined,
     };
-    
+
     const results = await this.db
       .insert(transcriptsTable)
       .values(dbValues)
@@ -1261,7 +1311,7 @@ export class DbStorage implements IStorage {
     if (updates.nextSteps !== undefined) updateData.nextSteps = updates.nextSteps;
     if (updates.supportingMaterials !== undefined) updateData.supportingMaterials = updates.supportingMaterials;
     if (updates.transcript !== undefined) updateData.transcript = updates.transcript;
-    
+
     const results = await this.db
       .update(transcriptsTable)
       .set(updateData)
@@ -1273,7 +1323,7 @@ export class DbStorage implements IStorage {
   async updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined> {
     const now = new Date();
     let updateData: any;
-    
+
     if (status === "pending") {
       updateData = {
         processingStatus: "pending",
@@ -1304,7 +1354,7 @@ export class DbStorage implements IStorage {
         processingError: error ?? "Processing failed",
       };
     }
-    
+
     const results = await this.db
       .update(transcriptsTable)
       .set(updateData)
@@ -1327,17 +1377,17 @@ export class DbStorage implements IStorage {
     await this.db
       .delete(productInsightsTable)
       .where(eq(productInsightsTable.transcriptId, id));
-    
+
     await this.db
       .delete(qaPairsTable)
       .where(eq(qaPairsTable.transcriptId, id));
-    
+
     // Then delete the transcript itself
     const results = await this.db
       .delete(transcriptsTable)
       .where(eq(transcriptsTable.id, id))
       .returning();
-    
+
     return results.length > 0;
   }
 
@@ -1363,7 +1413,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(eq(productInsightsTable.product, product));
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1392,7 +1442,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.transcriptId, transcriptId)));
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1421,7 +1471,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1508,7 +1558,7 @@ export class DbStorage implements IStorage {
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(eq(qaPairsTable.product, product));
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1543,7 +1593,7 @@ export class DbStorage implements IStorage {
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.transcriptId, transcriptId)));
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1634,7 +1684,7 @@ export class DbStorage implements IStorage {
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.companyId, companyId)));
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1673,9 +1723,9 @@ export class DbStorage implements IStorage {
   async updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined> {
     const results = await this.db
       .update(categoriesTable)
-      .set({ 
-        name, 
-        description: description !== undefined ? (description ?? null) : undefined 
+      .set({
+        name,
+        description: description !== undefined ? (description ?? null) : undefined
       })
       .where(eq(categoriesTable.id, id))
       .returning();
@@ -1688,13 +1738,13 @@ export class DbStorage implements IStorage {
       .update(productInsightsTable)
       .set({ categoryId: null })
       .where(eq(productInsightsTable.categoryId, id));
-    
+
     // Null out categoryId for all features that reference this category
     await this.db
       .update(featuresTable)
       .set({ categoryId: null })
       .where(eq(featuresTable.categoryId, id));
-    
+
     // Then delete the category
     const results = await this.db
       .delete(categoriesTable)
@@ -1723,7 +1773,7 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(featuresTable.categoryId, categoriesTable.id))
       .where(eq(featuresTable.product, product))
       .orderBy(featuresTable.name);
-    
+
     return results.map(r => ({
       ...r,
       categoryName: r.categoryName || null,
@@ -1755,7 +1805,7 @@ export class DbStorage implements IStorage {
     if (helpGuideLink !== undefined) updateData.helpGuideLink = helpGuideLink;
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (releaseDate !== undefined) updateData.releaseDate = releaseDate;
-    
+
     const results = await this.db
       .update(featuresTable)
       .set(updateData)
@@ -1824,8 +1874,8 @@ export class DbStorage implements IStorage {
   async updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined> {
     const results = await this.db
       .update(companiesTable)
-      .set({ 
-        name, 
+      .set({
+        name,
         notes: notes !== undefined ? (notes ?? null) : undefined,
         companyDescription: companyDescription !== undefined ? (companyDescription ?? null) : undefined,
         numberOfStores: numberOfStores !== undefined ? (numberOfStores ?? null) : undefined,
@@ -1851,7 +1901,7 @@ export class DbStorage implements IStorage {
       .update(productInsightsTable)
       .set({ company: newName })
       .where(eq(productInsightsTable.companyId, companyId));
-    
+
     await this.db
       .update(qaPairsTable)
       .set({ company: newName })
@@ -1969,8 +2019,8 @@ export class DbStorage implements IStorage {
   async updateContact(id: string, name: string, nameInTranscript?: string | null, jobTitle?: string | null): Promise<Contact | undefined> {
     const results = await this.db
       .update(contactsTable)
-      .set({ 
-        name, 
+      .set({
+        name,
         nameInTranscript: nameInTranscript !== undefined ? (nameInTranscript ?? null) : undefined,
         jobTitle: jobTitle !== undefined ? (jobTitle ?? null) : undefined
       })
@@ -1996,7 +2046,7 @@ export class DbStorage implements IStorage {
         eq(contactsTable.companyId, companyId)
       ))
       .orderBy(contactsTable.createdAt);
-    
+
     // Group contacts by normalized name (case-insensitive)
     const contactGroups = new Map<string, typeof contacts>();
     contacts.forEach(contact => {
@@ -2006,21 +2056,21 @@ export class DbStorage implements IStorage {
       }
       contactGroups.get(normalizedName)!.push(contact);
     });
-    
+
     let mergedCount = 0;
     let keptCount = 0;
-    
+
     // For each group with duplicates, merge them
     for (const [, group] of Array.from(contactGroups.entries())) {
       if (group.length > 1) {
         // Keep the oldest contact (first in sorted array) as base
         const keepContact = group[0];
         const duplicates = group.slice(1);
-        
+
         // Reconcile metadata: prefer non-null values, with newer values taking precedence
         let reconciledJobTitle = keepContact.jobTitle;
         let reconciledNameInTranscript = keepContact.nameInTranscript;
-        
+
         for (const duplicate of duplicates) {
           // Prefer newer non-null values (duplicates are sorted oldest to newest)
           if (duplicate.jobTitle) {
@@ -2030,7 +2080,7 @@ export class DbStorage implements IStorage {
             reconciledNameInTranscript = duplicate.nameInTranscript;
           }
         }
-        
+
         // Update the kept contact with reconciled metadata if anything changed
         if (reconciledJobTitle !== keepContact.jobTitle || reconciledNameInTranscript !== keepContact.nameInTranscript) {
           await this.db
@@ -2041,7 +2091,7 @@ export class DbStorage implements IStorage {
             })
             .where(eq(contactsTable.id, keepContact.id));
         }
-        
+
         // Update all Q&A pairs that reference duplicates to point to the kept contact
         for (const duplicate of duplicates) {
           await this.db
@@ -2049,19 +2099,19 @@ export class DbStorage implements IStorage {
             .set({ contactId: keepContact.id })
             .where(eq(qaPairsTable.contactId, duplicate.id));
         }
-        
+
         // Delete the duplicate contacts
         for (const duplicate of duplicates) {
           await this.db
             .delete(contactsTable)
             .where(eq(contactsTable.id, duplicate.id));
         }
-        
+
         mergedCount += duplicates.length;
         keptCount++;
       }
     }
-    
+
     return { merged: mergedCount, kept: keptCount };
   }
 
@@ -2092,7 +2142,7 @@ export class DbStorage implements IStorage {
   async updateUserProduct(userId: string, product: Product): Promise<User | undefined> {
     const [user] = await this.db
       .update(usersTable)
-      .set({ 
+      .set({
         currentProduct: product,
         updatedAt: new Date(),
       })
@@ -2173,7 +2223,7 @@ export class DbStorage implements IStorage {
   // POS Systems operations
   async getPOSSystems(product: Product): Promise<POSSystemWithCompanies[]> {
     const systems = await this.db.select().from(posSystemsTable).where(eq(posSystemsTable.product, product));
-    
+
     // Get all companies for each system
     const systemsWithCompanies = await Promise.all(
       systems.map(async (system) => {
@@ -2181,22 +2231,22 @@ export class DbStorage implements IStorage {
           .select()
           .from(posSystemCompaniesTable)
           .where(eq(posSystemCompaniesTable.posSystemId, system.id));
-        
+
         const companyIds = companyLinks.map(link => link.companyId);
         const companies = companyIds.length > 0
           ? await this.db
-              .select()
-              .from(companiesTable)
-              .where(and(eq(companiesTable.product, product), inArray(companiesTable.id, companyIds)))
+            .select()
+            .from(companiesTable)
+            .where(and(eq(companiesTable.product, product), inArray(companiesTable.id, companyIds)))
           : [];
-        
+
         return {
           ...system,
           companies,
         };
       })
     );
-    
+
     return systemsWithCompanies;
   }
 
@@ -2210,12 +2260,12 @@ export class DbStorage implements IStorage {
 
   async createPOSSystem(posSystemData: InsertPOSSystem): Promise<POSSystem> {
     const { companyIds, ...systemData } = posSystemData;
-    
+
     const [system] = await this.db
       .insert(posSystemsTable)
       .values(systemData)
       .returning();
-    
+
     // Create company relationships if provided
     if (companyIds && companyIds.length > 0) {
       await this.db.insert(posSystemCompaniesTable).values(
@@ -2225,7 +2275,7 @@ export class DbStorage implements IStorage {
         }))
       );
     }
-    
+
     return system;
   }
 
@@ -2245,16 +2295,16 @@ export class DbStorage implements IStorage {
       })
       .where(eq(posSystemsTable.id, id))
       .returning();
-    
+
     if (!system) return undefined;
-    
+
     // Update company relationships if provided
     if (companyIds !== undefined) {
       // Delete existing relationships
       await this.db
         .delete(posSystemCompaniesTable)
         .where(eq(posSystemCompaniesTable.posSystemId, id));
-      
+
       // Create new relationships
       if (companyIds.length > 0) {
         await this.db.insert(posSystemCompaniesTable).values(
@@ -2265,7 +2315,7 @@ export class DbStorage implements IStorage {
         );
       }
     }
-    
+
     return system;
   }
 
@@ -2274,12 +2324,12 @@ export class DbStorage implements IStorage {
     await this.db
       .delete(posSystemCompaniesTable)
       .where(eq(posSystemCompaniesTable.posSystemId, id));
-    
+
     // Delete the POS system
     const result = await this.db
       .delete(posSystemsTable)
       .where(eq(posSystemsTable.id, id));
-    
+
     return true;
   }
 
@@ -2299,7 +2349,7 @@ export class DbStorage implements IStorage {
       .where(
         drizzleSql`${posSystemCompaniesTable.posSystemId} = ${posSystemId} AND ${posSystemCompaniesTable.companyId} = ${companyId}`
       );
-    
+
     if (!existing) {
       await this.db.insert(posSystemCompaniesTable).values({
         posSystemId,
@@ -2317,7 +2367,7 @@ export class DbStorage implements IStorage {
   ): Promise<POSSystem> {
     // Try to find existing POS system by name (case-insensitive)
     let system = await this.getPOSSystemByName(product, name);
-    
+
     if (system) {
       // Link to company if not already linked
       await this.linkCompanyToPOSSystem(system.id, companyId);
@@ -2331,7 +2381,7 @@ export class DbStorage implements IStorage {
         companyIds: [companyId],
       });
     }
-    
+
     return system;
   }
 
@@ -2343,15 +2393,15 @@ export class DbStorage implements IStorage {
       .where(eq(transcriptChunksTable.companyId, companyId))
       .orderBy(drizzleSql`${transcriptChunksTable.createdAt} DESC`)
       .limit(1);
-    
+
     if (!chunkResult?.transcriptId) {
       return null;
     }
 
     // Then fetch the transcript's created_at, contentType, and attendee info
     const [transcript] = await this.db
-      .select({ 
-        createdAt: transcriptsTable.createdAt, 
+      .select({
+        createdAt: transcriptsTable.createdAt,
         contentType: transcriptsTable.contentType,
         leverageTeam: transcriptsTable.leverageTeam,
         customerNames: transcriptsTable.customerNames,
@@ -2359,14 +2409,14 @@ export class DbStorage implements IStorage {
       .from(transcriptsTable)
       .where(eq(transcriptsTable.id, chunkResult.transcriptId))
       .limit(1);
-    
+
     if (!transcript) {
       return null;
     }
 
-    return { 
-      id: chunkResult.transcriptId, 
-      createdAt: transcript.createdAt, 
+    return {
+      id: chunkResult.transcriptId,
+      createdAt: transcript.createdAt,
       contentType: transcript.contentType,
       leverageTeam: transcript.leverageTeam,
       customerNames: transcript.customerNames,
@@ -2384,25 +2434,25 @@ export class DbStorage implements IStorage {
 
   async listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]> {
     const { transcriptId, companyId, limit } = options;
-    
+
     const conditions = [];
     // Only include transcripts that have content and a companyId
     conditions.push(drizzleSql`${transcriptsTable.transcript} IS NOT NULL`);
     conditions.push(drizzleSql`${transcriptsTable.companyId} IS NOT NULL`);
-    
+
     // Only include transcripts that haven't been chunked yet
     conditions.push(drizzleSql`NOT EXISTS (
       SELECT 1 FROM ${transcriptChunksTable} 
       WHERE ${transcriptChunksTable.transcriptId} = ${transcriptsTable.id}
     )`);
-    
+
     if (transcriptId) {
       conditions.push(eq(transcriptsTable.id, transcriptId));
     }
     if (companyId) {
       conditions.push(eq(transcriptsTable.companyId, companyId));
     }
-    
+
     const results = await this.db
       .select({
         id: transcriptsTable.id,
@@ -2416,7 +2466,7 @@ export class DbStorage implements IStorage {
       .where(drizzleSql`${drizzleSql.join(conditions, drizzleSql` AND `)}`)
       .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`)
       .limit(limit);
-    
+
     // Filter out null companyId/content and map to expected type
     return results
       .filter(r => r.companyId !== null && r.content !== null)
@@ -2432,7 +2482,7 @@ export class DbStorage implements IStorage {
 
   async insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void> {
     if (chunks.length === 0) return;
-    
+
     // Use ON CONFLICT DO NOTHING keyed by (transcript_id, chunk_index) for idempotency
     await this.db
       .insert(transcriptChunksTable)
@@ -2478,6 +2528,101 @@ export class DbStorage implements IStorage {
       .orderBy(drizzleSql`${interactionLogsTable.createdAt} DESC`)
       .limit(1);
     return result ?? null;
+  }
+
+  async getInteractionByMessageTs(slackMessageTs: string): Promise<InteractionLog | null> {
+    const [result] = await this.db
+      .select()
+      .from(interactionLogsTable)
+      .where(eq(interactionLogsTable.slackMessageTs, slackMessageTs))
+      .limit(1);
+    return result ?? null;
+  }
+
+  // Prompt Versions - tracking prompt evolution
+  async insertPromptVersion(version: { promptName: string; version: string; promptText: string; changeReason?: string; changedBy?: string }): Promise<void> {
+    await this.db
+      .insert(promptVersionsTable)
+      .values(version)
+      .onConflictDoNothing(); // Prevent duplicate version entries
+  }
+
+  async getPromptVersion(promptName: string, version: string): Promise<{ promptName: string; version: string; promptText: string; changeReason: string | null; changedBy: string | null } | null> {
+    const [result] = await this.db
+      .select()
+      .from(promptVersionsTable)
+      .where(
+        and(
+          eq(promptVersionsTable.promptName, promptName),
+          eq(promptVersionsTable.version, version)
+        )
+      )
+      .limit(1);
+    return result ?? null;
+  }
+
+  async getPromptHistory(promptName: string): Promise<Array<{ version: string; promptText: string; changeReason: string | null; createdAt: Date }>> {
+    const results = await this.db
+      .select({
+        version: promptVersionsTable.version,
+        promptText: promptVersionsTable.promptText,
+        changeReason: promptVersionsTable.changeReason,
+        createdAt: promptVersionsTable.createdAt,
+      })
+      .from(promptVersionsTable)
+      .where(eq(promptVersionsTable.promptName, promptName))
+      .orderBy(drizzleSql`${promptVersionsTable.createdAt} DESC`);
+    return results;
+  }
+
+  // Interaction Feedback - user reactions
+  async insertInteractionFeedback(feedback: { interactionId: string; slackMessageTs: string; userId: string; emoji: string; sentiment: string; intent?: string | null; answerContract?: string | null; promptVersions?: any }): Promise<void> {
+    await this.db
+      .insert(interactionFeedbackTable)
+      .values(feedback)
+      .onConflictDoNothing(); // Prevent duplicate reactions
+  }
+
+  async getFeedbackByInteraction(interactionId: string): Promise<Array<{ userId: string; emoji: string; sentiment: string; createdAt: Date }>> {
+    const results = await this.db
+      .select({
+        userId: interactionFeedbackTable.userId,
+        emoji: interactionFeedbackTable.emoji,
+        sentiment: interactionFeedbackTable.sentiment,
+        createdAt: interactionFeedbackTable.createdAt,
+      })
+      .from(interactionFeedbackTable)
+      .where(eq(interactionFeedbackTable.interactionId, interactionId))
+      .orderBy(drizzleSql`${interactionFeedbackTable.createdAt} ASC`);
+    return results;
+  }
+
+  async getFeedbackByMessageTs(slackMessageTs: string): Promise<Array<{ interactionId: string; userId: string; emoji: string; sentiment: string }>> {
+    const results = await this.db
+      .select({
+        interactionId: interactionFeedbackTable.interactionId,
+        userId: interactionFeedbackTable.userId,
+        emoji: interactionFeedbackTable.emoji,
+        sentiment: interactionFeedbackTable.sentiment,
+      })
+      .from(interactionFeedbackTable)
+      .where(eq(interactionFeedbackTable.slackMessageTs, slackMessageTs));
+    return results;
+  }
+
+  async hasUserReacted(interactionId: string, userId: string, emoji: string): Promise<boolean> {
+    const [result] = await this.db
+      .select({ id: interactionFeedbackTable.id })
+      .from(interactionFeedbackTable)
+      .where(
+        and(
+          eq(interactionFeedbackTable.interactionId, interactionId),
+          eq(interactionFeedbackTable.userId, userId),
+          eq(interactionFeedbackTable.emoji, emoji)
+        )
+      )
+      .limit(1);
+    return result !== undefined;
   }
 
   async getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]> {

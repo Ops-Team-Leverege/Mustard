@@ -130,6 +130,8 @@ export interface InteractionMetadata {
     snippet?: string;
   }>;
 
+  prompt_versions?: Record<string, string>; // { intent_classification: "2026-02-17-001", ... }
+
   meeting_detection?: {
     regex_result: boolean;
     llm_called: boolean;

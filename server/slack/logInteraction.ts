@@ -28,43 +28,44 @@ export type LogInteractionParams = {
 export async function logInteraction(params: LogInteractionParams): Promise<void> {
   try {
     // Derive capability name from metadata or use provided value
-    const capabilityName = params.capabilityName || 
+    const capabilityName = params.capabilityName ||
       deriveCapabilityName(params.metadata);
-    
+
     // Merge timing data into context layers
     const contextLayersWithTiming = {
       ...params.metadata.context_layers,
       total_time_ms: params.totalTimeMs,
       progress_message_count: params.progressMessageCount,
     };
-    
+
     await storage.insertInteractionLog({
       entryPoint: params.metadata.entry_point,
       testRun: params.testRun || params.metadata.test_run || false,
-      
+
       slackChannelId: params.slackChannelId,
       slackThreadId: params.slackThreadId,
       slackMessageTs: params.slackMessageTs,
-      
+
       userId: params.userId,
       companyId: params.companyId,
       meetingId: params.meetingId,
-      
+
       questionText: params.questionText,
       answerText: params.answerText,
-      
+
       capabilityName,
-      
+
       intent: String(params.metadata.intent),
       intentDetectionMethod: params.metadata.intent_detection_method,
-      
+
       answerContract: String(params.metadata.answer_contract),
       contractSelectionMethod: params.metadata.contract_selection_method,
-      
+
       contextLayers: contextLayersWithTiming,
       resolution: params.metadata.resolution,
       evidenceSources: params.metadata.evidence_sources || null,
       llmUsage: params.metadata.llm_usage,
+      promptVersions: params.metadata.prompt_versions || null,
     });
   } catch (err) {
     console.error("[logInteraction] Failed to log interaction:", err);

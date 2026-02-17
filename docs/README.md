@@ -9,6 +9,9 @@
 - **[System Maintenance Guide](SYSTEM_MAINTENANCE.md)** - Complete reference for maintaining the system
 - **[Visual System Diagrams](VISUAL_SYSTEM_DIAGRAMS.md)** - End-to-end flow diagrams
 - **[System Conceptual Map](SYSTEM_CONCEPTUAL_MAP.md)** - Architecture overview
+- **[Prompt Version Control](PROMPT_VERSION_CONTROL.md)** - Track prompt changes and user feedback
+- **[Feedback System Setup](SETUP_FEEDBACK_SYSTEM.md)** - Setup guide for feedback system
+- **[Feedback Quick Reference](FEEDBACK_QUICK_REFERENCE.md)** - Quick commands and queries
 
 ---
 
@@ -39,6 +42,40 @@ Mustard is an AI-powered meeting intelligence platform that transforms customer 
 - ✅ Company intelligence
 - ✅ Slack bot integration -PitCrew Sauce
 - ✅ Document generation
+- ✅ Prompt version control and user feedback tracking
+
+---
+
+## Prompt Version Control & Feedback System
+
+The system tracks which prompt versions generate each answer and collects user feedback via Slack reactions.
+
+### For Users
+React to bot messages with:
+- 👍 or ✅ = Good answer
+- ❌ or ⛔ = Bad answer
+
+Negative feedback triggers notifications to the ops team for review.
+
+### For Developers
+- All prompts are versioned using date-based format: `YYYY-MM-DD-NNN`
+- Prompt versions are logged with each interaction
+- User feedback is stored and linked to prompt versions
+- See [Prompt Version Control](PROMPT_VERSION_CONTROL.md) for full details
+
+### Setup
+```bash
+# Apply database schema
+npm run db:push
+
+# Run backfill migration
+tsx server/migrations/backfillPromptVersions.ts
+
+# Update Slack app with reactions:read scope
+# Subscribe to reaction_added events
+```
+
+See [Feedback System Setup](SETUP_FEEDBACK_SYSTEM.md) for complete instructions.
 
 ---
 

@@ -1,0 +1,23 @@
+{
+    "emojis": {
+        "positive": [
+            "thumbsup",
+            "+1",
+            "white_check_mark",
+            "heavy_check_mark"
+        ],
+        "negative": [
+            "x",
+            "heavy_multiplication_x",
+            "cross_mark",
+            "no_entry"
+        ]
+    },
+    "notificationChannel": "operations-testing_notifications",
+    "notificationSettings": {
+        "enabled": true,
+        "includeThreadLink": true,
+        "includePromptVersions": true,
+        "includeEvidenceSources": true
+    }
+}

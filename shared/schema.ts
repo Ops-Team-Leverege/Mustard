@@ -424,42 +424,102 @@ export type InsertMeetingSummary = Omit<typeof meetingSummaries.$inferInsert, 'i
 export const interactionLogs = pgTable("interaction_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-  
+
   entryPoint: varchar("entry_point").notNull().default("slack"), // "slack", "api", "test"
   testRun: boolean("test_run").default(false), // For debugging/testing
-  
+
   slackChannelId: varchar("slack_channel_id"),
   slackThreadId: varchar("slack_thread_id"), // Thread TS for grouping
   slackMessageTs: varchar("slack_message_ts"), // Unique message timestamp
-  
+
   userId: varchar("user_id"), // Slack user ID who asked
   companyId: varchar("company_id"), // Resolved company if applicable
   meetingId: varchar("meeting_id"), // Resolved transcript/meeting ID if applicable
-  
+
   questionText: text("question_text").notNull(), // User's original question
   answerText: text("answer_text"), // System's response (nullable if error)
-  
+
   capabilityName: varchar("capability_name").notNull(), // Legacy field - derives from answer_contract or intent
-  
+
   intent: varchar("intent"), // SINGLE_MEETING, MULTI_MEETING, PRODUCT_KNOWLEDGE, GENERAL_HELP
   intentDetectionMethod: varchar("intent_detection_method"), // keyword, llm, default
-  
+
   answerContract: varchar("answer_contract"), // MEETING_SUMMARY, NEXT_STEPS, etc.
   contractSelectionMethod: varchar("contract_selection_method"), // keyword, llm, default
-  
+
   contextLayers: jsonb("context_layers"), // { product_identity: true, single_meeting: true, ... }
   resolution: jsonb("resolution"), // { meeting_id, company_id, resolved_by, ... }
   evidenceSources: jsonb("evidence_sources"), // [ { type, id, snippet }, ... ]
   llmUsage: jsonb("llm_usage"), // { intent_classification: {...}, answer_generation: {...} }
+  promptVersions: jsonb("prompt_versions"), // { intent_classification: "2026-02-17-001", contract_selection: "2026-02-17-001", answer_generation: "2026-02-17-002" }
 }, (table) => [
   index("interaction_logs_thread_idx").on(table.slackThreadId),
   index("interaction_logs_company_idx").on(table.companyId),
   index("interaction_logs_created_idx").on(table.createdAt),
   index("interaction_logs_intent_idx").on(table.intent),
+  index("interaction_logs_message_ts_idx").on(table.slackMessageTs), // For reaction lookup
 ]);
 
 export type InteractionLog = typeof interactionLogs.$inferSelect;
 export type InsertInteractionLog = Omit<typeof interactionLogs.$inferInsert, 'id' | 'createdAt'>;
+
+/**
+ * Prompt Versions Changelog
+ * 
+ * Tracks all prompt changes for auditability and A/B testing.
+ * Stores full prompt text to enable exact reproduction of any version.
+ */
+export const promptVersions = pgTable("prompt_versions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+
+  promptName: varchar("prompt_name").notNull(), // e.g., "INTENT_CLASSIFICATION_PROMPT"
+  version: varchar("version").notNull(), // Date-based: "2026-02-17-001"
+  promptText: text("prompt_text").notNull(), // Full prompt content
+  changeReason: text("change_reason"), // Why this change was made
+  changedBy: varchar("changed_by"), // User ID or "system"
+}, (table) => [
+  uniqueIndex("prompt_versions_name_version_idx").on(table.promptName, table.version),
+  index("prompt_versions_name_idx").on(table.promptName),
+  index("prompt_versions_created_idx").on(table.createdAt),
+]);
+
+export type PromptVersion = typeof promptVersions.$inferSelect;
+export type InsertPromptVersion = Omit<typeof promptVersions.$inferInsert, 'id' | 'createdAt'>;
+
+/**
+ * Interaction Feedback
+ * 
+ * Tracks user reactions to bot responses for quality evaluation.
+ * Linked to interaction_logs via interaction_id.
+ * Supports multiple reactions per interaction (e.g., different team members reacting).
+ */
+export const interactionFeedback = pgTable("interaction_feedback", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+
+  interactionId: varchar("interaction_id").notNull(), // FK to interaction_logs.id
+  slackMessageTs: varchar("slack_message_ts").notNull(), // For quick lookup from reaction events
+
+  userId: varchar("user_id").notNull(), // Slack user ID who reacted
+  emoji: varchar("emoji").notNull(), // Emoji name (without colons)
+  sentiment: varchar("sentiment").notNull(), // "positive" or "negative"
+
+  // Denormalized for quick filtering (copied from interaction_logs)
+  intent: varchar("intent"),
+  answerContract: varchar("answer_contract"),
+  promptVersions: jsonb("prompt_versions"), // Snapshot of prompt versions used
+}, (table) => [
+  index("interaction_feedback_interaction_idx").on(table.interactionId),
+  index("interaction_feedback_message_ts_idx").on(table.slackMessageTs),
+  index("interaction_feedback_sentiment_idx").on(table.sentiment),
+  index("interaction_feedback_created_idx").on(table.createdAt),
+  // Prevent duplicate reactions from same user on same message
+  uniqueIndex("interaction_feedback_unique_reaction").on(table.interactionId, table.userId, table.emoji),
+]);
+
+export type InteractionFeedback = typeof interactionFeedback.$inferSelect;
+export type InsertInteractionFeedback = Omit<typeof interactionFeedback.$inferInsert, 'id' | 'createdAt'>;
 
 // ============================================
 // AIRTABLE PRODUCT DATABASE TABLES
