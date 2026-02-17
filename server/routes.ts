@@ -275,19 +275,17 @@ async function processTranscriptInBackground(
     await storage.updateProcessingStep(transcriptId, "extracting_qa");
     await storage.createQAPairs(
       analysis.qaPairs.map((qa) => {
-        // Try to match asker name to a contact (case-insensitive)
-        const matchedContact = allContacts.find((contact) => {
+        const matchedContact = qa.asker ? allContacts.find((contact) => {
           const askerName = qa.asker.toLowerCase().trim();
           const nameInTranscript = contact.nameInTranscript
             ?.toLowerCase()
             .trim();
-          const contactName = contact.name.toLowerCase().trim();
+          const contactName = contact.name?.toLowerCase().trim();
 
-          // If nameInTranscript is provided, match against it; otherwise match against name
           return nameInTranscript
             ? nameInTranscript === askerName
             : contactName === askerName;
-        });
+        }) : undefined;
 
         return {
           transcriptId: transcript.id,
