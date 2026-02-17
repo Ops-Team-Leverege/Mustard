@@ -9,7 +9,7 @@
  */
 
 import { storage } from "../storage";
-import { postSlackMessage } from "./slackApi";
+import { postSlackMessage, addSlackReaction } from "./slackApi";
 import feedbackConfig from "../../config/feedback.json";
 import OpenAI from "openai";
 import { LLM_MODELS } from "../config/models";
@@ -258,6 +258,13 @@ export async function handleReactionAdded(event: {
             });
 
             console.log(`[Feedback] Stored ${sentiment} feedback for interaction ${interaction.id}`);
+
+            try {
+                await addSlackReaction(channel, messageTs, "white_check_mark");
+                console.log(`[Feedback] Acknowledged feedback with checkmark on ${messageTs}`);
+            } catch (ackError) {
+                console.warn(`[Feedback] Could not add acknowledgment reaction:`, ackError);
+            }
 
             if (sentiment === "negative" && config.notificationSettings.enabled) {
                 await sendNegativeFeedbackNotification(interaction, userId, emoji, channel, messageTs);

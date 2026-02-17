@@ -1536,12 +1536,12 @@ export async function handleSingleMeetingQuestion(
             dataSource: "semantic",
             semanticAnswerUsed: true,
             semanticConfidence: semanticResult.confidence,
+            promptVersions: semanticResult.promptVersions,
           };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           console.error(`[SingleMeetingOrchestrator] Semantic error: ${errorMsg}`);
           semanticError = errorMsg;
-          // Fall through to return artifacts if available, or uncertainty response
         }
       } else if (!isSemantic) {
         console.log(`[SingleMeetingOrchestrator] Non-semantic question: returning artifacts directly`);
@@ -1575,6 +1575,7 @@ export async function handleSingleMeetingQuestion(
             dataSource: "semantic",
             semanticAnswerUsed: true,
             semanticConfidence: semanticResult.confidence,
+            promptVersions: semanticResult.promptVersions,
           };
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);

@@ -22,6 +22,8 @@
 
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { MCP_ROUTING_PROMPT } from "../config/prompts";
+import { PROMPT_VERSIONS } from "../config/prompts/versions";
+import type { PromptUsageRecord } from "../utils/promptVersionTracker";
 
 /**
  *   (see server/rag/composers.ts)
@@ -83,19 +85,24 @@ export async function decideCapability({
    const message = response.choices[0]?.message;
    const toolCall = message?.tool_calls?.[0];
 
+   const trackedVersions: PromptUsageRecord = {
+     MCP_ROUTING_PROMPT: PROMPT_VERSIONS.MCP_ROUTING_PROMPT,
+   };
+
    if (!toolCall || toolCall.type !== "function") {
-     // No capability matched - return helpful fallback response
      return {
        name: "__fallback__",
        args: { 
          response: message?.content || "I can help you query our database. Try asking about companies, insights, or feedback." 
        },
+       promptVersions: trackedVersions,
      };
    }
 
    return {
      name: toolCall.function.name,
      args: JSON.parse(toolCall.function.arguments),
+     promptVersions: trackedVersions,
    };
  }
 

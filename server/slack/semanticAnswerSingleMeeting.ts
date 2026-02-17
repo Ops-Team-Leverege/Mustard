@@ -21,6 +21,8 @@ import { storage } from "../storage";
 import type { MeetingActionItem, TranscriptChunk, QAPairWithCategory } from "@shared/schema";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { buildSemanticAnswerPrompt } from "../config/prompts/singleMeeting";
+import { PROMPT_VERSIONS } from "../config/prompts/versions";
+import type { PromptUsageRecord } from "../utils/promptVersionTracker";
 
 let _geminiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
@@ -35,6 +37,7 @@ export type SemanticAnswerResult = {
   confidence: "high" | "medium" | "low";
   evidenceSources: string[];
   answerShape?: AnswerShape;
+  promptVersions?: PromptUsageRecord;
 };
 
 /**
@@ -313,6 +316,10 @@ export async function semanticAnswerSingleMeeting(
     console.log(`[SemanticAnswer] Gemini call: ${Date.now() - startTime}ms`);
     console.log(`[SemanticAnswer] Response length: ${rawAnswer?.length || 0}`);
 
+    const trackedVersions: PromptUsageRecord = {
+      SEMANTIC_ANSWER_PROMPT: PROMPT_VERSIONS.SEMANTIC_ANSWER_PROMPT,
+    };
+
     if (!rawAnswer) {
       console.log(`[SemanticAnswer] Empty response from Gemini`);
       return {
@@ -320,6 +327,7 @@ export async function semanticAnswerSingleMeeting(
         confidence: "low",
         evidenceSources,
         answerShape,
+        promptVersions: trackedVersions,
       };
     }
 
@@ -332,6 +340,7 @@ export async function semanticAnswerSingleMeeting(
       confidence,
       evidenceSources,
       answerShape,
+      promptVersions: trackedVersions,
     };
   } catch (error) {
     console.error(`[SemanticAnswer] Gemini error:`, error);

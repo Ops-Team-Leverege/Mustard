@@ -55,6 +55,32 @@ export async function postSlackMessage(params: PostMessageParams): Promise<PostM
   return { ts: data.ts || "" };
 }
 
+export async function addSlackReaction(channel: string, timestamp: string, emoji: string): Promise<void> {
+  const token = process.env.SLACK_BOT_TOKEN;
+  if (!token) {
+    throw new Error("Missing SLACK_BOT_TOKEN");
+  }
+
+  const response = await fetch("https://slack.com/api/reactions.add", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json; charset=utf-8",
+    },
+    body: JSON.stringify({
+      channel,
+      timestamp,
+      name: emoji,
+    }),
+  });
+
+  const data = (await response.json()) as { ok: boolean; error?: string };
+
+  if (!data.ok && data.error !== "already_reacted") {
+    throw new Error(`Slack reactions.add error: ${data.error}`);
+  }
+}
+
 type UploadFileParams = {
   channel: string;
   thread_ts?: string;

@@ -11,6 +11,7 @@ import type { AnswerContract, SSOTMode } from "../decisionLayer/answerContracts"
 import type { DecisionLayerResult } from "../decisionLayer";
 import type { ResearchResult } from "./externalResearch";
 import type { ArtifactSearchResult } from "./semanticArtifactSearch";
+import type { PromptUsageRecord } from "../utils/promptVersionTracker";
 
 /**
  * Evidence Source Type (derived from Decision Layer intent)
@@ -89,10 +90,11 @@ export type OpenAssistantResult = {
   singleMeetingResult?: SingleMeetingResult;
   delegatedToSingleMeeting: boolean;
   evidenceSources?: string[];
-  progressMessage?: string; // Optional: User-friendly message explaining what we're doing (for long operations)
-  streamingCompleted?: boolean; // True if handler already updated the streaming message with final content
-  isCapabilityResponse?: boolean; // True for capability/greeting responses — suppresses source attribution
-  shouldGenerateDoc?: boolean; // True when response should be delivered as a .docx document (e.g., research + writing)
+  progressMessage?: string;
+  streamingCompleted?: boolean;
+  isCapabilityResponse?: boolean;
+  shouldGenerateDoc?: boolean;
+  promptVersions?: PromptUsageRecord;
   coverage?: {
     messagesSearched?: number;
     channelsSearched?: number;

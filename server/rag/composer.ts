@@ -36,6 +36,8 @@ import {
   buildExtractiveAnswerUserPrompt,
   buildActionItemsUserPrompt,
 } from "../config/prompts";
+import { PROMPT_VERSIONS } from "../config/prompts/versions";
+import type { PromptUsageRecord } from "../utils/promptVersionTracker";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
@@ -184,7 +186,7 @@ function formatTranscript(chunks: TranscriptChunk[]): string {
  */
 export async function composeMeetingSummary(
   chunks: TranscriptChunk[],
-): Promise<MeetingSummary> {
+): Promise<MeetingSummary & { promptVersions?: PromptUsageRecord }> {
   const transcript = formatTranscript(chunks);
 
   const response = await openai.chat.completions.create({
@@ -210,7 +212,11 @@ export async function composeMeetingSummary(
 
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  return JSON.parse(jsonStr) as MeetingSummary;
+  const result = JSON.parse(jsonStr) as MeetingSummary;
+  return {
+    ...result,
+    promptVersions: { RAG_MEETING_SUMMARY_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_MEETING_SUMMARY_SYSTEM_PROMPT },
+  };
 }
 
 /**
@@ -225,7 +231,7 @@ export async function selectRepresentativeQuotes(
   chunks: TranscriptChunk[],
   contentType: "transcript" | "notes",
   maxQuotes = 5,
-): Promise<QuoteSelectionResult> {
+): Promise<QuoteSelectionResult & { promptVersions?: PromptUsageRecord }> {
   // Gate 1: Notes don't have reliable speaker attribution
   if (contentType !== "transcript") {
     return {
@@ -278,7 +284,10 @@ export async function selectRepresentativeQuotes(
 
   // Strip markdown code fences if present
   const jsonStr = content.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
-  return { quotes: JSON.parse(jsonStr) as SelectedQuote[] };
+  return {
+    quotes: JSON.parse(jsonStr) as SelectedQuote[],
+    promptVersions: { RAG_QUOTE_SELECTION_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_QUOTE_SELECTION_SYSTEM_PROMPT },
+  };
 }
 
 /**
@@ -295,7 +304,7 @@ export async function selectRepresentativeQuotes(
 export async function answerMeetingQuestion(
   chunks: TranscriptChunk[],
   question: string,
-): Promise<ExtractiveAnswer> {
+): Promise<ExtractiveAnswer & { promptVersions?: PromptUsageRecord }> {
   const transcript = formatTranscript(chunks);
 
   const response = await openai.chat.completions.create({
@@ -327,6 +336,7 @@ export async function answerMeetingQuestion(
     answer: parsed.answer,
     evidence: parsed.evidence ?? undefined,
     wasFound: parsed.wasFound,
+    promptVersions: { RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT },
   };
 }
 
@@ -416,7 +426,7 @@ function normalizeOwnerName(rawOwner: string, canonicalNames: string[]): string 
 export async function extractMeetingActionStates(
   chunks: TranscriptChunk[],
   attendees?: { leverageTeam?: string; customerNames?: string },
-): Promise<ActionExtractionResult> {
+): Promise<ActionExtractionResult & { promptVersions?: PromptUsageRecord }> {
   const transcript = formatTranscript(chunks);
   const canonicalNames = buildCanonicalAttendeeList(attendees);
 
@@ -538,5 +548,9 @@ export async function extractMeetingActionStates(
   const primary = greenRoomFiltered.filter((a) => a.confidence >= 0.85);
   const secondary = greenRoomFiltered.filter((a) => a.confidence >= 0.70 && a.confidence < 0.85);
 
-  return { primary, secondary };
+  return {
+    primary,
+    secondary,
+    promptVersions: { RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT },
+  };
 }

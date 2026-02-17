@@ -9,6 +9,8 @@
  * These types are the single source of truth for meeting context.
  */
 
+import type { PromptUsageRecord } from "../utils/promptVersionTracker";
+
 /**
  * Context for a resolved single meeting.
  * Used by the Execution Layer when executing single-meeting contracts.
@@ -53,6 +55,7 @@ export type SingleMeetingResult = {
   isClarificationRequest?: boolean;
   isBinaryQuestion?: boolean;
   progressMessage?: string;
+  promptVersions?: PromptUsageRecord;
 };
 
 /**

@@ -40,3 +40,13 @@ export class PromptVersionTracker {
         this.versions = { ...this.versions, ...other.versions };
     }
 }
+
+export function mergePromptVersionRecords(...records: (PromptUsageRecord | undefined | null)[]): PromptUsageRecord {
+    const merged: PromptUsageRecord = {};
+    for (const record of records) {
+        if (record) {
+            Object.assign(merged, record);
+        }
+    }
+    return merged;
+}

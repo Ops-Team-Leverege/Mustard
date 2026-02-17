@@ -41,6 +41,7 @@ import { RequestLogger } from "../utils/slackLogger";
 import { PROGRESS_MESSAGE_CONSTANTS, QA_SEARCH_CONSTANTS } from "../config/constants";
 import { LLM_MODELS } from "../config/models";
 import OpenAI from "openai";
+import { mergePromptVersionRecords } from "../utils/promptVersionTracker";
 
 // Legacy handler modules removed — Decision Layer is now sole authority for intent routing.
 // Removed: ambiguityHandler, binaryQuestionHandler, clarificationHandler, answerQuestionsHandler
@@ -432,6 +433,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
       let decisionLayerResult: DecisionLayerResult | null = null;
       let openAssistantResultData: OpenAssistantResult | null = null;
       let usedSingleMeetingMode = false;
+      let downstreamPromptVersions: import("../utils/promptVersionTracker").PromptUsageRecord | undefined;
       let streamingContext: SlackStreamingContext | undefined;
 
       // Stage timing tracking
@@ -699,6 +701,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
         semanticError = result.semanticError;
         isClarificationRequest = result.isClarificationRequest;
         isBinaryQuestion = result.isBinaryQuestion;
+        downstreamPromptVersions = result.promptVersions;
 
         logger.info('Single meeting response generated', {
           intent: result.intent,
@@ -1148,7 +1151,10 @@ export async function slackEventsHandler(req: Request, res: Response) {
               semanticConfidence,
               pendingOffer,
               lastResponseType: dataSource, // Track for follow-up context
-              promptVersions: decisionLayerResult?.promptVersions,
+              promptVersions: mergePromptVersionRecords(
+                decisionLayerResult?.promptVersions,
+                downstreamPromptVersions,
+              ),
               testRun,
               meetingDetection,
             }
@@ -1210,7 +1216,11 @@ export async function slackEventsHandler(req: Request, res: Response) {
               },
               evidenceSources: openAssistantResultData?.evidenceSources?.map(s => ({ type: s })),
               lastResponseType: dataSource, // Track for follow-up context
-              promptVersions: decisionLayerResult?.promptVersions,
+              promptVersions: mergePromptVersionRecords(
+                decisionLayerResult?.promptVersions,
+                openAssistantResultData?.promptVersions,
+                openAssistantResultData?.singleMeetingResult?.promptVersions,
+              ),
               testRun,
               meetingDetection,
             }
