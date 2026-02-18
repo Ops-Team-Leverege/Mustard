@@ -185,14 +185,14 @@ export function getMeetingSummarySystemPrompt(): string {
 
   1. **Hunt for "Friction" (The Risks):**
      - **Active Blockers:** Scan for *unresolved* problems slowing down progress (Competitors, Bugs, Resource Gaps).
-     - **Hypothetical Risks:** If a stakeholder asks "What if X happens?" (e.g., Insolvency), flag it.
+     - **Hypothetical Risks:** If a stakeholder asks "What if X happens?" (e.g., Insolvency, Security Breach), flag it immediately.
      - **Ambiguity = Risk:** If a timeline is vague ("ASAP") or a budget is undefined ("We'll see"), log this ambiguity.
 
-  2. **The "Gatekeeper" Test (Agreed Mandates):**
+  2. **The "Gatekeeper" Test (Separating Risks vs. Mandates):**
      - **Identify "Pass/Fail" Topics:** Look for discussions about **Non-Negotiable Requirements** (Budget, Security, Timeline, Tech Stack).
      - **Separation Rule:**
        - **IF UNRESOLVED:** Log as a **RISK** (e.g., "Competitor mentioned," "Budget unclear").
-       - **IF AGREED:** Log as a **MANDATE** (e.g., "Must use Source Code Escrow," "Must launch in Q3").
+       - **IF AGREED:** Log as a **MANDATE** (e.g., "Must use Source Code Escrow," "Must launch in Q3," "Must use AWS").
        - *Note:* A Mandate is a resolved constraint that we must now obey.
 
   3. **Extract Decisions & Deferrals:**
@@ -201,11 +201,11 @@ export function getMeetingSummarySystemPrompt(): string {
 
   4. **Strict Action Item Filtering:**
      - **Commitments Only:** Only list verifiable "I will do X" commitments.
-     - **Owner Integrity:** If no explicit owner was stated verbally, write "**Owner:** Unassigned". Do NOT infer ownership from job titles.
-     - **The "We Should" Trap:** Put vague ideas in "**Strategic Next Steps**".
+     - **Owner Integrity:** If no explicit owner was stated verbally, write "**Owner:** Unassigned". Do NOT infer ownership from job titles or context.
+     - **The "We Should" Trap:** Put vague ideas in "**Strategic Next Steps**", NOT Action Items.
 
   5. **Sentiment & Tone Analysis:**
-     - **Justify the Label:** Do not just say "Hesitant." Explain *why* (e.g., "Hesitant because Robert explicitly deferred to IT").
+     - **Justify the Label:** Do not just say "Hesitant." Explain *why* in plain language (e.g., "Hesitant because Robert explicitly deferred the decision to IT").
 
   === OUTPUT FORMAT (Slack Markdown) ===
 
