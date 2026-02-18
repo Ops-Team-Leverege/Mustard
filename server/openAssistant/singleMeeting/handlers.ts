@@ -2,8 +2,8 @@ import { PROMPT_VERSIONS } from "../../config/prompts/versions";
 import { MODEL_ASSIGNMENTS } from "../../config/models";
 import { storage } from "../../storage";
 import { OpenAI } from "openai";
-import { GoogleGenAI } from "@google/genai";
 import { AnswerContract } from "../../decisionLayer/answerContracts";
+import { generateText } from "../../llm/client";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../../airtable/productData";
 import {
   buildCustomerQuestionsAssessmentPrompt,
@@ -39,14 +39,6 @@ function getOpenAI(): OpenAI {
     _openai = getValidatedOpenAIClient();
   }
   return _openai;
-}
-
-let _geminiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
-  if (!_geminiClient) {
-    _geminiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-  }
-  return _geminiClient;
 }
 
 export async function handleExtractiveIntent(
@@ -428,15 +420,15 @@ export async function handleSummaryIntent(
 
   const userPrompt = buildSingleMeetingSummaryPrompt(summaryData, transcriptText);
 
-  const gemini = getGeminiClient();
-  const geminiResponse = await gemini.models.generateContent({
+  const llmResponse = await generateText({
     model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,
-    contents: [
-      { role: "user", parts: [{ text: getMeetingSummarySystemPrompt() + "\n\n" + userPrompt }] },
+    messages: [
+      { role: "system", content: getMeetingSummarySystemPrompt() },
+      { role: "user", content: userPrompt },
     ],
   });
 
-  const summary = geminiResponse.text || "Unable to generate meeting summary.";
+  const summary = llmResponse.text || "Unable to generate meeting summary.";
 
   return {
     answer: summary,
