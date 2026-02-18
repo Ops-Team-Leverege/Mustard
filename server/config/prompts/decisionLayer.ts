@@ -276,19 +276,23 @@ Examples:
 - "Research what Mavis does" → requiresStyleMatching: false
 - "What's PitCrew's value prop for this?" → requiresStyleMatching: false
 
+RESPONSE FORMAT — Chain-of-thought reasoning:
+Think step-by-step BEFORE choosing intent and contracts. The JSON fields MUST appear in this order:
+
 Respond with JSON: {
+  "reasoning": "Step 1: What is the user asking for? Step 2: What data source does this need (meeting transcript, product DB, web, Slack, none)? Step 3: Which intent matches that data source? Step 4: Which contract(s) produce the right output shape?",
+  "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
+  "extractedCompanies": ["array of company names if multiple"],
+  "conversationContext": "what is this conversation about?",
   "intent": "SINGLE_MEETING" | "MULTI_MEETING" | "PRODUCT_KNOWLEDGE" | "EXTERNAL_RESEARCH" | "SLACK_SEARCH" | "GENERAL_HELP" | "REFUSE" | "CLARIFY",
   CRITICAL: The "intent" field MUST be one of the exact strings listed above. Do NOT use synonyms like "summary", "meeting", "search", "help", etc. Always use the exact enum value.
   "confidence": 0.0-1.0, 
   "reason": "brief explanation",
-  "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
-  "extractedCompanies": ["array of company names if multiple"],
   "proposedContracts": ["CONTRACT_NAME"],
   "requiresSemantic": true/false,
   "requiresProductKnowledge": true/false,
   "requiresStyleMatching": true/false,
   "isAmbiguous": true/false,
-  "conversationContext": "what is this conversation about?",
   "keyTopics": ["topic1", "topic2"],  // The user's actual topic phrases (e.g. "TV issues", "pricing concerns"). Used for display/labeling.
   "searchKeywords": ["keyword1", "keyword2", "synonym1"],  // Database search terms: include the core nouns from keyTopics PLUS semantic synonyms, related terms, and alternate phrasings that might appear in meeting transcripts. For "TV issues" → ["TV", "display", "screen", "monitor", "troubleshooting"]. For "pricing concerns" → ["pricing", "cost", "price", "budget", "quote"]. Keep each term 1-2 words. Include 3-8 terms total for good coverage.
   "shouldProceed": true/false,
