@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Company } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "Partnerships";
 
 interface User {
   id: string;
