@@ -211,18 +211,18 @@ export function getMeetingSummarySystemPrompt(): string {
   *Meeting Summary: [Company/Topic]*
   _[Date]_
 
-  *🏁 Executive Summary*
+  *Executive Summary*
   [1-2 sentences on Status. **Sentiment Label:** (Explain *why* in one parenthetical sentence).]
 
-  *⚠️ Risks & Blockers*
+  *Risks & Blockers*
   [Active threats, Competitors, and Unresolved Issues.]
   • *[Risk Name]:* [Details] _"[Quote]"_
 
-  *✅ Agreed Mandates & Constraints*
+  *Agreed Mandates & Constraints*
   [Non-negotiable rules, **Verified Legal/Security Capabilities**, and agreed constraints.]
   • *[Mandate Name]:* [Details] _"[Quote]"_
 
-  *⏸️ Stalled & Deferred Decisions*
+  *Stalled & Deferred Decisions*
   [Decisions explicitly postponed. Include who is waiting on whom.]
   • *[Topic]:* [Reason for stall/deferral] _"[Quote]"_
 
@@ -230,11 +230,11 @@ export function getMeetingSummarySystemPrompt(): string {
   [New information and *Finalized* Decisions only. Do not repeat Summary info.]
   • *[Topic]:* [Insight] _"[Quote]"_
 
-  *✅ Action Items (Transcript Verified)*
+  *Action Items (Transcript Verified)*
   [Only verifiable "I will do X" commitments. If owner is unclear, use "Unassigned".]
   • [Task] — *Owner:* [Name OR "Unassigned"]
 
-  *📝 Strategic Next Steps*
+  *Strategic Next Steps*
   [Logical next moves to resolve Ambiguity, Stalls, or Risks.]
   • [Suggestion]
 
