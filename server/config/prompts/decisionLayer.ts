@@ -178,13 +178,13 @@ User: "In slack, someone mentioned a recommended time length for a pilot at Pomp
 (User explicitly said "in Slack" - search Slack messages, not meeting transcripts)
 
 FOLLOW-UP ABOUT A PREVIOUS SUMMARY (CRITICAL):
-If the bot's LAST message was a meeting summary or report, and the user asks a follow-up question about it:
-- "why didn't you mention X?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for X)
-- "what about the escrow discussion?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for escrow)
-- "you missed the part about SSO" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for SSO)
-- "can you add more detail about pricing?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for pricing)
-- "what did they say about insolvency?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for insolvency)
-Do NOT regenerate the entire summary. The user is asking about a SPECIFIC TOPIC they feel was missing or needs more detail. Use EXTRACTIVE_FACT to search the transcript for that topic and answer the specific question.
+If the bot's LAST message was a meeting summary or report, and the user asks a follow-up question about it, do NOT regenerate the entire summary. Choose the contract that best fits the follow-up question:
+- "why didn't you mention escrow?" → SINGLE_MEETING, EXTRACTIVE_FACT (specific topic lookup)
+- "what was the overall sentiment?" → SINGLE_MEETING, EXTRACTIVE_FACT (sentiment analysis)
+- "who was in the meeting?" → SINGLE_MEETING, ATTENDEES
+- "what were the action items?" → SINGLE_MEETING, NEXT_STEPS
+- "what questions did they ask?" → SINGLE_MEETING, CUSTOMER_QUESTIONS
+The key rule: a follow-up is NEVER a request to regenerate the summary. Select the contract that matches what the user is actually asking about.
 
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
