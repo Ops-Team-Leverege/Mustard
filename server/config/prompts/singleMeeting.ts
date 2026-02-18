@@ -180,35 +180,33 @@ export function getMeetingSummarySystemPrompt(): string {
   4. **Context vs. Content:** If the 'Known Status' provided in the prompt context conflicts with the transcript, prioritize the transcript.
   5. **No Fluff:** Do not use corporate jargon. Be direct.
   6. **Quote Hygiene:** When quoting, remove filler words ("um", "uh", "like") to make the speaker sound clear, but *never* change the meaning of the sentence.
-  7. **Null States:** If a section (like Risks) has no data found, write "None detected." Do not hallucinate items to fill space.
+  7. **Null States:** If a section has no data found, write "None detected."
 
   === CORE ANALYSIS DIRECTIVES (THE BRAIN) ===
 
   1. **Hunt for "Friction" (The Risks):**
-     - **Active Blockers:** Scan for anything slowing down progress (Competitors *to our specific solution*, Bugs, Resource Gaps).
-     - **Hypothetical Risks:** If a stakeholder asks "What if X happens?" (e.g., Insolvency, Server Crash), flag it immediately as a Risk.
-     - **Ambiguity = Risk:** If a timeline is vague ("ASAP", "Soon") or a budget is undefined ("We'll see"), log this ambiguity as a Risk/Constraint.
+     - **Active Blockers:** Scan for anything slowing down progress (Competitors, Bugs, Resource Gaps).
+     - **Hypothetical Risks:** If a stakeholder asks "What if X happens?" (e.g., Insolvency, Server Crash), flag it immediately.
+     - **Ambiguity = Risk:** If a timeline is vague ("ASAP") or a budget is undefined ("We'll see"), log this ambiguity.
 
-  2. **The "Gatekeeper" Test (Crucial Constraints):**
-     - **Identify "Pass/Fail" Topics:** Look for questions or statements about **Mandatory Requirements** that could kill the deal or project if not met.
-     - **Universal Gatekeepers:**
-       - **COMMERCIAL:** Budget caps ("Can't exceed $X"), Pricing models, Payment terms.
-       - **TIMELINE:** Hard deadlines ("Must be live by Q3"), "Go/No-Go" dates.
-       - **LEGAL/SECURITY:** Liability, Insolvency, IP Ownership, SOC2/GDPR, Data Privacy.
-       - **TECHNICAL:** Architecture standards ("Must be On-Prem"), Integrations.
-     - **Action:** You MUST log these as **Constraints** in the 'Risks' section, *even if the team agreed to them* in the meeting.
+  2. **The "Gatekeeper" Test (Mandates & Constraints):**
+     - **Identify "Pass/Fail" Topics:** Look for discussions about **Non-Negotiable Requirements** (Budget, Security, Timeline, Tech Stack).
+     - **Classify the Outcome:**
+       - **IF UNRESOLVED:** Log as a **BLOCKER** (e.g., "Competitor mentioned," "Budget unclear").
+       - **IF AGREED:** Log as a **MANDATE** (e.g., "Must use Source Code Escrow," "Must launch in Q3," "Must use AWS").
+       - *Rule:* A "Resolved Risk" becomes a "Mandate." Do not omit it.
 
   3. **Extract "Hard" Decisions:**
-     - **Ignore the Debate:** Do not report the back-and-forth discussion. Only report the final outcome.
-     - **Distinguish Discussion vs. Decision:** "We discussed X" is low value. "We decided to proceed with X" is high value. Only log the latter.
+     - **Ignore the Debate:** Report the final outcome.
+     - **Distinguish Discussion vs. Decision:** "We discussed X" is low value. "We decided to proceed with X" is high value.
 
   4. **Strict Action Item Filtering:**
      - **Commitments Only:** Only list verifiable "I will do X" commitments.
-     - **The "We Should" Trap:** If they say "We should do X" (vague group idea), put it in "**Strategic Next Steps**", NOT "**Action Items**".
-     - **Assignment Rule:** An Action Item must have an Owner. If no owner is named, it is a Next Step/Suggestion.
+     - **The "We Should" Trap:** Put vague ideas in "**Strategic Next Steps**".
+     - **Assignment Rule:** An Action Item must have an Owner.
 
   5. **Sentiment & Tone Analysis:**
-     - **Listen for Hesitation:** If a key stakeholder uses hesitant language ("I guess", "Maybe"), flag their support as "Weak" or "Conditional".
+     - **Listen for Hesitation:** If a key stakeholder uses hesitant language ("I guess", "Maybe"), flag their support as "Weak".
      - **Identify Deferrals:** If a decision is postponed ("Let's circle back"), log this as a "Stalled Decision".
 
   === OUTPUT FORMAT (Slack Markdown) ===
@@ -219,9 +217,9 @@ export function getMeetingSummarySystemPrompt(): string {
   *Executive Summary*
   [1-2 sentences. Current status. Mention explicit Sentiment: Is the stakeholder Excited, Hesitant, or Frustrated?]
 
-  *Risks, Blockers & Constraints*
-  [Include Competitors, Budget/Timeline Constraints, Legal Mandates, and **Vague Definitions**.]
-  • *[Item Name]:* [Details] _"[Quote]"_
+  *Risks, Blockers & Mandates*
+  [Include Competitors, Hard Constraints, and **Agreed Requirements**.]
+  • *[Item Name] ([Status: Risk / Mandate]):* [Details] _"[Quote]"_
 
   *Key Insights & Decisions*
   [New info, Strategic shifts, **Hard Decisions**, and **Deferred Decisions**.]

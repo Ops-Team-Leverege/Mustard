@@ -50,7 +50,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
     SEMANTIC_ANSWER_PROMPT: "2026-02-17-001",
 
     // Transcript Analysis - Initial versions
-    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-005",
+    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-006",
     RAG_QUOTE_SELECTION_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_ACTION_ITEMS_SYSTEM_PROMPT: "2026-02-17-001",
@@ -88,6 +88,7 @@ export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: 
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
     ],
     RAG_MEETING_SUMMARY_SYSTEM_PROMPT: [
+        { version: "2026-02-18-006", reason: "v6 Gatekeeper rework: replaced Universal Gatekeepers taxonomy with Classify the Outcome (IF UNRESOLVED→BLOCKER, IF AGREED→MANDATE); output header renamed to 'Risks, Blockers & Mandates' with Risk/Mandate status labels; tightened prose throughout directives.", date: "2026-02-18" },
         { version: "2026-02-18-005", reason: "v5 Decision-Ready Brief: expanded to 7 guardrail rules (Quote Hygiene, No Fluff, Null States), 5 analysis directives (added Gatekeeper Test with Universal Gatekeepers taxonomy and Sentiment & Tone Analysis), Assignment Rule for action items, Strategic Next Steps replaces Recommended Next Steps.", date: "2026-02-18" },
         { version: "2026-02-18-004", reason: "Reframed Section 1 as 'Friction & Constraints' with Active Blockers, Conditional Mandates, and 'Yes Trap' sub-directives; renamed output header to 'Risks, Blockers & Constraints' to capture agreed-upon constraints as engineering requirements.", date: "2026-02-18" },
         { version: "2026-02-18-003", reason: "Refined Section 1 to 'Friction & Hard Requirements' with MANDATORY REQUIREMENTS sub-directive; renamed output section to 'Risks, Blockers & Hard Requirements' to surface deal constraints even when verbally resolved.", date: "2026-02-18" },
