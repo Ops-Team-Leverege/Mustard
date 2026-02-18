@@ -21,13 +21,24 @@ import {
   getMeetingAttendees,
   getMeetingActionItems,
   searchTranscriptSnippets,
-  extractKeywords,
   UNCERTAINTY_RESPONSE,
 } from "./helpers";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+function getValidatedOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("[SingleMeeting] OPENAI_API_KEY is not set. Cannot initialize OpenAI client.");
+  }
+  return new OpenAI({ apiKey });
+}
+
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = getValidatedOpenAIClient();
+  }
+  return _openai;
+}
 
 export async function handleExtractiveIntent(
   ctx: SingleMeetingContext,
@@ -41,10 +52,8 @@ export async function handleExtractiveIntent(
 
   const isCustomerQuestionsRequest = contract === AnswerContract.CUSTOMER_QUESTIONS;
 
-  const wantsKBAnswers = /answer\s+(the|those|these|customer)?\s*questions?|help\s+(me\s+)?(answer|respond)|check\s+(for\s+)?correct|verify|assess|validate/i.test(question);
-
   if (isCustomerQuestionsRequest) {
-    console.log(`[SingleMeeting] Fast path: customer questions (contract=${contract}, wantsKBAnswers=${wantsKBAnswers})`);
+    console.log(`[SingleMeeting] Fast path: customer questions (contract=${contract})`);
     const customerQuestions = await lookupQAPairs(ctx.meetingId);
     console.log(`[SingleMeeting] Customer questions fetch: ${Date.now() - startTime}ms`);
 
@@ -55,11 +64,6 @@ export async function handleExtractiveIntent(
         intent: "extractive",
         dataSource: "qa_pairs",
       };
-    }
-
-    if (wantsKBAnswers) {
-      console.log(`[SingleMeeting] User requested KB-assisted answers for customer questions`);
-      return await generateKBAssistedCustomerQuestionAnswers(ctx, [], customerQuestions);
     }
 
     const lines: string[] = [];
@@ -159,93 +163,7 @@ export async function handleExtractiveIntent(
     };
   }
 
-  console.log(`[SingleMeeting] General path: parallel fetch`);
-  const [customerQuestions, actionItems] = await Promise.all([
-    lookupQAPairs(ctx.meetingId, question),
-    getMeetingActionItems(ctx.meetingId),
-  ]);
-  console.log(`[SingleMeeting] Parallel fetch complete: ${Date.now() - startTime}ms`);
-
-  const { keywords, properNouns } = extractKeywords(question);
-  const allKeywords = Array.from(new Set([...properNouns, ...keywords]));
-  const hasProperNouns = properNouns.length > 0;
-
-  console.log(`[SingleMeeting] Keywords: ${keywords.join(", ")} | Proper nouns: ${properNouns.join(", ")}`);
-
-  const scoreMatch = (text: string): number => {
-    const lowerText = text.toLowerCase();
-
-    if (hasProperNouns) {
-      const matchesProperNoun = properNouns.some(pn => lowerText.includes(pn));
-      if (!matchesProperNoun) {
-        return -1;
-      }
-    }
-
-    return allKeywords.filter(kw => lowerText.includes(kw)).length;
-  };
-
-  const keywordThreshold = keywords.length <= 2 ? 1 : 2;
-  const minRelevanceScore = hasProperNouns ? 1 : keywordThreshold;
-
-  const scoredActionItems = actionItems.map(ai => ({
-    item: ai,
-    score: scoreMatch(`${ai.action} ${ai.evidence} ${ai.owner}`),
-  })).filter(x => x.score >= minRelevanceScore).sort((a, b) => b.score - a.score);
-
-  const scoredCustomerQuestions = customerQuestions.map(cq => ({
-    item: cq,
-    score: scoreMatch(cq.questionText + " " + (cq.answerEvidence || "")),
-  })).filter(x => x.score >= minRelevanceScore).sort((a, b) => b.score - a.score);
-
-  const bestAI = scoredActionItems[0];
-  const bestCQ = scoredCustomerQuestions[0];
-
-  if (bestAI && (!bestCQ || bestAI.score >= bestCQ.score)) {
-    const item = bestAI.item;
-    const dateSuffix = getMeetingDateSuffix(ctx);
-    const lines: string[] = [];
-    lines.push(`In this meeting${dateSuffix}, the next steps reference the following:`);
-    lines.push(`\n_"${item.evidence}"_`);
-    let formattedItem = `\n• ${item.action} — ${item.owner}`;
-    if (item.deadline && item.deadline !== "Not specified") {
-      formattedItem += ` _(${item.deadline})_`;
-    }
-    lines.push(formattedItem);
-
-    return {
-      answer: lines.join("\n"),
-      intent: "extractive",
-      dataSource: "action_items",
-      evidence: item.evidence,
-    };
-  }
-
-  if (bestCQ) {
-    const match = bestCQ.item;
-    const dateSuffix = getMeetingDateSuffix(ctx);
-    const lines: string[] = [];
-    lines.push(`In this meeting${dateSuffix}, a customer question referenced this:`);
-    lines.push(`\n_"${match.questionText}"_`);
-    if (match.askedByName) {
-      lines.push(`— ${match.askedByName}`);
-    }
-    if (match.answerEvidence) {
-      lines.push(`\n*Answer provided:* ${match.answerEvidence}`);
-    }
-
-    return {
-      answer: lines.join("\n"),
-      intent: "extractive",
-      dataSource: "qa_pairs",
-      evidence: match.questionText,
-      promptVersions: {
-        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
-      }
-    };
-  }
-
-  console.log(`[SingleMeeting] Fallback: transcript search`);
+  console.log(`[SingleMeeting] EXTRACTIVE_FACT: transcript search`);
   const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
   console.log(`[SingleMeeting] Transcript fetch: ${Date.now() - startTime}ms`);
 
@@ -279,32 +197,31 @@ export async function handleExtractiveIntent(
 
 export async function handleAggregativeIntent(
   ctx: SingleMeetingContext,
-  question: string
+  question: string,
+  contract?: AnswerContract
 ): Promise<SingleMeetingResult> {
   const startTime = Date.now();
-  const q = question.toLowerCase();
 
-  const wantsQuestions = /\bquestions?\b/.test(q) || /\bask/.test(q);
-  const wantsConcerns = /\bissues?\b/.test(q) || /\bconcerns?\b/.test(q) || /\bproblems?\b/.test(q);
+  console.log(`[SingleMeeting] Aggregative handler: contract=${contract}`);
 
-  if (wantsQuestions) {
-    console.log(`[SingleMeeting] Aggregative: customer questions`);
-    const customerQuestions = await lookupQAPairs(ctx.meetingId);
-    console.log(`[SingleMeeting] Customer questions fetch: ${Date.now() - startTime}ms`);
+  const customerQuestions = await lookupQAPairs(ctx.meetingId);
+  const actionItems = await getMeetingActionItems(ctx.meetingId);
+  console.log(`[SingleMeeting] Aggregative data fetch: ${Date.now() - startTime}ms (qa=${customerQuestions.length}, actions=${actionItems.length})`);
 
-    if (customerQuestions.length === 0) {
-      return {
-        answer: UNCERTAINTY_RESPONSE,
-        intent: "aggregative",
-        dataSource: "not_found",
-      };
-    }
+  if (customerQuestions.length === 0 && actionItems.length === 0) {
+    return {
+      answer: UNCERTAINTY_RESPONSE,
+      intent: "aggregative",
+      dataSource: "not_found",
+    };
+  }
 
-    const lines: string[] = [];
+  const lines: string[] = [];
+
+  if (customerQuestions.length > 0) {
     lines.push(`*Customer Questions from the meeting with ${ctx.companyName}:*`);
-
     customerQuestions.slice(0, 10).forEach(q => {
-      lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
+      lines.push(`\u2022 "${q.questionText}"${q.askedByName ? ` \u2014 ${q.askedByName}` : ""}`);
       if (q.answerEvidence) {
         lines.push(`  _Answer: ${q.answerEvidence}_`);
       }
@@ -312,81 +229,26 @@ export async function handleAggregativeIntent(
     if (customerQuestions.length > 10) {
       lines.push(`_...and ${customerQuestions.length - 10} more_`);
     }
-
-    if (customerQuestions.length > 0) {
-      lines.push("\n---");
-      lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
-    }
-
-    return {
-      answer: lines.join("\n"),
-      intent: "aggregative",
-      dataSource: "qa_pairs",
-      promptVersions: {
-        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
-      }
-    };
+    lines.push("\n---");
+    lines.push("_Would you like me to check these answers for correctness against our product knowledge? Just say \"check for correctness\" and I'll review them._");
   }
-
-  if (wantsConcerns) {
-    console.log(`[SingleMeeting] Aggregative: concerns/issues`);
-    const customerQuestions = await lookupQAPairs(ctx.meetingId);
-    console.log(`[SingleMeeting] Customer questions fetch: ${Date.now() - startTime}ms`);
-
-    const concernQuestions = customerQuestions.filter(cq => {
-      const text = cq.questionText.toLowerCase();
-      return /concern|issue|problem|worry|risk|challenge|difficult|block/.test(text);
-    });
-
-    if (concernQuestions.length === 0) {
-      return {
-        answer: UNCERTAINTY_RESPONSE,
-        intent: "aggregative",
-        dataSource: "not_found",
-      };
-    }
-
-    const lines: string[] = [];
-    lines.push(`*Concerns raised in the meeting with ${ctx.companyName}:*`);
-    concernQuestions.forEach(q => {
-      lines.push(`• "${q.questionText}"${q.askedByName ? ` — ${q.askedByName}` : ""}`);
-    });
-
-    return {
-      answer: lines.join("\n"),
-      intent: "aggregative",
-      dataSource: "qa_pairs",
-      promptVersions: {
-        CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT
-      }
-    };
-  }
-
-  console.log(`[SingleMeeting] Aggregative: general (action items)`);
-  const actionItems = await getMeetingActionItems(ctx.meetingId);
-  console.log(`[SingleMeeting] Action items fetch: ${Date.now() - startTime}ms`);
 
   if (actionItems.length > 0) {
-    const lines: string[] = [];
-    lines.push(`*Items from the meeting with ${ctx.companyName}:*`);
+    if (lines.length > 0) lines.push("");
+    lines.push(`*Action Items from the meeting with ${ctx.companyName}:*`);
     actionItems.forEach(item => {
-      lines.push(`• ${item.action} — ${item.owner}`);
+      lines.push(`\u2022 ${item.action} \u2014 ${item.owner}`);
     });
-
-    return {
-      answer: lines.join("\n"),
-      intent: "aggregative",
-      dataSource: "action_items",
-      promptVersions: {
-        RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT
-      }
-    };
   }
 
   return {
-    answer: UNCERTAINTY_RESPONSE,
+    answer: lines.join("\n"),
     intent: "aggregative",
-    dataSource: "not_found",
+    dataSource: customerQuestions.length > 0 ? "qa_pairs" : "action_items",
+    promptVersions: {
+      CUSTOMER_QUESTIONS_EXTRACTION_PROMPT: PROMPT_VERSIONS.CUSTOMER_QUESTIONS_EXTRACTION_PROMPT,
+      RAG_ACTION_ITEMS_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_ACTION_ITEMS_SYSTEM_PROMPT
+    }
   };
 }
 
@@ -458,7 +320,7 @@ export async function handleDraftingIntent(
 
   const meetingContext = contextParts.join("\n");
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: MODEL_ASSIGNMENTS.SINGLE_MEETING_RESPONSE,
     temperature: 0.7,
     messages: [
@@ -557,7 +419,7 @@ export async function handleSummaryIntent(
 
   const userPrompt = buildSingleMeetingSummaryPrompt(summaryData, transcriptText);
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,
     messages: [
       { role: "system", content: getMeetingSummarySystemPrompt() },
@@ -628,7 +490,7 @@ export async function generateKBAssistedCustomerQuestionAnswers(
   const systemPrompt = buildCustomerQuestionsAssessmentPrompt(productKnowledge);
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: MODEL_ASSIGNMENTS.SINGLE_MEETING_RESPONSE,
       messages: [
         { role: "system", content: systemPrompt },

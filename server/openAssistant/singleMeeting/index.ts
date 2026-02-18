@@ -92,7 +92,7 @@ export async function executeSingleMeetingContract(
     }
 
     case AnswerContract.AGGREGATIVE_LIST: {
-      const result = await handleAggregativeIntent(ctx, question);
+      const result = await handleAggregativeIntent(ctx, question, contract);
       let aggSemanticError: string | undefined;
 
       if (isSemantic) {

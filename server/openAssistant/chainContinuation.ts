@@ -19,9 +19,13 @@ import { AnswerContract } from "../decisionLayer/answerContracts";
 import { MODEL_ASSIGNMENTS } from "../config/models";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../airtable/productData";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+function getOpenAI(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("[ChainContinuation] OPENAI_API_KEY is not set. Cannot execute chain continuation.");
+  }
+  return new OpenAI({ apiKey });
+}
 
 export interface ChainContinuationInput {
   userMessage: string;
@@ -84,10 +88,29 @@ async function executeContinuationContract(
   priorOutput: string,
   meetingContext?: { companyName: string; meetingDate?: Date | null }
 ): Promise<string> {
-  const systemPrompt = buildContinuationPrompt(contract, priorOutput, meetingContext);
+  let enrichedPriorOutput = priorOutput;
+
+  const pkContracts = [
+    AnswerContract.PRODUCT_KNOWLEDGE,
+    AnswerContract.PRODUCT_INFO,
+    AnswerContract.PRODUCT_EXPLANATION,
+    AnswerContract.FEATURE_VERIFICATION,
+  ];
+  if (pkContracts.includes(contract)) {
+    try {
+      const pkResult = await getComprehensiveProductKnowledge();
+      const pkText = formatProductKnowledgeForPrompt(pkResult);
+      enrichedPriorOutput = `${priorOutput}\n\n## PitCrew Product Knowledge Reference\n${pkText}`;
+      console.log(`[ChainContinuation] Injected product knowledge (${pkText.length} chars) for ${contract}`);
+    } catch (err) {
+      console.error(`[ChainContinuation] Failed to load product knowledge for ${contract}:`, err);
+    }
+  }
+
+  const systemPrompt = buildContinuationPrompt(contract, enrichedPriorOutput, meetingContext);
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: getContinuationModel(contract),
       messages: [
         { role: "system", content: systemPrompt },
@@ -118,6 +141,10 @@ function getContinuationModel(contract: AnswerContract): string {
       return MODEL_ASSIGNMENTS.SINGLE_MEETING_RESPONSE;
     case AnswerContract.SALES_DOCS_PREP:
     case AnswerContract.VALUE_PROPOSITION:
+    case AnswerContract.PRODUCT_KNOWLEDGE:
+    case AnswerContract.PRODUCT_INFO:
+    case AnswerContract.PRODUCT_EXPLANATION:
+    case AnswerContract.FEATURE_VERIFICATION:
       return MODEL_ASSIGNMENTS.PRODUCT_KNOWLEDGE_RESPONSE;
     default:
       return MODEL_ASSIGNMENTS.SINGLE_MEETING_RESPONSE;
@@ -132,7 +159,11 @@ function getContinuationTemperature(contract: AnswerContract): number {
     case AnswerContract.SALES_DOCS_PREP:
       return 0.3;
     case AnswerContract.VALUE_PROPOSITION:
-      return 0.5;
+    case AnswerContract.PRODUCT_KNOWLEDGE:
+    case AnswerContract.PRODUCT_INFO:
+    case AnswerContract.PRODUCT_EXPLANATION:
+    case AnswerContract.FEATURE_VERIFICATION:
+      return 0.3;
     default:
       return 0.5;
   }
@@ -216,6 +247,23 @@ PRIOR DATA:
 ${priorOutput}
 
 Provide a clear, structured summary of the key takeaways, decisions, and action items.`;
+
+    case AnswerContract.PRODUCT_KNOWLEDGE:
+    case AnswerContract.PRODUCT_INFO:
+    case AnswerContract.PRODUCT_EXPLANATION:
+    case AnswerContract.FEATURE_VERIFICATION:
+      return `You are a product knowledge expert for PitCrew (by Leverege).
+${meetingLine}
+
+PRIOR OUTPUT (may contain customer questions, meeting data, or research):
+${priorOutput}
+
+Your task: review the prior output against PitCrew's product knowledge.
+- If the prior output contains customer questions with answers, assess each answer for correctness
+- If the prior output contains unanswered questions, provide answers from product knowledge
+- If the prior output contains research or analysis, enrich it with relevant PitCrew capabilities
+- Flag any incorrect claims and provide corrections
+- Be specific about which PitCrew features or tiers are relevant`;
 
     default:
       return `You are a helpful assistant for the Leverege/PitCrew sales team.

@@ -1,0 +1,86 @@
+ Critical Issues
+1. Hotfixes & Band-Aids
+handlers.ts - Keyword Matching Logic (Lines 230-280)
+
+const scoreMatch = (text: string): number => {
+  const lowerText = text.toLowerCase();
+  if (hasProperNouns) {
+    const matchesProperNoun = properNouns.some(pn => lowerText.includes(pn));
+    if (!matchesProperNoun) return -1;
+  }
+  return allKeywords.filter(kw => lowerText.includes(kw)).length;
+};
+Problem: This is a symptomatic fix. Simple substring matching with keyword scoring is brittle and will break with:
+
+Synonyms ("issue" vs "problem")
+Different phrasings ("next steps" vs "action items")
+Typos or variations
+Root Cause: Should use semantic similarity (embeddings) or the existing LLM-based semantic search instead of keyword matching.
+
+handlers.ts - Hardcoded Thresholds (Lines 282-283)
+
+const keywordThreshold = keywords.length <= 2 ? 1 : 2;
+const minRelevanceScore = hasProperNouns ? 1 : keywordThreshold;
+Problem: Magic numbers that were tuned for current data. Will need constant adjustment as data grows.
+
+2. Architecture Violations
+events.ts - Massive God Function (1294 lines)
+
+export async function slackEventsHandler(req: Request, res: Response) {
+  // 1294 lines of mixed concerns
+}
+Problem: This function violates Single Responsibility Principle by handling:
+
+Request parsing
+Authentication
+Deduplication
+Intent classification
+Meeting resolution
+Response generation
+Error handling
+Logging
+Recommendation: Break into smaller functions with clear boundaries:
+
+async function parseAndValidateRequest(req: Request): Promise<SlackEvent>
+async function resolveContext(event: SlackEvent): Promise<Context>
+async function routeToHandler(context: Context): Promise<Response>
+async function sendResponse(response: Response): Promise<void>
+handlers.ts - Inconsistent Error Handling
+
+// Line 29-31: Silent failure with hardcoded API key
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY!,
+});
+Problem: Using ! assertion operator bypasses TypeScript's null checking. If OPENAI_API_KEY is missing, the app will crash at runtime with a cryptic error instead of failing fast at startup.
+
+Recommendation:
+
+const apiKey = process.env.OPENAI_API_KEY;
+if (!apiKey) {
+  throw new Error("OPENAI_API_KEY environment variable is required");
+}
+const openai = new OpenAI({ apiKey });
+3. Hardcoded Use-Case Logic
+handlers.ts - Customer Questions Detection (Lines 40-42)
+
+const wantsKBAnswers = /answer\s+(the|those|these|customer)?\s*questions?|help\s+(me\s+)?(answer|respond)|check\s+(for\s+)?correct|verify|assess|validate/i.test(question);
+Problem: This regex only works for English and specific phrasings. Breaks when:
+
+User asks "Can you verify these?" (no "questions" keyword)
+Non-English queries
+Different phrasing like "Are these answers right?"
+Root Cause: Should use the Decision Layer's intent classification instead of regex patterns.
+
+handlers.ts - Concern Detection (Lines 424-427)
+
+const concernQuestions = customerQuestions.filter(cq => {
+  const text = cq.questionText.toLowerCase();
+  return /concern|issue|problem|worry|risk|challenge|difficult|block/.test(text);
+});
+Problem: Hardcoded keyword list that misses:
+
+Synonyms ("trouble", "obstacle", "barrier")
+Contextual concerns without keywords
+False positives ("no concerns" would match)
+4. Security Issues
+✅ Good: Slack signature verification is properly implemented with timing-safe comparison and replay attack prevention.
