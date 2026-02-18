@@ -41,7 +41,7 @@ export type PromptVersions = {
  */
 export const PROMPT_VERSIONS: PromptVersions = {
     // Decision Layer - Initial versions
-    INTENT_CLASSIFICATION_PROMPT: "2026-02-18-003",
+    INTENT_CLASSIFICATION_PROMPT: "2026-02-18-004",
     CONTRACT_SELECTION_PROMPT: "2026-02-17-001",
     AMBIGUOUS_QUERY_INTERPRETATION_PROMPT: "2026-02-17-001",
     AGGREGATE_SPECIFICITY_CHECK_PROMPT: "2026-02-17-001",
@@ -70,6 +70,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
  */
 export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: string; date: string }>> = {
     INTENT_CLASSIFICATION_PROMPT: [
+        { version: "2026-02-18-004", reason: "Follow-up routing fix: added CRITICAL section for follow-up questions about a previous summary — routes to EXTRACTIVE_FACT instead of regenerating MEETING_SUMMARY. Covers patterns like 'why didn't you mention X', 'what about the escrow discussion', 'you missed the part about SSO'.", date: "2026-02-18" },
         { version: "2026-02-18-003", reason: "Simplified chain-of-thought: single reasoning field before intent, letting model reason through what user wants before picking enum value", date: "2026-02-18" },
         { version: "2026-02-18-002", reason: "Chain-of-thought reasoning: restructured JSON schema so model reasons through data source and intent before labeling. Moved reasoning, extractedCompany, conversationContext before intent field to force deliberate classification", date: "2026-02-18" },
         { version: "2026-02-18-001", reason: "Enforce exact enum values in intent response — LLM was returning synonyms like 'summary' instead of 'SINGLE_MEETING', causing fallback to GENERAL_RESPONSE", date: "2026-02-18" },

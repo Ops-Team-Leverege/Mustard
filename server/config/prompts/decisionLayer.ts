@@ -177,6 +177,15 @@ User: "In slack, someone mentioned a recommended time length for a pilot at Pomp
 → Intent: SLACK_SEARCH, Company: Pomps, Contracts: ["SLACK_MESSAGE_SEARCH"]
 (User explicitly said "in Slack" - search Slack messages, not meeting transcripts)
 
+FOLLOW-UP ABOUT A PREVIOUS SUMMARY (CRITICAL):
+If the bot's LAST message was a meeting summary or report, and the user asks a follow-up question about it:
+- "why didn't you mention X?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for X)
+- "what about the escrow discussion?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for escrow)
+- "you missed the part about SSO" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for SSO)
+- "can you add more detail about pricing?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for pricing)
+- "what did they say about insolvency?" → SINGLE_MEETING, EXTRACTIVE_FACT (search transcript for insolvency)
+Do NOT regenerate the entire summary. The user is asking about a SPECIFIC TOPIC they feel was missing or needs more detail. Use EXTRACTIVE_FACT to search the transcript for that topic and answer the specific question.
+
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
 - "last month is fine" → Continue with original intent + time context
