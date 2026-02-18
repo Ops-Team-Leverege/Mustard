@@ -37,6 +37,7 @@ export interface Customer {
 
 export interface TranscriptData {
   companyName: string;
+  companyIds?: string[]; // NEW: Multi-company support
   name?: string;
   meetingDate?: string;
   contentType?: "transcript" | "notes";
@@ -96,7 +97,15 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', nameInTranscript: '', jobTitle: '' });
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
+
+  /**
+   * Multi-Company Support (Task 6.1)
+   * 
+   * selectedCompanies replaces the single selectedCompanyId to support
+   * associating a transcript with multiple companies.
+   */
+  const [selectedCompanies, setSelectedCompanies] = useState<Company[]>([]);
+
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [teamSearchOpen, setTeamSearchOpen] = useState(false);
   const [teamSearchValue, setTeamSearchValue] = useState('');
@@ -111,10 +120,36 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     queryKey: ['/api/companies'],
   });
 
+  /**
+   * Multi-Company Contact Loading (Task 6.1)
+   * 
+   * Load contacts for the primary company when only one company is selected.
+   * This enables the quick-add existing contacts feature.
+   */
+  const primaryCompanyId = selectedCompanies.length === 1 ? selectedCompanies[0].id : null;
+
   const { data: companyContacts = [] } = useQuery<any[]>({
-    queryKey: ['/api/contacts/company', selectedCompanyId],
-    enabled: !!selectedCompanyId,
+    queryKey: ['/api/contacts/company', primaryCompanyId],
+    enabled: !!primaryCompanyId,
   });
+
+  /**
+   * Multi-Company Management (Task 6.1)
+   * 
+   * Functions to add and remove companies from the selected companies list.
+   */
+  const handleAddCompany = (company: Company) => {
+    // Check if company is already selected
+    if (selectedCompanies.some(c => c.id === company.id)) {
+      return;
+    }
+    setSelectedCompanies([...selectedCompanies, company]);
+    setCompanySearchOpen(false);
+  };
+
+  const handleRemoveCompany = (companyId: string) => {
+    setSelectedCompanies(selectedCompanies.filter(c => c.id !== companyId));
+  };
 
   const handleAddCustomer = () => {
     if (!newCustomer.name.trim()) return;
@@ -126,7 +161,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     // Check if contact is already added
     const alreadyAdded = customers.some(c => c.name === contact.name);
     if (alreadyAdded) return;
-    
+
     const newContactData: Customer = {
       name: contact.name,
       nameInTranscript: contact.nameInTranscript || '',
@@ -165,16 +200,16 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setFormData(prev => ({ 
-      ...prev, 
-      supportingMaterials: [...(prev.supportingMaterials || []), file.name] 
+    setFormData(prev => ({
+      ...prev,
+      supportingMaterials: [...(prev.supportingMaterials || []), file.name]
     }));
 
     toast({
       title: "File reference added",
       description: `${file.name} added to supporting materials`,
     });
-    
+
     // Clear the file input
     e.target.value = '';
   };
@@ -182,16 +217,16 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
   const handleUrlAdd = () => {
     if (!fileUrl.trim()) return;
 
-    setFormData(prev => ({ 
-      ...prev, 
-      supportingMaterials: [...(prev.supportingMaterials || []), fileUrl.trim()] 
+    setFormData(prev => ({
+      ...prev,
+      supportingMaterials: [...(prev.supportingMaterials || []), fileUrl.trim()]
     }));
 
     toast({
       title: "URL added",
       description: "Supporting materials link saved",
     });
-    
+
     setFileUrl("");
   };
 
@@ -204,42 +239,66 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.companyName.trim()) {
+
+    /**
+     * Multi-Company Validation (Task 6.1)
+     * Require at least one company to be selected
+     */
+    if (selectedCompanies.length === 0) {
       return;
     }
-    
+
+    /**
+     * Required Field Validation (Task 6.2)
+     * Meeting name and date are now mandatory
+     */
+    if (!formData.name?.trim()) {
+      return;
+    }
+
+    if (!formData.meetingDate?.trim()) {
+      return;
+    }
+
     if (customers.length === 0) {
       return;
     }
-    
+
     // For transcripts, require transcript field. For notes, require mainMeetingTakeaways
     if (contentType === "transcript" && !formData.transcript.trim()) {
       return;
     }
-    
+
     if (contentType === "notes" && !formData.mainMeetingTakeaways?.trim()) {
       return;
     }
-    
+
     if (teamMembers.length === 0) {
       return;
     }
-    
+
     // Convert customers array to comma-separated names for backward compatibility
     const customerNames = customers.map(c => c.name).join(', ');
     const leverageTeamString = teamMembers.join(', ');
-    
+
+    /**
+     * Multi-Company Submission (Task 6.1)
+     * 
+     * Send companyIds array for new multi-company support.
+     * Also send companyName (first company) for backward compatibility.
+     */
     const submissionData: any = {
       ...formData,
       contentType,
+      companyIds: selectedCompanies.map(c => c.id),
+      companyName: selectedCompanies[0].name, // Legacy field (first company)
       leverageTeam: leverageTeamString,
       customerNames,
       customers,
       // For notes mode, use mainMeetingTakeaways as the transcript content
       transcript: contentType === "notes" ? (formData.mainMeetingTakeaways || '') : formData.transcript,
     };
-    
+
     // Only include optional fields if they have non-empty values
     if (!formData.supportingMaterials || formData.supportingMaterials.length === 0) {
       delete submissionData.supportingMaterials;
@@ -247,22 +306,34 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
     if (!formData.nextSteps?.trim()) {
       delete submissionData.nextSteps;
     }
-    
+
     onSubmit?.(submissionData);
   };
 
   return (
     <Card className="max-w-4xl mx-auto">
       <CardHeader>
+        {/**
+         * Dynamic UI Text (Task 6.3)
+         * 
+         * Adjust card title and description based on current product.
+         * For Partnerships, use partnership-specific language.
+         */}
         <CardTitle className="text-2xl font-semibold">
-          {contentType === "transcript" ? "Add New Transcript" : "Add Meeting Notes"}
+          {user?.currentProduct === "Partnerships"
+            ? (contentType === "transcript" ? "Add Partnership Meeting" : "Add Partnership Notes")
+            : (contentType === "transcript" ? "Add New Transcript" : "Add Meeting Notes")}
         </CardTitle>
         <CardDescription>
-          {contentType === "transcript" 
-            ? "Upload BD call transcript to extract product insights and customer questions"
-            : "Upload meeting notes from an onsite visit to extract product insights and customer questions"}
+          {user?.currentProduct === "Partnerships"
+            ? (contentType === "transcript"
+              ? "Upload partnership call transcript to extract insights and discussion points"
+              : "Upload partnership meeting notes to extract insights and discussion points")
+            : (contentType === "transcript"
+              ? "Upload BD call transcript to extract product insights and customer questions"
+              : "Upload meeting notes from an onsite visit to extract product insights and customer questions")}
         </CardDescription>
-        
+
         <div className="flex items-center space-x-4 pt-4 border-t mt-4">
           <div className="flex items-center space-x-3 flex-1">
             <div className={cn(
@@ -272,13 +343,13 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               <FileText className="h-4 w-4" />
               <span className="text-sm font-medium">Transcript</span>
             </div>
-            
+
             <Switch
               checked={contentType === "notes"}
               onCheckedChange={(checked) => setContentType(checked ? "notes" : "transcript")}
               data-testid="switch-content-type"
             />
-            
+
             <div className={cn(
               "flex items-center gap-2 px-3 py-2 rounded-md transition-colors",
               contentType === "notes" ? "bg-primary/10 text-primary" : "text-muted-foreground"
@@ -291,101 +362,117 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/**
+           * Multi-Company Selector (Task 6.1)
+           * 
+           * Replaced single company selector with multi-select that displays
+           * selected companies as badges with remove buttons.
+           */}
           <div className="space-y-2">
-            <Label data-testid="label-company-name">Company Name <span className="text-destructive">*</span></Label>
+            <Label data-testid="label-company-name">Company Name(s) <span className="text-destructive">*</span></Label>
             <Popover open={companySearchOpen} onOpenChange={setCompanySearchOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={companySearchOpen}
-                  className="w-full justify-between"
+                <div
+                  className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover:bg-accent"
                   data-testid="button-company-selector"
                 >
-                  {formData.companyName || "Select or enter company name..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
+                  {selectedCompanies.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedCompanies.map((company) => (
+                        <Badge
+                          key={company.id}
+                          variant="secondary"
+                          className="gap-1"
+                          data-testid={`badge-company-${company.id}`}
+                        >
+                          {company.name}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveCompany(company.id);
+                            }}
+                            className="ml-1 hover:text-destructive"
+                            data-testid={`button-remove-company-${company.id}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Select companies...</span>
+                  )}
+                </div>
               </PopoverTrigger>
               <PopoverContent className="w-full p-0" align="start">
                 <Command>
-                  <CommandInput 
-                    placeholder="Search or type new company..." 
-                    value={formData.companyName}
-                    onValueChange={(value) => setFormData({ ...formData, companyName: value })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        setCompanySearchOpen(false);
-                      }
-                    }}
+                  <CommandInput
+                    placeholder="Search companies..."
                     data-testid="input-company-search"
                   />
                   <CommandList>
-                    <CommandEmpty>
-                      Press Enter to use "{formData.companyName}"
-                    </CommandEmpty>
+                    <CommandEmpty>No companies found</CommandEmpty>
                     <CommandGroup>
-                      {companies.map((company) => (
-                        <CommandItem
-                          key={company.id}
-                          value={company.name}
-                          onSelect={() => {
-                            setFormData({ 
-                              ...formData, 
-                              companyName: company.name,
-                              companyDescription: company.companyDescription || '',
-                              numberOfStores: company.numberOfStores || '',
-                              serviceTags: company.serviceTags || []
-                            });
-                            setSelectedCompanyId(company.id);
-                            setCompanySearchOpen(false);
-                          }}
-                          data-testid={`option-company-${company.id}`}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              formData.companyName === company.name ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {company.name}
-                        </CommandItem>
-                      ))}
+                      {companies
+                        .filter(company => !selectedCompanies.some(c => c.id === company.id))
+                        .map((company) => (
+                          <CommandItem
+                            key={company.id}
+                            value={company.name}
+                            onSelect={() => handleAddCompany(company)}
+                            data-testid={`option-company-${company.id}`}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            {company.name}
+                          </CommandItem>
+                        ))}
                     </CommandGroup>
                   </CommandList>
                 </Command>
               </PopoverContent>
             </Popover>
             <p className="text-xs text-muted-foreground">
-              Select an existing company or type a new one
+              Select one or more companies for this meeting
             </p>
           </div>
 
+          {/**
+           * Required Fields (Task 6.2)
+           * 
+           * Meeting name and date are now mandatory fields with visual indicators.
+           */}
           <div className="space-y-2">
-            <Label htmlFor="meetingName" data-testid="label-meeting-name">Meeting Name</Label>
+            <Label htmlFor="meetingName" data-testid="label-meeting-name">
+              Meeting Name <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="meetingName"
               data-testid="input-meeting-name"
               placeholder="e.g., BD Intro Call, Weekly Customer Meeting, User Interview"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              required
             />
             <p className="text-xs text-muted-foreground">
-              Optional name to identify this transcript
+              Required name to identify this meeting
             </p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="meetingDate" data-testid="label-meeting-date">Meeting Date</Label>
+            <Label htmlFor="meetingDate" data-testid="label-meeting-date">
+              Meeting Date <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="meetingDate"
               type="date"
               data-testid="input-meeting-date"
               value={formData.meetingDate}
               onChange={(e) => setFormData({ ...formData, meetingDate: e.target.value })}
+              required
             />
             <p className="text-xs text-muted-foreground">
-              Optional date when the meeting took place
+              Required date when the meeting took place
             </p>
           </div>
 
@@ -409,7 +496,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               {contentType === "notes" ? "Meeting Notes" : "Main Meeting Takeaways"}
               {contentType === "notes" && <span className="text-destructive"> *</span>}
             </Label>
-            
+
             {contentType === "notes" ? (
               <Textarea
                 id="mainMeetingTakeaways"
@@ -460,7 +547,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
                   From URL
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="file" className="mt-2">
                 <div className="border-2 border-dashed rounded-md p-6 text-center space-y-3">
                   <Upload className="h-10 w-10 mx-auto text-muted-foreground" />
@@ -482,7 +569,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
                   </div>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="url" className="mt-2">
                 <div className="space-y-3">
                   <Input
@@ -509,8 +596,8 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               <div className="mt-3 space-y-2">
                 <p className="text-xs text-muted-foreground">Added materials:</p>
                 {formData.supportingMaterials.map((material, index) => (
-                  <div 
-                    key={index} 
+                  <div
+                    key={index}
                     className="p-3 bg-muted rounded-md flex items-start gap-2"
                     data-testid={`supporting-material-${index}`}
                   >
@@ -549,19 +636,19 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
 
           <div className="space-y-2">
             <Label data-testid="label-leverage-team">Leverege Team Members <span className="text-destructive">*</span></Label>
-            
+
             <Popover open={teamSearchOpen} onOpenChange={setTeamSearchOpen}>
               <PopoverTrigger asChild>
-                <div 
+                <div
                   className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm cursor-pointer hover-elevate"
                   data-testid="button-team-selector"
                 >
                   {teamMembers.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
                       {teamMembers.map((member) => (
-                        <Badge 
-                          key={member} 
-                          variant="secondary" 
+                        <Badge
+                          key={member}
+                          variant="secondary"
                           className="gap-1"
                           data-testid={`badge-team-${member.replace(/\s+/g, '-').toLowerCase()}`}
                         >
@@ -587,8 +674,8 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               </PopoverTrigger>
               <PopoverContent className="w-full p-0" align="start">
                 <Command>
-                  <CommandInput 
-                    placeholder="Search or type name..." 
+                  <CommandInput
+                    placeholder="Search or type name..."
                     value={teamSearchValue}
                     onValueChange={setTeamSearchValue}
                     onKeyDown={(e) => {
@@ -643,7 +730,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
                 </Command>
               </PopoverContent>
             </Popover>
-            
+
             <p className="text-xs text-muted-foreground">
               Select from the list or type a custom name
             </p>
@@ -651,7 +738,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
 
           <div className="space-y-3">
             <Label data-testid="label-customers">Customer Attendees <span className="text-destructive">*</span></Label>
-            
+
             <div className="border rounded-md p-4 space-y-3 bg-muted/30">
               <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,1fr,auto] gap-3 items-end">
                 <div>
@@ -740,8 +827,8 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0" align="start">
                   <Command>
-                    <CommandInput 
-                      placeholder="Search contacts..." 
+                    <CommandInput
+                      placeholder="Search contacts..."
                       data-testid="input-existing-contact-search"
                     />
                     <CommandList>
@@ -883,8 +970,10 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
             className="w-full"
             disabled={
               isSubmitting ||
-              customers.length === 0 || 
-              !formData.companyName.trim() || 
+              selectedCompanies.length === 0 ||
+              !formData.name?.trim() ||
+              !formData.meetingDate?.trim() ||
+              customers.length === 0 ||
               teamMembers.length === 0 ||
               (contentType === "transcript" && !formData.transcript.trim()) ||
               (contentType === "notes" && !formData.mainMeetingTakeaways?.trim())

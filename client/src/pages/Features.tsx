@@ -50,8 +50,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, ExternalLink, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, ExternalLink, Search, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
 
 type Feature = {
   id: string;
@@ -79,6 +88,18 @@ export default function Features() {
   const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
+  /**
+   * Empty State for Partnerships (Task 7.2)
+   * 
+   * Check if current product is Partnerships and show appropriate message.
+   * Features are not applicable to Partnerships product.
+   */
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const isPartnerships = user?.currentProduct === "Partnerships";
 
   const addForm = useForm<InsertFeature>({
     resolver: zodResolver(insertFeatureSchema),
@@ -118,7 +139,7 @@ export default function Features() {
     mutationFn: async (data: InsertFeature) => {
       const payload = {
         ...data,
-        releaseDate: data.releaseDate 
+        releaseDate: data.releaseDate
           ? (data.releaseDate instanceof Date ? data.releaseDate.toISOString() : data.releaseDate)
           : null,
       };
@@ -148,7 +169,7 @@ export default function Features() {
       const { id, ...updateData } = data;
       const payload = {
         ...updateData,
-        releaseDate: updateData.releaseDate 
+        releaseDate: updateData.releaseDate
           ? (updateData.releaseDate instanceof Date ? updateData.releaseDate.toISOString() : updateData.releaseDate)
           : null,
       };
@@ -248,22 +269,22 @@ export default function Features() {
 
   // Filter features based on search and category
   const filteredFeatures = features.filter((feature) => {
-    const matchesSearch = searchQuery === "" || 
+    const matchesSearch = searchQuery === "" ||
       feature.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (feature.description && feature.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (feature.value && feature.value.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesCategory = categoryFilter === "all" || 
+
+    const matchesCategory = categoryFilter === "all" ||
       (categoryFilter === "none" && !feature.categoryId) ||
       feature.categoryId === categoryFilter;
-    
+
     return matchesSearch && matchesCategory;
   });
 
   // Filter features released in the last 2 weeks
   const twoWeeksAgo = new Date();
   twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-  
+
   const recentlyReleasedFeatures = features.filter((feature) => {
     if (!feature.releaseDate) return false;
     const releaseDate = new Date(feature.releaseDate);
@@ -273,6 +294,25 @@ export default function Features() {
     const dateB = new Date(b.releaseDate!);
     return dateB.getTime() - dateA.getTime();
   });
+
+  /**
+   * Empty State for Partnerships (Task 7.2)
+   * 
+   * Show informative message when Features page is accessed under Partnerships product.
+   */
+  if (isPartnerships) {
+    return (
+      <div className="container mx-auto py-8 px-6">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Not Available for Partnerships</AlertTitle>
+          <AlertDescription>
+            Features are not applicable to the Partnerships product. This feature is designed for product-specific functionality tracking and is only available for PitCrew, AutoTrace, WorkWatch, and ExpressLane.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto py-8 px-6">
@@ -299,8 +339,8 @@ export default function Features() {
             <div className="space-y-2">
               {recentlyReleasedFeatures.map((feature) => (
                 <Link key={feature.id} href={`/features/${feature.id}`}>
-                  <div 
-                    className="flex items-center justify-between p-3 rounded-md hover-elevate cursor-pointer border" 
+                  <div
+                    className="flex items-center justify-between p-3 rounded-md hover-elevate cursor-pointer border"
                     data-testid={`recent-feature-${feature.id}`}
                   >
                     <div className="flex-1">
@@ -481,9 +521,9 @@ export default function Features() {
                   <FormItem>
                     <FormLabel>Name *</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Feature name" 
-                        {...field} 
+                      <Input
+                        placeholder="Feature name"
+                        {...field}
                         data-testid="input-feature-name"
                       />
                     </FormControl>
@@ -616,17 +656,17 @@ export default function Features() {
                 )}
               />
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsAddDialogOpen(false)} 
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddDialogOpen(false)}
                   data-testid="button-cancel-add"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={addMutation.isPending} 
+                <Button
+                  type="submit"
+                  disabled={addMutation.isPending}
                   data-testid="button-submit-add"
                 >
                   {addMutation.isPending ? "Adding..." : "Add Feature"}
@@ -655,9 +695,9 @@ export default function Features() {
                   <FormItem>
                     <FormLabel>Name *</FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Feature name" 
-                        {...field} 
+                      <Input
+                        placeholder="Feature name"
+                        {...field}
                         data-testid="input-edit-name"
                       />
                     </FormControl>
@@ -790,17 +830,17 @@ export default function Features() {
                 )}
               />
               <DialogFooter>
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setIsEditDialogOpen(false)} 
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
                   data-testid="button-cancel-edit"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={editMutation.isPending} 
+                <Button
+                  type="submit"
+                  disabled={editMutation.isPending}
                   data-testid="button-submit-edit"
                 >
                   {editMutation.isPending ? "Updating..." : "Update Feature"}

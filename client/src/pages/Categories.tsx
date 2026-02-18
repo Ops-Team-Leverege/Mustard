@@ -5,11 +5,32 @@ import CategoryAnalytics from "@/components/CategoryAnalytics";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
 
 export default function Categories() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+
+  /**
+   * Empty State for Partnerships (Task 7.2)
+   * 
+   * Check if current product is Partnerships and show appropriate message.
+   * Categories are not applicable to Partnerships product.
+   */
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const isPartnerships = user?.currentProduct === "Partnerships";
 
   const { data: categories = [], isLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -99,6 +120,25 @@ export default function Categories() {
     );
   }
 
+  /**
+   * Empty State for Partnerships (Task 7.2)
+   * 
+   * Show informative message when Categories page is accessed under Partnerships product.
+   */
+  if (isPartnerships) {
+    return (
+      <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Not Available for Partnerships</AlertTitle>
+          <AlertDescription>
+            Categories are not applicable to the Partnerships product. This feature is designed for product-specific insights and is only available for PitCrew, AutoTrace, WorkWatch, and ExpressLane.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   const filteredCategories = categories.filter(cat =>
     cat.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (cat.description && cat.description.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -107,7 +147,7 @@ export default function Categories() {
   return (
     <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
       <CategoryAnalytics categories={categories} />
-      
+
       <div className="mb-4 sm:mb-6">
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

@@ -9,12 +9,12 @@ import multer from "multer";
 import { createMCP } from "./mcp";
 import type { MCPContext } from "./mcp/types";
 import { handleZendeskWebhook, verifyZendeskWebhook } from "./zendesk/webhook";
-import { 
-  handleAirtableWebhook, 
+import {
+  handleAirtableWebhook,
   handleAirtableRefresh,
-  verifyAirtableWebhook, 
-  getProductFeaturesFormatted, 
-  getProductValuePropositionsFormatted, 
+  verifyAirtableWebhook,
+  getProductFeaturesFormatted,
+  getProductValuePropositionsFormatted,
   searchProductKnowledge,
   listTables,
   discoverSchema,
@@ -88,25 +88,25 @@ async function extractActionItemsForTranscript(
   product: Product,
 ): Promise<void> {
   console.log(`[ActionItems] Starting extraction for transcript ${transcriptId}`);
-  
+
   // Get transcript chunks (up to 5000 for full coverage)
   const chunks = await storage.getChunksForTranscript(transcriptId, 5000);
-  
+
   if (chunks.length === 0) {
     console.log(`[ActionItems] No chunks found for transcript ${transcriptId}, skipping`);
     return;
   }
-  
+
   // Idempotent: Clear any existing action items from previous runs
   await storage.deleteMeetingActionItemsByTranscript(transcriptId);
-  
+
   // Get transcript for companyId and speaker info
   const transcript = await storage.getTranscript(product, transcriptId);
   if (!transcript) {
     console.log(`[ActionItems] Transcript ${transcriptId} not found, skipping`);
     return;
   }
-  
+
   // Map to composer format
   const composerChunks: ComposerChunk[] = chunks.map(c => ({
     chunkIndex: c.chunkIndex,
@@ -114,20 +114,20 @@ async function extractActionItemsForTranscript(
     speakerName: c.speakerName || undefined,
     text: c.content,
   }));
-  
+
   // Extract action items using the RAG composer
   const { primary, secondary } = await extractMeetingActionStates(composerChunks, {
     leverageTeam: transcript.leverageTeam || undefined,
     customerNames: transcript.customerNames || undefined,
   });
-  
+
   const allItems = [...primary, ...secondary];
-  
+
   if (allItems.length === 0) {
     console.log(`[ActionItems] Extraction complete for transcript ${transcriptId}: 0 items found (success=true)`);
     return;
   }
-  
+
   // Save to database
   await storage.createMeetingActionItems(
     allItems.map((item, index) => ({
@@ -143,7 +143,7 @@ async function extractActionItemsForTranscript(
       isPrimary: index < primary.length, // First N items are primary
     })),
   );
-  
+
   console.log(`[ActionItems] Extraction complete for transcript ${transcriptId}: ${allItems.length} items (${primary.length} primary, ${secondary.length} secondary) (success=true)`);
 }
 
@@ -219,21 +219,21 @@ async function processTranscriptInBackground(
     // Parse customer names and leverage team from transcript (with null/undefined guards)
     const leverageTeam = transcript.leverageTeam
       ? transcript.leverageTeam
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s)
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s)
       : [];
     const customerNamesList = transcript.customerNames
       ? transcript.customerNames
-          .split(",")
-          .map((s) => s.trim())
-          .filter((s) => s)
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s) => s)
       : [];
 
     // Determine content to analyze based on type (fallback to "transcript" if undefined)
     const contentType: "transcript" | "notes" =
       transcript.contentType === "notes" ||
-      transcript.contentType === "transcript"
+        transcript.contentType === "transcript"
         ? transcript.contentType
         : "transcript";
     const contentToAnalyze =
@@ -256,22 +256,34 @@ async function processTranscriptInBackground(
       contentType,
     });
 
-    // Save insights with companyId
-    await storage.updateProcessingStep(transcriptId, "extracting_insights");
-    await storage.createProductInsights(
-      analysis.insights.map((insight) => ({
-        transcriptId: transcript.id,
-        feature: insight.feature,
-        context: insight.context,
-        quote: insight.quote,
-        company: company.name,
-        companyId: company.id,
-        categoryId: insight.categoryId,
-        product,
-      })),
-    );
+    /**
+     * Conditional Product Insights Extraction (Task 8.1)
+     * 
+     * For Partnerships product, skip saving product insights since they are not applicable.
+     * Partnerships focuses on partnership discussions rather than product-specific features.
+     * Q&A pairs are still extracted as they apply to all products.
+     */
+    if (product !== "Partnerships") {
+      // Save insights with companyId (only for non-Partnerships products)
+      await storage.updateProcessingStep(transcriptId, "extracting_insights");
+      await storage.createProductInsights(
+        analysis.insights.map((insight) => ({
+          transcriptId: transcript.id,
+          feature: insight.feature,
+          context: insight.context,
+          quote: insight.quote,
+          company: company.name,
+          companyId: company.id,
+          categoryId: insight.categoryId,
+          product,
+        })),
+      );
+      console.log(`Extracted ${analysis.insights.length} product insights for ${product}`);
+    } else {
+      console.log(`Skipping product insights extraction for Partnerships product`);
+    }
 
-    // Save Q&A pairs with companyId and matched contactId
+    // Save Q&A pairs with companyId and matched contactId (applies to all products)
     await storage.updateProcessingStep(transcriptId, "extracting_qa");
     await storage.createQAPairs(
       analysis.qaPairs.map((qa) => {
@@ -324,7 +336,7 @@ async function processTranscriptInBackground(
     // Chunk transcript for RAG/MCP queries (non-blocking, fire-and-forget)
     ingestTranscriptChunks({ transcriptId }).then(async (result) => {
       console.log(`Chunked transcript ${transcriptId}: ${result.chunksPrepared} chunks created`);
-      
+
       // Meeting Action Items Extraction (Read-only Artifact, Materialized)
       // Runs AFTER chunking, fails independently, retryable
       try {
@@ -370,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Note: Slack routes are registered in index.ts BEFORE express.json() to preserve raw body
-  
+
   const mcpContext: MCPContext = {
     db: {
       query: async (sql: string, params?: any[]) => {
@@ -453,6 +465,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (body.createdAt && typeof body.createdAt === "string") {
         body.createdAt = new Date(body.createdAt);
       }
+      // Convert meetingDate string to Date if provided
+      if (body.meetingDate && typeof body.meetingDate === "string") {
+        body.meetingDate = new Date(body.meetingDate);
+      }
 
       const validatedData = insertTranscriptSchema.parse(body);
       const data = validatedData as typeof validatedData & {
@@ -461,35 +477,129 @@ export async function registerRoutes(app: Express): Promise<Server> {
           nameInTranscript?: string;
           jobTitle?: string;
         }>;
+        companyIds?: string[];
+        serviceTags?: string[];
       };
 
-      // Find or create company - check by name first to prevent duplicates
-      let company = await storage.getCompanyByName(product, data.companyName);
+      /**
+       * Multi-Company Support (Task 4.1)
+       * 
+       * Handle both new multi-company approach (companyIds array) and legacy single-company approach (companyName).
+       * This maintains backward compatibility while enabling transcripts to be associated with multiple companies.
+       */
+      const companies: Array<{ id: string; name: string; slug: string }> = [];
 
-      if (!company) {
-        // Generate slug and create company
-        const slug = generateSlug(data.companyName);
-        company = await storage.createCompany({
-          name: data.companyName,
-          slug,
-          notes: null,
-          companyDescription: data.companyDescription || null,
-          numberOfStores: data.numberOfStores || null,
-          product,
+      if (data.companyIds && data.companyIds.length > 0) {
+        // New approach: Use companyIds array for multi-company support
+        for (const companyId of data.companyIds) {
+          const company = await storage.getCompanyById(companyId);
+          if (company) {
+            companies.push({
+              id: company.id,
+              name: company.name,
+              slug: company.slug,
+            });
+          }
+        }
+
+        if (companies.length === 0) {
+          throw new ValidationError("No valid companies found for provided companyIds");
+        }
+      } else if (data.companyName) {
+        // Legacy approach: Single company by name (backward compatibility)
+        let company = await storage.getCompanyByName(product, data.companyName);
+
+        if (!company) {
+          // Generate slug and create company
+          const slug = generateSlug(data.companyName);
+          company = await storage.createCompany({
+            name: data.companyName,
+            slug,
+            notes: null,
+            companyDescription: data.companyDescription || null,
+            numberOfStores: data.numberOfStores || null,
+            product,
+          });
+        }
+
+        companies.push({
+          id: company.id,
+          name: company.name,
+          slug: company.slug,
         });
+      } else {
+        throw new ValidationError("Either companyIds or companyName must be provided");
       }
+
+      // Use first company as primary for legacy companyId field (backward compatibility)
+      const primaryCompany = companies[0];
 
       // Create transcript immediately with "pending" status
       const transcript = await storage.createTranscript({
         ...data,
-        companyId: company.id,
+        companyId: primaryCompany.id, // Legacy field for backward compatibility
         product,
       });
 
-      // Get all existing contacts for this company first
+      /**
+       * Junction Table Associations (Task 4.1)
+       * 
+       * Create transcript_companies junction table entries for all associated companies.
+       * This enables many-to-many relationship between transcripts and companies.
+       */
+      for (const company of companies) {
+        await storage.createTranscriptCompanyAssociation({
+          transcriptId: transcript.id,
+          companyId: company.id,
+        });
+
+        /**
+         * Service Tags Synchronization (Task 4.2 - BUG FIX)
+         * 
+         * CRITICAL: This fixes the bug where service tags were collected in the form
+         * but never synced to the company.serviceTags field. Now when a transcript
+         * is created with service tags, those tags are merged with the company's
+         * existing tags (with deduplication) and persisted to the company record.
+         */
+        if (data.serviceTags && data.serviceTags.length > 0) {
+          const fullCompany = await storage.getCompanyById(company.id);
+          if (fullCompany) {
+            const existingTags = fullCompany.serviceTags || [];
+            // Merge new tags with existing tags and remove duplicates
+            const mergedTags = Array.from(new Set([...existingTags, ...data.serviceTags]));
+
+            await storage.updateCompany(
+              company.id,
+              fullCompany.name,
+              fullCompany.notes,
+              fullCompany.companyDescription,
+              fullCompany.numberOfStores,
+              fullCompany.stage,
+              fullCompany.pilotStartDate,
+              mergedTags,
+            );
+
+            console.log(
+              `Service tags synced for company ${company.name}: ${mergedTags.length} total tags (${data.serviceTags.length} new, ${existingTags.length} existing)`,
+            );
+          }
+        }
+
+        /**
+         * Automatic Company-Product Association (Task 4.3)
+         * 
+         * Automatically create company_products junction table entry to associate
+         * the company with the current product. This ensures the company appears
+         * when filtering by this product, even if it was originally created for
+         * a different product. Idempotent - safe to call multiple times.
+         */
+        await storage.ensureCompanyProductAssociation(company.id, product);
+      }
+
+      // Get all existing contacts for primary company first
       const existingContacts = await storage.getContactsByCompany(
         product,
-        company.id,
+        primaryCompany.id,
       );
 
       // Create or reuse contact records from validated customers array
@@ -522,7 +632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               name: customer.name,
               nameInTranscript: customer.nameInTranscript || null,
               jobTitle: customer.jobTitle || null,
-              companyId: company.id,
+              companyId: primaryCompany.id,
               product,
             });
             contacts.push(contact);
@@ -543,11 +653,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(202).json({
         transcript,
         contacts,
-        company: {
-          id: company.id,
-          name: company.name,
-          slug: company.slug,
-        },
+        companies, // Return all associated companies (new multi-company support)
+        company: primaryCompany, // Keep for backward compatibility
       });
     } catch (error) {
       handleRouteError(res, error, "POST /api/transcripts");
@@ -1319,10 +1426,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Companies
+  /**
+   * GET /api/companies - Multi-Product Support (Task 9.1)
+   * 
+   * Updated to use getCompaniesByProduct() which implements dual-query strategy.
+   * This queries both the legacy companies.product field AND the company_products
+   * junction table to ensure backward compatibility with existing data.
+   */
   app.get("/api/companies", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
-      const companies = await storage.getCompanies(product);
+      const companies = await storage.getCompaniesByProduct(product);
       res.json(companies);
     } catch (error) {
       handleRouteError(res, error, "GET /api/companies");
@@ -1639,20 +1753,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ==========================================
   // EXTERNAL API - API Key Authentication
   // ==========================================
-  
+
   // Middleware to validate API key
   const validateApiKey = (req: any, res: any, next: any) => {
     const apiKey = req.headers['x-api-key'];
     const expectedKey = process.env.EXTERNAL_API_KEY;
-    
+
     if (!expectedKey) {
       return res.status(503).json({ error: "External API not configured" });
     }
-    
+
     if (!apiKey || apiKey !== expectedKey) {
       return res.status(401).json({ error: "Invalid or missing API key" });
     }
-    
+
     next();
   };
 
@@ -1676,14 +1790,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const status = req.query.status as string | undefined;
       const limit = Math.min(parseInt(req.query.limit as string) || 100, 500);
       const offset = parseInt(req.query.offset as string) || 0;
-      
+
       let transcripts = await storage.getTranscripts(product);
-      
+
       // Filter by companyId if provided
       if (companyId) {
         transcripts = transcripts.filter(t => t.companyId === companyId);
       }
-      
+
       // Filter by companyName if provided (need to fetch companies first)
       if (companyName) {
         const companies = await storage.getCompanies(product);
@@ -1694,16 +1808,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         transcripts = transcripts.filter(t => t.companyId && matchingCompanyIds.has(t.companyId));
       }
-      
+
       // Filter by status if provided
       if (status) {
         transcripts = transcripts.filter(t => t.processingStatus === status);
       }
-      
+
       // Apply pagination
       const total = transcripts.length;
       transcripts = transcripts.slice(offset, offset + limit);
-      
+
       res.json({
         success: true,
         total,
@@ -1726,13 +1840,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!product) {
         throw new ValidationError(`Invalid product. Must be one of: ${PRODUCTS.join(", ")}`);
       }
-      
+
       const transcript = await storage.getTranscript(product, id);
-      
+
       if (!transcript) {
         throw new NotFoundError("Transcript");
       }
-      
+
       // Fetch all related data
       const [insights, qaPairs, actionItems, chunks, company] = await Promise.all([
         storage.getProductInsightsByTranscript(product, id),
@@ -1741,7 +1855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getChunksForTranscript(id, 1000),
         transcript.companyId ? storage.getCompany(product, transcript.companyId) : Promise.resolve(undefined),
       ]);
-      
+
       res.json({
         success: true,
         transcript,
@@ -1760,7 +1874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       handleRouteError(res, error, "GET /api/external/transcripts/:id", { includeSuccessField: true });
     }
   });
-  
+
   // ===== AIRTABLE INTEGRATION =====
 
   // Webhook endpoint for Airtable updates (cache invalidation)
@@ -1820,12 +1934,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         throw new ValidationError("Missing query parameter 'q'");
       }
       const results = await searchProductKnowledge(query);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         query,
         featuresCount: results.features.length,
         valuePropositionsCount: results.valuePropositions.length,
-        ...results 
+        ...results
       });
     } catch (error) {
       handleRouteError(res, error, "GET /api/airtable/search", { includeSuccessField: true });
@@ -1874,8 +1988,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const results = await searchAllTables(query);
       const totalMatches = results.reduce((sum, r) => sum + r.matches.length, 0);
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         query,
         tablesSearched: results.length,
         totalMatches,
@@ -1885,7 +1999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       handleRouteError(res, error, "GET /api/airtable/search-all", { includeSuccessField: true });
     }
   });
-  
+
   const httpServer = createServer(app);
 
   return httpServer;

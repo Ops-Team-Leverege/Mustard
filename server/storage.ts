@@ -54,6 +54,8 @@ import {
   promptVersions as promptVersionsTable,
   interactionFeedback as interactionFeedbackTable,
   meetingActionItems as meetingActionItemsTable,
+  transcriptCompanies as transcriptCompaniesTable,
+  companyProducts as companyProductsTable,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -181,6 +183,41 @@ export interface IStorage {
   getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
   createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]>;
   deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean>;
+
+  // Junction Table Methods (for multi-company and multi-product support)
+  // These methods enable many-to-many relationships while maintaining backward compatibility
+
+  /**
+   * Create a transcript-company association in the junction table
+   * Used when creating transcripts with multiple companies
+   */
+  createTranscriptCompanyAssociation(data: { transcriptId: string; companyId: string }): Promise<void>;
+
+  /**
+   * Get all companies associated with a transcript (via junction table)
+   * Returns companies linked through the transcript_companies junction table
+   */
+  getCompaniesByTranscript(transcriptId: string): Promise<Company[]>;
+
+  /**
+   * Ensure a company-product association exists in the junction table
+   * Idempotent - safe to call multiple times for the same association
+   * Used to automatically associate companies with products when transcripts are created
+   */
+  ensureCompanyProductAssociation(companyId: string, product: Product): Promise<void>;
+
+  /**
+   * Get all companies for a product using dual-query strategy
+   * Queries both legacy companies.product field AND company_products junction table
+   * This ensures backward compatibility with existing data
+   */
+  getCompaniesByProduct(product: Product): Promise<Company[]>;
+
+  /**
+   * Get a company by ID (helper method for junction table operations)
+   * Product-agnostic lookup used internally by junction table methods
+   */
+  getCompanyById(id: string): Promise<Company | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -1230,6 +1267,37 @@ export class MemStorage implements IStorage {
   async deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean> {
     throw new Error("MemStorage not supported for Meeting Action Items");
   }
+
+  // Junction Table Methods (for multi-company and multi-product support)
+  async createTranscriptCompanyAssociation(data: { transcriptId: string; companyId: string }): Promise<void> {
+    // MemStorage doesn't need junction tables since it uses in-memory maps
+    // The association is already handled by transcript.companyId
+    return Promise.resolve();
+  }
+
+  async getCompaniesByTranscript(transcriptId: string): Promise<Company[]> {
+    const transcript = this.transcripts.get(transcriptId);
+    if (!transcript || !transcript.companyId) return [];
+
+    const company = this.companies.get(transcript.companyId);
+    return company ? [company] : [];
+  }
+
+  async ensureCompanyProductAssociation(companyId: string, product: Product): Promise<void> {
+    // MemStorage doesn't need junction tables
+    // The association is already handled by company.product
+    return Promise.resolve();
+  }
+
+  async getCompaniesByProduct(product: Product): Promise<Company[]> {
+    return Array.from(this.companies.values())
+      .filter(c => c.product === product)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async getCompanyById(id: string): Promise<Company | undefined> {
+    return this.companies.get(id);
+  }
 }
 
 export class DbStorage implements IStorage {
@@ -1294,13 +1362,68 @@ export class DbStorage implements IStorage {
     return results[0];
   }
 
+  /**
+   * Get transcripts by company using dual-query strategy
+   * Queries both legacy transcripts.companyId field AND transcript_companies junction table
+   * This ensures backward compatibility with existing data
+   */
   async getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]> {
-    const results = await this.db
+    // Query 1: Legacy field (transcripts.companyId)
+    const legacyResults = await this.db
       .select()
       .from(transcriptsTable)
       .where(and(eq(transcriptsTable.product, product), eq(transcriptsTable.companyId, companyId)))
       .orderBy(transcriptsTable.createdAt);
-    return results;
+
+    // Query 2: Junction table (transcript_companies)
+    const junctionResults = await this.db
+      .select({
+        id: transcriptsTable.id,
+        product: transcriptsTable.product,
+        name: transcriptsTable.name,
+        companyName: transcriptsTable.companyName,
+        companyId: transcriptsTable.companyId,
+        contentType: transcriptsTable.contentType,
+        transcript: transcriptsTable.transcript,
+        supportingMaterials: transcriptsTable.supportingMaterials,
+        leverageTeam: transcriptsTable.leverageTeam,
+        customerNames: transcriptsTable.customerNames,
+        companyDescription: transcriptsTable.companyDescription,
+        numberOfStores: transcriptsTable.numberOfStores,
+        contactJobTitle: transcriptsTable.contactJobTitle,
+        mainInterestAreas: transcriptsTable.mainInterestAreas,
+        mainMeetingTakeaways: transcriptsTable.mainMeetingTakeaways,
+        nextSteps: transcriptsTable.nextSteps,
+        processingStatus: transcriptsTable.processingStatus,
+        processingStep: transcriptsTable.processingStep,
+        processingStartedAt: transcriptsTable.processingStartedAt,
+        processingCompletedAt: transcriptsTable.processingCompletedAt,
+        processingError: transcriptsTable.processingError,
+        meetingDate: transcriptsTable.meetingDate,
+        createdAt: transcriptsTable.createdAt,
+      })
+      .from(transcriptCompaniesTable)
+      .innerJoin(transcriptsTable, eq(transcriptCompaniesTable.transcriptId, transcriptsTable.id))
+      .where(and(
+        eq(transcriptsTable.product, product),
+        eq(transcriptCompaniesTable.companyId, companyId)
+      ))
+      .orderBy(transcriptsTable.createdAt);
+
+    // Merge and deduplicate by transcript ID
+    const transcriptMap = new Map<string, Transcript>();
+
+    for (const transcript of legacyResults) {
+      transcriptMap.set(transcript.id, transcript);
+    }
+
+    for (const transcript of junctionResults) {
+      transcriptMap.set(transcript.id, transcript);
+    }
+
+    // Return sorted by createdAt
+    return Array.from(transcriptMap.values())
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   }
 
   async updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined> {
@@ -2712,6 +2835,129 @@ export class DbStorage implements IStorage {
       .where(eq(meetingActionItemsTable.transcriptId, transcriptId))
       .returning();
     return results.length > 0;
+  }
+
+  // Junction Table Methods (for multi-company and multi-product support)
+
+  /**
+   * Create a transcript-company association in the junction table
+   * Idempotent - uses ON CONFLICT DO NOTHING to safely handle duplicates
+   */
+  async createTranscriptCompanyAssociation(data: { transcriptId: string; companyId: string }): Promise<void> {
+    await this.db
+      .insert(transcriptCompaniesTable)
+      .values({
+        transcriptId: data.transcriptId,
+        companyId: data.companyId,
+      })
+      .onConflictDoNothing();
+  }
+
+  /**
+   * Get all companies associated with a transcript via junction table
+   * Returns companies linked through the transcript_companies junction table
+   */
+  async getCompaniesByTranscript(transcriptId: string): Promise<Company[]> {
+    const results = await this.db
+      .select({
+        id: companiesTable.id,
+        product: companiesTable.product,
+        name: companiesTable.name,
+        slug: companiesTable.slug,
+        notes: companiesTable.notes,
+        companyDescription: companiesTable.companyDescription,
+        numberOfStores: companiesTable.numberOfStores,
+        stage: companiesTable.stage,
+        pilotStartDate: companiesTable.pilotStartDate,
+        serviceTags: companiesTable.serviceTags,
+        createdAt: companiesTable.createdAt,
+      })
+      .from(transcriptCompaniesTable)
+      .innerJoin(companiesTable, eq(transcriptCompaniesTable.companyId, companiesTable.id))
+      .where(eq(transcriptCompaniesTable.transcriptId, transcriptId));
+
+    return results;
+  }
+
+  /**
+   * Ensure a company-product association exists in the junction table
+   * Idempotent - uses ON CONFLICT DO NOTHING to safely handle duplicates
+   * Used to automatically associate companies with products when transcripts are created
+   */
+  async ensureCompanyProductAssociation(companyId: string, product: Product): Promise<void> {
+    await this.db
+      .insert(companyProductsTable)
+      .values({
+        companyId,
+        product,
+      })
+      .onConflictDoNothing();
+  }
+
+  /**
+   * Get all companies for a product using dual-query strategy
+   * Queries both legacy companies.product field AND company_products junction table
+   * This ensures backward compatibility with existing data
+   * 
+   * Strategy:
+   * 1. Get companies where legacy product field matches
+   * 2. Get companies via junction table where product matches
+   * 3. Merge and deduplicate by company ID
+   */
+  async getCompaniesByProduct(product: Product): Promise<Company[]> {
+    // Query 1: Legacy field (companies.product)
+    const legacyResults = await this.db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.product, product));
+
+    // Query 2: Junction table (company_products)
+    const junctionResults = await this.db
+      .select({
+        id: companiesTable.id,
+        product: companiesTable.product,
+        name: companiesTable.name,
+        slug: companiesTable.slug,
+        notes: companiesTable.notes,
+        companyDescription: companiesTable.companyDescription,
+        numberOfStores: companiesTable.numberOfStores,
+        stage: companiesTable.stage,
+        pilotStartDate: companiesTable.pilotStartDate,
+        serviceTags: companiesTable.serviceTags,
+        createdAt: companiesTable.createdAt,
+      })
+      .from(companyProductsTable)
+      .innerJoin(companiesTable, eq(companyProductsTable.companyId, companiesTable.id))
+      .where(eq(companyProductsTable.product, product));
+
+    // Merge and deduplicate by company ID
+    const companyMap = new Map<string, Company>();
+
+    for (const company of legacyResults) {
+      companyMap.set(company.id, company);
+    }
+
+    for (const company of junctionResults) {
+      companyMap.set(company.id, company);
+    }
+
+    // Return sorted by name
+    return Array.from(companyMap.values())
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Get a company by ID (product-agnostic lookup)
+   * Helper method for junction table operations
+   */
+  async getCompanyById(id: string): Promise<Company | undefined> {
+    const results = await this.db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.id, id))
+      .limit(1);
+
+    return results[0];
   }
 }
 

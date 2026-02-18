@@ -16,7 +16,10 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Product types
-export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane"] as const;
+// Partnerships is a special product type for partnership meetings
+// It follows the same data model as other products but has adjusted UI language
+// and skips product-specific features like insights extraction
+export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane", "Partnerships"] as const;
 export type Product = typeof PRODUCTS[number];
 
 const PRODUCT_LOOKUP = new Map(PRODUCTS.map(p => [p.toLowerCase(), p]));
@@ -176,6 +179,34 @@ export const posSystemCompanies = pgTable("pos_system_companies", {
   companyId: varchar("company_id").notNull(),
 });
 
+// Junction table for many-to-many relationship between transcripts and companies
+// Enables multi-company meeting support while maintaining backward compatibility
+// with the legacy transcripts.companyId field
+export const transcriptCompanies = pgTable("transcript_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  transcriptId: varchar("transcript_id").notNull(),
+  companyId: varchar("company_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("transcript_companies_transcript_idx").on(table.transcriptId),
+  index("transcript_companies_company_idx").on(table.companyId),
+  uniqueIndex("transcript_companies_unique").on(table.transcriptId, table.companyId),
+]);
+
+// Junction table for many-to-many relationship between companies and products
+// Enables multi-product company support while maintaining backward compatibility
+// with the legacy companies.product field
+export const companyProducts = pgTable("company_products", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull(),
+  product: text("product").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("company_products_company_idx").on(table.companyId),
+  index("company_products_product_idx").on(table.product),
+  uniqueIndex("company_products_unique").on(table.companyId, table.product),
+]);
+
 export const transcriptChunks = pgTable("transcript_chunks", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   transcriptId: varchar("transcript_id").notNull(),
@@ -232,6 +263,22 @@ const customerSchema = z.object({
   jobTitle: z.string().optional(),
 });
 
+/**
+ * Validation schema for transcript creation
+ * 
+ * Required fields:
+ * - name: Meeting name (now mandatory for better organization)
+ * - meetingDate: Date of the meeting (now mandatory for reporting)
+ * - customers: At least one customer attendee
+ * - transcript OR mainMeetingTakeaways (depending on contentType)
+ * 
+ * Multi-company support:
+ * - companyIds: Array of company IDs (new multi-company approach)
+ * - companyName: Single company name (legacy, kept for backward compatibility)
+ * 
+ * Form-only fields (not stored in transcripts table):
+ * - serviceTags: Service tags to sync to company record
+ */
 export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   id: true,
   processingStatus: true,
@@ -241,6 +288,8 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   processingError: true,
 }).extend({
   product: z.enum(PRODUCTS).default("PitCrew"),
+  name: z.string().min(1, "Meeting name is required"), // NOW REQUIRED
+  meetingDate: z.string().min(1, "Meeting date is required"), // NOW REQUIRED
   contentType: z.enum(["transcript", "notes"]).default("transcript"),
   transcript: z.string().optional(),
   mainMeetingTakeaways: z.string().optional(),
@@ -249,7 +298,10 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   customers: z.array(customerSchema).min(1, "At least one customer is required"),
   // Form-only fields (not stored in transcripts table, but sent by frontend)
   serviceTags: z.array(z.string()).optional(),
-  meetingDate: z.string().optional(),
+  // Multi-company support (new approach)
+  companyIds: z.array(z.string()).min(1, "At least one company is required").optional(),
+  // Keep companyName for backward compatibility
+  companyName: z.string().optional(),
 }).refine(
   (data) => {
     // If contentType is "transcript", transcript field must be provided
@@ -265,6 +317,15 @@ export const insertTranscriptSchema = createInsertSchema(transcripts).omit({
   {
     message: "Transcript content is required when content type is 'transcript', and meeting notes are required when content type is 'notes'",
     path: ["transcript"],
+  }
+).refine(
+  (data) => {
+    // Either companyIds or companyName must be provided
+    return (data.companyIds && data.companyIds.length > 0) || (data.companyName && data.companyName.trim().length > 0);
+  },
+  {
+    message: "Either companyIds or companyName must be provided",
+    path: ["companyIds"],
   }
 );
 

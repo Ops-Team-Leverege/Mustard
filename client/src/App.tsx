@@ -1,6 +1,6 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import TabNavigation from "@/components/TabNavigation";
@@ -26,18 +26,30 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import mustardLogo from "@assets/ChatGPT Image Oct 17, 2025, 01_05_54 PM_1760720789936.png";
 import { useToast } from "@/hooks/use-toast";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const tabs = [
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: Product;
+}
+
+/**
+ * Base tabs configuration
+ * This will be filtered based on the current product
+ */
+const baseTabs = [
   { id: 'input', label: 'Add Transcript', path: '/' },
   { id: 'latest', label: 'Latest', path: '/latest' },
   { id: 'companies', label: 'Companies', path: '/companies' },
   { id: 'categories', label: 'Categories', path: '/categories' },
   { id: 'features', label: 'Features', path: '/features' },
-  { 
-    id: 'databases', 
-    label: 'Databases', 
+  {
+    id: 'databases',
+    label: 'Databases',
     items: [
       { id: 'insights', label: 'Product Insights', path: '/insights' },
       { id: 'qa', label: 'Q&A Database', path: '/qa' },
@@ -47,16 +59,16 @@ const tabs = [
   },
 ];
 
-function ProtectedRoute({ 
-  component: Component, 
-  isAuthenticated, 
-  isLoading, 
-  isDomainRestricted 
-}: { 
-  component: any; 
-  isAuthenticated: boolean | null; 
-  isLoading: boolean; 
-  isDomainRestricted: boolean; 
+function ProtectedRoute({
+  component: Component,
+  isAuthenticated,
+  isLoading,
+  isDomainRestricted
+}: {
+  component: any;
+  isAuthenticated: boolean | null;
+  isLoading: boolean;
+  isDomainRestricted: boolean;
 }) {
   if (isLoading || !isAuthenticated || isDomainRestricted) {
     return <Landing />;
@@ -67,111 +79,111 @@ function ProtectedRoute({
 
 function Router() {
   const { isAuthenticated, isLoading, error } = useAuth();
-  
-  const isDomainRestricted = Boolean(error && 
+
+  const isDomainRestricted = Boolean(error &&
     (String(error).includes('403') || String(error).includes('DOMAIN_RESTRICTED')));
 
   return (
     <Switch>
       <Route path="/">
-        <ProtectedRoute 
-          component={TranscriptInput} 
+        <ProtectedRoute
+          component={TranscriptInput}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/transcripts">
-        <ProtectedRoute 
-          component={Transcripts} 
+        <ProtectedRoute
+          component={Transcripts}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/latest">
-        <ProtectedRoute 
-          component={Latest} 
+        <ProtectedRoute
+          component={Latest}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/insights">
-        <ProtectedRoute 
-          component={ProductInsights} 
+        <ProtectedRoute
+          component={ProductInsights}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/qa">
-        <ProtectedRoute 
-          component={QADatabase} 
+        <ProtectedRoute
+          component={QADatabase}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/companies">
-        <ProtectedRoute 
-          component={Companies} 
+        <ProtectedRoute
+          component={Companies}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/companies/:slug">
-        <ProtectedRoute 
-          component={CompanyPage} 
+        <ProtectedRoute
+          component={CompanyPage}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/categories">
-        <ProtectedRoute 
-          component={Categories} 
+        <ProtectedRoute
+          component={Categories}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/categories/:id">
-        <ProtectedRoute 
-          component={CategoryPage} 
+        <ProtectedRoute
+          component={CategoryPage}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/features">
-        <ProtectedRoute 
-          component={Features} 
+        <ProtectedRoute
+          component={Features}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/features/:id">
-        <ProtectedRoute 
-          component={FeatureDetail} 
+        <ProtectedRoute
+          component={FeatureDetail}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/pos-systems">
-        <ProtectedRoute 
-          component={POSSystems} 
+        <ProtectedRoute
+          component={POSSystems}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
         />
       </Route>
       <Route path="/transcripts/:id">
-        <ProtectedRoute 
-          component={TranscriptDetailPage} 
+        <ProtectedRoute
+          component={TranscriptDetailPage}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
@@ -190,21 +202,70 @@ function AuthenticatedApp() {
   const hasShownError = useRef(false);
   const [showLogoDialog, setShowLogoDialog] = useState(false);
 
+  /**
+   * Conditional Navigation (Task 7.1)
+   * 
+   * Get current user and product to filter tabs based on product.
+   * For Partnerships, hide Categories, Features, and Product Insights.
+   */
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+    enabled: isAuthenticated === true,
+  });
+
+  const isPartnerships = user?.currentProduct === "Partnerships";
+
+  /**
+   * Filter tabs based on current product (Task 7.1)
+   * 
+   * For Partnerships:
+   * - Hide "Categories" tab
+   * - Hide "Features" tab
+   * - Hide "Product Insights" in Databases dropdown
+   */
+  const filteredTabs = useMemo(() => {
+    if (!isPartnerships) {
+      return baseTabs;
+    }
+
+    return baseTabs
+      .filter(tab => {
+        // Hide Categories and Features tabs for Partnerships
+        if (tab.id === 'categories' || tab.id === 'features') {
+          return false;
+        }
+        return true;
+      })
+      .map(tab => {
+        // Filter Databases dropdown items for Partnerships
+        if (tab.id === 'databases' && tab.items) {
+          return {
+            ...tab,
+            items: tab.items.filter(item => {
+              // Hide Product Insights for Partnerships
+              return item.id !== 'insights';
+            }),
+          };
+        }
+        return tab;
+      });
+  }, [isPartnerships]);
+
   useEffect(() => {
     if (error && !hasShownError.current) {
       const errorMessage = (error as any)?.message || String(error);
-      
+
       if (errorMessage.includes('403') || errorMessage.includes('DOMAIN_RESTRICTED')) {
         hasShownError.current = true;
-        
+
         queryClient.clear();
-        
+
         toast({
           title: "Access Denied",
           description: "Only leverege.com email addresses are allowed to access this application.",
           variant: "destructive",
         });
-        
+
         setTimeout(() => {
           window.location.href = '/api/logout';
         }, 2000);
@@ -219,7 +280,7 @@ function AuthenticatedApp() {
           <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="container mx-auto px-6 h-16 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <button 
+                <button
                   onClick={() => setShowLogoDialog(true)}
                   className="hover-elevate active-elevate-2 transition-transform rounded-md overflow-visible"
                   data-testid="button-logo"
@@ -233,8 +294,8 @@ function AuthenticatedApp() {
               <div className="flex items-center gap-2">
                 <ProductSwitcher />
                 <ThemeToggle />
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="icon"
                   onClick={() => window.location.href = '/api/logout'}
                   data-testid="button-logout"
@@ -244,11 +305,11 @@ function AuthenticatedApp() {
               </div>
             </div>
           </header>
-          
-          <TabNavigation tabs={tabs} />
+
+          <TabNavigation tabs={filteredTabs} />
         </>
       )}
-      
+
       <main className="pb-12">
         <Router />
       </main>
