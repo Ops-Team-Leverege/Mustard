@@ -277,7 +277,8 @@ Examples:
 - "What's PitCrew's value prop for this?" → requiresStyleMatching: false
 
 Respond with JSON: {
-  "intent": "INTENT_NAME", 
+  "intent": "SINGLE_MEETING" | "MULTI_MEETING" | "PRODUCT_KNOWLEDGE" | "EXTERNAL_RESEARCH" | "SLACK_SEARCH" | "GENERAL_HELP" | "REFUSE" | "CLARIFY",
+  CRITICAL: The "intent" field MUST be one of the exact strings listed above. Do NOT use synonyms like "summary", "meeting", "search", "help", etc. Always use the exact enum value.
   "confidence": 0.0-1.0, 
   "reason": "brief explanation",
   "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
