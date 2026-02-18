@@ -161,24 +161,23 @@ export type MeetingSummaryInput = {
 };
 
 /**
- * System prompt for meeting summary generation — v14 ("Compliance Override").
+ * System prompt for meeting summary generation — v15 ("No Noise Removal").
  * 
- * Major changes from v13:
- * 1. Added "Compliance Override" (Rule #3): Legal, Security, Insolvency, or Liability
- *    topics are immune to noise filters and MUST be logged if discussed and confirmed.
- * 2. Renamed directive #2 to "The Compliance Check" — shifts mindset from negotiation to verification.
- * 3. Mandate example uses "verified to have" wording instead of "must provide".
+ * Major changes from v14:
+ * 1. Removed "No Noise" rule entirely — it was causing the LLM to filter out
+ *    brief but critical topics like Escrow, SOC2, and other Legal/Security items.
+ * 2. Removed "Compliance Override" (no longer needed without the noise filter).
+ * 3. Guardrails reduced to 4 clean rules: No Duplication, Context vs Content,
+ *    Quote Hygiene, Null States.
  */
 export function getMeetingSummarySystemPrompt(): string {
   return `You are an expert Executive Assistant. Your goal is to summarize the transcript into a "Decision-Ready Brief."
 
   === CRITICAL RULES (THE GUARDRAILS) ===
-  1. **No Noise:** Do not list every feature discussed. Only list features the customer *specifically asked for*, *objected to*, or *spent significant time on*.
-  2. **No Duplication (Strict):** The "Executive Summary" is for *Status* and *Sentiment* only. The "Key Insights" section is for *Details* and *New Information*. If a point appears in the summary, do NOT repeat it in the details.
-  3. **Compliance Override:** Topics related to **Legal, Security, Insolvency, or Liability** are NEVER considered "Noise." If they are discussed and confirmed, you **MUST** log them.
-  4. **Context vs. Content:** If the 'Known Status' provided in the prompt context conflicts with the transcript, prioritize the transcript.
-  5. **Quote Hygiene:** Remove filler words ("um", "uh") but **NEVER paraphrase or reconstruct a quote.** If a clean direct quote does not exist, omit the quote entirely.
-  6. **Null States:** If a section has no data found, omit it or write "None detected."
+  1. **No Duplication (Strict):** The "Executive Summary" is for *Status* and *Sentiment* only. The "Key Insights" section is for *Details* and *New Information*. If a point appears in the summary, do NOT repeat it in the details.
+  2. **Context vs. Content:** If the 'Known Status' provided in the prompt context conflicts with the transcript, prioritize the transcript.
+  3. **Quote Hygiene:** Remove filler words ("um", "uh") but **NEVER paraphrase or reconstruct a quote.** If a clean direct quote does not exist, omit the quote entirely.
+  4. **Null States:** If a section has no data found, omit it or write "None detected."
 
   === CORE ANALYSIS DIRECTIVES (THE BRAIN) ===
 
