@@ -50,7 +50,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
     SEMANTIC_ANSWER_PROMPT: "2026-02-17-001",
 
     // Transcript Analysis - Initial versions
-    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-008",
+    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-009",
     RAG_QUOTE_SELECTION_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_ACTION_ITEMS_SYSTEM_PROMPT: "2026-02-17-001",
@@ -88,6 +88,7 @@ export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: 
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
     ],
     RAG_MEETING_SUMMARY_SYSTEM_PROMPT: [
+        { version: "2026-02-18-009", reason: "v12 Keyword Anchoring: restored explicit Legal/Security/Business keyword lists (Insolvency, Escrow, Liability, IP Ownership, SSO, Data Residency, SOC2, Budget caps, Hard Deadlines) to Gatekeeper directive; added CRITICAL rule to never omit Legal/Security mandates even if briefly discussed; Mandates output section now references Escrow/Liability explicitly.", date: "2026-02-18" },
         { version: "2026-02-18-008", reason: "v8 polish: added Security Breach to hypothetical risk examples; Gatekeeper subtitle clarified to 'Separating Risks vs. Mandates' with AWS example; owner integrity now blocks context-based inference; 'We Should' trap explicitly says NOT Action Items; sentiment justification requires plain language.", date: "2026-02-18" },
         { version: "2026-02-18-007", reason: "v7 Split Sections: separated Risks (active threats) from Mandates (agreed constraints) into dedicated output sections; added Stalled & Deferred Decisions section; sentiment requires justification; anti-hallucination rules for quotes and owner inference; strict Executive Summary vs Insights boundary.", date: "2026-02-18" },
         { version: "2026-02-18-006", reason: "v6 Gatekeeper rework: replaced Universal Gatekeepers taxonomy with Classify the Outcome (IF UNRESOLVED→BLOCKER, IF AGREED→MANDATE); output header renamed to 'Risks, Blockers & Mandates' with Risk/Mandate status labels; tightened prose throughout directives.", date: "2026-02-18" },
