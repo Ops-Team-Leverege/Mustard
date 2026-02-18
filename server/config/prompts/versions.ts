@@ -41,7 +41,7 @@ export type PromptVersions = {
  */
 export const PROMPT_VERSIONS: PromptVersions = {
     // Decision Layer - Initial versions
-    INTENT_CLASSIFICATION_PROMPT: "2026-02-18-005",
+    INTENT_CLASSIFICATION_PROMPT: "2026-02-18-006",
     CONTRACT_SELECTION_PROMPT: "2026-02-17-001",
     AMBIGUOUS_QUERY_INTERPRETATION_PROMPT: "2026-02-17-001",
     AGGREGATE_SPECIFICITY_CHECK_PROMPT: "2026-02-17-001",
@@ -70,6 +70,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
  */
 export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: string; date: string }>> = {
     INTENT_CLASSIFICATION_PROMPT: [
+        { version: "2026-02-18-006", reason: "Follow-up routing v3: reframed as 'message = topic, thread = context'. LLM uses thread to identify meeting/company and message to determine what user wants NOW. No contract defaults — contract is chosen based on the current message's topic.", date: "2026-02-18" },
         { version: "2026-02-18-005", reason: "Follow-up routing fix v2: follow-ups about a previous summary now select the best-fit contract (EXTRACTIVE_FACT, ATTENDEES, NEXT_STEPS, etc.) instead of hardcoding EXTRACTIVE_FACT. Key rule: follow-up is NEVER a request to regenerate the summary.", date: "2026-02-18" },
         { version: "2026-02-18-004", reason: "Follow-up routing fix: added CRITICAL section for follow-up questions about a previous summary — routes to EXTRACTIVE_FACT instead of regenerating MEETING_SUMMARY. Covers patterns like 'why didn't you mention X', 'what about the escrow discussion', 'you missed the part about SSO'.", date: "2026-02-18" },
         { version: "2026-02-18-003", reason: "Simplified chain-of-thought: single reasoning field before intent, letting model reason through what user wants before picking enum value", date: "2026-02-18" },

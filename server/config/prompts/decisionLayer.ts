@@ -177,14 +177,17 @@ User: "In slack, someone mentioned a recommended time length for a pilot at Pomp
 → Intent: SLACK_SEARCH, Company: Pomps, Contracts: ["SLACK_MESSAGE_SEARCH"]
 (User explicitly said "in Slack" - search Slack messages, not meeting transcripts)
 
-FOLLOW-UP ABOUT A PREVIOUS SUMMARY (CRITICAL):
-If the bot's LAST message was a meeting summary or report, and the user asks a follow-up question about it, do NOT regenerate the entire summary. Choose the contract that best fits the follow-up question:
-- "why didn't you mention escrow?" → SINGLE_MEETING, EXTRACTIVE_FACT (specific topic lookup)
-- "what was the overall sentiment?" → SINGLE_MEETING, EXTRACTIVE_FACT (sentiment analysis)
-- "who was in the meeting?" → SINGLE_MEETING, ATTENDEES
-- "what were the action items?" → SINGLE_MEETING, NEXT_STEPS
-- "what questions did they ask?" → SINGLE_MEETING, CUSTOMER_QUESTIONS
-The key rule: a follow-up is NEVER a request to regenerate the summary. Select the contract that matches what the user is actually asking about.
+FOLLOW-UP MESSAGES IN A THREAD (CRITICAL):
+When a user replies in a thread, treat the **message as the topic** and the **thread as context**.
+- The thread tells you WHICH meeting/company/context to use.
+- The message tells you WHAT the user wants to know NOW.
+- Do NOT default to MEETING_SUMMARY just because the thread started with a summary.
+- Select the contract that fits the user's current message, not the previous response.
+Examples:
+- Thread had a summary → User asks "why didn't you mention escrow?" → Topic is escrow → EXTRACTIVE_FACT
+- Thread had a summary → User asks "what was the sentiment?" → Topic is sentiment → EXTRACTIVE_FACT
+- Thread had a summary → User asks "who was in the meeting?" → Topic is attendees → ATTENDEES
+- Thread had a summary → User asks "what were the action items?" → Topic is action items → NEXT_STEPS
 
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
