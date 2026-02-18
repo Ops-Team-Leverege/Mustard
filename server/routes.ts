@@ -465,12 +465,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (body.createdAt && typeof body.createdAt === "string") {
         body.createdAt = new Date(body.createdAt);
       }
-      // Convert meetingDate string to Date if provided
-      if (body.meetingDate && typeof body.meetingDate === "string") {
-        body.meetingDate = new Date(body.meetingDate);
-      }
 
       const validatedData = insertTranscriptSchema.parse(body);
+
+      // Convert meetingDate string to Date after validation (schema validates as string)
+      if (validatedData.meetingDate && typeof validatedData.meetingDate === "string") {
+        (validatedData as any).meetingDate = new Date(validatedData.meetingDate);
+      }
       const data = validatedData as typeof validatedData & {
         customers?: Array<{
           name: string;

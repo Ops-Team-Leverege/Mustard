@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sparkles, Loader2, Plus, X, User, Check, ChevronsUpDown, FileText, StickyNote, Upload, Link2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
@@ -95,6 +96,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [newCustomer, setNewCustomer] = useState<Customer>({ name: '', nameInTranscript: '', jobTitle: '' });
   const [companySearchOpen, setCompanySearchOpen] = useState(false);
+  const [companySearchValue, setCompanySearchValue] = useState('');
 
   /**
    * Multi-Company Support (Task 6.1)
@@ -137,12 +139,32 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
    * Functions to add and remove companies from the selected companies list.
    */
   const handleAddCompany = (company: Company) => {
-    // Check if company is already selected
     if (selectedCompanies.some(c => c.id === company.id)) {
       return;
     }
     setSelectedCompanies([...selectedCompanies, company]);
     setCompanySearchOpen(false);
+    setCompanySearchValue('');
+  };
+
+  const handleCreateNewCompany = async (name: string) => {
+    try {
+      const res = await fetch('/api/companies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        const newCompany = await res.json();
+        setSelectedCompanies([...selectedCompanies, newCompany]);
+        setCompanySearchOpen(false);
+        setCompanySearchValue('');
+        queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+      }
+    } catch (e) {
+      console.error('Failed to create company', e);
+    }
   };
 
   const handleRemoveCompany = (companyId: string) => {
@@ -406,11 +428,27 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               <PopoverContent className="w-full p-0" align="start">
                 <Command>
                   <CommandInput
-                    placeholder="Search companies..."
+                    placeholder="Search or type new company name..."
+                    value={companySearchValue}
+                    onValueChange={setCompanySearchValue}
                     data-testid="input-company-search"
                   />
                   <CommandList>
-                    <CommandEmpty>No companies found</CommandEmpty>
+                    <CommandEmpty>
+                      {companySearchValue.trim() ? (
+                        <button
+                          type="button"
+                          className="w-full px-2 py-1.5 text-sm text-left hover-elevate rounded-md"
+                          onClick={() => handleCreateNewCompany(companySearchValue.trim())}
+                          data-testid="button-create-new-company"
+                        >
+                          <Plus className="mr-2 h-4 w-4 inline" />
+                          Create "{companySearchValue.trim()}"
+                        </button>
+                      ) : (
+                        "No companies found"
+                      )}
+                    </CommandEmpty>
                     <CommandGroup>
                       {companies
                         .filter(company => !selectedCompanies.some(c => c.id === company.id))
