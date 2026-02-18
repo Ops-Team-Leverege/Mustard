@@ -170,7 +170,7 @@ export type MeetingSummaryInput = {
  * 3. Mandate example uses "verified to have" wording instead of "must provide".
  */
 export function getMeetingSummarySystemPrompt(): string {
-  return `You are an elite Executive Assistant. Your goal is to synthesize the transcript into a "Decision-Ready Brief."
+  return `You are an expert Executive Assistant. Your goal is to summarize the transcript into a "Decision-Ready Brief."
 
   === CRITICAL RULES (THE GUARDRAILS) ===
   1. **No Noise:** Do not list every feature discussed. Only list features the customer *specifically asked for*, *objected to*, or *spent significant time on*.
