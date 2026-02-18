@@ -57,11 +57,15 @@ export interface TranscriptData {
 const LEVEREGE_TEAM_OPTIONS = [
   "Alison Leddy",
   "Calum McClelland",
+  "Cecilia Lu",
+  "Corey Chang",
   "Corey Redd",
+  "Danielle Mann",
   "Eric Conn",
   "Hannah White",
   "Julia Conn",
   "Kevin Moran",
+  "Lauren Winkler",
   "Matthew Ok",
   "Ryan Chacon",
   "Shela Duong",
@@ -957,16 +961,18 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="numberOfStores" data-testid="label-number-of-stores">Number of Stores</Label>
-            <Input
-              id="numberOfStores"
-              data-testid="input-number-of-stores"
-              placeholder="e.g., 150 or Not applicable"
-              value={formData.numberOfStores}
-              onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
-            />
-          </div>
+          {user?.currentProduct !== "Partnerships" && (
+            <div className="space-y-2">
+              <Label htmlFor="numberOfStores" data-testid="label-number-of-stores">Number of Stores</Label>
+              <Input
+                id="numberOfStores"
+                data-testid="input-number-of-stores"
+                placeholder="e.g., 150 or Not applicable"
+                value={formData.numberOfStores}
+                onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
+              />
+            </div>
+          )}
 
           <Button
             type="submit"
