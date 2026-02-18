@@ -50,7 +50,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
     SEMANTIC_ANSWER_PROMPT: "2026-02-17-001",
 
     // Transcript Analysis - Initial versions
-    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-010",
+    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-011",
     RAG_QUOTE_SELECTION_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_ACTION_ITEMS_SYSTEM_PROMPT: "2026-02-17-001",
@@ -88,6 +88,7 @@ export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: 
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
     ],
     RAG_MEETING_SUMMARY_SYSTEM_PROMPT: [
+        { version: "2026-02-18-011", reason: "v14 Compliance Override: added Rule #3 making Legal/Security/Insolvency/Liability topics immune to 'No Noise' filter; renamed directive #2 to 'The Compliance Check' shifting mindset from negotiation to verification; mandate example uses 'verified to have' wording.", date: "2026-02-18" },
         { version: "2026-02-18-010", reason: "v13 Mandate Verification: added CRITICAL rule for feature verification (Escrow, SOC2, Encryption) where 'YES' answer must be logged as Agreed Mandate; updated output format to explicitly include Verified Legal/Security Capabilities.", date: "2026-02-18" },
         { version: "2026-02-18-009", reason: "v12 Keyword Anchoring: restored explicit Legal/Security/Business keyword lists (Insolvency, Escrow, Liability, IP Ownership, SSO, Data Residency, SOC2, Budget caps, Hard Deadlines) to Gatekeeper directive; added CRITICAL rule to never omit Legal/Security mandates even if briefly discussed; Mandates output section now references Escrow/Liability explicitly.", date: "2026-02-18" },
         { version: "2026-02-18-008", reason: "v8 polish: added Security Breach to hypothetical risk examples; Gatekeeper subtitle clarified to 'Separating Risks vs. Mandates' with AWS example; owner integrity now blocks context-based inference; 'We Should' trap explicitly says NOT Action Items; sentiment justification requires plain language.", date: "2026-02-18" },
