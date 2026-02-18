@@ -1527,11 +1527,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/companies", isAuthenticated, async (req: any, res) => {
     try {
       const { product } = await getUserAndProduct(req);
-      const data = insertCompanySchema.parse(req.body);
+      const body = { ...req.body, slug: req.body.slug || generateSlug(req.body.name || '') };
+      const data = insertCompanySchema.parse(body);
       const company = await storage.createCompany({
         ...data,
         product,
       });
+      await storage.ensureCompanyProductAssociation(company.id, product);
       res.json(company);
     } catch (error) {
       handleRouteError(res, error, "POST /api/companies");

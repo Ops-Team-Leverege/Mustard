@@ -161,9 +161,13 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
         setCompanySearchOpen(false);
         setCompanySearchValue('');
         queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
+        toast({ title: `Company "${name}" created` });
+      } else {
+        const err = await res.json().catch(() => ({ message: 'Failed to create company' }));
+        toast({ title: "Error", description: err.message || 'Failed to create company', variant: "destructive" });
       }
     } catch (e) {
-      console.error('Failed to create company', e);
+      toast({ title: "Error", description: "Failed to create company", variant: "destructive" });
     }
   };
 
