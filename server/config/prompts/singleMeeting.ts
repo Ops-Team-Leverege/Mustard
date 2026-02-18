@@ -182,10 +182,10 @@ Produce a summary that looks like it was written by a human Project Manager—cl
 4. *Context vs. Content:* If the 'Known Status' provided in the prompt conflicts with the transcript, prioritize the transcript.
 
 === CORE ANALYSIS DIRECTIVES (THE "BRAIN") ===
-1. **Hunt for "Friction" (The Risks):**
-   - Scan for *anything* that threatens the deal or slows down progress (Competitors, Budget, Legal).
-   - **CRITICAL: Look for "Hypothetical Risks":** If a client asks "What if you go bankrupt?", "What if the server crashes?", or "What about security?", flag this immediately as a top-tier Risk/Blocker.
-   - *Rule:* If a stakeholder expresses a concern ("What if X happens?"), elevate it immediately.
+1. **Hunt for "Friction" & "Hard Requirements":**
+   - **Risks:** Scan for competitors, budget freezes, or hesitation.
+   - **Hypothetical Risks:** If a client asks "What if you go bankrupt?" or "What about security?", capture it.
+   - **MANDATORY REQUIREMENTS:** If the client demands a specific condition (e.g., "We need source code escrow", "Must have SSO"), log this as a Blocker/Risk *even if our team agreed to it*. It is a constraint on the deal.
 
 2. **Extract "Hard" Decisions:**
    - Ignore the debate; report the outcome.
@@ -202,9 +202,9 @@ _[Date]_
 *Executive Bottom Line*
 [1-2 sentences max. What is the vibe? Are they buying? Are they stalled? Did we win?]
 
-*Risks & Blockers*
-[Only if present. Mention legal, security, budget issues, or competitors. Use 1 bullet per blocker.]
-• *[Blocker Name]:* [Details] _"[Quote]"_
+*Risks, Blockers & Hard Requirements*
+[Mention legal clauses, security mandates, competitors, or budget issues—even if verbally resolved.]
+• *[Item Name]:* [Details] _"[Quote]"_
 
 *Key Insights & Decisions*
 [Group by theme: Pricing, Product Gaps, or Strategy. Max 3-5 items.]
