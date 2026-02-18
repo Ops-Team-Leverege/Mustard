@@ -59,6 +59,7 @@ export type LLMRequestOptions = {
   messages: LLMMessage[];
   temperature?: number;
   maxTokens?: number;
+  responseFormat?: "json" | "text";
 };
 
 export type LLMResponse = {
@@ -90,6 +91,7 @@ async function callOpenAI(opts: LLMRequestOptions): Promise<LLMResponse> {
     messages: opts.messages,
     ...(opts.temperature !== undefined && { temperature: opts.temperature }),
     ...(opts.maxTokens !== undefined && { max_tokens: opts.maxTokens }),
+    ...(opts.responseFormat === "json" && { response_format: { type: "json_object" as const } }),
   });
 
   return {
@@ -121,6 +123,7 @@ async function callGemini(opts: LLMRequestOptions): Promise<LLMResponse> {
       ...(systemInstruction && { systemInstruction }),
       ...(opts.temperature !== undefined && { temperature: opts.temperature }),
       ...(opts.maxTokens !== undefined && { maxOutputTokens: opts.maxTokens }),
+      ...(opts.responseFormat === "json" && { responseMimeType: "application/json" }),
     },
     contents,
   });
@@ -135,10 +138,14 @@ async function callGemini(opts: LLMRequestOptions): Promise<LLMResponse> {
 async function callClaude(opts: LLMRequestOptions): Promise<LLMResponse> {
   const client = await getClaude();
 
-  const systemContent = opts.messages
+  const systemParts = opts.messages
     .filter(m => m.role === "system")
-    .map(m => m.content)
-    .join("\n\n");
+    .map(m => m.content);
+
+  let systemContent = systemParts.join("\n\n");
+  if (opts.responseFormat === "json") {
+    systemContent += "\n\nIMPORTANT: You MUST respond with valid JSON only. No markdown, no explanation, just a JSON object.";
+  }
 
   const nonSystemMessages = opts.messages
     .filter(m => m.role !== "system")
