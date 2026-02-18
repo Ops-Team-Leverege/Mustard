@@ -459,7 +459,30 @@ async function classifyByLLM(
     }
 
     const parsed = JSON.parse(content);
-    const intentStr = parsed.intent as string;
+    const rawIntentStr = parsed.intent as string;
+
+    const INTENT_SYNONYM_MAP: Record<string, string> = {
+      "summary": "SINGLE_MEETING",
+      "meeting_summary": "SINGLE_MEETING",
+      "meeting": "SINGLE_MEETING",
+      "search": "MULTI_MEETING",
+      "aggregate": "MULTI_MEETING",
+      "product": "PRODUCT_KNOWLEDGE",
+      "research": "EXTERNAL_RESEARCH",
+      "slack": "SLACK_SEARCH",
+      "help": "GENERAL_HELP",
+      "general": "GENERAL_HELP",
+      "refuse": "REFUSE",
+      "clarify": "CLARIFY",
+    };
+
+    const intentStr = rawIntentStr in Intent
+      ? rawIntentStr
+      : INTENT_SYNONYM_MAP[rawIntentStr.toLowerCase()] || rawIntentStr;
+
+    if (intentStr !== rawIntentStr) {
+      console.warn(`[IntentClassifier] LLM returned non-enum intent "${rawIntentStr}", normalized to "${intentStr}"`);
+    }
 
     if (intentStr in Intent) {
       const contracts = parsed.proposedContracts?.join(',') || 'none';

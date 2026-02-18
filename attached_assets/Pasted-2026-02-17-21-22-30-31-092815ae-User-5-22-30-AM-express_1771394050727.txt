@@ -1,0 +1,208 @@
+2026-02-17 21:22:30.31
+092815ae
+User
+5:22:30 AM [express] GET /api/companies 200 in 138ms :: [{"id":"42ec847e-5d00-4398-b8f1-653e36ac65f3…
+2026-02-17 21:22:30.35
+092815ae
+User
+5:22:30 AM [express] GET /api/auth/user 200 in 224ms :: {"id":"48739727","email":"silvina.figueroa@l…
+2026-02-17 21:22:34.70
+092815ae
+User
+5:22:34 AM [express] PUT /api/user/product 200 in 229ms :: {"id":"48739727","email":"silvina.figuero…
+2026-02-17 21:22:34.85
+092815ae
+User
+5:22:34 AM [express] GET /api/auth/user 200 in 76ms :: {"id":"48739727","email":"silvina.figueroa@le…
+2026-02-17 21:22:34.88
+092815ae
+User
+5:22:34 AM [express] GET /api/companies 200 in 99ms :: [{"id":"2f012854-0d3e-4eb7-a6b6-f88ca205ca9b"…
+2026-02-17 21:22:49.88
+092815ae
+User
+5:22:49 AM [express] PUT /api/user/product 200 in 339ms :: {"id":"48739727","email":"silvina.figuero…
+2026-02-17 21:22:50.03
+092815ae
+User
+5:22:50 AM [express] GET /api/auth/user 200 in 72ms :: {"id":"48739727","email":"silvina.figueroa@le…
+2026-02-17 21:22:50.21
+092815ae
+User
+5:22:50 AM [express] GET /api/companies 200 in 237ms :: []
+2026-02-17 21:24:47.67
+092815ae
+User
+5:24:47 AM [express] GET /api/categories 200 in 1065ms :: []
+2026-02-17 21:24:47.90
+092815ae
+User
+5:24:47 AM [express] GET /api/categories/company-stats 200 in 145ms :: []
+2026-02-17 21:24:48.90
+092815ae
+User
+5:24:48 AM [express] GET /api/qa-pairs 200 in 2275ms :: []
+2026-02-17 21:24:48.93
+092815ae
+User
+5:24:48 AM [express] GET /api/features 200 in 2317ms :: []
+2026-02-17 21:24:48.95
+092815ae
+User
+5:24:48 AM [express] GET /api/dashboard/recent-transcripts 200 in 2339ms :: []
+2026-02-17 21:24:48.95
+092815ae
+User
+5:24:48 AM [express] GET /api/insights 200 in 2335ms :: []
+2026-02-17 21:24:49.33
+092815ae
+User
+5:24:49 AM [express] GET /api/auth/user 304 in 2232ms :: {"id":"48739727","email":"silvina.figueroa@…
+2026-02-17 21:24:49.43
+092815ae
+User
+5:24:49 AM [express] GET /api/dashboard/stats 200 in 2323ms :: {"stageStats":{}}
+2026-02-17 21:24:49.44
+092815ae
+User
+5:24:49 AM [express] GET /api/companies 304 in 2326ms :: []
+2026-02-17 21:24:54.82
+092815ae
+User
+5:24:54 AM [express] PUT /api/user/product 200 in 197ms :: {"id":"48739727","email":"silvina.figuero…
+2026-02-17 21:24:54.96
+092815ae
+User
+5:24:54 AM [express] GET /api/auth/user 200 in 71ms :: {"id":"48739727","email":"silvina.figueroa@le…
+2026-02-17 21:24:55.15
+092815ae
+User
+5:24:55 AM [express] GET /api/categories/company-stats 200 in 247ms :: [{"id":"aa8d09ce-aefc-4c32-a9…
+2026-02-17 21:24:55.17
+092815ae
+User
+5:24:55 AM [express] GET /api/categories 200 in 269ms :: [{"id":"aa8d09ce-aefc-4c32-a991-98c2fd94b0b…
+2026-02-17 21:24:56.15
+092815ae
+User
+5:24:56 AM [express] PUT /api/user/product 200 in 98ms :: {"id":"48739727","email":"silvina.figueroa…
+2026-02-17 21:24:56.32
+092815ae
+User
+5:24:56 AM [express] GET /api/auth/user 200 in 86ms :: {"id":"48739727","email":"silvina.figueroa@le…
+2026-02-17 21:24:56.42
+092815ae
+User
+5:24:56 AM [express] GET /api/categories 200 in 176ms :: []
+2026-02-17 21:24:56.44
+092815ae
+User
+5:24:56 AM [express] GET /api/categories/company-stats 200 in 194ms :: []
+2026-02-17 21:24:57.79
+092815ae
+User
+5:24:57 AM [express] PUT /api/user/product 200 in 96ms :: {"id":"48739727","email":"silvina.figueroa…
+2026-02-17 21:24:57.94
+092815ae
+User
+5:24:57 AM [express] GET /api/auth/user 200 in 70ms :: {"id":"48739727","email":"silvina.figueroa@le…
+2026-02-17 21:24:58.16
+092815ae
+User
+5:24:58 AM [express] GET /api/categories 200 in 280ms :: [{"id":"51d465e5-6518-4556-9c1b-b308aebdc0b…
+2026-02-17 21:24:58.23
+092815ae
+User
+5:24:58 AM [express] GET /api/categories/company-stats 200 in 352ms :: [{"id":"51d465e5-6518-4556-9c…
+2026-02-17 21:24:59.56
+092815ae
+User
+5:24:59 AM [express] PUT /api/user/product 200 in 99ms :: {"id":"48739727","email":"silvina.figueroa…
+2026-02-17 21:24:59.72
+092815ae
+User
+5:24:59 AM [express] GET /api/auth/user 200 in 76ms :: {"id":"48739727","email":"silvina.figueroa@le…
+2026-02-17 21:24:59.79
+092815ae
+User
+5:24:59 AM [express] GET /api/categories/company-stats 200 in 148ms :: []
+2026-02-17 21:24:59.83
+092815ae
+User
+5:24:59 AM [express] GET /api/categories 200 in 193ms :: []
+2026-02-17 21:25:02.18
+092815ae
+User
+5:25:02 AM [express] GET /api/companies 304 in 95ms :: []
+2026-02-17 21:25:02.18
+092815ae
+User
+5:25:02 AM [express] GET /api/dashboard/stats 304 in 88ms :: {"stageStats":{}}
+2026-02-17 21:25:02.19
+092815ae
+User
+5:25:02 AM [express] GET /api/dashboard/recent-transcripts 304 in 94ms :: []
+2026-02-17 21:25:10.80
+092815ae
+User
+5:25:10 AM [express] GET /api/insights 304 in 219ms :: []
+2026-02-17 21:28:01.96
+092815ae
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T05:28:01.965Z ==========
+2026-02-17 21:28:01.96
+092815ae
+User
+[Slack] Received event request
+2026-02-17 21:28:01.96
+092815ae
+User
+[Slack] Processing direct message
+2026-02-17 21:28:01.96
+092815ae
+User
+Event type: message
+2026-02-17 21:28:01.96
+092815ae
+User
+[Slack] Event details: eventId=Ev0AFEKDC3JP, clientMsgId=085aef0a-99ae-4739-a91a-1e9d4ed6113e, messageTs=1771392480.850989, threadTs=1771392480.850989, channel=D0A7A4R9C04
+2026-02-17 21:28:01.96
+092815ae
+User
+Slack payload type: event_callback
+2026-02-17 21:28:01.97
+092815ae
+User
+5:28:01 AM [express] POST /api/slack/events 200 in 9ms
+2026-02-17 21:28:05.97
+092815ae
+User
+[Dedupe] Cleaned up 3 old entries
+2026-02-17 21:28:09.07
+092815ae
+User
+[INFO] [c8074d44] Slack event received {"correlationId":"c8074d44","channel":"D0A7A4R9C04","threadTs":"1771392480.850989","userId":"U082TV42FM0","duration":0,"text":"what key details would be worth sharing from our last call with Costco on feb 10th for those who wer","isReply":false,"testRun":false}
+2026-02-17 21:28:11.82
+092815ae
+User
+[Slack] LLM-first architecture - running Decision Layer for intent classification
+2026-02-17 21:28:11.83
+092815ae
+User
+Slack payload type: event_callback
+2026-02-17 21:28:11.83
+092815ae
+User
+5:28:11 AM [express] POST /api/slack/events 200 in 3ms
+2026-02-17 21:28:11.83
+092815ae
+User
+Event type: message
+2026-02-17 21:28:11.83
+092815ae
+User
+[Slack] Ignoring bot message (preventing loop)
+2026-02-17 21:28:11.93
+092815ae
+User
+Messages: 2

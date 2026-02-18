@@ -276,9 +276,10 @@ Examples:
 - "Research what Mavis does" → requiresStyleMatching: false
 - "What's PitCrew's value prop for this?" → requiresStyleMatching: false
 
-Respond with JSON: {
+Respond with JSON (field order matters — reasoning MUST come before intent):
+{
+  "reasoning": "explain step by step what the user wants and why",
   "intent": "SINGLE_MEETING" | "MULTI_MEETING" | "PRODUCT_KNOWLEDGE" | "EXTERNAL_RESEARCH" | "SLACK_SEARCH" | "GENERAL_HELP" | "REFUSE" | "CLARIFY",
-  CRITICAL: The "intent" field MUST be one of the exact strings listed above. Do NOT use synonyms like "summary", "meeting", "search", "help", etc. Always use the exact enum value.
   "confidence": 0.0-1.0, 
   "reason": "brief explanation",
   "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
