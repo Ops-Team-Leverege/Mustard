@@ -1,0 +1,133 @@
+TRANSCRIPT UI IMPROVEMENTS - DEPLOYMENT SUMMARY
+Commit Range: 8b5b579..786f0d3 (commit 856438a)
+Files Changed: 10 files, +1006 insertions, -274 deletions
+Status: Pushed to origin/main, ready for Replit deployment
+
+CRITICAL CHANGES REQUIRING ANALYSIS
+1. DATABASE MIGRATIONS (MUST RUN FIRST)
+Two new migration files that create junction tables for many-to-many relationships:
+
+migrations/0001_add_junction_tables.sql (38 lines)
+
+Creates transcript_companies table (transcriptId → companyId mapping)
+Creates company_products table (companyId → product mapping)
+Adds indexes for performance: idx_transcript_companies_transcript, idx_transcript_companies_company, idx_company_products_company, idx_company_products_product
+Unique constraints to prevent duplicate associations
+migrations/0002_populate_junction_tables.sql (42 lines)
+
+Backfills existing data from legacy fields (transcripts.companyId → transcript_companies, companies.product → company_products)
+Uses ON CONFLICT DO NOTHING for idempotent execution (safe to re-run)
+ACTION REQUIRED: Run these migrations in order before deploying code changes.
+
+2. SCHEMA CHANGES (shared/schema.ts - 65 lines changed)
+Added companyIds field to insertTranscriptSchema (optional array of integers)
+Made name and meetingDate required with validation (min length 1)
+Added refinement: ensures either companyIds OR companyName is provided (backward compatibility)
+Added "Partnerships" to PRODUCTS array
+Junction table schemas: transcriptCompanies and companyProducts
+BREAKING CHANGE: Forms now require name and meetingDate - existing code must provide these.
+
+3. BACKEND CHANGES (server/routes.ts - 278 lines changed)
+POST /api/transcripts endpoint:
+
+Accepts both companyIds (new) and companyName (legacy) for backward compatibility
+Creates multiple transcript_companies associations via storage.createTranscriptCompanyAssociation()
+BUG FIX: Now syncs service tags to company.serviceTags field during transcript creation
+Converts meetingDate string to Date object
+Calls storage.ensureCompanyProductAssociation() for automatic company-product linking
+Contacts are created only for primary (first) company in multi-company transcripts
+GET /api/companies endpoint:
+
+Updated to use storage.getCompaniesByProduct() with dual-query strategy
+Queries both legacy companies.product field AND company_products junction table
+Ensures backward compatibility with existing data
+4. STORAGE LAYER (server/storage.ts - 250 lines changed)
+New methods added:
+
+createTranscriptCompanyAssociation(transcriptId, companyId) - Creates junction table entry
+getCompaniesByProduct(product) - Dual-query strategy for backward compatibility
+ensureCompanyProductAssociation(companyId, product) - Auto-links companies to products
+Updated existing methods to handle multi-company scenarios
+BACKWARD COMPATIBILITY: All queries use dual-strategy (legacy fields + junction tables).
+
+5. FRONTEND CHANGES
+client/src/components/TranscriptForm.tsx (293 lines changed):
+
+Multi-company selector with badges and remove buttons
+Meeting name and date now required (red asterisks)
+Dynamic UI text: "Add Partnership Meeting" vs "Add New Transcript"
+Form validation enforces at least one company selected
+Sends both companyIds array and legacy companyName for compatibility
+client/src/App.tsx (169 lines changed):
+
+Conditional navigation based on user.currentProduct === "Partnerships"
+Hides Categories and Features tabs for Partnerships users
+Hides Product Insights in Databases dropdown for Partnerships
+client/src/pages/Categories.tsx (44 lines changed):
+
+Shows empty state alert for Partnerships product
+client/src/pages/Features.tsx (100 lines changed):
+
+Shows empty state alert for Partnerships product
+6. AI PROCESSING CHANGES (server/transcriptAnalyzer.ts - implied)
+Skips saving product insights for Partnerships product
+Always extracts Q&A pairs for all products
+Conditional check: if (product !== "Partnerships")
+TESTING CHECKLIST FOR REPLIT AGENT
+Database Migrations:
+
+# Run in order
+psql $DATABASE_URL -f migrations/0001_add_junction_tables.sql
+psql $DATABASE_URL -f migrations/0002_populate_junction_tables.sql
+
+# Verify tables created
+psql $DATABASE_URL -c "\dt transcript_companies"
+psql $DATABASE_URL -c "\dt company_products"
+Backend Verification:
+
+Test POST /api/transcripts with companyIds array (new format)
+Test POST /api/transcripts with companyName string (legacy format)
+Verify service tags are synced to company record
+Verify GET /api/companies returns companies from both legacy and junction tables
+Check that contacts are created for primary company only
+Frontend Verification:
+
+Test multi-company selector in TranscriptForm
+Verify meeting name and date are required
+Test Partnerships product: verify "Add Partnership Meeting" text
+Test Partnerships product: verify Categories/Features tabs are hidden
+Test non-Partnerships product: verify all tabs visible
+Partnerships Product Specific:
+
+Create a Partnerships transcript
+Verify Q&A pairs are extracted
+Verify product insights are NOT saved
+Verify UI shows "Partnership Meeting" language
+Verify Categories and Features pages show empty state
+Service Tags Bug Fix:
+
+Create a transcript with service tags
+Verify tags are saved to company.serviceTags field
+Query database: SELECT id, name, "serviceTags" FROM companies WHERE id = ?
+ROLLBACK INSTRUCTIONS
+If issues occur:
+
+# Rollback code
+git revert 856438a
+
+# Rollback database (if needed)
+DROP TABLE IF EXISTS transcript_companies;
+DROP TABLE IF EXISTS company_products;
+KNOWN ISSUES & DESIGN DECISIONS
+Contacts Association: Contacts are only created for the primary (first) company in multi-company transcripts. This is acceptable as contacts typically belong to one primary company.
+
+Backward Compatibility: System queries both legacy fields (companyId, product) AND junction tables to support existing data. This dual-query strategy ensures no data loss.
+
+Partnerships Product: Skips product insights extraction but still extracts Q&A pairs. This is intentional as Partnerships meetings focus on relationship discussions rather than product features.
+
+Schema Validation: Both companyIds and companyName are optional individually, but refinement ensures at least one is provided.
+
+DEPLOYMENT PRIORITY
+HIGH PRIORITY: Run database migrations before deploying code changes to avoid runtime errors.
+
+Summary: This is a significant feature update adding multi-company support, fixing the service tags bug, and introducing Partnerships product with conditional UI. The implementation maintains full backward compatibility through dual-query strategies and legacy field support.
