@@ -1,0 +1,212 @@
+2026-02-18 09:30:36.41
+1be87ce0
+User
+[SemanticAnswer] Starting for meeting 9fd8d931-902a-4396-b311-960c9428aeac
+2026-02-18 09:30:36.41
+1be87ce0
+User
+[SearchTranscript] Found 1 chunks matching both proper nouns AND keywords
+2026-02-18 09:30:36.41
+1be87ce0
+User
+[SingleMeeting] Semantic processing: judgment question requires filtering
+2026-02-18 09:30:36.41
+1be87ce0
+User
+[SingleMeeting] Transcript fetch: 768ms
+2026-02-18 09:30:36.42
+1be87ce0
+User
+Slack payload type: event_callback
+2026-02-18 09:30:36.42
+1be87ce0
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T17:30:36.424Z ==========
+2026-02-18 09:30:36.42
+1be87ce0
+User
+5:30:36 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-18 09:30:37.64
+1be87ce0
+User
+[Slack] Updated placeholder with progress: "Reviewing the notes from the February 10th call wi..."
+2026-02-18 09:30:38.01
+1be87ce0
+User
+[Slack] Received event request
+2026-02-18 09:30:38.01
+1be87ce0
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T17:30:38.010Z ==========
+2026-02-18 09:30:38.01
+1be87ce0
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-18 09:30:38.01
+1be87ce0
+User
+5:30:38 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-18 09:30:38.01
+1be87ce0
+User
+Slack payload type: event_callback
+2026-02-18 09:30:38.01
+1be87ce0
+User
+Event type: message
+2026-02-18 09:30:40.34
+1be87ce0
+User
+[Slack] Updated streaming placeholder with final content (1030 chars)
+2026-02-18 09:30:40.34
+1be87ce0
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-18 09:30:40.54
+1be87ce0
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 163, Generate doc: false
+2026-02-18 09:30:40.54
+1be87ce0
+User
+[DocumentGenerator] Contract not in list, checking word count: 163 > 300 = false
+2026-02-18 09:30:40.54
+1be87ce0
+User
+[DocumentResponse] Document-only mode, skipping message (word count 163 below threshold)
+2026-02-18 09:30:40.54
+1be87ce0
+User
+[Slack] Document check complete
+2026-02-18 09:30:40.54
+1be87ce0
+User
+[INFO] [a824576e] Request completed successfully {"correlationId":"a824576e","channel":"D0A7A4R9C04","threadTs":"1771435822.409659","userId":"U082TV42FM0","duration":15801,"intent":"SINGLE_MEETING","contract":"EXTRACTIVE_FACT","responseLength":1030,"totalTimeMs":14201,"stages":{"meeting_resolution":900,"decision_layer":6901,"handler":4100}}
+2026-02-18 09:30:40.78
+1be87ce0
+User
+[Slack] Received event request
+2026-02-18 09:30:40.78
+1be87ce0
+User
+Event type: message
+2026-02-18 09:30:41.64
+1be87ce0
+User
+[Slack] Received event request
+2026-02-18 09:30:41.64
+1be87ce0
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T17:30:41.649Z ==========
+2026-02-18 09:30:41.64
+1be87ce0
+User
+Slack payload type: event_callback
+2026-02-18 09:30:41.64
+1be87ce0
+User
+Event type: reaction_added
+2026-02-18 09:30:41.65
+1be87ce0
+User
+[Feedback] Ignoring bot's own reaction (seeded feedback emoji)
+2026-02-18 09:30:41.65
+1be87ce0
+User
+[Feedback] Reaction added: -1 by U0A704T7THR on message 1771435835.520879
+2026-02-18 09:30:41.65
+1be87ce0
+User
+5:30:41 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-18 09:30:41.73
+1be87ce0
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T17:30:41.738Z ==========
+2026-02-18 09:30:41.73
+1be87ce0
+User
+[Slack] Received event request
+2026-02-18 09:30:41.73
+1be87ce0
+User
+5:30:41 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-18 09:30:41.73
+1be87ce0
+User
+Event type: reaction_added
+2026-02-18 09:31:06.16
+1be87ce0
+User
+[Slack] Received event request
+2026-02-18 09:31:06.16
+1be87ce0
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T17:31:06.163Z ==========
+2026-02-18 09:31:06.16
+1be87ce0
+User
+[Feedback] Reaction added: -1::skin-tone-2 by U082TV42FM0 on message 1771435835.520879
+2026-02-18 09:31:06.16
+1be87ce0
+User
+5:31:06 PM [express] POST /api/slack/events 200 in 2ms
+2026-02-18 09:31:06.16
+1be87ce0
+User
+Slack payload type: event_callback
+2026-02-18 09:31:06.16
+1be87ce0
+User
+Event type: reaction_added
+2026-02-18 09:31:06.16
+1be87ce0
+User
+[Feedback] Final classification: negative
+2026-02-18 09:31:06.16
+1be87ce0
+User
+[Feedback] Config classified "-1::skin-tone-2" as negative
+2026-02-18 09:31:06.29
+1be87ce0
+User
+[Feedback] Found interaction: 0686ad50-9e48-4ae0-ba5a-8fe217e674c7
+2026-02-18 09:31:06.64
+1be87ce0
+User
+[Feedback] Stored negative feedback for interaction 0686ad50-9e48-4ae0-ba5a-8fe217e674c7
+2026-02-18 09:31:07.44
+1be87ce0
+User
+[Feedback] Acknowledged feedback with checkmark on 1771435835.520879
+2026-02-18 09:31:07.74
+1be87ce0
+User
+[Feedback] Sent negative feedback notification to operations-testing_notifications
+2026-02-18 09:31:07.90
+1be87ce0
+User
+[Slack] Received event request
+2026-02-18 09:31:07.90
+1be87ce0
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T17:31:07.903Z ==========
+2026-02-18 09:31:07.90
+1be87ce0
+User
+5:31:07 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-18 09:31:07.90
+1be87ce0
+User
+Slack payload type: event_callback
+2026-02-18 09:31:07.90
+1be87ce0
+User
+[Feedback] Reaction added: white_check_mark by U0A704T7THR on message 1771435835.520879
+2026-02-18 09:31:07.90
+1be87ce0
+User
+Event type: reaction_added
+2026-02-18 09:31:07.90
+1be87ce0
+User
+[Feedback] Ignoring bot's own reaction (seeded feedback emoji)

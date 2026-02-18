@@ -177,17 +177,10 @@ User: "In slack, someone mentioned a recommended time length for a pilot at Pomp
 → Intent: SLACK_SEARCH, Company: Pomps, Contracts: ["SLACK_MESSAGE_SEARCH"]
 (User explicitly said "in Slack" - search Slack messages, not meeting transcripts)
 
-FOLLOW-UP MESSAGES IN A THREAD (CRITICAL):
+THREAD CONTEXT RULE:
 When a user replies in a thread, treat the **message as the topic** and the **thread as context**.
 - The thread tells you WHICH meeting/company/context to use.
 - The message tells you WHAT the user wants to know NOW.
-- Do NOT default to MEETING_SUMMARY just because the thread started with a summary.
-- Select the contract that fits the user's current message, not the previous response.
-Examples:
-- Thread had a summary → User asks "why didn't you mention escrow?" → Topic is escrow → EXTRACTIVE_FACT
-- Thread had a summary → User asks "what was the sentiment?" → Topic is sentiment → EXTRACTIVE_FACT
-- Thread had a summary → User asks "who was in the meeting?" → Topic is attendees → ATTENDEES
-- Thread had a summary → User asks "what were the action items?" → Topic is action items → NEXT_STEPS
 
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
@@ -198,10 +191,10 @@ If the bot's LAST message asked for clarification and user responds:
 CONTRACT SELECTION (propose the best contract for this request):
 SINGLE_MEETING contracts:
 - NEXT_STEPS: Action items, follow-ups, commitments, next steps, what to do next
-- MEETING_SUMMARY: General summary or recap of a meeting
+- MEETING_SUMMARY: Summary, recap, overview, key details, highlights, or briefing of a meeting. Use this when the user wants to catch up on what happened, share with people who missed it, or get an overall picture. Examples: "summarize the call", "key details worth sharing", "what happened in the meeting", "brief me on the call", "catch me up"
 - ATTENDEES: Who was in the meeting, participants
 - CUSTOMER_QUESTIONS: Questions the customer asked
-- EXTRACTIVE_FACT: Specific factual information from a meeting
+- EXTRACTIVE_FACT: A specific factual detail or topic from a meeting. Use this when the user asks about ONE specific thing (e.g., "what did they say about escrow?", "did they mention pricing?"). Do NOT use this for broad overview requests.
 
 MULTI_MEETING contracts:
 - PATTERN_ANALYSIS: Patterns, trends, common themes across meetings
