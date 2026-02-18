@@ -41,7 +41,7 @@ export type PromptVersions = {
  */
 export const PROMPT_VERSIONS: PromptVersions = {
     // Decision Layer - Initial versions
-    INTENT_CLASSIFICATION_PROMPT: "2026-02-18-003",
+    INTENT_CLASSIFICATION_PROMPT: "2026-02-18-008",
     CONTRACT_SELECTION_PROMPT: "2026-02-17-001",
     AMBIGUOUS_QUERY_INTERPRETATION_PROMPT: "2026-02-17-001",
     AGGREGATE_SPECIFICITY_CHECK_PROMPT: "2026-02-17-001",
@@ -50,7 +50,7 @@ export const PROMPT_VERSIONS: PromptVersions = {
     SEMANTIC_ANSWER_PROMPT: "2026-02-17-001",
 
     // Transcript Analysis - Initial versions
-    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-008",
+    RAG_MEETING_SUMMARY_SYSTEM_PROMPT: "2026-02-18-012",
     RAG_QUOTE_SELECTION_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: "2026-02-17-001",
     RAG_ACTION_ITEMS_SYSTEM_PROMPT: "2026-02-17-001",
@@ -70,6 +70,11 @@ export const PROMPT_VERSIONS: PromptVersions = {
  */
 export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: string; date: string }>> = {
     INTENT_CLASSIFICATION_PROMPT: [
+        { version: "2026-02-18-008", reason: "Simplified thread context rule: removed all follow-up examples and MEETING_SUMMARY avoidance — just 'message = topic, thread = context'. Kept expanded contract descriptions from v007.", date: "2026-02-18" },
+        { version: "2026-02-18-007", reason: "Contract misrouting fix: scoped thread follow-up rule to only apply when bot already responded (prevents false EXTRACTIVE_FACT on new requests). Expanded MEETING_SUMMARY description to cover 'key details', 'catch up', 'brief me' patterns. Clarified EXTRACTIVE_FACT is for ONE specific topic only, not broad overviews.", date: "2026-02-18" },
+        { version: "2026-02-18-006", reason: "Follow-up routing v3: reframed as 'message = topic, thread = context'. LLM uses thread to identify meeting/company and message to determine what user wants NOW. No contract defaults — contract is chosen based on the current message's topic.", date: "2026-02-18" },
+        { version: "2026-02-18-005", reason: "Follow-up routing fix v2: follow-ups about a previous summary now select the best-fit contract (EXTRACTIVE_FACT, ATTENDEES, NEXT_STEPS, etc.) instead of hardcoding EXTRACTIVE_FACT. Key rule: follow-up is NEVER a request to regenerate the summary.", date: "2026-02-18" },
+        { version: "2026-02-18-004", reason: "Follow-up routing fix: added CRITICAL section for follow-up questions about a previous summary — routes to EXTRACTIVE_FACT instead of regenerating MEETING_SUMMARY. Covers patterns like 'why didn't you mention X', 'what about the escrow discussion', 'you missed the part about SSO'.", date: "2026-02-18" },
         { version: "2026-02-18-003", reason: "Simplified chain-of-thought: single reasoning field before intent, letting model reason through what user wants before picking enum value", date: "2026-02-18" },
         { version: "2026-02-18-002", reason: "Chain-of-thought reasoning: restructured JSON schema so model reasons through data source and intent before labeling. Moved reasoning, extractedCompany, conversationContext before intent field to force deliberate classification", date: "2026-02-18" },
         { version: "2026-02-18-001", reason: "Enforce exact enum values in intent response — LLM was returning synonyms like 'summary' instead of 'SINGLE_MEETING', causing fallback to GENERAL_RESPONSE", date: "2026-02-18" },
@@ -88,6 +93,10 @@ export const PROMPT_CHANGE_LOG: Record<string, Array<{ version: string; reason: 
         { version: "2026-02-17-001", reason: "Initial version with prompt version control system", date: "2026-02-17" }
     ],
     RAG_MEETING_SUMMARY_SYSTEM_PROMPT: [
+        { version: "2026-02-18-012", reason: "v15 No Noise Removal: removed 'No Noise' rule entirely — it was filtering out brief but critical topics like Escrow and SOC2. Also removed 'Compliance Override' (no longer needed). Guardrails reduced to 4 rules.", date: "2026-02-18" },
+        { version: "2026-02-18-011", reason: "v14 Compliance Override: added Rule #3 making Legal/Security/Insolvency/Liability topics immune to 'No Noise' filter; renamed directive #2 to 'The Compliance Check' shifting mindset from negotiation to verification; mandate example uses 'verified to have' wording.", date: "2026-02-18" },
+        { version: "2026-02-18-010", reason: "v13 Mandate Verification: added CRITICAL rule for feature verification (Escrow, SOC2, Encryption) where 'YES' answer must be logged as Agreed Mandate; updated output format to explicitly include Verified Legal/Security Capabilities.", date: "2026-02-18" },
+        { version: "2026-02-18-009", reason: "v12 Keyword Anchoring: restored explicit Legal/Security/Business keyword lists (Insolvency, Escrow, Liability, IP Ownership, SSO, Data Residency, SOC2, Budget caps, Hard Deadlines) to Gatekeeper directive; added CRITICAL rule to never omit Legal/Security mandates even if briefly discussed; Mandates output section now references Escrow/Liability explicitly.", date: "2026-02-18" },
         { version: "2026-02-18-008", reason: "v8 polish: added Security Breach to hypothetical risk examples; Gatekeeper subtitle clarified to 'Separating Risks vs. Mandates' with AWS example; owner integrity now blocks context-based inference; 'We Should' trap explicitly says NOT Action Items; sentiment justification requires plain language.", date: "2026-02-18" },
         { version: "2026-02-18-007", reason: "v7 Split Sections: separated Risks (active threats) from Mandates (agreed constraints) into dedicated output sections; added Stalled & Deferred Decisions section; sentiment requires justification; anti-hallucination rules for quotes and owner inference; strict Executive Summary vs Insights boundary.", date: "2026-02-18" },
         { version: "2026-02-18-006", reason: "v6 Gatekeeper rework: replaced Universal Gatekeepers taxonomy with Classify the Outcome (IF UNRESOLVED→BLOCKER, IF AGREED→MANDATE); output header renamed to 'Risks, Blockers & Mandates' with Risk/Mandate status labels; tightened prose throughout directives.", date: "2026-02-18" },

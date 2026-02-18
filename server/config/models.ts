@@ -155,8 +155,8 @@ export const MODEL_ASSIGNMENTS = {
   TRANSCRIPT_ANALYSIS: LLM_MODELS.HEAVY_ANALYSIS,
   COMPLEX_SYNTHESIS: LLM_MODELS.HEAVY_ANALYSIS,
 
-  // Meeting Summary - Heavy analysis (reads raw transcript + structured data checklist)
-  MEETING_SUMMARY: LLM_MODELS.HEAVY_ANALYSIS,
+  // Meeting Summary - Optimized for transcript synthesis
+  MEETING_SUMMARY: GEMINI_MODELS.FLASH,
 
   // Semantic Answer - Gemini 2.5 Flash for fast transcript analysis with 1M context
   SEMANTIC_ANSWER_SYNTHESIS: GEMINI_MODELS.FLASH,

@@ -3,6 +3,7 @@ import { MODEL_ASSIGNMENTS } from "../../config/models";
 import { storage } from "../../storage";
 import { OpenAI } from "openai";
 import { AnswerContract } from "../../decisionLayer/answerContracts";
+import { generateText } from "../../llm/client";
 import { getComprehensiveProductKnowledge, formatProductKnowledgeForPrompt } from "../../airtable/productData";
 import {
   buildCustomerQuestionsAssessmentPrompt,
@@ -419,7 +420,7 @@ export async function handleSummaryIntent(
 
   const userPrompt = buildSingleMeetingSummaryPrompt(summaryData, transcriptText);
 
-  const response = await getOpenAI().chat.completions.create({
+  const llmResponse = await generateText({
     model: MODEL_ASSIGNMENTS.MEETING_SUMMARY,
     messages: [
       { role: "system", content: getMeetingSummarySystemPrompt() },
@@ -427,7 +428,7 @@ export async function handleSummaryIntent(
     ],
   });
 
-  const summary = response.choices[0]?.message?.content || "Unable to generate meeting summary.";
+  const summary = llmResponse.text || "Unable to generate meeting summary.";
 
   return {
     answer: summary,

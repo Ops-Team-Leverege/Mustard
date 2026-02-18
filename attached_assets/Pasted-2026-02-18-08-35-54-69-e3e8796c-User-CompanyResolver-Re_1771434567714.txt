@@ -1,0 +1,184 @@
+2026-02-18 08:35:54.69
+e3e8796c
+User
+[CompanyResolver] Resolved from LLM extraction: Costco
+2026-02-18 08:35:54.69
+e3e8796c
+User
+[MeetingResolver] Detected "last meeting" pattern for Costco
+2026-02-18 08:35:54.69
+e3e8796c
+User
+[MeetingResolver] Using LLM-extracted company context: Costco
+2026-02-18 08:35:54.69
+e3e8796c
+User
+[MeetingResolver] Resolving meeting from message: "what key details would be worth sharing from our l..." (llmDetected=false)
+2026-02-18 08:35:56.59
+e3e8796c
+User
+[Slack] Meeting resolved: 9fd8d931-902a-4396-b311-960c9428aeac (Costco)
+2026-02-18 08:35:56.79
+e3e8796c
+User
+[INFO] [c5d65d6e] Decision Layer completed {"correlationId":"c5d65d6e","channel":"D0A7A4R9C04","threadTs":"1771432541.582999","userId":"U082TV42FM0","duration":10900,"intent":"SINGLE_MEETING","contract":"MEETING_SUMMARY","method":"llm","resolvedMeetingId":"9fd8d931-902a-4396-b311-960c9428aeac","duration_ms":5287}
+2026-02-18 08:35:57.59
+e3e8796c
+User
+[Slack] Single-meeting streaming placeholder posted: ts=1771432557.471849
+2026-02-18 08:35:57.77
+e3e8796c
+User
+[Slack] Single-meeting mode activated for meeting 9fd8d931-902a-4396-b311-960c9428aeac (Costco)
+2026-02-18 08:35:57.77
+e3e8796c
+User
+[SingleMeeting] Executing contract=MEETING_SUMMARY for meeting 9fd8d931-902a-4396-b311-960c9428aeac
+2026-02-18 08:35:57.77
+e3e8796c
+User
+[SingleMeeting] Question: "what key details would be worth sharing from our last call with Costco on feb 10th for those who wer..."
+2026-02-18 08:35:57.85
+e3e8796c
+User
+[SingleMeeting] Summary v4: 100 chunks, transcript-only extraction
+2026-02-18 08:35:58.81
+e3e8796c
+User
+Slack payload type: event_callback
+2026-02-18 08:35:58.81
+e3e8796c
+User
+Event type: message
+2026-02-18 08:35:58.81
+e3e8796c
+User
+[Slack] Received event request
+2026-02-18 08:35:58.81
+e3e8796c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T16:35:58.818Z ==========
+2026-02-18 08:35:58.81
+e3e8796c
+User
+[Slack] Ignoring bot message (preventing loop)
+2026-02-18 08:35:58.81
+e3e8796c
+User
+4:35:58 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-18 08:35:59.59
+e3e8796c
+User
+[Slack] Updated placeholder with progress: "Gathering key points from the February 10th call w..."
+2026-02-18 08:35:59.59
+e3e8796c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T16:35:59.594Z ==========
+2026-02-18 08:35:59.59
+e3e8796c
+User
+[Slack] Received event request
+2026-02-18 08:35:59.59
+e3e8796c
+User
+Event type: message
+2026-02-18 08:35:59.59
+e3e8796c
+User
+4:35:59 PM [express] POST /api/slack/events 200 in 1ms
+2026-02-18 08:35:59.59
+e3e8796c
+User
+Slack payload type: event_callback
+2026-02-18 08:35:59.59
+e3e8796c
+User
+[Slack] Ignoring message subtype: message_changed
+2026-02-18 08:36:55.39
+e3e8796c
+User
+[Slack] Document decision: testRun=false, contract=NONE, streaming=true, willGenerateDoc=false
+2026-02-18 08:36:55.39
+e3e8796c
+User
+[INFO] [c5d65d6e] Single meeting response generated {"correlationId":"c5d65d6e","channel":"D0A7A4R9C04","threadTs":"1771432541.582999","userId":"U082TV42FM0","duration":69599,"intent":"summary","dataSource":"summary","duration_ms":57698}
+2026-02-18 08:36:55.39
+e3e8796c
+User
+[Slack] Appended slack_search offer to meeting-based response
+2026-02-18 08:36:55.39
+e3e8796c
+User
+[Slack] Single-meeting response: intent=summary, source=summary, pendingOffer=undefined, semantic=N/A
+2026-02-18 08:36:55.39
+e3e8796c
+User
+[Slack] Pipeline completed in 67193ms, progressMessages=0
+2026-02-18 08:36:56.32
+e3e8796c
+User
+[Slack] Checking if response needs document generation (word count check)
+2026-02-18 08:36:56.32
+e3e8796c
+User
+[Slack] Updated streaming placeholder with final content (3394 chars)
+2026-02-18 08:36:56.70
+e3e8796c
+User
+[DocumentResponse] Contract: GENERAL_RESPONSE, Words: 501, Generate doc: true
+2026-02-18 08:36:56.70
+e3e8796c
+User
+[DocumentResponse] Starting document generation for contract: GENERAL_RESPONSE
+2026-02-18 08:36:56.70
+e3e8796c
+User
+[DocumentGenerator] Contract not in list, checking word count: 501 > 300 = true
+2026-02-18 08:36:56.70
+e3e8796c
+User
+[DocumentResponse] Document title: Costco Report
+2026-02-18 08:36:56.79
+e3e8796c
+User
+[DocumentResponse] Parsed 1 sections
+2026-02-18 08:36:56.85
+e3e8796c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T16:36:56.858Z ==========
+2026-02-18 08:36:56.87
+e3e8796c
+User
+Event type: message
+2026-02-18 08:36:57.49
+e3e8796c
+User
+[Slack] Document generated - updating streaming message to preview
+2026-02-18 08:36:58.18
+e3e8796c
+User
+[Slack] Document check complete
+2026-02-18 08:36:58.18
+e3e8796c
+User
+[INFO] [c5d65d6e] Request completed successfully {"correlationId":"c5d65d6e","channel":"D0A7A4R9C04","threadTs":"1771432541.582999","userId":"U082TV42FM0","duration":72491,"intent":"SINGLE_MEETING","contract":"MEETING_SUMMARY","responseLength":3394,"totalTimeMs":67193,"stages":{"meeting_resolution":1900,"decision_layer":5287,"handler":57698}}
+2026-02-18 08:36:58.19
+e3e8796c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T16:36:58.193Z ==========
+2026-02-18 08:36:58.19
+e3e8796c
+User
+[Slack] Received event request
+2026-02-18 08:36:58.19
+e3e8796c
+User
+Slack payload type: event_callback
+2026-02-18 08:36:59.04
+e3e8796c
+User
+[Slack] Received event request
+2026-02-18 08:36:59.04
+e3e8796c
+User
+[Slack] ========== EVENT RECEIVED AT 2026-02-18T16:36:59.043Z ==========

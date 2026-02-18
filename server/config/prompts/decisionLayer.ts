@@ -177,6 +177,11 @@ User: "In slack, someone mentioned a recommended time length for a pilot at Pomp
 → Intent: SLACK_SEARCH, Company: Pomps, Contracts: ["SLACK_MESSAGE_SEARCH"]
 (User explicitly said "in Slack" - search Slack messages, not meeting transcripts)
 
+THREAD CONTEXT RULE:
+When a user replies in a thread, treat the **message as the topic** and the **thread as context**.
+- The thread tells you WHICH meeting/company/context to use.
+- The message tells you WHAT the user wants to know NOW.
+
 CLARIFICATION RESPONSES:
 If the bot's LAST message asked for clarification and user responds:
 - "last month is fine" → Continue with original intent + time context
@@ -186,10 +191,10 @@ If the bot's LAST message asked for clarification and user responds:
 CONTRACT SELECTION (propose the best contract for this request):
 SINGLE_MEETING contracts:
 - NEXT_STEPS: Action items, follow-ups, commitments, next steps, what to do next
-- MEETING_SUMMARY: General summary or recap of a meeting
+- MEETING_SUMMARY: Summary, recap, overview, key details, highlights, or briefing of a meeting. Use this when the user wants to catch up on what happened, share with people who missed it, or get an overall picture. Examples: "summarize the call", "key details worth sharing", "what happened in the meeting", "brief me on the call", "catch me up"
 - ATTENDEES: Who was in the meeting, participants
 - CUSTOMER_QUESTIONS: Questions the customer asked
-- EXTRACTIVE_FACT: Specific factual information from a meeting
+- EXTRACTIVE_FACT: A specific factual detail or topic from a meeting. Use this when the user asks about ONE specific thing (e.g., "what did they say about escrow?", "did they mention pricing?"). Do NOT use this for broad overview requests.
 
 MULTI_MEETING contracts:
 - PATTERN_ANALYSIS: Patterns, trends, common themes across meetings
