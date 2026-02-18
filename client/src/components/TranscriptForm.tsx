@@ -799,7 +799,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               </div>
             </div>
 
-            {selectedCompanyId && companyContacts.length > 0 && (
+            {primaryCompanyId && companyContacts.length > 0 && (
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
@@ -810,7 +810,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               </div>
             )}
 
-            {selectedCompanyId && companyContacts.length > 0 && (
+            {primaryCompanyId && companyContacts.length > 0 && (
               <Popover open={existingContactOpen} onOpenChange={setExistingContactOpen}>
                 <PopoverTrigger asChild>
                   <Button
