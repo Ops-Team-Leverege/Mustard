@@ -7,8 +7,7 @@ import { Link } from "wouter";
 import { useState } from "react";
 import { format } from "date-fns";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+import type { Product } from "@shared/schema";
 
 interface User {
   id: string;

@@ -28,8 +28,7 @@ import mustardLogo from "@assets/ChatGPT Image Oct 17, 2025, 01_05_54 PM_1760720
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useRef, useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
+import type { Product } from "@shared/schema";
 
 interface User {
   id: string;

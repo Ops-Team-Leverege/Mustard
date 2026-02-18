@@ -13,10 +13,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import type { Company } from "@shared/schema";
+import type { Company, Product } from "@shared/schema";
 import { cn } from "@/lib/utils";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "Partnerships";
 
 interface User {
   id: string;

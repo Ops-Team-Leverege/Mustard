@@ -19,9 +19,7 @@ import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { CompanyOverview, Contact } from "@shared/schema";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+import type { CompanyOverview, Contact, Product } from "@shared/schema";
 
 interface User {
   id: string;

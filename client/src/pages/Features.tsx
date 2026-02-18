@@ -5,7 +5,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertFeatureSchema, type InsertFeature } from "@shared/schema";
+import { insertFeatureSchema, type InsertFeature, type Product } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,8 +53,6 @@ import {
 import { Plus, Pencil, Trash2, ExternalLink, Search, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
 
 interface User {
   id: string;

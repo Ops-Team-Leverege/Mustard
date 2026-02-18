@@ -7,8 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Search, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
+import type { Product } from "@shared/schema";
 
 interface User {
   id: string;

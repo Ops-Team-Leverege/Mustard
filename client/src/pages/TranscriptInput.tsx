@@ -6,8 +6,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery } from "@tanstack/react-query";
-
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+import type { Product } from "@shared/schema";
 
 interface User {
   id: string;
