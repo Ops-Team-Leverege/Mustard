@@ -141,20 +141,24 @@ export function generateFileName(type: string, customer?: string): string {
 }
 
 /**
- * Parse inline markdown (bold and links) and return array of TextRun/ExternalHyperlink.
- * Handles **word** patterns and [text](url) links within text.
+ * Parse inline markdown (bold, italic, and links) and return array of TextRun/ExternalHyperlink.
+ * Supports both standard markdown (**bold**) and Slack markdown (*bold*, _italic_).
+ * Also handles combined bold+italic patterns like *_text_*.
  */
 function parseInlineMarkdown(text: string): (TextRun | ExternalHyperlink)[] {
   const children: (TextRun | ExternalHyperlink)[] = [];
   
-  // Combined regex for bold and markdown links
-  // Matches: **bold text** or [link text](url)
-  const inlineRegex = /\*\*(.+?)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+  // Combined regex for all inline formatting:
+  // 1. **bold text** (standard markdown bold)
+  // 2. *bold text* (Slack bold) - but not ** or *  at word boundaries
+  // 3. _italic text_ (Slack italic) - not __ 
+  // 4. [link text](url) (markdown links)
+  // Order matters: ** must be checked before * to avoid partial matches
+  const inlineRegex = /\*\*(.+?)\*\*|\*([^*]+?)\*|_([^_]+?)_|\[([^\]]+)\]\(([^)]+)\)/g;
   let lastIndex = 0;
   let match;
   
   while ((match = inlineRegex.exec(text)) !== null) {
-    // Add text before this match
     if (match.index > lastIndex) {
       children.push(new TextRun({
         text: text.substring(lastIndex, match.index),
@@ -162,42 +166,57 @@ function parseInlineMarkdown(text: string): (TextRun | ExternalHyperlink)[] {
     }
     
     if (match[1]) {
-      // Bold text: **text**
       children.push(new TextRun({
         text: match[1],
         bold: true,
       }));
-    } else if (match[2] && match[3]) {
-      // Markdown link: [text](url)
+    } else if (match[2]) {
+      children.push(new TextRun({
+        text: match[2],
+        bold: true,
+      }));
+    } else if (match[3]) {
+      children.push(new TextRun({
+        text: match[3],
+        italics: true,
+      }));
+    } else if (match[4] && match[5]) {
       children.push(new ExternalHyperlink({
         children: [
           new TextRun({
-            text: match[2],
+            text: match[4],
             style: "Hyperlink",
             color: "0563C1",
             underline: { type: "single" },
           }),
         ],
-        link: match[3],
+        link: match[5],
       }));
     }
     
     lastIndex = match.index + match[0].length;
   }
   
-  // Add remaining text after last match
   if (lastIndex < text.length) {
     children.push(new TextRun({
       text: text.substring(lastIndex),
     }));
   }
   
-  // If no matches, return original text
   if (children.length === 0) {
     children.push(new TextRun({ text }));
   }
   
   return children;
+}
+
+/**
+ * Check if a line is a Slack-style bold header: *Header Text*
+ * Must start and end with * (single), not be a bullet, and contain no other * inside.
+ */
+function isSlackBoldHeader(line: string): string | null {
+  const match = line.match(/^\*([^*]+)\*$/);
+  return match ? match[1] : null;
 }
 
 function parseMarkdownContent(content: string): Paragraph[] {
@@ -257,6 +276,28 @@ function parseMarkdownContent(content: string): Paragraph[] {
           }),
         ],
         spacing: { before: 200, after: 100 },
+      }));
+    } else if (isSlackBoldHeader(trimmed)) {
+      const headerText = isSlackBoldHeader(trimmed)!;
+      paragraphs.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: headerText,
+            bold: true,
+            size: 26,
+          }),
+        ],
+        spacing: { before: 300, after: 150 },
+      }));
+    } else if (trimmed.startsWith('_') && trimmed.endsWith('_') && !trimmed.startsWith('__')) {
+      paragraphs.push(new Paragraph({
+        children: [
+          new TextRun({
+            text: trimmed.slice(1, -1),
+            italics: true,
+          }),
+        ],
+        spacing: { before: 100, after: 100 },
       }));
     } else {
       // Parse inline markdown for regular text
@@ -486,6 +527,18 @@ export function contentToSections(content: string, title?: string): DocumentSect
         });
       }
       currentSection = { heading: trimmed.substring(2), level: 1, content: '' };
+      currentContent = [];
+    }
+    // Handle Slack-style *Bold Header* lines (standalone bold lines used as section headers)
+    else if (isSlackBoldHeader(trimmed)) {
+      if (currentSection || currentContent.length > 0) {
+        sections.push({
+          heading: currentSection?.heading,
+          level: currentSection?.level || 2,
+          content: currentContent.join('\n'),
+        });
+      }
+      currentSection = { heading: isSlackBoldHeader(trimmed)!, level: 2, content: '' };
       currentContent = [];
     } else {
       currentContent.push(line);
