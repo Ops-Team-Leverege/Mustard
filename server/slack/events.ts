@@ -1136,6 +1136,19 @@ export async function slackEventsHandler(req: Request, res: Response) {
             { companyId: resolvedCompanyId || undefined, meetingId: resolvedMeetingId },
             {
               entryPoint: "slack",
+              decisionLayer: decisionLayerResult ? {
+                intent: decisionLayerResult.intent,
+                intentDetectionMethod: (decisionLayerResult.intentDetectionMethod as "keyword" | "pattern" | "entity" | "llm" | "default") || "llm",
+                contextLayers: decisionLayerResult.contextLayers ?? {
+                  product_identity: true,
+                  product_ssot: false,
+                  single_meeting: true,
+                  multi_meeting: false,
+                  slack_search: false,
+                },
+                answerContract: decisionLayerResult.answerContract,
+                contractSelectionMethod: (decisionLayerResult.contractSelectionMethod as "keyword" | "llm" | "default") || "default",
+              } : undefined,
               legacyIntent: mappedIntent,
               answerShape: mappedShape,
               dataSource: mappedDataSource,
@@ -1147,7 +1160,7 @@ export async function slackEventsHandler(req: Request, res: Response) {
               semanticAnswerUsed,
               semanticConfidence,
               pendingOffer,
-              lastResponseType: dataSource, // Track for follow-up context
+              lastResponseType: dataSource,
               promptVersions: mergePromptVersionRecords(
                 decisionLayerResult?.promptVersions,
                 downstreamPromptVersions,
