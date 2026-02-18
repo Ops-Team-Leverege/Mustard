@@ -362,7 +362,7 @@ export const insertCompanySchema = createInsertSchema(companies).omit({
   createdAt: true,
 }).extend({
   product: z.enum(PRODUCTS).default("PitCrew"),
-  stage: z.enum(["Prospect", "Pilot", "Rollout", "Scale"]).optional(),
+  stage: z.enum(["Prospect", "Pilot", "Rollout", "Scale", "Partnership"]).optional(),
   serviceTags: z.array(z.enum(["tire services", "oil & express services", "commercial truck services", "full services"])).optional(),
 });
 

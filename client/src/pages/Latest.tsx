@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Rocket, Calendar } from "lucide-react";
+import { FileText, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
@@ -11,13 +11,6 @@ interface RecentTranscript {
   name: string | null;
   companyName: string;
   createdAt: Date;
-}
-
-interface RecentFeature {
-  id: string;
-  name: string;
-  description: string | null;
-  releaseDate: Date;
 }
 
 interface ProductInsight {
@@ -54,20 +47,9 @@ interface Category {
   name: string;
 }
 
-interface Feature {
-  id: string;
-  name: string;
-  description: string | null;
-  releaseDate: Date | null;
-}
-
 export default function Latest() {
   const { data: recentTranscripts = [] } = useQuery<RecentTranscript[]>({
     queryKey: ['/api/dashboard/recent-transcripts'],
-  });
-
-  const { data: features = [] } = useQuery<Feature[]>({
-    queryKey: ['/api/features'],
   });
 
   const { data: insights = [] } = useQuery<ProductInsight[]>({
@@ -82,26 +64,11 @@ export default function Latest() {
     queryKey: ['/api/categories'],
   });
 
-  // Filter features released in the last 7 days
+  // Filter insights from last 7 days
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const recentFeatures: RecentFeature[] = features
-    .filter((feature) => {
-      if (!feature.releaseDate) return false;
-      const releaseDate = new Date(feature.releaseDate);
-      return releaseDate >= sevenDaysAgo && releaseDate <= new Date();
-    })
-    .map(f => ({
-      id: f.id,
-      name: f.name,
-      description: f.description,
-      releaseDate: new Date(f.releaseDate!),
-    }))
-    .sort((a, b) => b.releaseDate.getTime() - a.releaseDate.getTime());
-
-  // Filter insights from last 7 days
   const now = new Date();
+
   const recentInsights = insights
     .filter((insight) => {
       const createdDate = new Date(insight.createdAt);
@@ -188,59 +155,11 @@ export default function Latest() {
             )}
           </CardContent>
         </Card>
-
-        {/* Recent Releases Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Rocket className="h-4 w-4" />
-              Recent Releases (Last 7 Days)
-            </CardTitle>
-            <CardDescription>Recently released features</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentFeatures.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No releases in the last 7 days
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {recentFeatures.map((feature) => (
-                  <Link key={feature.id} href={`/features/${feature.id}`}>
-                    <div 
-                      className="flex items-start justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer border" 
-                      data-testid={`recent-feature-${feature.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {feature.name}
-                        </p>
-                        {feature.description && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                            {feature.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                        <Calendar className="h-3 w-3" />
-                        {(() => {
-                          const dateStr = typeof feature.releaseDate === 'string' ? feature.releaseDate : feature.releaseDate.toISOString();
-                          const datePart = dateStr.split('T')[0];
-                          return format(new Date(datePart + 'T12:00:00'), 'MMM d');
-                        })()}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
-      {/* Recent Product Insights */}
+      {/* Recent Insights */}
       <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">Recent Product Insights (Last 7 Days)</h3>
+        <h3 className="text-lg font-semibold mb-3">Recent Insights (Last 7 Days)</h3>
         {recentInsights.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">

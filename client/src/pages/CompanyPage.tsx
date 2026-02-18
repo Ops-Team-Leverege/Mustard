@@ -69,12 +69,12 @@ export default function CompanyPage() {
   const updateMutation = useMutation({
     mutationFn: async (data: { name: string; companyDescription: string; numberOfStores: string; stage: string; pilotStartDate: string; serviceTags: string[] }) => {
       if (!overview?.company.id) throw new Error("Company not found");
-      
+
       let pilotStartDateISO = null;
       if (data.pilotStartDate) {
         pilotStartDateISO = new Date(data.pilotStartDate + 'T12:00:00').toISOString();
       }
-      
+
       const res = await apiRequest('PATCH', `/api/companies/${overview.company.id}`, {
         name: data.name,
         notes: overview.company.notes,
@@ -87,7 +87,7 @@ export default function CompanyPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && key.startsWith('/api/companies');
@@ -120,7 +120,7 @@ export default function CompanyPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
@@ -152,7 +152,7 @@ export default function CompanyPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
@@ -180,7 +180,7 @@ export default function CompanyPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
@@ -207,13 +207,13 @@ export default function CompanyPage() {
       return res.json();
     },
     onSuccess: (data: { merged: number; kept: number }) => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && (key.startsWith('/api/companies') || key.startsWith('/api/qa-pairs'));
         }
       });
-      
+
       if (data.merged > 0) {
         toast({
           title: "Success",
@@ -331,7 +331,7 @@ export default function CompanyPage() {
       const date = new Date(overview.company.pilotStartDate);
       pilotStartDateString = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
     }
-    
+
     setEditForm({
       name: overview?.company.name || '',
       companyDescription: overview?.company.companyDescription || '',
@@ -407,8 +407,8 @@ export default function CompanyPage() {
 
   const handleSaveTranscript = () => {
     if (!editingTranscriptId || !editTranscriptName.trim()) return;
-    updateTranscriptMutation.mutate({ 
-      id: editingTranscriptId, 
+    updateTranscriptMutation.mutate({
+      id: editingTranscriptId,
       name: editTranscriptName.trim(),
       createdAt: editTranscriptDate ? new Date(editTranscriptDate + 'T12:00:00').toISOString() : undefined,
     });
@@ -531,8 +531,8 @@ export default function CompanyPage() {
                       <h3 className="text-sm font-semibold mb-1">Pilot Start Date</h3>
                       <p className="text-sm text-muted-foreground" data-testid="text-pilot-start-date">
                         {(() => {
-                          const isoString = typeof overview.company.pilotStartDate === 'string' 
-                            ? overview.company.pilotStartDate 
+                          const isoString = typeof overview.company.pilotStartDate === 'string'
+                            ? overview.company.pilotStartDate
                             : overview.company.pilotStartDate.toISOString();
                           const datePart = isoString.split('T')[0];
                           const [year, month, day] = datePart.split('-').map(Number);
@@ -587,6 +587,7 @@ export default function CompanyPage() {
                         <SelectItem value="Pilot">Pilot</SelectItem>
                         <SelectItem value="Rollout">Rollout</SelectItem>
                         <SelectItem value="Scale">Scale</SelectItem>
+                        <SelectItem value="Partnership">Partnership</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -673,7 +674,7 @@ export default function CompanyPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ProductInsightsTable 
+              <ProductInsightsTable
                 insights={overview.insights.map(i => ({
                   ...i,
                   category: i.categoryName || 'NEW',
@@ -692,7 +693,7 @@ export default function CompanyPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <QATable 
+              <QATable
                 qaPairs={overview.qaPairs.map(qa => ({
                   ...qa,
                   companyId: qa.companyId || overview.company.id,
@@ -715,196 +716,196 @@ export default function CompanyPage() {
                     Customer contacts from {overview.company.name}
                   </CardDescription>
                 </div>
-            {!isAddingContact && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => mergeDuplicateContactsMutation.mutate()}
-                  disabled={mergeDuplicateContactsMutation.isPending}
-                  data-testid="button-merge-duplicates"
-                >
-                  <GitMerge className="h-4 w-4 mr-2" />
-                  Merge Duplicates
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setIsAddingContact(true)}
-                  data-testid="button-add-contact"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Contact
-                </Button>
+                {!isAddingContact && (
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => mergeDuplicateContactsMutation.mutate()}
+                      disabled={mergeDuplicateContactsMutation.isPending}
+                      data-testid="button-merge-duplicates"
+                    >
+                      <GitMerge className="h-4 w-4 mr-2" />
+                      Merge Duplicates
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsAddingContact(true)}
+                      data-testid="button-add-contact"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Contact
+                    </Button>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {isAddingContact && (
-              <div className="border rounded-md p-4 space-y-3 bg-muted/30">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Name</label>
-                    <Input
-                      value={newContact.name}
-                      onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                      placeholder="Contact name"
-                      data-testid="input-contact-name"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Name in Transcript</label>
-                    <Input
-                      value={newContact.nameInTranscript}
-                      onChange={(e) => setNewContact({ ...newContact, nameInTranscript: e.target.value })}
-                      placeholder="Name as appears in transcript"
-                      data-testid="input-contact-name-in-transcript"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium mb-1 block">Job Title</label>
-                    <Input
-                      value={newContact.jobTitle}
-                      onChange={(e) => setNewContact({ ...newContact, jobTitle: e.target.value })}
-                      placeholder="e.g., VP of Engineering"
-                      data-testid="input-contact-job-title"
-                    />
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleAddContact}
-                    disabled={!newContact.name.trim() || createContactMutation.isPending}
-                    data-testid="button-save-contact"
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    Save Contact
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setIsAddingContact(false);
-                      setNewContact({ name: '', nameInTranscript: '', jobTitle: '' });
-                    }}
-                    disabled={createContactMutation.isPending}
-                    data-testid="button-cancel-add-contact"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {overview.contacts && overview.contacts.length > 0 ? (
-              <div className="space-y-2">
-                {overview.contacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="flex items-center justify-between gap-4 p-3 border rounded-md hover-elevate"
-                    data-testid={`contact-${contact.id}`}
-                  >
-                    {editingContactId === contact.id ? (
-                      <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {isAddingContact && (
+                  <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Name</label>
                         <Input
-                          value={editContactForm.name}
-                          onChange={(e) => setEditContactForm({ ...editContactForm, name: e.target.value })}
+                          value={newContact.name}
+                          onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
                           placeholder="Contact name"
-                          data-testid={`input-edit-contact-name-${contact.id}`}
-                        />
-                        <Input
-                          value={editContactForm.nameInTranscript}
-                          onChange={(e) => setEditContactForm({ ...editContactForm, nameInTranscript: e.target.value })}
-                          placeholder="Name in transcript"
-                          data-testid={`input-edit-contact-name-in-transcript-${contact.id}`}
-                        />
-                        <Input
-                          value={editContactForm.jobTitle}
-                          onChange={(e) => setEditContactForm({ ...editContactForm, jobTitle: e.target.value })}
-                          placeholder="Job title"
-                          data-testid={`input-edit-contact-job-title-${contact.id}`}
+                          data-testid="input-contact-name"
                         />
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <User className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate" data-testid={`text-contact-name-${contact.id}`}>
-                            {contact.name}
-                          </p>
-                          {contact.jobTitle && (
-                            <p className="text-sm text-muted-foreground truncate" data-testid={`text-contact-job-title-${contact.id}`}>
-                              {contact.jobTitle}
-                            </p>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Name in Transcript</label>
+                        <Input
+                          value={newContact.nameInTranscript}
+                          onChange={(e) => setNewContact({ ...newContact, nameInTranscript: e.target.value })}
+                          placeholder="Name as appears in transcript"
+                          data-testid="input-contact-name-in-transcript"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium mb-1 block">Job Title</label>
+                        <Input
+                          value={newContact.jobTitle}
+                          onChange={(e) => setNewContact({ ...newContact, jobTitle: e.target.value })}
+                          placeholder="e.g., VP of Engineering"
+                          data-testid="input-contact-job-title"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={handleAddContact}
+                        disabled={!newContact.name.trim() || createContactMutation.isPending}
+                        data-testid="button-save-contact"
+                      >
+                        <Check className="h-4 w-4 mr-2" />
+                        Save Contact
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setIsAddingContact(false);
+                          setNewContact({ name: '', nameInTranscript: '', jobTitle: '' });
+                        }}
+                        disabled={createContactMutation.isPending}
+                        data-testid="button-cancel-add-contact"
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {overview.contacts && overview.contacts.length > 0 ? (
+                  <div className="space-y-2">
+                    {overview.contacts.map((contact) => (
+                      <div
+                        key={contact.id}
+                        className="flex items-center justify-between gap-4 p-3 border rounded-md hover-elevate"
+                        data-testid={`contact-${contact.id}`}
+                      >
+                        {editingContactId === contact.id ? (
+                          <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <Input
+                              value={editContactForm.name}
+                              onChange={(e) => setEditContactForm({ ...editContactForm, name: e.target.value })}
+                              placeholder="Contact name"
+                              data-testid={`input-edit-contact-name-${contact.id}`}
+                            />
+                            <Input
+                              value={editContactForm.nameInTranscript}
+                              onChange={(e) => setEditContactForm({ ...editContactForm, nameInTranscript: e.target.value })}
+                              placeholder="Name in transcript"
+                              data-testid={`input-edit-contact-name-in-transcript-${contact.id}`}
+                            />
+                            <Input
+                              value={editContactForm.jobTitle}
+                              onChange={(e) => setEditContactForm({ ...editContactForm, jobTitle: e.target.value })}
+                              placeholder="Job title"
+                              data-testid={`input-edit-contact-job-title-${contact.id}`}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate" data-testid={`text-contact-name-${contact.id}`}>
+                                {contact.name}
+                              </p>
+                              {contact.jobTitle && (
+                                <p className="text-sm text-muted-foreground truncate" data-testid={`text-contact-job-title-${contact.id}`}>
+                                  {contact.jobTitle}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex gap-1 flex-shrink-0">
+                          {editingContactId === contact.id ? (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleSaveContact}
+                                disabled={!editContactForm.name.trim() || updateContactMutation.isPending}
+                                data-testid={`button-save-edit-contact-${contact.id}`}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={handleCancelEditContact}
+                                disabled={updateContactMutation.isPending}
+                                data-testid={`button-cancel-edit-contact-${contact.id}`}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleStartEditContact(contact)}
+                                data-testid={`button-edit-contact-${contact.id}`}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleDeleteContact(contact.id)}
+                                disabled={deleteContactMutation.isPending}
+                                data-testid={`button-delete-contact-${contact.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
                           )}
                         </div>
                       </div>
-                    )}
-                    <div className="flex gap-1 flex-shrink-0">
-                      {editingContactId === contact.id ? (
-                        <>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={handleSaveContact}
-                            disabled={!editContactForm.name.trim() || updateContactMutation.isPending}
-                            data-testid={`button-save-edit-contact-${contact.id}`}
-                          >
-                            <Check className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={handleCancelEditContact}
-                            disabled={updateContactMutation.isPending}
-                            data-testid={`button-cancel-edit-contact-${contact.id}`}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleStartEditContact(contact)}
-                            data-testid={`button-edit-contact-${contact.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleDeleteContact(contact.id)}
-                            disabled={deleteContactMutation.isPending}
-                            data-testid={`button-delete-contact-${contact.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  !isAddingContact && (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p>No contacts added yet</p>
+                      <p className="text-sm mt-1">Click "Add Contact" to add customer contacts</p>
+                    </div>
+                  )
+                )}
               </div>
-            ) : (
-              !isAddingContact && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <User className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                  <p>No contacts added yet</p>
-                  <p className="text-sm mt-1">Click "Add Contact" to add customer contacts</p>
-                </div>
-              )
-            )}
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="transcripts">
@@ -941,7 +942,7 @@ export default function CompanyPage() {
                             />
                           </div>
                         ) : (
-                          <div 
+                          <div
                             className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer"
                             onClick={() => navigate(`/transcripts/${transcript.id}`)}
                             data-testid={`button-navigate-transcript-${transcript.id}`}
@@ -1052,8 +1053,8 @@ export default function CompanyPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transcript</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{transcriptToDelete?.name || 'Untitled Transcript'}"? 
-              This will also permanently delete all product insights and Q&A pairs extracted from this transcript. 
+              Are you sure you want to delete "{transcriptToDelete?.name || 'Untitled Transcript'}"?
+              This will also permanently delete all product insights and Q&A pairs extracted from this transcript.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>

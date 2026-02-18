@@ -25,7 +25,7 @@ export default function TranscriptInput() {
 
   const handleSubmit = async (data: TranscriptData) => {
     if (isSubmitting) return; // Prevent double submission
-    
+
     setIsSubmitting(true);
     try {
       const submissionData = {
@@ -34,21 +34,21 @@ export default function TranscriptInput() {
       };
       const response = await apiRequest('POST', '/api/transcripts', submissionData);
       const result = await response.json();
-      
+
       // Invalidate all relevant caches to ensure fresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/companies'] });
       await queryClient.invalidateQueries({ queryKey: ['/api/transcripts'] });
-      
+
       toast({
         title: "Transcript Created",
         description: "AI analysis is running in the background. You'll see results as they become available.",
       });
-      
+
       // Navigate to transcript detail page immediately
       setLocation(`/transcripts/${result.transcript.id}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Failed to create transcript";
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -67,7 +67,7 @@ export default function TranscriptInput() {
         <AlertDescription className="ml-2">
           <span className="font-semibold text-lg">Adding transcript for: {currentProduct}</span>
           <p className="text-sm mt-1 text-muted-foreground">
-            This transcript will be saved to <strong>{currentProduct}</strong>. Use the product switcher in the header to change products.
+            This transcript will be saved to <strong>{currentProduct}</strong>.
           </p>
         </AlertDescription>
       </Alert>

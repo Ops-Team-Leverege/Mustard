@@ -519,6 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             notes: null,
             companyDescription: data.companyDescription || null,
             numberOfStores: data.numberOfStores || null,
+            stage: product === "Partnerships" ? "Partnership" : "Prospect",
             product,
           });
         }
@@ -887,6 +888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          stage: product === "Partnerships" ? "Partnership" : "Prospect",
           product,
         });
       }
@@ -943,6 +945,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          stage: product === "Partnerships" ? "Partnership" : "Prospect",
           product,
         });
       }
@@ -1037,6 +1040,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          stage: product === "Partnerships" ? "Partnership" : "Prospect",
           product,
         });
       }
@@ -1112,6 +1116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: company,
           slug,
           notes: null,
+          stage: product === "Partnerships" ? "Partnership" : "Prospect",
           product,
         });
       }

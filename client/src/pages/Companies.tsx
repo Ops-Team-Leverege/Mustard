@@ -42,6 +42,8 @@ function getStageStyles(stage: string) {
       return 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-950 dark:text-orange-300 dark:border-orange-900';
     case 'Scale':
       return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900';
+    case 'Partnership':
+      return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-950 dark:text-purple-300 dark:border-purple-900';
     default:
       return 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-800';
   }
@@ -52,6 +54,7 @@ const STAGE_COLORS: Record<string, string> = {
   'Pilot': '#3b82f6',
   'Rollout': '#f97316',
   'Scale': '#10b981',
+  'Partnership': '#a855f7',
   'Unknown': '#6b7280',
 };
 
@@ -187,7 +190,7 @@ export default function Companies() {
             </CardContent>
           </Card>
         </div>
-        
+
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -221,8 +224,8 @@ export default function Companies() {
                       <CardTitle className="text-base truncate">{company.name}</CardTitle>
                     </div>
                     {company.stage && (
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className={`text-xs flex-shrink-0 ${getStageStyles(company.stage)}`}
                         data-testid={`badge-stage-${company.id}`}
                       >

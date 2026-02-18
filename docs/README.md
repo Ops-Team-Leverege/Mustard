@@ -201,6 +201,168 @@ ORDER BY created_at DESC LIMIT 10;
 npm run db:push
 # 3. Verify changes
 ```
+
+---
+
+## Deployment Instructions for Replit
+
+### Transcript UI Improvements Deployment (February 2026)
+
+This deployment includes multi-company support, service tags bug fix, and Partnerships product features.
+
+#### Prerequisites
+- Replit environment with PostgreSQL database
+- Access to Replit console
+- Database backup recommended before deployment
+
+#### Step 1: Pull Latest Code
+```bash
+# In Replit Shell
+git pull origin main
+```
+
+#### Step 2: Install Dependencies
+```bash
+npm install
+```
+
+#### Step 3: Run Database Migrations
+**IMPORTANT**: These migrations must be run in order.
+
+```bash
+# Migration 1: Create junction tables
+# This creates transcript_companies and company_products tables
+psql $DATABASE_URL -f migrations/0001_add_junction_tables.sql
+
+# Migration 2: Populate junction tables from existing data
+# This backfills data from legacy fields for backward compatibility
+psql $DATABASE_URL -f migrations/0002_populate_junction_tables.sql
+```
+
+**Verify migrations succeeded**:
+```bash
+# Check that junction tables exist
+psql $DATABASE_URL -c "\dt transcript_companies"
+psql $DATABASE_URL -c "\dt company_products"
+
+# Check that data was populated
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM transcript_companies;"
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM company_products;"
+```
+
+#### Step 4: Update Schema
+```bash
+# Push schema changes to database
+npm run db:push
+```
+
+#### Step 5: Restart Application
+In Replit:
+1. Click "Stop" button
+2. Click "Run" button
+3. Wait for application to start
+
+#### Step 6: Verify Deployment
+
+**Backend Verification**:
+```bash
+# Test multi-company endpoint
+curl -X GET "https://your-replit-url.replit.dev/api/companies" \
+  -H "Cookie: your-session-cookie"
+
+# Should return companies with proper product filtering
+```
+
+**Frontend Verification**:
+1. Navigate to the web application
+2. Click "Add Transcript"
+3. Verify:
+   - ✅ Company selector shows multi-select with badges
+   - ✅ Meeting Name has red asterisk (required)
+   - ✅ Meeting Date has red asterisk (required)
+   - ✅ Can select multiple companies
+   - ✅ Can remove companies by clicking X on badges
+
+**Partnerships Product Verification**:
+1. Switch product to "Partnerships" in product selector
+2. Verify:
+   - ✅ "Categories" tab is hidden
+   - ✅ "Features" tab is hidden
+   - ✅ "Product Insights" is hidden in Databases dropdown
+   - ✅ Form title changes to "Add Partnership Meeting"
+   - ✅ If you navigate to /categories, see empty state message
+
+**Service Tags Verification**:
+1. Create a transcript with service tags selected
+2. Navigate to the company page
+3. Verify:
+   - ✅ Service tags appear in company record
+   - ✅ Tags are deduplicated (no duplicates)
+
+#### Step 7: Monitor for Issues
+
+**Check logs for errors**:
+```bash
+# In Replit console, watch for:
+# - Database connection errors
+# - Migration errors
+# - TypeScript compilation errors
+# - Runtime errors during transcript creation
+```
+
+**Test transcript creation**:
+1. Create a test transcript with multiple companies
+2. Verify it processes successfully (status: "completed")
+3. Check that junction table entries were created:
+```bash
+psql $DATABASE_URL -c "SELECT * FROM transcript_companies WHERE transcript_id = 'your-transcript-id';"
+```
+
+#### Rollback Instructions (If Needed)
+
+If issues occur, rollback:
+
+```bash
+# 1. Revert code
+git reset --hard HEAD~1
+
+# 2. Drop junction tables (data will be lost)
+psql $DATABASE_URL -c "DROP TABLE IF EXISTS transcript_companies CASCADE;"
+psql $DATABASE_URL -c "DROP TABLE IF EXISTS company_products CASCADE;"
+
+# 3. Restart application
+# Click Stop → Run in Replit
+```
+
+#### Known Issues & Considerations
+
+1. **Contacts Association**: Contacts are only created for the primary (first) company in multi-company transcripts. This is by design.
+
+2. **Backward Compatibility**: Legacy single-company transcripts will continue to work. The system queries both legacy fields and junction tables.
+
+3. **Partnerships Product**: Existing data is not affected. Only new transcripts created under Partnerships will skip product insights extraction.
+
+4. **Migration Idempotency**: Migrations can be run multiple times safely. They use `ON CONFLICT DO NOTHING` to prevent duplicates.
+
+#### Post-Deployment Checklist
+
+- [ ] Migrations completed successfully
+- [ ] Application restarted without errors
+- [ ] Multi-company selector working in UI
+- [ ] Required fields enforced (meeting name, date)
+- [ ] Partnerships product tabs hidden correctly
+- [ ] Service tags syncing to company records
+- [ ] Test transcript created and processed successfully
+- [ ] No errors in Replit console logs
+
+#### Support
+
+If issues arise:
+1. Check Replit console logs for errors
+2. Verify database migrations completed: `psql $DATABASE_URL -c "\dt"`
+3. Check TypeScript compilation: `npm run check`
+4. Review recent commits: `git log --oneline -5`
+
 ---
 
 ## Support

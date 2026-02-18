@@ -56,11 +56,15 @@ export interface TranscriptData {
 const LEVEREGE_TEAM_OPTIONS = [
   "Alison Leddy",
   "Calum McClelland",
+  "Cecilia Lu",
+  "Corey Chang",
   "Corey Redd",
+  "Danielle Mann",
   "Eric Conn",
   "Hannah White",
   "Julia Conn",
   "Kevin Moran",
+  "Lauren Winkler",
   "Matthew Ok",
   "Ryan Chacon",
   "Shela Duong",
@@ -125,8 +129,11 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
    * 
    * Load contacts for the primary company when only one company is selected.
    * This enables the quick-add existing contacts feature.
+   * 
+   * UPDATE: Also load contacts when multiple companies are selected (from first company)
+   * to allow searching existing contacts even in multi-company scenarios.
    */
-  const primaryCompanyId = selectedCompanies.length === 1 ? selectedCompanies[0].id : null;
+  const primaryCompanyId = selectedCompanies.length > 0 ? selectedCompanies[0].id : null;
 
   const { data: companyContacts = [] } = useQuery<any[]>({
     queryKey: ['/api/contacts/company', primaryCompanyId],
@@ -354,7 +361,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               ? "Upload partnership call transcript to extract insights and discussion points"
               : "Upload partnership meeting notes to extract insights and discussion points")
             : (contentType === "transcript"
-              ? "Upload BD call transcript to extract product insights and customer questions"
+              ? "Upload call transcript to extract product insights and customer questions"
               : "Upload meeting notes from an onsite visit to extract product insights and customer questions")}
         </CardDescription>
 
@@ -994,16 +1001,18 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
             </div>
           )}
 
-          <div className="space-y-2">
-            <Label htmlFor="numberOfStores" data-testid="label-number-of-stores">Number of Stores</Label>
-            <Input
-              id="numberOfStores"
-              data-testid="input-number-of-stores"
-              placeholder="e.g., 150 or Not applicable"
-              value={formData.numberOfStores}
-              onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
-            />
-          </div>
+          {user?.currentProduct !== "Partnerships" && (
+            <div className="space-y-2">
+              <Label htmlFor="numberOfStores" data-testid="label-number-of-stores">Number of Stores</Label>
+              <Input
+                id="numberOfStores"
+                data-testid="input-number-of-stores"
+                placeholder="e.g., 150 or Not applicable"
+                value={formData.numberOfStores}
+                onChange={(e) => setFormData({ ...formData, numberOfStores: e.target.value })}
+              />
+            </div>
+          )}
 
           <Button
             type="submit"
