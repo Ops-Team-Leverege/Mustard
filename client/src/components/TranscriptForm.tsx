@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Company } from "@shared/schema";
 import { cn } from "@/lib/utils";
 
-type Product = "PitCrew" | "AutoTrace" | "WorkWatch";
+type Product = "PitCrew" | "AutoTrace" | "WorkWatch" | "ExpressLane" | "Partnerships";
 
 interface User {
   id: string;
@@ -125,8 +125,11 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
    * 
    * Load contacts for the primary company when only one company is selected.
    * This enables the quick-add existing contacts feature.
+   * 
+   * UPDATE: Also load contacts when multiple companies are selected (from first company)
+   * to allow searching existing contacts even in multi-company scenarios.
    */
-  const primaryCompanyId = selectedCompanies.length === 1 ? selectedCompanies[0].id : null;
+  const primaryCompanyId = selectedCompanies.length > 0 ? selectedCompanies[0].id : null;
 
   const { data: companyContacts = [] } = useQuery<any[]>({
     queryKey: ['/api/contacts/company', primaryCompanyId],
@@ -330,7 +333,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               ? "Upload partnership call transcript to extract insights and discussion points"
               : "Upload partnership meeting notes to extract insights and discussion points")
             : (contentType === "transcript"
-              ? "Upload BD call transcript to extract product insights and customer questions"
+              ? "Upload call transcript to extract product insights and customer questions"
               : "Upload meeting notes from an onsite visit to extract product insights and customer questions")}
         </CardDescription>
 
