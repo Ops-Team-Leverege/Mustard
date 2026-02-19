@@ -1,4 +1,5 @@
 import { storage } from "../../storage";
+import { generateText } from "../../llm/client";
 
 export type OrchestratorActionItem = {
   action: string;
@@ -177,68 +178,113 @@ export async function searchActionItemsForRelevantIssues(
 export async function searchTranscriptSnippets(
   meetingId: string,
   query: string,
-  limit: number = 3
+  limit: number = 5
 ): Promise<Array<{
   speakerName: string;
   content: string;
   chunkIndex: number;
-  matchType?: "both" | "keyword" | "proper_noun";
+  matchType?: "both" | "keyword" | "proper_noun" | "semantic";
 }>> {
   const chunks = await storage.getChunksForTranscript(meetingId, 1000);
 
+  if (chunks.length === 0) {
+    return [];
+  }
+
   const { keywords, properNouns } = extractKeywords(query);
 
-  if (properNouns.length > 0 && keywords.length > 0) {
-    const bothMatches = chunks.filter(chunk => {
+  const keywordCandidates = chunks.filter(chunk => {
+    const content = chunk.content.toLowerCase();
+    const hasProperNoun = properNouns.length > 0 && properNouns.some(noun => content.includes(noun));
+    const hasKeyword = keywords.length > 0 && keywords.some(kw => content.includes(kw));
+    return hasProperNoun || hasKeyword;
+  });
+
+  console.log(`[SearchTranscript] Keyword pre-filter: ${keywordCandidates.length}/${chunks.length} chunks matched`);
+
+  let candidatePool: typeof chunks;
+  if (keywordCandidates.length > 0) {
+    candidatePool = keywordCandidates.slice(0, 30);
+  } else {
+    console.log(`[SearchTranscript] No keyword matches — sending sample of all chunks for semantic search`);
+    const step = Math.max(1, Math.floor(chunks.length / 30));
+    candidatePool = chunks.filter((_, i) => i % step === 0).slice(0, 30);
+  }
+
+  try {
+    const numberedChunks = candidatePool.map((chunk, i) => 
+      `[${i}] [${chunk.speakerName || "Unknown"}]: ${chunk.content.substring(0, 300)}`
+    ).join("\n\n");
+
+    const llmResponse = await generateText({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a transcript search assistant. Given a user's question and numbered transcript chunks, identify which chunks are RELEVANT to answering the question.
+
+RULES:
+1. Look for semantic relevance, not just keyword matches. "monitors" is relevant to a question about "TVs". "screens" is relevant to "displays".
+2. Include chunks that contain the actual answer, supporting context, or directly related discussion.
+3. Exclude chunks that merely mention the same topic but don't help answer the specific question.
+4. Return ONLY a JSON array of the relevant chunk indices, ordered by relevance (most relevant first).
+5. If NO chunks are relevant, return an empty array [].
+
+Return valid JSON only: [0, 5, 12] or []`
+        },
+        {
+          role: "user",
+          content: `Question: ${query}\n\nTranscript chunks:\n${numberedChunks}`
+        }
+      ],
+      temperature: 0,
+      responseFormat: "json",
+    });
+
+    const relevantIndices: number[] = JSON.parse(llmResponse.text);
+    console.log(`[SearchTranscript] LLM selected ${relevantIndices.length} relevant chunks from ${candidatePool.length} candidates`);
+
+    if (relevantIndices.length > 0) {
+      const results = relevantIndices
+        .filter(i => i >= 0 && i < candidatePool.length)
+        .slice(0, limit)
+        .map(i => {
+          const chunk = candidatePool[i];
+          return {
+            speakerName: chunk.speakerName || "Unknown",
+            content: chunk.content,
+            chunkIndex: chunk.chunkIndex,
+            matchType: "semantic" as const,
+          };
+        });
+
+      if (results.length > 0) {
+        return results;
+      }
+    }
+  } catch (err) {
+    console.error(`[SearchTranscript] LLM chunk selection failed, falling back to keyword matches:`, err);
+  }
+
+  if (keywordCandidates.length > 0) {
+    console.log(`[SearchTranscript] Falling back to keyword matches (${keywordCandidates.length} chunks)`);
+
+    const bothMatches = keywordCandidates.filter(chunk => {
       const content = chunk.content.toLowerCase();
-      const hasProperNoun = properNouns.some(noun => content.includes(noun));
-      const hasKeyword = keywords.some(kw => content.includes(kw));
+      const hasProperNoun = properNouns.length > 0 && properNouns.some(noun => content.includes(noun));
+      const hasKeyword = keywords.length > 0 && keywords.some(kw => content.includes(kw));
       return hasProperNoun && hasKeyword;
     });
 
-    if (bothMatches.length > 0) {
-      console.log(`[SearchTranscript] Found ${bothMatches.length} chunks matching both proper nouns AND keywords`);
-      return bothMatches.slice(0, limit).map(chunk => ({
-        speakerName: chunk.speakerName || "Unknown",
-        content: chunk.content,
-        chunkIndex: chunk.chunkIndex,
-        matchType: "both" as const,
-      }));
-    }
-  }
+    const bestMatches = bothMatches.length > 0 ? bothMatches : keywordCandidates;
+    const matchType = bothMatches.length > 0 ? "both" : (keywords.length > 0 ? "keyword" : "proper_noun");
 
-  if (keywords.length > 0) {
-    const keywordMatches = chunks.filter(chunk => {
-      const content = chunk.content.toLowerCase();
-      return keywords.some(kw => content.includes(kw));
-    });
-
-    if (keywordMatches.length > 0) {
-      console.log(`[SearchTranscript] Found ${keywordMatches.length} chunks matching keywords only`);
-      return keywordMatches.slice(0, limit).map(chunk => ({
-        speakerName: chunk.speakerName || "Unknown",
-        content: chunk.content,
-        chunkIndex: chunk.chunkIndex,
-        matchType: "keyword" as const,
-      }));
-    }
-  }
-
-  if (properNouns.length > 0) {
-    const properNounMatches = chunks.filter(chunk => {
-      const content = chunk.content.toLowerCase();
-      return properNouns.some(noun => content.includes(noun));
-    });
-
-    if (properNounMatches.length > 0) {
-      console.log(`[SearchTranscript] Found ${properNounMatches.length} chunks matching proper nouns only`);
-      return properNounMatches.slice(0, limit).map(chunk => ({
-        speakerName: chunk.speakerName || "Unknown",
-        content: chunk.content,
-        chunkIndex: chunk.chunkIndex,
-        matchType: "proper_noun" as const,
-      }));
-    }
+    return bestMatches.slice(0, limit).map(chunk => ({
+      speakerName: chunk.speakerName || "Unknown",
+      content: chunk.content,
+      chunkIndex: chunk.chunkIndex,
+      matchType: matchType as "both" | "keyword" | "proper_noun",
+    }));
   }
 
   return [];

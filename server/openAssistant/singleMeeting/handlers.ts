@@ -172,7 +172,7 @@ export async function handleExtractiveIntent(
   const snippets = await searchTranscriptSnippets(ctx.meetingId, question, 5);
   console.log(`[SingleMeeting] Transcript fetch: ${Date.now() - startTime}ms`);
 
-  const relevantSnippets = snippets.filter(s => s.matchType === "both" || s.matchType === "keyword");
+  const relevantSnippets = snippets.filter(s => s.matchType === "both" || s.matchType === "keyword" || s.matchType === "semantic");
 
   if (relevantSnippets.length > 0) {
     const transcriptContext = relevantSnippets
