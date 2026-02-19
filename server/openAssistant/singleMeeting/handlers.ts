@@ -12,6 +12,10 @@ import {
   type MeetingSummaryInput,
 } from "../../config/prompts/singleMeeting";
 import {
+  RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT,
+  buildExtractiveAnswerUserPrompt,
+} from "../../config/prompts/transcript";
+import {
   type SingleMeetingContext,
   type SingleMeetingResult,
   formatMeetingDate,
@@ -165,12 +169,56 @@ export async function handleExtractiveIntent(
   }
 
   console.log(`[SingleMeeting] EXTRACTIVE_FACT: transcript search`);
-  const snippets = await searchTranscriptSnippets(ctx.meetingId, question);
+  const snippets = await searchTranscriptSnippets(ctx.meetingId, question, 5);
   console.log(`[SingleMeeting] Transcript fetch: ${Date.now() - startTime}ms`);
 
   const relevantSnippets = snippets.filter(s => s.matchType === "both" || s.matchType === "keyword");
 
   if (relevantSnippets.length > 0) {
+    const transcriptContext = relevantSnippets
+      .map(s => `[${s.speakerName}]: ${s.content}`)
+      .join("\n\n");
+
+    console.log(`[SingleMeeting] EXTRACTIVE_FACT: sending ${relevantSnippets.length} snippets to LLM for answer extraction`);
+
+    try {
+      const llmResponse = await generateText({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT },
+          { role: "user", content: buildExtractiveAnswerUserPrompt(question, transcriptContext) },
+        ],
+        temperature: 0.1,
+        responseFormat: "json",
+      });
+
+      console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM response: ${Date.now() - startTime}ms`);
+
+      const parsed = JSON.parse(llmResponse.text);
+      const dateSuffix = getMeetingDateSuffix(ctx);
+
+      if (parsed.wasFound && parsed.answer) {
+        const lines: string[] = [];
+        lines.push(`In this meeting${dateSuffix}:`);
+        lines.push(`\n${parsed.answer}`);
+        if (parsed.evidence) {
+          lines.push(`\n_Evidence: "${parsed.evidence}"_`);
+        }
+
+        return {
+          answer: lines.join("\n"),
+          intent: "extractive",
+          dataSource: "transcript",
+          evidence: parsed.evidence || relevantSnippets[0].content,
+          promptVersions: {
+            RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+          }
+        };
+      }
+    } catch (err) {
+      console.error(`[SingleMeeting] EXTRACTIVE_FACT LLM error, falling back to raw snippets:`, err);
+    }
+
     const dateSuffix = getMeetingDateSuffix(ctx);
     const lines: string[] = [];
     lines.push(`In this meeting${dateSuffix}, the transcript mentions:`);

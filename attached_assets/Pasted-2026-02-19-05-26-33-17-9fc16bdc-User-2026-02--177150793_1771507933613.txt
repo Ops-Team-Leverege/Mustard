@@ -1,0 +1,212 @@
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+==================================================
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+=== Slack Feedback System Configuration Check ===
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+Required: reactions:read
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+1. Go to https://api.slack.com/apps
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+2. Select your PitCrew app
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+If missing, add them and reinstall the app to your workspace.
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+Required: reaction_added, reaction_removed
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+3. Check 'OAuth & Permissions' → 'Bot Token Scopes'
+2026-02-19 05:26:33.17
+9fc16bdc
+User
+Slack routes registered at /api/slack/events
+2026-02-19 05:26:33.62
+9fc16bdc
+User
+1:26:33 PM [express] serving on port 5000
+2026-02-19 05:27:12.07
+9fc16bdc
+User
+1:27:12 PM [express] GET /api/categories 304 in 2764ms :: [{"id":"51d465e5-6518-4556-9c1b-b308aebdc0…
+2026-02-19 05:27:12.19
+9fc16bdc
+User
+1:27:12 PM [express] GET /api/auth/user 200 in 72ms :: {"id":"49346173","email":"ops-user@leverege.c…
+2026-02-19 05:27:12.37
+9fc16bdc
+User
+1:27:12 PM [express] GET /api/features/84cd1322-52a6-4e45-8203-1bf89ba4a3e9 200 in 106ms :: {"id":"8…
+2026-02-19 05:27:12.56
+9fc16bdc
+User
+1:27:12 PM [express] GET /api/categories 200 in 259ms :: [{"id":"51d465e5-6518-4556-9c1b-b308aebdc0b…
+2026-02-19 05:27:12.80
+9fc16bdc
+User
+1:27:12 PM [express] GET /api/insights 304 in 338ms :: [{"id":"d6631f51-557b-4f20-bd4f-9b2312ba7a9a"…
+2026-02-19 05:27:12.97
+9fc16bdc
+User
+1:27:12 PM [express] GET /api/companies 304 in 94ms :: [{"id":"dbb806f5-c83a-49b7-9182-f506b86826af"…
+2026-02-19 05:27:13.68
+9fc16bdc
+User
+1:27:13 PM [express] GET /api/auth/user 304 in 4375ms :: {"id":"49346173","email":"ops-user@leverege…
+2026-02-19 05:27:13.76
+9fc16bdc
+User
+1:27:13 PM [express] GET /api/features/84cd1322-52a6-4e45-8203-1bf89ba4a3e9 200 in 4451ms :: {"id":"…
+2026-02-19 05:27:15.09
+9fc16bdc
+User
+1:27:15 PM [express] GET /api/features 304 in 91ms :: [{"id":"84cd1322-52a6-4e45-8203-1bf89ba4a3e9",…
+2026-02-19 05:27:20.22
+9fc16bdc
+User
+1:27:20 PM [express] GET /api/categories/company-stats 304 in 442ms :: [{"id":"51d465e5-6518-4556-9c…
+2026-02-19 05:27:22.48
+9fc16bdc
+User
+1:27:22 PM [express] GET /api/categories/51d465e5-6518-4556-9c1b-b308aebdc0bc/overview 200 in 138ms …
+2026-02-19 05:27:23.99
+9fc16bdc
+User
+1:27:23 PM [express] GET /api/dashboard/stats 304 in 118ms :: {"stageStats":{"Prospect":39,"Pilot":4…
+2026-02-19 05:27:24.39
+9fc16bdc
+User
+1:27:24 PM [express] GET /api/dashboard/recent-transcripts 304 in 507ms :: [{"id":"31be282e-141e-480…
+2026-02-19 05:27:25.58
+9fc16bdc
+User
+1:27:25 PM [express] GET /api/transcripts/51a5af67-3b18-48d6-bf23-1add920ddd08/details 200 in 176ms …
+2026-02-19 05:27:27.18
+9fc16bdc
+User
+1:27:27 PM [express] GET /api/qa-pairs 304 in 227ms :: [{"id":"19d65f13-471a-404c-b0d4-83c43e638ed5"…
+2026-02-19 05:27:28.02
+9fc16bdc
+User
+1:27:28 PM [express] GET /api/transcripts/31be282e-141e-4809-bc48-0ebb8400afd3/details 304 in 122ms …
+2026-02-19 05:27:36.80
+9fc16bdc
+User
+1:27:36 PM [express] PUT /api/user/product 200 in 200ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-19 05:27:37.05
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/insights 200 in 176ms :: [{"id":"17b3d33c-2cef-47ff-905e-50eb9c7c2dcd"…
+2026-02-19 05:27:37.07
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/categories 200 in 195ms :: []
+2026-02-19 05:27:37.07
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/auth/user 200 in 194ms :: {"id":"49346173","email":"ops-user@leverege.…
+2026-02-19 05:27:37.10
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/features 200 in 215ms :: []
+2026-02-19 05:27:37.16
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/dashboard/recent-transcripts 200 in 279ms :: [{"id":"59eae292-e15b-42d…
+2026-02-19 05:27:37.19
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/companies 200 in 309ms :: [{"id":"2f012854-0d3e-4eb7-a6b6-f88ca205ca9b…
+2026-02-19 05:27:37.22
+9fc16bdc
+User
+1:27:37 PM [express] GET /api/qa-pairs 200 in 336ms :: [{"id":"74589c75-bc33-43d5-98a1-84ec292854c6"…
+2026-02-19 05:27:38.82
+9fc16bdc
+User
+1:27:38 PM [express] PUT /api/user/product 200 in 104ms :: {"id":"49346173","email":"ops-user@levere…
+2026-02-19 05:27:38.97
+9fc16bdc
+User
+1:27:38 PM [express] GET /api/auth/user 200 in 66ms :: {"id":"49346173","email":"ops-user@leverege.c…
+2026-02-19 05:27:39.00
+9fc16bdc
+User
+1:27:39 PM [express] GET /api/features 200 in 88ms :: [{"id":"84cd1322-52a6-4e45-8203-1bf89ba4a3e9",…
+2026-02-19 05:27:39.05
+9fc16bdc
+User
+1:27:39 PM [express] GET /api/companies 200 in 139ms :: [{"id":"dbb806f5-c83a-49b7-9182-f506b86826af…
+2026-02-19 05:27:39.16
+9fc16bdc
+User
+1:27:39 PM [express] GET /api/insights 200 in 232ms :: [{"id":"d6631f51-557b-4f20-bd4f-9b2312ba7a9a"…
+2026-02-19 05:27:39.17
+9fc16bdc
+User
+1:27:39 PM [express] GET /api/qa-pairs 200 in 252ms :: [{"id":"19d65f13-471a-404c-b0d4-83c43e638ed5"…
+2026-02-19 05:27:39.28
+9fc16bdc
+User
+1:27:39 PM [express] GET /api/dashboard/recent-transcripts 200 in 367ms :: [{"id":"31be282e-141e-480…
+2026-02-19 05:27:39.33
+9fc16bdc
+User
+1:27:39 PM [express] GET /api/categories 200 in 432ms :: [{"id":"51d465e5-6518-4556-9c1b-b308aebdc0b…
+2026-02-19 05:27:42.37
+9fc16bdc
+User
+1:27:42 PM [express] GET /api/dashboard/stats 304 in 109ms :: {"stageStats":{"Prospect":39,"Pilot":4…
+2026-02-19 05:27:45.45
+9fc16bdc
+User
+1:27:45 PM [express] GET /api/companies/atlantic-coast-enterprise-ace-jiffy-lube/overview 200 in 364…
+2026-02-19 05:28:11.57
+9fc16bdc
+User
+1:28:11 PM [express] GET /api/categories/company-stats 304 in 589ms :: [{"id":"51d465e5-6518-4556-9c…
+2026-02-19 05:28:18.36
+9fc16bdc
+User
+1:28:18 PM [express] GET /api/categories/51d465e5-6518-4556-9c1b-b308aebdc0bc/overview 304 in 235ms …
+2026-02-19 05:28:47.02
+9fc16bdc
+User
+1:28:47 PM [express] GET /api/auth/user 304 in 251ms :: {"id":"49346173","email":"ops-user@leverege.…
+2026-02-19 05:28:47.09
+9fc16bdc
+User
+1:28:47 PM [express] GET /api/features 304 in 322ms :: [{"id":"84cd1322-52a6-4e45-8203-1bf89ba4a3e9"…
+2026-02-19 05:28:47.33
+9fc16bdc
+User
+1:28:47 PM [express] GET /api/categories 304 in 565ms :: [{"id":"51d465e5-6518-4556-9c1b-b308aebdc0b…
+2026-02-19 05:29:00.87
+9fc16bdc
+User
+1:29:00 PM [express] GET /api/companies 304 in 279ms :: [{"id":"dbb806f5-c83a-49b7-9182-f506b86826af…
+2026-02-19 05:29:00.99
+9fc16bdc
+User
+1:29:00 PM [express] GET /api/dashboard/recent-transcripts 304 in 398ms :: [{"id":"31be282e-141e-480…
+2026-02-19 05:29:01.04
+9fc16bdc
+User
+1:29:01 PM [express] GET /api/qa-pairs 304 in 449ms :: [{"id":"19d65f13-471a-404c-b0d4-83c43e638ed5"…
+2026-02-19 05:29:01.40
+9fc16bdc
+User
+1:29:01 PM [express] GET /api/insights 304 in 796ms :: [{"id":"d6631f51-557b-4f20-bd4f-9b2312ba7a9a"
