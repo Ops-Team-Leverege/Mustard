@@ -168,76 +168,77 @@ export async function handleExtractiveIntent(
     };
   }
 
-  console.log(`[SingleMeeting] EXTRACTIVE_FACT: transcript search`);
-  const snippets = await searchTranscriptSnippets(ctx.meetingId, question, 5);
-  console.log(`[SingleMeeting] Transcript fetch: ${Date.now() - startTime}ms`);
+  console.log(`[SingleMeeting] EXTRACTIVE_FACT: loading transcript chunks`);
+  const allChunks = await storage.getChunksForTranscript(ctx.meetingId, 1000);
+  console.log(`[SingleMeeting] Loaded ${allChunks.length} chunks (${Date.now() - startTime}ms)`);
 
-  const relevantSnippets = snippets.filter(s => s.matchType === "both" || s.matchType === "keyword" || s.matchType === "semantic");
+  if (allChunks.length === 0) {
+    return {
+      answer: UNCERTAINTY_RESPONSE,
+      intent: "extractive",
+      dataSource: "not_found",
+    };
+  }
 
-  if (relevantSnippets.length > 0) {
-    const transcriptContext = relevantSnippets
-      .map(s => `[${s.speakerName}]: ${s.content}`)
-      .join("\n\n");
+  const fullTranscript = allChunks
+    .map(c => `[${c.speakerName || "Unknown"}]: ${c.content}`)
+    .join("\n\n");
 
-    console.log(`[SingleMeeting] EXTRACTIVE_FACT: sending ${relevantSnippets.length} snippets (${transcriptContext.length} chars) to LLM for answer extraction`);
+  const maxChars = 60000;
+  const transcriptForLLM = fullTranscript.length > maxChars
+    ? fullTranscript.substring(0, maxChars) + "\n\n[...transcript truncated...]"
+    : fullTranscript;
 
-    try {
-      const llmResponse = await generateText({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT },
-          { role: "user", content: buildExtractiveAnswerUserPrompt(question, transcriptContext) },
-        ],
-        temperature: 0.1,
-        responseFormat: "json",
-      });
+  console.log(`[SingleMeeting] EXTRACTIVE_FACT: sending ${transcriptForLLM.length} chars to LLM for direct answer extraction`);
 
-      console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM raw: ${llmResponse.text.substring(0, 300)}`);
-      console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM response: ${Date.now() - startTime}ms`);
-
-      const parsed = JSON.parse(llmResponse.text);
-      const dateSuffix = getMeetingDateSuffix(ctx);
-
-      if (parsed.wasFound && parsed.answer) {
-        const lines: string[] = [];
-        lines.push(`In this meeting${dateSuffix}:`);
-        lines.push(`\n${parsed.answer}`);
-        if (parsed.evidence) {
-          lines.push(`\n_Evidence: "${parsed.evidence}"_`);
-        }
-
-        return {
-          answer: lines.join("\n"),
-          intent: "extractive",
-          dataSource: "transcript",
-          evidence: parsed.evidence || relevantSnippets[0].content,
-          promptVersions: {
-            RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
-          }
-        };
-      } else {
-        console.log(`[SingleMeeting] EXTRACTIVE_FACT: LLM said wasFound=${parsed.wasFound}, answer="${parsed.answer?.substring(0, 100)}"`);
-      }
-    } catch (err) {
-      console.error(`[SingleMeeting] EXTRACTIVE_FACT LLM error, falling back to raw snippets:`, err);
-    }
-
-    const dateSuffix = getMeetingDateSuffix(ctx);
-    const lines: string[] = [];
-    lines.push(`In this meeting${dateSuffix}, the transcript mentions:`);
-    relevantSnippets.slice(0, 2).forEach(s => {
-      lines.push(`\n_"${s.content.substring(0, 200)}${s.content.length > 200 ? '...' : ''}"_`);
-      lines.push(`— ${s.speakerName}`);
+  try {
+    const llmResponse = await generateText({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT },
+        { role: "user", content: buildExtractiveAnswerUserPrompt(question, transcriptForLLM) },
+      ],
+      temperature: 0.1,
+      responseFormat: "json",
     });
 
-    return {
-      answer: lines.join("\n"),
-      intent: "extractive",
-      dataSource: "transcript",
-      evidence: relevantSnippets[0].content,
-    };
-  } else if (snippets.length > 0 && snippets[0].matchType === "proper_noun") {
-    console.log(`[SingleMeeting] GUARDRAIL: proper_noun-only matches (${snippets.length} chunks) - refusing to answer with unrelated content`);
+    console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM raw: ${llmResponse.text.substring(0, 300)}`);
+    console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM completed: ${Date.now() - startTime}ms`);
+
+    const parsed = JSON.parse(llmResponse.text);
+    const dateSuffix = getMeetingDateSuffix(ctx);
+
+    if (parsed.wasFound && parsed.answer) {
+      const lines: string[] = [];
+      lines.push(`In this meeting${dateSuffix}:`);
+      lines.push(`\n${parsed.answer}`);
+      if (parsed.evidence) {
+        lines.push(`\n_Evidence: "${parsed.evidence}"_`);
+      }
+
+      return {
+        answer: lines.join("\n"),
+        intent: "extractive",
+        dataSource: "transcript",
+        evidence: parsed.evidence || null,
+        promptVersions: {
+          RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+        }
+      };
+    } else {
+      console.log(`[SingleMeeting] EXTRACTIVE_FACT: LLM said wasFound=${parsed.wasFound}, answer="${parsed.answer?.substring(0, 100)}"`);
+      const notFoundAnswer = parsed.answer || "This wasn't explicitly mentioned in the meeting.";
+      return {
+        answer: notFoundAnswer,
+        intent: "extractive",
+        dataSource: "transcript",
+        promptVersions: {
+          RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
+        }
+      };
+    }
+  } catch (err) {
+    console.error(`[SingleMeeting] EXTRACTIVE_FACT LLM error:`, err);
   }
 
   return {
