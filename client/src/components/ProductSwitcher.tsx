@@ -36,9 +36,19 @@ export default function ProductSwitcher() {
         Partnerships: "You're now viewing strategic partnership meetings and discussions.",
       };
 
+      // Product-specific colors for visual distinction
+      const productColors: Record<Product, string> = {
+        PitCrew: "border-blue-500 bg-blue-50 dark:bg-blue-950",
+        AutoTrace: "border-green-500 bg-green-50 dark:bg-green-950",
+        WorkWatch: "border-orange-500 bg-orange-50 dark:bg-orange-950",
+        ExpressLane: "border-yellow-500 bg-yellow-50 dark:bg-yellow-950",
+        Partnerships: "border-purple-500 bg-purple-50 dark:bg-purple-950",
+      };
+
       toast({
         title: `Switched to ${product}`,
         description: contextMessages[product] || `All data has been refreshed for ${product}.`,
+        className: `border-l-4 ${productColors[product]}`,
       });
     },
     onError: (error: Error) => {
