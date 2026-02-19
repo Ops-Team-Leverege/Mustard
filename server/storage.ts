@@ -1491,7 +1491,9 @@ export class DbStorage implements IStorage {
     const legacyResults = await this.db
       .select()
       .from(transcriptsTable)
-      .where(and(eq(transcriptsTable.product, product), eq(transcriptsTable.companyId, companyId)))
+      .where(product === "All Activity"
+        ? eq(transcriptsTable.companyId, companyId)
+        : and(eq(transcriptsTable.product, product), eq(transcriptsTable.companyId, companyId)))
       .orderBy(transcriptsTable.createdAt);
 
     // Query 2: Junction table (transcript_companies)
@@ -1523,10 +1525,12 @@ export class DbStorage implements IStorage {
       })
       .from(transcriptCompaniesTable)
       .innerJoin(transcriptsTable, eq(transcriptCompaniesTable.transcriptId, transcriptsTable.id))
-      .where(and(
-        eq(transcriptsTable.product, product),
-        eq(transcriptCompaniesTable.companyId, companyId)
-      ))
+      .where(product === "All Activity"
+        ? eq(transcriptCompaniesTable.companyId, companyId)
+        : and(
+          eq(transcriptsTable.product, product),
+          eq(transcriptCompaniesTable.companyId, companyId)
+        ))
       .orderBy(transcriptsTable.createdAt);
 
     // Merge and deduplicate by transcript ID
@@ -1719,7 +1723,9 @@ export class DbStorage implements IStorage {
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
+      .where(product === "All Activity"
+        ? eq(productInsightsTable.categoryId, categoryId)
+        : and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
 
     return results.map(r => ({
       ...r,
@@ -1938,7 +1944,9 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.companyId, companyId)));
+      .where(product === "All Activity"
+        ? eq(qaPairsTable.companyId, companyId)
+        : and(eq(qaPairsTable.product, product), eq(qaPairsTable.companyId, companyId)));
 
     return results.map(r => ({
       ...r,
@@ -1970,7 +1978,9 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .select()
       .from(categoriesTable)
-      .where(and(eq(categoriesTable.product, product), eq(categoriesTable.id, id)))
+      .where(product === "All Activity"
+        ? eq(categoriesTable.id, id)
+        : and(eq(categoriesTable.product, product), eq(categoriesTable.id, id)))
       .limit(1);
     return results[0];
   }
@@ -2051,7 +2061,9 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .select()
       .from(featuresTable)
-      .where(and(eq(featuresTable.product, product), eq(featuresTable.id, id)))
+      .where(product === "All Activity"
+        ? eq(featuresTable.id, id)
+        : and(eq(featuresTable.product, product), eq(featuresTable.id, id)))
       .limit(1);
     return results[0];
   }
@@ -2122,7 +2134,9 @@ export class DbStorage implements IStorage {
     const results = await this.db
       .select()
       .from(companiesTable)
-      .where(and(eq(companiesTable.product, product), eq(companiesTable.slug, slug)))
+      .where(product === "All Activity"
+        ? eq(companiesTable.slug, slug)
+        : and(eq(companiesTable.product, product), eq(companiesTable.slug, slug)))
       .limit(1);
     return results[0];
   }
@@ -2132,10 +2146,12 @@ export class DbStorage implements IStorage {
       .select()
       .from(companiesTable)
       .where(
-        and(
-          eq(companiesTable.product, product),
-          drizzleSql`LOWER(TRIM(${companiesTable.name})) = LOWER(TRIM(${name}))`
-        )
+        product === "All Activity"
+          ? drizzleSql`LOWER(TRIM(${companiesTable.name})) = LOWER(TRIM(${name}))`
+          : and(
+              eq(companiesTable.product, product),
+              drizzleSql`LOWER(TRIM(${companiesTable.name})) = LOWER(TRIM(${name}))`
+            )
       )
       .limit(1);
     return results[0];
@@ -2195,7 +2211,9 @@ export class DbStorage implements IStorage {
       .select()
       .from(transcriptsTable)
       .where(
-        drizzleSql`${transcriptsTable.product} = ${product} AND (${transcriptsTable.companyId} = ${company.id} OR LOWER(${transcriptsTable.companyName}) = LOWER(${company.name}))`
+        product === "All Activity"
+          ? drizzleSql`(${transcriptsTable.companyId} = ${company.id} OR LOWER(${transcriptsTable.companyName}) = LOWER(${company.name}))`
+          : drizzleSql`${transcriptsTable.product} = ${product} AND (${transcriptsTable.companyId} = ${company.id} OR LOWER(${transcriptsTable.companyName}) = LOWER(${company.name}))`
       );
 
     // Get insights with category names - match by both companyId and legacy company field, filter by product
@@ -2219,7 +2237,9 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
       .where(
-        drizzleSql`${productInsightsTable.product} = ${product} AND (${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name}))`
+        product === "All Activity"
+          ? drizzleSql`(${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name}))`
+          : drizzleSql`${productInsightsTable.product} = ${product} AND (${productInsightsTable.companyId} = ${company.id} OR LOWER(${productInsightsTable.company}) = LOWER(${company.name}))`
       );
 
     // Get Q&A pairs with category and contact info - match by both companyId and legacy company field, filter by product
@@ -2247,14 +2267,18 @@ export class DbStorage implements IStorage {
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
       .where(
-        drizzleSql`${qaPairsTable.product} = ${product} AND (${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name}))`
+        product === "All Activity"
+          ? drizzleSql`(${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name}))`
+          : drizzleSql`${qaPairsTable.product} = ${product} AND (${qaPairsTable.companyId} = ${company.id} OR LOWER(${qaPairsTable.company}) = LOWER(${company.name}))`
       );
 
     // Get contacts for this company - filter by product
     const contacts = await this.db
       .select()
       .from(contactsTable)
-      .where(and(eq(contactsTable.product, product), eq(contactsTable.companyId, company.id)));
+      .where(product === "All Activity"
+        ? eq(contactsTable.companyId, company.id)
+        : and(eq(contactsTable.product, product), eq(contactsTable.companyId, company.id)));
 
     return {
       company,
@@ -2283,7 +2307,9 @@ export class DbStorage implements IStorage {
     return await this.db
       .select()
       .from(contactsTable)
-      .where(and(eq(contactsTable.product, product), eq(contactsTable.companyId, companyId)));
+      .where(product === "All Activity"
+        ? eq(contactsTable.companyId, companyId)
+        : and(eq(contactsTable.product, product), eq(contactsTable.companyId, companyId)));
   }
 
   async createContact(insertContact: InsertContact): Promise<Contact> {
@@ -2319,10 +2345,12 @@ export class DbStorage implements IStorage {
     const contacts = await this.db
       .select()
       .from(contactsTable)
-      .where(and(
-        eq(contactsTable.product, product),
-        eq(contactsTable.companyId, companyId)
-      ))
+      .where(product === "All Activity"
+        ? eq(contactsTable.companyId, companyId)
+        : and(
+          eq(contactsTable.product, product),
+          eq(contactsTable.companyId, companyId)
+        ))
       .orderBy(contactsTable.createdAt);
 
     // Group contacts by normalized name (case-insensitive)
@@ -2453,7 +2481,9 @@ export class DbStorage implements IStorage {
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
+      .where(product === "All Activity"
+        ? eq(productInsightsTable.categoryId, categoryId)
+        : and(eq(productInsightsTable.product, product), eq(productInsightsTable.categoryId, categoryId)));
 
     // Get Q&A pairs for this category with category and contact info
     const qaPairs = await this.db
@@ -2479,7 +2509,9 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.categoryId, categoryId)));
+      .where(product === "All Activity"
+        ? eq(qaPairsTable.categoryId, categoryId)
+        : and(eq(qaPairsTable.product, product), eq(qaPairsTable.categoryId, categoryId)));
 
     return {
       category,
@@ -2542,7 +2574,9 @@ export class DbStorage implements IStorage {
     const [system] = await this.db
       .select()
       .from(posSystemsTable)
-      .where(and(eq(posSystemsTable.product, product), eq(posSystemsTable.id, id)));
+      .where(product === "All Activity"
+        ? eq(posSystemsTable.id, id)
+        : and(eq(posSystemsTable.product, product), eq(posSystemsTable.id, id)));
     return system;
   }
 
