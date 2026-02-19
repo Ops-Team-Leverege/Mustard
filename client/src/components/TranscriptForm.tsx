@@ -125,20 +125,40 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
   });
 
   /**
-   * Multi-Company Contact Loading (Task 6.1)
+   * Multi-Company Contact Loading
    * 
-   * Load contacts for the primary company when only one company is selected.
-   * This enables the quick-add existing contacts feature.
-   * 
-   * UPDATE: Also load contacts when multiple companies are selected (from first company)
-   * to allow searching existing contacts even in multi-company scenarios.
+   * Load contacts from ALL selected companies to enable quick-add of existing contacts
+   * from any of the companies involved in this multi-company meeting.
    */
-  const primaryCompanyId = selectedCompanies.length > 0 ? selectedCompanies[0].id : null;
+  const companyContactQueries = useQuery({
+    queryKey: ['/api/contacts/companies', selectedCompanies.map(c => c.id).join(',')],
+    queryFn: async () => {
+      if (selectedCompanies.length === 0) return [];
 
-  const { data: companyContacts = [] } = useQuery<any[]>({
-    queryKey: ['/api/contacts/company', primaryCompanyId],
-    enabled: !!primaryCompanyId,
+      // Fetch contacts for all selected companies
+      const contactPromises = selectedCompanies.map(company =>
+        fetch(`/api/contacts/company/${company.id}`, {
+          credentials: 'include',
+        }).then(res => res.ok ? res.json() : [])
+      );
+
+      const contactArrays = await Promise.all(contactPromises);
+
+      // Flatten and deduplicate by contact name (same person might be in multiple companies)
+      const allContacts = contactArrays.flat();
+      const uniqueContacts = allContacts.reduce((acc, contact) => {
+        if (!acc.some(c => c.name === contact.name)) {
+          acc.push(contact);
+        }
+        return acc;
+      }, [] as any[]);
+
+      return uniqueContacts;
+    },
+    enabled: selectedCompanies.length > 0,
   });
+
+  const companyContacts = companyContactQueries.data || [];
 
   /**
    * Multi-Company Management (Task 6.1)
@@ -847,7 +867,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               </div>
             </div>
 
-            {primaryCompanyId && companyContacts.length > 0 && (
+            {selectedCompanies.length > 0 && companyContacts.length > 0 && (
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />
@@ -858,7 +878,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
               </div>
             )}
 
-            {primaryCompanyId && companyContacts.length > 0 && (
+            {selectedCompanies.length > 0 && companyContacts.length > 0 && (
               <Popover open={existingContactOpen} onOpenChange={setExistingContactOpen}>
                 <PopoverTrigger asChild>
                   <Button
