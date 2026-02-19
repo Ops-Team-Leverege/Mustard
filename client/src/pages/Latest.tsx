@@ -287,51 +287,33 @@ export default function Latest() {
           </Card>
         </div>
       )}
-      const datePart = dateStr.split('T')[0];
-      return format(new Date(datePart + 'T12:00:00'), 'MMM d');
-                        })()}
+      {/* Recent Insights */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold mb-3">Recent Insights (Last 7 Days)</h3>
+        {recentInsights.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">No insights in the last 7 days</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <ProductInsightsTable insights={recentInsights} categories={categoryObjects} />
+        )}
+      </div>
+
+      {/* Recent Q&A Pairs */}
+      <div>
+        <h3 className="text-lg font-semibold mb-3">Recent Q&A Pairs (Last 7 Days)</h3>
+        {recentQAPairs.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <p className="text-muted-foreground">No Q&A pairs in the last 7 days</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <QATable qaPairs={recentQAPairs} categories={categoryObjects} />
+        )}
+      </div>
     </div>
-                    </div >
-                  </Link >
-                ))
-}
-              </div >
-            )}
-          </CardContent >
-        </Card >
-      </div >
-
-  {/* Recent Insights */ }
-  < div className = "mb-6" >
-    <h3 className="text-lg font-semibold mb-3">Recent Insights (Last 7 Days)</h3>
-{
-  recentInsights.length === 0 ? (
-    <Card>
-      <CardContent className="py-12 text-center">
-        <p className="text-muted-foreground">No insights in the last 7 days</p>
-      </CardContent>
-    </Card>
-  ) : (
-    <ProductInsightsTable insights={recentInsights} categories={categoryObjects} />
-  )
-}
-      </div >
-
-  {/* Recent Q&A Pairs */ }
-  < div >
-  <h3 className="text-lg font-semibold mb-3">Recent Q&A Pairs (Last 7 Days)</h3>
-{
-  recentQAPairs.length === 0 ? (
-    <Card>
-      <CardContent className="py-12 text-center">
-        <p className="text-muted-foreground">No Q&A pairs in the last 7 days</p>
-      </CardContent>
-    </Card>
-  ) : (
-    <QATable qaPairs={recentQAPairs} categories={categoryObjects} />
-  )
-}
-      </div >
-    </div >
   );
 }
