@@ -146,54 +146,98 @@ export default function Latest() {
         </p>
       </div>
 
-      <div className="mb-6">
-        {/* Recent Meetings Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Recent Meetings (Last 7 Days)
-            </CardTitle>
-            <CardDescription>Latest meeting transcripts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentTranscripts.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No meetings in the last 7 days
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {recentTranscripts.map((transcript) => (
-                  <Link key={transcript.id} href={`/transcripts/${transcript.id}`}>
-                    <div className="flex items-start justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer border" data-testid={`recent-transcript-${transcript.id}`}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {transcript.name || 'Untitled Meeting'}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {transcript.companyName}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
-                        <Calendar className="h-3 w-3" />
-                        {(() => {
-                          const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
-                          const datePart = dateStr.split('T')[0];
-                          return format(new Date(datePart + 'T12:00:00'), 'MMM d');
-                        })()}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Releases - Hidden for Partnerships */}
-      {user?.currentProduct !== "Partnerships" && (
+      {/* For Partnerships: Full width Recent Meetings */}
+      {user?.currentProduct === "Partnerships" ? (
         <div className="mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Recent Meetings (Last 7 Days)
+              </CardTitle>
+              <CardDescription>Latest meeting transcripts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentTranscripts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No meetings in the last 7 days
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentTranscripts.map((transcript) => (
+                    <Link key={transcript.id} href={`/transcripts/${transcript.id}`}>
+                      <div className="flex items-start justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer border" data-testid={`recent-transcript-${transcript.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {transcript.name || 'Untitled Meeting'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {transcript.companyName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                          <Calendar className="h-3 w-3" />
+                          {(() => {
+                            const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
+                            const datePart = dateStr.split('T')[0];
+                            return format(new Date(datePart + 'T12:00:00'), 'MMM d');
+                          })()}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        /* For other products: Side by side grid */
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Recent Meetings Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Recent Meetings (Last 7 Days)
+              </CardTitle>
+              <CardDescription>Latest meeting transcripts</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentTranscripts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No meetings in the last 7 days
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentTranscripts.map((transcript) => (
+                    <Link key={transcript.id} href={`/transcripts/${transcript.id}`}>
+                      <div className="flex items-start justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer border" data-testid={`recent-transcript-${transcript.id}`}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {transcript.name || 'Untitled Meeting'}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {transcript.companyName}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                          <Calendar className="h-3 w-3" />
+                          {(() => {
+                            const dateStr = typeof transcript.createdAt === 'string' ? transcript.createdAt : transcript.createdAt.toISOString();
+                            const datePart = dateStr.split('T')[0];
+                            return format(new Date(datePart + 'T12:00:00'), 'MMM d');
+                          })()}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Releases Card */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">

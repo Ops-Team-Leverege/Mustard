@@ -109,7 +109,7 @@ export default function Companies() {
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div className={user?.currentProduct === "Partnerships" ? "mb-6" : "grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6"}>
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
@@ -152,43 +152,45 @@ export default function Companies() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Building2 className="h-4 w-4" />
-                Companies by Stage
-              </CardTitle>
-              <CardDescription>Distribution across sales stages</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {pieData.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No stage data available
-                </p>
-              ) : (
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={70}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.name] || STAGE_COLORS['Unknown']} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+          {user?.currentProduct !== "Partnerships" && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Companies by Stage
+                </CardTitle>
+                <CardDescription>Distribution across sales stages</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {pieData.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No stage data available
+                  </p>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={70}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.name] || STAGE_COLORS['Unknown']} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="relative max-w-md">
