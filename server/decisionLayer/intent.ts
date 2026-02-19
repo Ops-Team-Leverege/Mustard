@@ -155,11 +155,6 @@ const REFUSE_PATTERNS = [
   /\bwrite\s+(me\s+)?a?\s*(poem|story|song)\b/i,
 ];
 
-const MULTI_INTENT_PATTERNS = [
-  /\b(summarize|summary)\b.*\b(and|then)\b.*\b(pricing|check|email|compare)\b/i,
-  /\b(answer|respond)\b.*\b(and|then)\b.*\b(email|summarize|pricing)\b/i,
-  /\bcompare\b.*\b(and|then)\b.*\b(email|summarize)\b/i,
-];
 
 // ============================================================================
 // KNOWN ENTITIES - Trigger SINGLE_MEETING or MULTI_MEETING based on context
@@ -272,17 +267,6 @@ function containsKnownContact(text: string): string | null {
   return null;
 }
 
-function detectMultiIntent(text: string): { needsSplit: boolean; splitOptions?: string[] } {
-  for (const pattern of MULTI_INTENT_PATTERNS) {
-    if (pattern.test(text)) {
-      return {
-        needsSplit: true,
-        splitOptions: ["meeting content", "other request"],
-      };
-    }
-  }
-  return { needsSplit: false };
-}
 
 // ============================================================================
 // FOLLOW-UP MESSAGE DETECTION
@@ -348,19 +332,6 @@ async function classifyByKeyword(
       intentDetectionMethod: "pattern",
       confidence: 0.95,
       reason: "Question is out of scope for this assistant",
-    };
-  }
-
-  // HARDENING: Check for explicit multi-intent patterns
-  const multiIntentCheck = detectMultiIntent(question);
-  if (multiIntentCheck.needsSplit) {
-    return {
-      intent: Intent.CLARIFY,
-      intentDetectionMethod: "pattern",
-      confidence: 0.9,
-      reason: "Request requires multiple intents - ask user to split",
-      needsSplit: true,
-      splitOptions: multiIntentCheck.splitOptions,
     };
   }
 
