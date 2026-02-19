@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileText, Calendar } from "lucide-react";
+import { FileText, Rocket, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
@@ -47,9 +47,30 @@ interface Category {
   name: string;
 }
 
+interface Feature {
+  id: string;
+  name: string;
+  description: string | null;
+  releaseDate: Date | null;
+}
+
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: string;
+}
+
 export default function Latest() {
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
   const { data: recentTranscripts = [] } = useQuery<RecentTranscript[]>({
     queryKey: ['/api/dashboard/recent-transcripts'],
+  });
+
+  const { data: features = [] } = useQuery<Feature[]>({
+    queryKey: ['/api/features'],
   });
 
   const { data: insights = [] } = useQuery<ProductInsight[]>({
@@ -68,6 +89,19 @@ export default function Latest() {
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
   const now = new Date();
+
+  // Filter features released in the last 7 days (only for non-Partnerships products)
+  const recentFeatures = features
+    .filter((feature) => {
+      if (!feature.releaseDate) return false;
+      const releaseDate = new Date(feature.releaseDate);
+      return releaseDate >= sevenDaysAgo && releaseDate <= now;
+    })
+    .sort((a, b) => {
+      const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+      const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+      return dateB - dateA;
+    });
 
   const recentInsights = insights
     .filter((insight) => {
@@ -112,7 +146,7 @@ export default function Latest() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+      <div className="mb-6">
         {/* Recent Meetings Card */}
         <Card>
           <CardHeader>
@@ -157,33 +191,103 @@ export default function Latest() {
         </Card>
       </div>
 
-      {/* Recent Insights */}
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold mb-3">Recent Insights (Last 7 Days)</h3>
-        {recentInsights.length === 0 ? (
+      {/* Recent Releases - Hidden for Partnerships */}
+      {user?.currentProduct !== "Partnerships" && (
+        <div className="mb-6">
           <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No insights in the last 7 days</p>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Rocket className="h-4 w-4" />
+                Recent Releases (Last 7 Days)
+              </CardTitle>
+              <CardDescription>Recently released features</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {recentFeatures.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No releases in the last 7 days
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentFeatures.map((feature) => (
+                    <Link key={feature.id} href={`/features/${feature.id}`}>
+                      <div
+                        className="flex items-start justify-between gap-3 p-3 rounded-md hover-elevate cursor-pointer border"
+                        data-testid={`recent-feature-${feature.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {feature.name}
+                          </p>
+                          {feature.description && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                              {feature.description}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0">
+                          <Calendar className="h-3 w-3" />
+                          {(() => {
+                            const dateStr = typeof feature.releaseDate === 'string' ? feature.releaseDate : feature.releaseDate?.toISOString();
+                            if (!dateStr) return 'N/A';
+                            const datePart = dateStr.split('T')[0];
+                            return format(new Date(datePart + 'T12:00:00'), 'MMM d');
+                          })()}
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
-        ) : (
-          <ProductInsightsTable insights={recentInsights} categories={categoryObjects} />
-        )}
-      </div>
-
-      {/* Recent Q&A Pairs */}
-      <div>
-        <h3 className="text-lg font-semibold mb-3">Recent Q&A Pairs (Last 7 Days)</h3>
-        {recentQAPairs.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">No Q&A pairs in the last 7 days</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <QATable qaPairs={recentQAPairs} categories={categoryObjects} />
-        )}
-      </div>
+        </div>
+      )}
+      const datePart = dateStr.split('T')[0];
+      return format(new Date(datePart + 'T12:00:00'), 'MMM d');
+                        })()}
     </div>
+                    </div >
+                  </Link >
+                ))
+}
+              </div >
+            )}
+          </CardContent >
+        </Card >
+      </div >
+
+  {/* Recent Insights */ }
+  < div className = "mb-6" >
+    <h3 className="text-lg font-semibold mb-3">Recent Insights (Last 7 Days)</h3>
+{
+  recentInsights.length === 0 ? (
+    <Card>
+      <CardContent className="py-12 text-center">
+        <p className="text-muted-foreground">No insights in the last 7 days</p>
+      </CardContent>
+    </Card>
+  ) : (
+    <ProductInsightsTable insights={recentInsights} categories={categoryObjects} />
+  )
+}
+      </div >
+
+  {/* Recent Q&A Pairs */ }
+  < div >
+  <h3 className="text-lg font-semibold mb-3">Recent Q&A Pairs (Last 7 Days)</h3>
+{
+  recentQAPairs.length === 0 ? (
+    <Card>
+      <CardContent className="py-12 text-center">
+        <p className="text-muted-foreground">No Q&A pairs in the last 7 days</p>
+      </CardContent>
+    </Card>
+  ) : (
+    <QATable qaPairs={recentQAPairs} categories={categoryObjects} />
+  )
+}
+      </div >
+    </div >
   );
 }
