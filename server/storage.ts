@@ -1445,6 +1445,9 @@ export class DbStorage implements IStorage {
   }
 
   async getTranscript(product: Product, id: string): Promise<Transcript | undefined> {
+    if (product === "All Activity") {
+      return this.getTranscriptById(id);
+    }
     const results = await this.db
       .select()
       .from(transcriptsTable)
@@ -1665,6 +1668,9 @@ export class DbStorage implements IStorage {
   }
 
   async getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]> {
+    const whereClause = product === "All Activity"
+      ? eq(productInsightsTable.transcriptId, transcriptId)
+      : and(eq(productInsightsTable.product, product), eq(productInsightsTable.transcriptId, transcriptId));
     const results = await this.db
       .select({
         id: productInsightsTable.id,
@@ -1684,7 +1690,7 @@ export class DbStorage implements IStorage {
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
       .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(and(eq(productInsightsTable.product, product), eq(productInsightsTable.transcriptId, transcriptId)));
+      .where(whereClause);
 
     return results.map(r => ({
       ...r,
@@ -1839,7 +1845,9 @@ export class DbStorage implements IStorage {
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
       .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(and(eq(qaPairsTable.product, product), eq(qaPairsTable.transcriptId, transcriptId)));
+      .where(product === "All Activity"
+        ? eq(qaPairsTable.transcriptId, transcriptId)
+        : and(eq(qaPairsTable.product, product), eq(qaPairsTable.transcriptId, transcriptId)));
 
     return results.map(r => ({
       ...r,
@@ -2099,10 +2107,13 @@ export class DbStorage implements IStorage {
   }
 
   async getCompany(product: Product, id: string): Promise<Company | undefined> {
+    const whereClause = product === "All Activity"
+      ? eq(companiesTable.id, id)
+      : and(eq(companiesTable.product, product), eq(companiesTable.id, id));
     const results = await this.db
       .select()
       .from(companiesTable)
-      .where(and(eq(companiesTable.product, product), eq(companiesTable.id, id)))
+      .where(whereClause)
       .limit(1);
     return results[0];
   }
