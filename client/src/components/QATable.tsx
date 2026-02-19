@@ -34,6 +34,7 @@ export interface QAPair {
   categoryId?: string | null;
   categoryName?: string | null;
   isStarred?: string;
+  product?: string;
   createdAt?: Date | string | null;
   transcriptDate?: Date | string | null;
 }
@@ -56,20 +57,23 @@ export interface Company {
   slug: string;
 }
 
+const STORABLE_PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane", "Partnerships"] as const;
+
 interface QATableProps {
   qaPairs: QAPair[];
   categories?: Category[];
   defaultCompany?: string;
+  isAllActivity?: boolean;
 }
 
-export default function QATable({ qaPairs, categories = [], defaultCompany }: QATableProps) {
+export default function QATable({ qaPairs, categories = [], defaultCompany, isAllActivity = false }: QATableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [starredFilter, setStarredFilter] = useState('all');
   const [editingQA, setEditingQA] = useState<QAPair | null>(null);
-  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', company: '', categoryId: null as string | null, contactId: null as string | null });
+  const [editForm, setEditForm] = useState({ question: '', answer: '', asker: '', company: '', categoryId: null as string | null, contactId: null as string | null, product: '' as string });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null });
+  const [addForm, setAddForm] = useState({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null as string | null, product: '' as string });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sortColumn, setSortColumn] = useState<'category' | 'createdAt' | 'transcriptDate'>('createdAt');
@@ -113,9 +117,10 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, question, answer, asker, company, categoryId, contactId }: { id: string; question: string; answer: string; asker: string; company: string; categoryId: string | null; contactId?: string | null }) => {
-      // Update the Q&A pair
-      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, { question, answer, asker, company, contactId });
+    mutationFn: async ({ id, question, answer, asker, company, categoryId, contactId, product }: { id: string; question: string; answer: string; asker: string; company: string; categoryId: string | null; contactId?: string | null; product: string }) => {
+      const payload: Record<string, string | null> = { question, answer, asker, company, contactId };
+      if (isAllActivity && product) payload.product = product;
+      const res = await apiRequest('PATCH', `/api/qa-pairs/${id}`, payload);
       if (!res.ok) {
         throw new Error('Failed to update Q&A pair');
       }
@@ -153,8 +158,10 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({ question, answer, asker, company, categoryId }: { question: string; answer: string; asker: string; company: string; categoryId: string | null }) => {
-      const res = await apiRequest('POST', '/api/qa-pairs', { question, answer, asker, company, categoryId });
+    mutationFn: async ({ question, answer, asker, company, categoryId, product }: { question: string; answer: string; asker: string; company: string; categoryId: string | null; product: string }) => {
+      const payload: Record<string, string | null> = { question, answer, asker, company, categoryId };
+      if (isAllActivity && product) payload.product = product;
+      const res = await apiRequest('POST', '/api/qa-pairs', payload);
       return res.json();
     },
     onSuccess: () => {
@@ -167,7 +174,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
         }
       });
       setIsAddDialogOpen(false);
-      setAddForm({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null });
+      setAddForm({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null, product: '' });
       toast({
         title: "Success",
         description: "Q&A pair added successfully",
@@ -214,7 +221,8 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
       asker: qa.asker,
       company: qa.company,
       categoryId: qa.categoryId ?? null, 
-      contactId: qa.contactId ?? null 
+      contactId: qa.contactId ?? null,
+      product: qa.product || ''
     });
   };
 
@@ -229,7 +237,8 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
         asker,
         company: editForm.company,
         categoryId: editForm.categoryId,
-        contactId: editForm.contactId
+        contactId: editForm.contactId,
+        product: editForm.product
       });
     }
   };
@@ -247,7 +256,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
   };
 
   const handleOpenAddDialog = () => {
-    setAddForm({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null });
+    setAddForm({ question: '', answer: '', asker: '', company: defaultCompany || '', categoryId: null, product: '' });
     setIsAddDialogOpen(true);
   };
 
@@ -384,6 +393,9 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
               <TableHead className="min-w-[250px]">Answer</TableHead>
               <TableHead className="min-w-[150px]">Asked By</TableHead>
               <TableHead className="min-w-[150px]">Company</TableHead>
+              {isAllActivity && (
+                <TableHead className="min-w-[120px]">Product</TableHead>
+              )}
               <TableHead className="min-w-[120px]">
                 <button 
                   onClick={() => handleSort('category')} 
@@ -432,7 +444,7 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
           <TableBody>
             {paginatedQAPairs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAllActivity ? 10 : 9} className="text-center py-8 text-muted-foreground">
                   {filteredQAPairs.length === 0 ? 'No Q&A pairs found' : 'No Q&A pairs on this page'}
                 </TableCell>
               </TableRow>
@@ -483,6 +495,13 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                       </Badge>
                     </Link>
                   </TableCell>
+                  {isAllActivity && (
+                    <TableCell data-testid={`text-product-${qa.id}`}>
+                      <Badge variant="outline" className="font-normal">
+                        {qa.product || 'Unknown'}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {qa.categoryId && qa.categoryName ? (
                       <Link href={`/categories/${qa.categoryId}`}>
@@ -645,6 +664,24 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                 testId="select-edit-company-qa"
               />
             </div>
+            {isAllActivity && (
+              <div>
+                <Label htmlFor="edit-product-qa">Product</Label>
+                <Select
+                  value={editForm.product}
+                  onValueChange={(value) => setEditForm({ ...editForm, product: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-product-qa">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORABLE_PRODUCTS.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="category">Category</Label>
               <Combobox
@@ -724,6 +761,24 @@ export default function QATable({ qaPairs, categories = [], defaultCompany }: QA
                 testId="select-add-company-qa"
               />
             </div>
+            {isAllActivity && (
+              <div>
+                <Label htmlFor="add-product-qa">Product</Label>
+                <Select
+                  value={addForm.product}
+                  onValueChange={(value) => setAddForm({ ...addForm, product: value })}
+                >
+                  <SelectTrigger data-testid="select-add-product-qa">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORABLE_PRODUCTS.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="add-category">Category</Label>
               <Combobox

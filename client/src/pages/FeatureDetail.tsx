@@ -30,6 +30,12 @@ type Category = {
   name: string;
 };
 
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: string;
+}
+
 export default function FeatureDetail() {
   const params = useParams<{ id: string }>();
   const featureId = params.id;
@@ -44,6 +50,11 @@ export default function FeatureDetail() {
     categoryId: '',
     releaseDate: null as Date | null,
   });
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+  const isAllActivity = user?.currentProduct === "All Activity";
 
   const { data: feature, isLoading: isLoadingFeature } = useQuery<Feature>({
     queryKey: [`/api/features/${featureId}`],
@@ -372,7 +383,7 @@ export default function FeatureDetail() {
               No insights found for this category yet.
             </div>
           ) : (
-            <ProductInsightsTable insights={insights} />
+            <ProductInsightsTable insights={insights} isAllActivity={isAllActivity} />
           )}
         </div>
       )}

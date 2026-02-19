@@ -21,6 +21,7 @@ interface ProductInsight {
   company: string;
   categoryName: string | null;
   categoryId: string | null;
+  product?: string;
   createdAt: Date;
   transcriptDate: Date | null;
 }
@@ -116,6 +117,7 @@ export default function Latest() {
       company: insight.company,
       category: insight.categoryName || 'NEW',
       categoryId: insight.categoryId || null,
+      product: insight.product,
       createdAt: insight.createdAt,
       transcriptDate: insight.transcriptDate,
     }));
@@ -297,7 +299,7 @@ export default function Latest() {
             </CardContent>
           </Card>
         ) : (
-          <ProductInsightsTable insights={recentInsights} categories={categoryObjects} />
+          <ProductInsightsTable insights={recentInsights} categories={categoryObjects} isAllActivity={user?.currentProduct === "All Activity"} />
         )}
       </div>
 
@@ -311,7 +313,7 @@ export default function Latest() {
             </CardContent>
           </Card>
         ) : (
-          <QATable qaPairs={recentQAPairs} categories={categoryObjects} />
+          <QATable qaPairs={recentQAPairs} categories={categoryObjects} isAllActivity={user?.currentProduct === "All Activity"} />
         )}
       </div>
     </div>

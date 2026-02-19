@@ -1,7 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import QATable from "@/components/QATable";
 
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: string;
+}
+
 export default function QADatabase() {
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const isAllActivity = user?.currentProduct === "All Activity";
 
   const { data: qaPairs = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/qa-pairs'],
@@ -11,7 +22,6 @@ export default function QADatabase() {
     queryKey: ['/api/categories'],
   });
 
-  // Transform categories
   const categoryObjects = (categories as any[]).map((cat: any) => ({
     id: cat.id,
     name: cat.name,
@@ -29,7 +39,7 @@ export default function QADatabase() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading Q&A pairs...</div>
       ) : (
-        <QATable qaPairs={qaPairs as any[]} categories={categoryObjects} />
+        <QATable qaPairs={qaPairs as any[]} categories={categoryObjects} isAllActivity={isAllActivity} />
       )}
     </div>
   );

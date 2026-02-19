@@ -60,16 +60,15 @@ export default function TranscriptInput() {
 
   const currentProduct = user?.currentProduct || "PitCrew";
 
-  // Hide the entire page for "All Activity" view
   if (currentProduct === "All Activity") {
     return (
       <div className="container mx-auto py-6 sm:py-8 px-4 sm:px-6">
-        <Alert className="border-2 border-muted">
-          <AlertCircle className="h-5 w-5" />
+        <Alert className="border-2 border-primary/30 bg-primary/5">
+          <AlertCircle className="h-5 w-5 text-primary" />
           <AlertDescription className="ml-2">
-            <span className="font-semibold text-lg">Cannot add transcripts in All Activity view</span>
+            <span className="font-semibold text-lg">You're viewing All Activity</span>
             <p className="text-sm mt-1 text-muted-foreground">
-              Please switch to a specific product to add a new transcript.
+              To add a new transcript, select a specific product from the top navigation bar (e.g. PitCrew, AutoTrace, WorkWatch).
             </p>
           </AlertDescription>
         </Alert>

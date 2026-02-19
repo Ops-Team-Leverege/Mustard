@@ -1,7 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import ProductInsightsTable from "@/components/ProductInsightsTable";
 
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: string;
+}
+
 export default function ProductInsights() {
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  const isAllActivity = user?.currentProduct === "All Activity";
 
   const { data: insights = [], isLoading } = useQuery<any[]>({
     queryKey: ['/api/insights'],
@@ -11,7 +22,6 @@ export default function ProductInsights() {
     queryKey: ['/api/categories'],
   });
 
-  // Transform data to match component interface
   const tableInsights = (insights as any[]).map((insight: any) => ({
     id: insight.id,
     feature: insight.feature,
@@ -20,11 +30,11 @@ export default function ProductInsights() {
     company: insight.company,
     category: insight.categoryName || 'NEW',
     categoryId: insight.categoryId || null,
+    product: insight.product,
     createdAt: insight.createdAt,
     transcriptDate: insight.transcriptDate,
   }));
 
-  // Pass full category objects with id and name
   const categoryObjects = (categories as any[]).map((cat: any) => ({
     id: cat.id,
     name: cat.name,
@@ -42,7 +52,7 @@ export default function ProductInsights() {
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading insights...</div>
       ) : (
-        <ProductInsightsTable insights={tableInsights} categories={categoryObjects} />
+        <ProductInsightsTable insights={tableInsights} categories={categoryObjects} isAllActivity={isAllActivity} />
       )}
     </div>
   );

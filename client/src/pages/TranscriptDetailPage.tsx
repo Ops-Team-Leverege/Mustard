@@ -17,6 +17,12 @@ import ProductInsightsTable from "@/components/ProductInsightsTable";
 import QATable from "@/components/QATable";
 import type { Transcript, ProductInsightWithCategory, QAPairWithCategory, Company } from "@shared/schema";
 
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: string;
+}
+
 interface TranscriptDetails {
   transcript: Transcript;
   insights: ProductInsightWithCategory[];
@@ -39,6 +45,11 @@ export default function TranscriptDetailPage() {
     transcript: '',
   });
   const [newMaterial, setNewMaterial] = useState('');
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+  const isAllActivity = user?.currentProduct === "All Activity";
 
   const { data, isLoading } = useQuery<TranscriptDetails>({
     queryKey: [`/api/transcripts/${transcriptId}/details`],
@@ -623,6 +634,7 @@ export default function TranscriptDetailPage() {
                     category: i.categoryName || 'NEW',
                   }))}
                   categories={categories}
+                  isAllActivity={isAllActivity}
                 />
               </CardContent>
             </Card>
@@ -643,6 +655,7 @@ export default function TranscriptDetailPage() {
                     companyId: qa.companyId || '',
                   }))}
                   categories={categories}
+                  isAllActivity={isAllActivity}
                 />
               </CardContent>
             </Card>

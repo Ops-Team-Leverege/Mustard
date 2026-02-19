@@ -7,9 +7,20 @@ import QATable from "@/components/QATable";
 import { Badge } from "@/components/ui/badge";
 import type { CategoryOverview } from "@shared/schema";
 
+interface User {
+  id: string;
+  email: string | null;
+  currentProduct: string;
+}
+
 export default function CategoryPage() {
   const params = useParams();
   const categoryId = params.id;
+
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+  const isAllActivity = user?.currentProduct === "All Activity";
 
   const { data: overview, isLoading } = useQuery<CategoryOverview>({
     queryKey: [`/api/categories/${categoryId}/overview`],
@@ -80,6 +91,7 @@ export default function CategoryPage() {
               category: i.categoryName || 'NEW',
             }))}
             categories={categories}
+            isAllActivity={isAllActivity}
           />
         </CardContent>
       </Card>
@@ -98,6 +110,7 @@ export default function CategoryPage() {
               category: qa.categoryName || 'NEW',
             }))}
             categories={categories}
+            isAllActivity={isAllActivity}
           />
         </CardContent>
       </Card>

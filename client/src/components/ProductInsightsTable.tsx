@@ -29,6 +29,7 @@ export interface ProductInsight {
   company: string;
   category: string;
   categoryId?: string | null;
+  product?: string;
   createdAt?: Date | string | null;
   transcriptDate?: Date | string | null;
 }
@@ -44,19 +45,22 @@ export interface Company {
   slug: string;
 }
 
+const STORABLE_PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane", "Partnerships"] as const;
+
 interface ProductInsightsTableProps {
   insights: ProductInsight[];
   categories?: Category[];
   defaultCompany?: string;
+  isAllActivity?: boolean;
 }
 
-export default function ProductInsightsTable({ insights, categories = [], defaultCompany }: ProductInsightsTableProps) {
+export default function ProductInsightsTable({ insights, categories = [], defaultCompany, isAllActivity = false }: ProductInsightsTableProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [editingInsight, setEditingInsight] = useState<ProductInsight | null>(null);
-  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', company: '', categoryId: null as string | null });
+  const [editForm, setEditForm] = useState({ feature: '', context: '', quote: '', company: '', categoryId: null as string | null, product: '' as string });
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null });
+  const [addForm, setAddForm] = useState({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null as string | null, product: '' as string });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [sortColumn, setSortColumn] = useState<'category' | 'createdAt' | 'transcriptDate'>('createdAt');
@@ -96,9 +100,10 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   });
 
   const editMutation = useMutation({
-    mutationFn: async ({ id, feature, context, quote, company, categoryId }: { id: string; feature: string; context: string; quote: string; company: string; categoryId: string | null }) => {
-      // Update the insight
-      const res = await apiRequest('PATCH', `/api/insights/${id}`, { feature, context, quote, company });
+    mutationFn: async ({ id, feature, context, quote, company, categoryId, product }: { id: string; feature: string; context: string; quote: string; company: string; categoryId: string | null; product: string }) => {
+      const payload: Record<string, string> = { feature, context, quote, company };
+      if (isAllActivity && product) payload.product = product;
+      const res = await apiRequest('PATCH', `/api/insights/${id}`, payload);
       if (!res.ok) {
         throw new Error('Failed to update insight');
       }
@@ -136,8 +141,10 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   });
 
   const createMutation = useMutation({
-    mutationFn: async ({ feature, context, quote, company, categoryId }: { feature: string; context: string; quote: string; company: string; categoryId: string | null }) => {
-      const res = await apiRequest('POST', '/api/insights', { feature, context, quote, company, categoryId });
+    mutationFn: async ({ feature, context, quote, company, categoryId, product }: { feature: string; context: string; quote: string; company: string; categoryId: string | null; product: string }) => {
+      const payload: Record<string, string | null> = { feature, context, quote, company, categoryId };
+      if (isAllActivity && product) payload.product = product;
+      const res = await apiRequest('POST', '/api/insights', payload);
       return res.json();
     },
     onSuccess: () => {
@@ -150,7 +157,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
         }
       });
       setIsAddDialogOpen(false);
-      setAddForm({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null });
+      setAddForm({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null, product: '' });
       toast({
         title: "Success",
         description: "Insight added successfully",
@@ -172,7 +179,8 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
       context: insight.context, 
       quote: insight.quote,
       company: insight.company,
-      categoryId: insight.categoryId || null
+      categoryId: insight.categoryId || null,
+      product: insight.product || ''
     });
   };
 
@@ -195,7 +203,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
   };
 
   const handleOpenAddDialog = () => {
-    setAddForm({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null });
+    setAddForm({ feature: '', context: '', quote: '', company: defaultCompany || '', categoryId: null, product: '' });
     setIsAddDialogOpen(true);
   };
 
@@ -311,6 +319,9 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
               <TableHead className="min-w-[200px]">Context</TableHead>
               <TableHead className="min-w-[250px]">Customer Quote</TableHead>
               <TableHead className="min-w-[150px]">Company</TableHead>
+              {isAllActivity && (
+                <TableHead className="min-w-[120px]">Product</TableHead>
+              )}
               <TableHead className="min-w-[120px]">
                 <button 
                   onClick={() => handleSort('category')} 
@@ -359,7 +370,7 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
           <TableBody>
             {paginatedInsights.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={isAllActivity ? 9 : 8} className="text-center py-8 text-muted-foreground">
                   {filteredInsights.length === 0 ? 'No insights found' : 'No insights on this page'}
                 </TableCell>
               </TableRow>
@@ -388,6 +399,13 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                       </Badge>
                     </Link>
                   </TableCell>
+                  {isAllActivity && (
+                    <TableCell data-testid={`text-product-${insight.id}`}>
+                      <Badge variant="outline" className="font-normal">
+                        {insight.product || 'Unknown'}
+                      </Badge>
+                    </TableCell>
+                  )}
                   <TableCell>
                     {insight.categoryId && insight.category !== 'NEW' ? (
                       <Link href={`/categories/${insight.categoryId}`}>
@@ -541,6 +559,24 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                 testId="select-edit-company"
               />
             </div>
+            {isAllActivity && (
+              <div>
+                <Label htmlFor="edit-product">Product</Label>
+                <Select
+                  value={editForm.product}
+                  onValueChange={(value) => setEditForm({ ...editForm, product: value })}
+                >
+                  <SelectTrigger data-testid="select-edit-product">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORABLE_PRODUCTS.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="category">Category</Label>
               <Combobox
@@ -620,6 +656,24 @@ export default function ProductInsightsTable({ insights, categories = [], defaul
                 testId="select-add-company"
               />
             </div>
+            {isAllActivity && (
+              <div>
+                <Label htmlFor="add-product">Product</Label>
+                <Select
+                  value={addForm.product}
+                  onValueChange={(value) => setAddForm({ ...addForm, product: value })}
+                >
+                  <SelectTrigger data-testid="select-add-product">
+                    <SelectValue placeholder="Select product" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STORABLE_PRODUCTS.map(p => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div>
               <Label htmlFor="add-category">Category</Label>
               <Combobox

@@ -681,6 +681,7 @@ export default function CompanyPage() {
                 }))}
                 categories={categories}
                 defaultCompany={overview.company.name}
+                isAllActivity={user?.currentProduct === "All Activity"}
               />
             </CardContent>
           </Card>
@@ -701,6 +702,7 @@ export default function CompanyPage() {
                 }))}
                 categories={categories}
                 defaultCompany={overview.company.name}
+                isAllActivity={user?.currentProduct === "All Activity"}
               />
             </CardContent>
           </Card>
