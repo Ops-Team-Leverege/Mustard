@@ -81,7 +81,7 @@ function HomePage() {
     queryKey: ["/api/auth/user"],
   });
 
-  if (user?.currentProduct === "Partnerships" || user?.currentProduct === "All Activity") {
+  if (user?.currentProduct === "All Activity") {
     return <Redirect to="/latest" />;
   }
 
@@ -230,7 +230,7 @@ function AuthenticatedApp() {
   const filteredTabs = useMemo(() => {
     let tabs = baseTabs;
 
-    if (isAllActivity || isPartnerships) {
+    if (isAllActivity) {
       tabs = tabs.filter(tab => tab.id !== 'input');
     }
 
