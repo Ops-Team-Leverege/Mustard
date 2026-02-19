@@ -241,7 +241,15 @@ Return valid JSON only: [0, 5, 12] or []`
       responseFormat: "json",
     });
 
-    const relevantIndices: number[] = JSON.parse(llmResponse.text);
+    const parsed = JSON.parse(llmResponse.text);
+    const relevantIndices: number[] = Array.isArray(parsed) 
+      ? parsed 
+      : Array.isArray(parsed.indices) ? parsed.indices 
+      : Array.isArray(parsed.relevant) ? parsed.relevant
+      : Array.isArray(parsed.chunks) ? parsed.chunks
+      : Array.isArray(parsed.relevant_chunks) ? parsed.relevant_chunks
+      : [];
+    console.log(`[SearchTranscript] LLM raw response: ${llmResponse.text.substring(0, 200)}`);
     console.log(`[SearchTranscript] LLM selected ${relevantIndices.length} relevant chunks from ${candidatePool.length} candidates`);
 
     if (relevantIndices.length > 0) {

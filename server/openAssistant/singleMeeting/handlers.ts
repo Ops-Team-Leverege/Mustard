@@ -179,7 +179,7 @@ export async function handleExtractiveIntent(
       .map(s => `[${s.speakerName}]: ${s.content}`)
       .join("\n\n");
 
-    console.log(`[SingleMeeting] EXTRACTIVE_FACT: sending ${relevantSnippets.length} snippets to LLM for answer extraction`);
+    console.log(`[SingleMeeting] EXTRACTIVE_FACT: sending ${relevantSnippets.length} snippets (${transcriptContext.length} chars) to LLM for answer extraction`);
 
     try {
       const llmResponse = await generateText({
@@ -192,6 +192,7 @@ export async function handleExtractiveIntent(
         responseFormat: "json",
       });
 
+      console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM raw: ${llmResponse.text.substring(0, 300)}`);
       console.log(`[SingleMeeting] EXTRACTIVE_FACT LLM response: ${Date.now() - startTime}ms`);
 
       const parsed = JSON.parse(llmResponse.text);
@@ -214,6 +215,8 @@ export async function handleExtractiveIntent(
             RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT: PROMPT_VERSIONS.RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT
           }
         };
+      } else {
+        console.log(`[SingleMeeting] EXTRACTIVE_FACT: LLM said wasFound=${parsed.wasFound}, answer="${parsed.answer?.substring(0, 100)}"`);
       }
     } catch (err) {
       console.error(`[SingleMeeting] EXTRACTIVE_FACT LLM error, falling back to raw snippets:`, err);
