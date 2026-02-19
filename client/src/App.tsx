@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -76,6 +76,18 @@ function ProtectedRoute({
   return <Component />;
 }
 
+function HomePage() {
+  const { data: user } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+
+  if (user?.currentProduct === "Partnerships" || user?.currentProduct === "All Activity") {
+    return <Redirect to="/latest" />;
+  }
+
+  return <TranscriptInput />;
+}
+
 function Router() {
   const { isAuthenticated, isLoading, error } = useAuth();
 
@@ -86,7 +98,7 @@ function Router() {
     <Switch>
       <Route path="/">
         <ProtectedRoute
-          component={TranscriptInput}
+          component={HomePage}
           isAuthenticated={isAuthenticated}
           isLoading={isLoading}
           isDomainRestricted={isDomainRestricted}
@@ -218,7 +230,7 @@ function AuthenticatedApp() {
   const filteredTabs = useMemo(() => {
     let tabs = baseTabs;
 
-    if (isAllActivity) {
+    if (isAllActivity || isPartnerships) {
       tabs = tabs.filter(tab => tab.id !== 'input');
     }
 
