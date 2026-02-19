@@ -19,7 +19,8 @@ import { z } from "zod";
 // Partnerships is a special product type for partnership meetings
 // It follows the same data model as other products but has adjusted UI language
 // and skips product-specific features like insights extraction
-export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane", "Partnerships"] as const;
+// "All Activity" is a special view that shows data across all products (not stored in DB)
+export const PRODUCTS = ["PitCrew", "AutoTrace", "WorkWatch", "ExpressLane", "Partnerships", "All Activity"] as const;
 export type Product = typeof PRODUCTS[number];
 
 const PRODUCT_LOOKUP = new Map(PRODUCTS.map(p => [p.toLowerCase(), p]));

@@ -64,160 +64,176 @@ import { eq, sql as drizzleSql, inArray, and, gt } from "drizzle-orm";
 
 export interface IStorage {
   // Transcripts
-  getTranscripts(product: Product): Promise<Transcript[]>;
-  getTranscript(product: Product, id: string): Promise<Transcript | undefined>;
-  getTranscriptById(id: string): Promise<Transcript | undefined>;
-  getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
-  createTranscript(transcript: InsertTranscript): Promise<Transcript>;
-  updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined>;
-  updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error?: string | null): Promise<Transcript | undefined>;
-  updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined>;
-  deleteTranscript(id: string): Promise<boolean>;
+  async getTranscripts(product: Product): Promise<Transcript[]> {
+  // Special case: "All Activity" returns all transcripts
+  if (product === "All Activity") {
+    return await this.db
+      .select()
+      .from(transcriptsTable)
+      .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`);
+  }
 
-  // Raw query for MCP
-  rawQuery(sql: string, params?: any[]): Promise<any[]>;
+  const results = await this.db
+    .select()
+    .from(transcriptsTable)
+    .where(eq(transcriptsTable.product, product))
+    .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`);
+  return results;
+}
+;
+getTranscript(product: Product, id: string): Promise<Transcript | undefined>;
+getTranscriptById(id: string): Promise<Transcript | undefined>;
+getTranscriptsByCompany(product: Product, companyId: string): Promise<Transcript[]>;
+createTranscript(transcript: InsertTranscript): Promise<Transcript>;
+updateTranscript(id: string, updates: { name?: string | null; createdAt?: Date; mainMeetingTakeaways?: string | null; nextSteps?: string | null; supportingMaterials?: string[]; transcript?: string | null }): Promise<Transcript | undefined>;
+updateTranscriptProcessingStatus(id: string, status: ProcessingStatus, error ?: string | null): Promise<Transcript | undefined>;
+updateProcessingStep(id: string, step: ProcessingStep | null): Promise<Transcript | undefined>;
+deleteTranscript(id: string): Promise<boolean>;
 
-  // Product Insights
-  getProductInsights(product: Product): Promise<ProductInsightWithCategory[]>;
-  getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]>;
-  getProductInsightsByCategory(product: Product, categoryId: string): Promise<ProductInsightWithCategory[]>;
-  createProductInsight(insight: InsertProductInsight): Promise<ProductInsight>;
-  createProductInsights(insights: InsertProductInsight[]): Promise<ProductInsight[]>;
-  updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined>;
-  deleteProductInsight(id: string): Promise<boolean>;
-  assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
-  assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
+// Raw query for MCP
+rawQuery(sql: string, params ?: any[]): Promise<any[]>;
 
-  // Q&A Pairs
-  getQAPairs(product: Product): Promise<QAPairWithCategory[]>;
-  getQAPairsByTranscript(product: Product, transcriptId: string): Promise<QAPairWithCategory[]>;
-  createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
-  createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
-  updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId?: string | null): Promise<QAPair | undefined>;
-  deleteQAPair(id: string): Promise<boolean>;
-  assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
-  getQAPairsByCompany(product: Product, companyId: string): Promise<QAPairWithCategory[]>;
-  toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined>;
+// Product Insights
+getProductInsights(product: Product): Promise<ProductInsightWithCategory[]>;
+getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]>;
+getProductInsightsByCategory(product: Product, categoryId: string): Promise<ProductInsightWithCategory[]>;
+createProductInsight(insight: InsertProductInsight): Promise<ProductInsight>;
+createProductInsights(insights: InsertProductInsight[]): Promise<ProductInsight[]>;
+updateProductInsight(id: string, feature: string, context: string, quote: string, company: string, companyId: string): Promise<ProductInsight | undefined>;
+deleteProductInsight(id: string): Promise<boolean>;
+assignCategoryToInsight(insightId: string, categoryId: string | null): Promise<boolean>;
+assignCategoryToInsights(insightIds: string[], categoryId: string | null): Promise<boolean>;
 
-  // Categories
-  getCategories(product: Product): Promise<Category[]>;
-  getCategory(product: Product, id: string): Promise<Category | undefined>;
-  createCategory(category: InsertCategory): Promise<Category>;
-  updateCategory(id: string, name: string, description?: string | null): Promise<Category | undefined>;
-  deleteCategory(id: string): Promise<boolean>;
-  getCategoryOverview(product: Product, categoryId: string): Promise<CategoryOverview | null>;
+// Q&A Pairs
+getQAPairs(product: Product): Promise<QAPairWithCategory[]>;
+getQAPairsByTranscript(product: Product, transcriptId: string): Promise<QAPairWithCategory[]>;
+createQAPair(qaPair: InsertQAPair): Promise<QAPair>;
+createQAPairs(qaPairs: InsertQAPair[]): Promise<QAPair[]>;
+updateQAPair(id: string, question: string, answer: string, asker: string, company: string, companyId: string, contactId ?: string | null): Promise<QAPair | undefined>;
+deleteQAPair(id: string): Promise<boolean>;
+assignCategoryToQAPair(qaPairId: string, categoryId: string | null): Promise<boolean>;
+getQAPairsByCompany(product: Product, companyId: string): Promise<QAPairWithCategory[]>;
+toggleQAPairStar(id: string, isStarred: string): Promise<QAPair | undefined>;
 
-  // Features
-  getFeatures(product: Product): Promise<FeatureWithCategory[]>;
-  getFeature(product: Product, id: string): Promise<Feature | undefined>;
-  createFeature(feature: InsertFeature): Promise<Feature>;
-  updateFeature(id: string, name: string, description?: string | null, value?: string | null, videoLink?: string | null, helpGuideLink?: string | null, categoryId?: string | null, releaseDate?: Date | null): Promise<Feature | undefined>;
-  deleteFeature(id: string): Promise<boolean>;
+// Categories
+getCategories(product: Product): Promise<Category[]>;
+getCategory(product: Product, id: string): Promise<Category | undefined>;
+createCategory(category: InsertCategory): Promise<Category>;
+updateCategory(id: string, name: string, description ?: string | null): Promise<Category | undefined>;
+deleteCategory(id: string): Promise<boolean>;
+getCategoryOverview(product: Product, categoryId: string): Promise<CategoryOverview | null>;
 
-  // Companies
-  getCompanies(product: Product): Promise<Company[]>;
-  getCompany(product: Product, id: string): Promise<Company | undefined>;
-  getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined>;
-  getCompanyByName(product: Product, name: string): Promise<Company | undefined>;
-  createCompany(company: InsertCompany): Promise<Company>;
-  updateCompany(id: string, name: string, notes?: string | null, companyDescription?: string | null, numberOfStores?: string | null, stage?: string | null, pilotStartDate?: Date | null, serviceTags?: string[] | null): Promise<Company | undefined>;
-  deleteCompany(id: string): Promise<boolean>;
-  getCompanyOverview(product: Product, slug: string): Promise<CompanyOverview | null>;
-  updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void>;
+// Features
+getFeatures(product: Product): Promise<FeatureWithCategory[]>;
+getFeature(product: Product, id: string): Promise<Feature | undefined>;
+createFeature(feature: InsertFeature): Promise<Feature>;
+updateFeature(id: string, name: string, description ?: string | null, value ?: string | null, videoLink ?: string | null, helpGuideLink ?: string | null, categoryId ?: string | null, releaseDate ?: Date | null): Promise<Feature | undefined>;
+deleteFeature(id: string): Promise<boolean>;
 
-  // Contacts
-  getContactsByCompany(product: Product, companyId: string): Promise<Contact[]>;
-  createContact(contact: InsertContact): Promise<Contact>;
-  updateContact(id: string, name: string, nameInTranscript?: string | null, jobTitle?: string | null): Promise<Contact | undefined>;
-  deleteContact(id: string): Promise<boolean>;
-  mergeDuplicateContacts(product: Product, companyId: string): Promise<{ merged: number; kept: number }>;
+// Companies
+getCompanies(product: Product): Promise<Company[]>;
+getCompany(product: Product, id: string): Promise<Company | undefined>;
+getCompanyBySlug(product: Product, slug: string): Promise<Company | undefined>;
+getCompanyByName(product: Product, name: string): Promise<Company | undefined>;
+createCompany(company: InsertCompany): Promise<Company>;
+updateCompany(id: string, name: string, notes ?: string | null, companyDescription ?: string | null, numberOfStores ?: string | null, stage ?: string | null, pilotStartDate ?: Date | null, serviceTags ?: string[] | null): Promise<Company | undefined>;
+deleteCompany(id: string): Promise<boolean>;
+getCompanyOverview(product: Product, slug: string): Promise<CompanyOverview | null>;
+updateCompanyNameInRelatedRecords(companyId: string, newName: string): Promise<void>;
 
-  // Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
-  updateUserProduct(userId: string, product: Product): Promise<User | undefined>;
+// Contacts
+getContactsByCompany(product: Product, companyId: string): Promise<Contact[]>;
+createContact(contact: InsertContact): Promise<Contact>;
+updateContact(id: string, name: string, nameInTranscript ?: string | null, jobTitle ?: string | null): Promise<Contact | undefined>;
+deleteContact(id: string): Promise<boolean>;
+mergeDuplicateContacts(product: Product, companyId: string): Promise<{ merged: number; kept: number }>;
 
-  // POS Systems
-  getPOSSystems(product: Product): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
-  getPOSSystem(product: Product, id: string): Promise<import("@shared/schema").POSSystem | undefined>;
-  getPOSSystemByName(product: Product, name: string): Promise<import("@shared/schema").POSSystem | undefined>;
-  createPOSSystem(posSystem: import("@shared/schema").InsertPOSSystem): Promise<import("@shared/schema").POSSystem>;
-  updatePOSSystem(id: string, name: string, websiteLink?: string | null, description?: string | null, companyIds?: string[]): Promise<import("@shared/schema").POSSystem | undefined>;
-  deletePOSSystem(id: string): Promise<boolean>;
-  linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void>;
-  findOrCreatePOSSystemAndLink(product: Product, name: string, companyId: string, websiteLink?: string, description?: string): Promise<import("@shared/schema").POSSystem>;
+// Users (from Replit Auth integration - blueprint:javascript_log_in_with_replit)
+getUser(id: string): Promise<User | undefined>;
+upsertUser(user: UpsertUser): Promise<User>;
+updateUserProduct(userId: string, product: Product): Promise<User | undefined>;
 
-  // Transcript Chunks (for RAG)
-  getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date; contentType: string } | null>;
-  getChunksForTranscript(transcriptId: string, limit?: number): Promise<TranscriptChunk[]>;
-  listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]>;
-  insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void>;
+// POS Systems
+getPOSSystems(product: Product): Promise<import("@shared/schema").POSSystemWithCompanies[]>;
+getPOSSystem(product: Product, id: string): Promise<import("@shared/schema").POSSystem | undefined>;
+getPOSSystemByName(product: Product, name: string): Promise<import("@shared/schema").POSSystem | undefined>;
+createPOSSystem(posSystem: import("@shared/schema").InsertPOSSystem): Promise<import("@shared/schema").POSSystem>;
+updatePOSSystem(id: string, name: string, websiteLink ?: string | null, description ?: string | null, companyIds ?: string[]): Promise<import("@shared/schema").POSSystem | undefined>;
+deletePOSSystem(id: string): Promise<boolean>;
+linkCompanyToPOSSystem(posSystemId: string, companyId: string): Promise<void>;
+findOrCreatePOSSystemAndLink(product: Product, name: string, companyId: string, websiteLink ?: string, description ?: string): Promise<import("@shared/schema").POSSystem>;
 
-  // Meeting Summaries (for persisting RAG artifacts)
-  saveMeetingSummary(data: InsertMeetingSummary): Promise<MeetingSummary>;
-  getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null>;
+// Transcript Chunks (for RAG)
+getLastTranscriptIdForCompany(companyId: string): Promise<{ id: string; createdAt: Date; contentType: string } | null>;
+getChunksForTranscript(transcriptId: string, limit ?: number): Promise<TranscriptChunk[]>;
+listTranscriptsForChunking(options: { transcriptId?: string; companyId?: string; limit: number }): Promise<{ id: string; companyId: string; content: string; meetingDate: Date; leverageTeam: string | null; customerNames: string | null }[]>;
+insertTranscriptChunks(chunks: InsertTranscriptChunk[]): Promise<void>;
 
-  // Interaction Logs (for auditability/evaluation, NOT LLM input)
-  insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
-  getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null>;
-  getInteractionByMessageTs(slackMessageTs: string): Promise<InteractionLog | null>;
+// Meeting Summaries (for persisting RAG artifacts)
+saveMeetingSummary(data: InsertMeetingSummary): Promise<MeetingSummary>;
+getLatestMeetingSummary(companyId: string): Promise<MeetingSummary | null>;
 
-  // Prompt Versions (for tracking prompt evolution)
-  insertPromptVersion(version: { promptName: string; version: string; promptText: string; changeReason?: string; changedBy?: string }): Promise<void>;
-  getPromptVersion(promptName: string, version: string): Promise<{ promptName: string; version: string; promptText: string; changeReason: string | null; changedBy: string | null } | null>;
-  getPromptHistory(promptName: string): Promise<Array<{ version: string; promptText: string; changeReason: string | null; createdAt: Date }>>;
+// Interaction Logs (for auditability/evaluation, NOT LLM input)
+insertInteractionLog(log: InsertInteractionLog): Promise<InteractionLog>;
+getLastInteractionByThread(slackThreadId: string): Promise<InteractionLog | null>;
+getInteractionByMessageTs(slackMessageTs: string): Promise<InteractionLog | null>;
 
-  // Interaction Feedback (for user reactions)
-  insertInteractionFeedback(feedback: { interactionId: string; slackMessageTs: string; userId: string; emoji: string; sentiment: string; intent?: string | null; answerContract?: string | null; promptVersions?: any }): Promise<void>;
-  getFeedbackByInteraction(interactionId: string): Promise<Array<{ userId: string; emoji: string; sentiment: string; createdAt: Date }>>;
-  getFeedbackByMessageTs(slackMessageTs: string): Promise<Array<{ interactionId: string; userId: string; emoji: string; sentiment: string }>>;
-  hasUserReacted(interactionId: string, userId: string, emoji: string): Promise<boolean>;
+// Prompt Versions (for tracking prompt evolution)
+insertPromptVersion(version: { promptName: string; version: string; promptText: string; changeReason?: string; changedBy?: string }): Promise<void>;
+getPromptVersion(promptName: string, version: string): Promise<{ promptName: string; version: string; promptText: string; changeReason: string | null; changedBy: string | null } | null>;
+getPromptHistory(promptName: string): Promise<Array<{ version: string; promptText: string; changeReason: string | null; createdAt: Date }>>;
 
-  // Q&A Pairs - meeting-scoped lookup (no product required, for bot/Slack pipeline)
-  getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
+// Interaction Feedback (for user reactions)
+insertInteractionFeedback(feedback: { interactionId: string; slackMessageTs: string; userId: string; emoji: string; sentiment: string; intent?: string | null; answerContract?: string | null; promptVersions?: any }): Promise<void>;
+getFeedbackByInteraction(interactionId: string): Promise<Array<{ userId: string; emoji: string; sentiment: string; createdAt: Date }>>;
+getFeedbackByMessageTs(slackMessageTs: string): Promise<Array<{ interactionId: string; userId: string; emoji: string; sentiment: string }>>;
+hasUserReacted(interactionId: string, userId: string, emoji: string): Promise<boolean>;
 
-  // Q&A Pairs - keyword search across all companies (for aggregate topic queries)
-  searchQaPairsByKeyword(searchTerms: string[], limit?: number): Promise<Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>>;
+// Q&A Pairs - meeting-scoped lookup (no product required, for bot/Slack pipeline)
+getQAPairsByTranscriptId(transcriptId: string): Promise<QAPairWithCategory[]>;
 
-  // Meeting Action Items (read-only artifact, materialized at ingestion)
-  getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
-  createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]>;
-  deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean>;
+// Q&A Pairs - keyword search across all companies (for aggregate topic queries)
+searchQaPairsByKeyword(searchTerms: string[], limit ?: number): Promise<Array<{ company: string; question: string; answer: string | null; meetingDate: string | null }>>;
 
-  // Junction Table Methods (for multi-company and multi-product support)
-  // These methods enable many-to-many relationships while maintaining backward compatibility
+// Meeting Action Items (read-only artifact, materialized at ingestion)
+getMeetingActionItemsByTranscript(transcriptId: string): Promise<MeetingActionItem[]>;
+createMeetingActionItems(items: InsertMeetingActionItem[]): Promise<MeetingActionItem[]>;
+deleteMeetingActionItemsByTranscript(transcriptId: string): Promise<boolean>;
 
-  /**
-   * Create a transcript-company association in the junction table
-   * Used when creating transcripts with multiple companies
-   */
-  createTranscriptCompanyAssociation(data: { transcriptId: string; companyId: string }): Promise<void>;
+// Junction Table Methods (for multi-company and multi-product support)
+// These methods enable many-to-many relationships while maintaining backward compatibility
 
-  /**
-   * Get all companies associated with a transcript (via junction table)
-   * Returns companies linked through the transcript_companies junction table
-   */
-  getCompaniesByTranscript(transcriptId: string): Promise<Company[]>;
+/**
+ * Create a transcript-company association in the junction table
+ * Used when creating transcripts with multiple companies
+ */
+createTranscriptCompanyAssociation(data: { transcriptId: string; companyId: string }): Promise<void>;
 
-  /**
-   * Ensure a company-product association exists in the junction table
-   * Idempotent - safe to call multiple times for the same association
-   * Used to automatically associate companies with products when transcripts are created
-   */
-  ensureCompanyProductAssociation(companyId: string, product: Product): Promise<void>;
+/**
+ * Get all companies associated with a transcript (via junction table)
+ * Returns companies linked through the transcript_companies junction table
+ */
+getCompaniesByTranscript(transcriptId: string): Promise<Company[]>;
 
-  /**
-   * Get all companies for a product using dual-query strategy
-   * Queries both legacy companies.product field AND company_products junction table
-   * This ensures backward compatibility with existing data
-   */
-  getCompaniesByProduct(product: Product): Promise<Company[]>;
+/**
+ * Ensure a company-product association exists in the junction table
+ * Idempotent - safe to call multiple times for the same association
+ * Used to automatically associate companies with products when transcripts are created
+ */
+ensureCompanyProductAssociation(companyId: string, product: Product): Promise<void>;
 
-  /**
-   * Get a company by ID (helper method for junction table operations)
-   * Product-agnostic lookup used internally by junction table methods
-   */
-  getCompanyById(id: string): Promise<Company | undefined>;
+/**
+ * Get all companies for a product using dual-query strategy
+ * Queries both legacy companies.product field AND company_products junction table
+ * This ensures backward compatibility with existing data
+ */
+getCompaniesByProduct(product: Product): Promise<Company[]>;
+
+/**
+ * Get a company by ID (helper method for junction table operations)
+ * Product-agnostic lookup used internally by junction table methods
+ */
+getCompanyById(id: string): Promise<Company | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -433,10 +449,38 @@ export class MemStorage implements IStorage {
   }
 
   async getProductInsights(product: Product): Promise<ProductInsightWithCategory[]> {
-    return Array.from(this.productInsights.values())
-      .filter(i => i.product === product)
-      .map(i => this.enrichInsightWithCategory(i));
+    // Special case: "All Activity" returns all insights
+    const query = this.db
+      .select({
+        id: productInsightsTable.id,
+        product: productInsightsTable.product,
+        transcriptId: productInsightsTable.transcriptId,
+        feature: productInsightsTable.feature,
+        context: productInsightsTable.context,
+        quote: productInsightsTable.quote,
+        company: productInsightsTable.company,
+        categoryId: productInsightsTable.categoryId,
+        categoryName: categoriesTable.name,
+        companyId: productInsightsTable.companyId,
+        jiraTicketKey: productInsightsTable.jiraTicketKey,
+        createdAt: productInsightsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
+      })
+      .from(productInsightsTable)
+      .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id));
+
+    const results = product === "All Activity"
+      ? await query
+      : await query.where(eq(productInsightsTable.product, product));
+
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      transcriptDate: r.transcriptDate || null,
+    }));
   }
+
 
   async getProductInsightsByTranscript(product: Product, transcriptId: string): Promise<ProductInsightWithCategory[]> {
     return Array.from(this.productInsights.values())
@@ -571,10 +615,44 @@ export class MemStorage implements IStorage {
   }
 
   async getQAPairs(product: Product): Promise<QAPairWithCategory[]> {
-    return Array.from(this.qaPairs.values())
-      .filter(qa => qa.product === product)
-      .map(qa => this.enrichQAPairWithCategory(qa));
+    // Special case: "All Activity" returns all Q&A pairs
+    const query = this.db
+      .select({
+        id: qaPairsTable.id,
+        product: qaPairsTable.product,
+        transcriptId: qaPairsTable.transcriptId,
+        question: qaPairsTable.question,
+        answer: qaPairsTable.answer,
+        asker: qaPairsTable.asker,
+        contactId: qaPairsTable.contactId,
+        company: qaPairsTable.company,
+        companyId: qaPairsTable.companyId,
+        categoryId: qaPairsTable.categoryId,
+        isStarred: qaPairsTable.isStarred,
+        categoryName: categoriesTable.name,
+        contactName: contactsTable.name,
+        contactJobTitle: contactsTable.jobTitle,
+        createdAt: qaPairsTable.createdAt,
+        transcriptDate: transcriptsTable.createdAt,
+      })
+      .from(qaPairsTable)
+      .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
+      .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id));
+
+    const results = product === "All Activity"
+      ? await query
+      : await query.where(eq(qaPairsTable.product, product));
+
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+      contactName: r.contactName || null,
+      contactJobTitle: r.contactJobTitle || null,
+      transcriptDate: r.transcriptDate || null,
+    }));
   }
+
 
   async getQAPairsByTranscript(product: Product, transcriptId: string): Promise<QAPairWithCategory[]> {
     return Array.from(this.qaPairs.values())
@@ -698,12 +776,21 @@ export class MemStorage implements IStorage {
 
   // Categories
   async getCategories(product: Product): Promise<Category[]> {
-    return Array.from(this.categories.values())
-      .filter(c => c.product === product)
-      .sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
+    // Special case: "All Activity" returns all categories
+    if (product === "All Activity") {
+      return await this.db
+        .select()
+        .from(categoriesTable)
+        .orderBy(categoriesTable.name);
+    }
+
+    return await this.db
+      .select()
+      .from(categoriesTable)
+      .where(eq(categoriesTable.product, product))
+      .orderBy(categoriesTable.name);
   }
+
 
   async getCategory(product: Product, id: string): Promise<Category | undefined> {
     const category = this.categories.get(id);
@@ -783,15 +870,35 @@ export class MemStorage implements IStorage {
 
   // Features
   async getFeatures(product: Product): Promise<FeatureWithCategory[]> {
-    const features = Array.from(this.features.values()).filter(f => f.product === product);
-    return features.map(feature => {
-      const category = feature.categoryId ? this.categories.get(feature.categoryId) : null;
-      return {
-        ...feature,
-        categoryName: category?.name ?? null,
-      };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    // Special case: "All Activity" returns all features
+    const query = this.db
+      .select({
+        id: featuresTable.id,
+        product: featuresTable.product,
+        name: featuresTable.name,
+        description: featuresTable.description,
+        value: featuresTable.value,
+        videoLink: featuresTable.videoLink,
+        helpGuideLink: featuresTable.helpGuideLink,
+        categoryId: featuresTable.categoryId,
+        categoryName: categoriesTable.name,
+        releaseDate: featuresTable.releaseDate,
+        createdAt: featuresTable.createdAt,
+      })
+      .from(featuresTable)
+      .leftJoin(categoriesTable, eq(featuresTable.categoryId, categoriesTable.id))
+      .orderBy(featuresTable.name);
+
+    const results = product === "All Activity"
+      ? await query
+      : await query.where(eq(featuresTable.product, product));
+
+    return results.map(r => ({
+      ...r,
+      categoryName: r.categoryName || null,
+    }));
   }
+
 
   async getFeature(product: Product, id: string): Promise<Feature | undefined> {
     const feature = this.features.get(id);
@@ -839,12 +946,21 @@ export class MemStorage implements IStorage {
 
   // Companies
   async getCompanies(product: Product): Promise<Company[]> {
-    return Array.from(this.companies.values())
-      .filter(c => c.product === product)
-      .sort((a, b) =>
-        a.name.localeCompare(b.name)
-      );
+    // Special case: "All Activity" returns all companies
+    if (product === "All Activity") {
+      return await this.db
+        .select()
+        .from(companiesTable)
+        .orderBy(companiesTable.name);
+    }
+
+    return await this.db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.product, product))
+      .orderBy(companiesTable.name);
   }
+
 
   async getCompany(product: Product, id: string): Promise<Company | undefined> {
     const company = this.companies.get(id);
@@ -1141,8 +1257,44 @@ export class MemStorage implements IStorage {
 
   // POS Systems (stub implementations - not used in production)
   async getPOSSystems(product: Product): Promise<POSSystemWithCompanies[]> {
-    return [];
+    // Special case: "All Activity" returns all POS systems
+    const systems = product === "All Activity"
+      ? await this.db.select().from(posSystemsTable)
+      : await this.db.select().from(posSystemsTable).where(eq(posSystemsTable.product, product));
+
+    // Get all companies for each system
+    const systemsWithCompanies = await Promise.all(
+      systems.map(async (system) => {
+        const companyLinks = await this.db
+          .select()
+          .from(posSystemCompaniesTable)
+          .where(eq(posSystemCompaniesTable.posSystemId, system.id));
+
+        const companyIds = companyLinks.map(link => link.companyId);
+
+        // For "All Activity", get companies without product filter
+        const companies = companyIds.length > 0
+          ? product === "All Activity"
+            ? await this.db
+              .select()
+              .from(companiesTable)
+              .where(inArray(companiesTable.id, companyIds))
+            : await this.db
+              .select()
+              .from(companiesTable)
+              .where(and(eq(companiesTable.product, product), inArray(companiesTable.id, companyIds)))
+          : [];
+
+        return {
+          ...system,
+          companies,
+        };
+      })
+    );
+
+    return systemsWithCompanies;
   }
+
 
   async getPOSSystem(product: Product, id: string): Promise<POSSystem | undefined> {
     return undefined;
@@ -1320,6 +1472,14 @@ export class DbStorage implements IStorage {
 
   // Transcripts
   async getTranscripts(product: Product): Promise<Transcript[]> {
+    // Special case: "All Activity" returns all transcripts
+    if (product === "All Activity") {
+      return await this.db
+        .select()
+        .from(transcriptsTable)
+        .orderBy(drizzleSql`${transcriptsTable.createdAt} DESC`);
+    }
+
     const results = await this.db
       .select()
       .from(transcriptsTable)
@@ -1516,7 +1676,8 @@ export class DbStorage implements IStorage {
 
   // Product Insights
   async getProductInsights(product: Product): Promise<ProductInsightWithCategory[]> {
-    const results = await this.db
+    // Special case: "All Activity" returns all insights
+    const query = this.db
       .select({
         id: productInsightsTable.id,
         product: productInsightsTable.product,
@@ -1534,8 +1695,11 @@ export class DbStorage implements IStorage {
       })
       .from(productInsightsTable)
       .leftJoin(categoriesTable, eq(productInsightsTable.categoryId, categoriesTable.id))
-      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id))
-      .where(eq(productInsightsTable.product, product));
+      .leftJoin(transcriptsTable, eq(productInsightsTable.transcriptId, transcriptsTable.id));
+
+    const results = product === "All Activity"
+      ? await query
+      : await query.where(eq(productInsightsTable.product, product));
 
     return results.map(r => ({
       ...r,
@@ -1657,7 +1821,8 @@ export class DbStorage implements IStorage {
 
   // Q&A Pairs
   async getQAPairs(product: Product): Promise<QAPairWithCategory[]> {
-    const results = await this.db
+    // Special case: "All Activity" returns all Q&A pairs
+    const query = this.db
       .select({
         id: qaPairsTable.id,
         product: qaPairsTable.product,
@@ -1679,8 +1844,11 @@ export class DbStorage implements IStorage {
       .from(qaPairsTable)
       .leftJoin(categoriesTable, eq(qaPairsTable.categoryId, categoriesTable.id))
       .leftJoin(contactsTable, eq(qaPairsTable.contactId, contactsTable.id))
-      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id))
-      .where(eq(qaPairsTable.product, product));
+      .leftJoin(transcriptsTable, eq(qaPairsTable.transcriptId, transcriptsTable.id));
+
+    const results = product === "All Activity"
+      ? await query
+      : await query.where(eq(qaPairsTable.product, product));
 
     return results.map(r => ({
       ...r,
@@ -1819,6 +1987,14 @@ export class DbStorage implements IStorage {
 
   // Categories
   async getCategories(product: Product): Promise<Category[]> {
+    // Special case: "All Activity" returns all categories
+    if (product === "All Activity") {
+      return await this.db
+        .select()
+        .from(categoriesTable)
+        .orderBy(categoriesTable.name);
+    }
+
     return await this.db
       .select()
       .from(categoriesTable)
@@ -1878,7 +2054,8 @@ export class DbStorage implements IStorage {
 
   // Features
   async getFeatures(product: Product): Promise<FeatureWithCategory[]> {
-    const results = await this.db
+    // Special case: "All Activity" returns all features
+    const query = this.db
       .select({
         id: featuresTable.id,
         product: featuresTable.product,
@@ -1894,8 +2071,11 @@ export class DbStorage implements IStorage {
       })
       .from(featuresTable)
       .leftJoin(categoriesTable, eq(featuresTable.categoryId, categoriesTable.id))
-      .where(eq(featuresTable.product, product))
       .orderBy(featuresTable.name);
+
+    const results = product === "All Activity"
+      ? await query
+      : await query.where(eq(featuresTable.product, product));
 
     return results.map(r => ({
       ...r,
@@ -1947,6 +2127,14 @@ export class DbStorage implements IStorage {
 
   // Companies
   async getCompanies(product: Product): Promise<Company[]> {
+    // Special case: "All Activity" returns all companies
+    if (product === "All Activity") {
+      return await this.db
+        .select()
+        .from(companiesTable)
+        .orderBy(companiesTable.name);
+    }
+
     return await this.db
       .select()
       .from(companiesTable)
@@ -2345,7 +2533,10 @@ export class DbStorage implements IStorage {
 
   // POS Systems operations
   async getPOSSystems(product: Product): Promise<POSSystemWithCompanies[]> {
-    const systems = await this.db.select().from(posSystemsTable).where(eq(posSystemsTable.product, product));
+    // Special case: "All Activity" returns all POS systems
+    const systems = product === "All Activity"
+      ? await this.db.select().from(posSystemsTable)
+      : await this.db.select().from(posSystemsTable).where(eq(posSystemsTable.product, product));
 
     // Get all companies for each system
     const systemsWithCompanies = await Promise.all(
@@ -2356,11 +2547,18 @@ export class DbStorage implements IStorage {
           .where(eq(posSystemCompaniesTable.posSystemId, system.id));
 
         const companyIds = companyLinks.map(link => link.companyId);
+
+        // For "All Activity", get companies without product filter
         const companies = companyIds.length > 0
-          ? await this.db
-            .select()
-            .from(companiesTable)
-            .where(and(eq(companiesTable.product, product), inArray(companiesTable.id, companyIds)))
+          ? product === "All Activity"
+            ? await this.db
+              .select()
+              .from(companiesTable)
+              .where(inArray(companiesTable.id, companyIds))
+            : await this.db
+              .select()
+              .from(companiesTable)
+              .where(and(eq(companiesTable.product, product), inArray(companiesTable.id, companyIds)))
           : [];
 
         return {
@@ -2903,8 +3101,18 @@ export class DbStorage implements IStorage {
    * 1. Get companies where legacy product field matches
    * 2. Get companies via junction table where product matches
    * 3. Merge and deduplicate by company ID
+   * 
+   * Special case: If product is "All Activity", return all companies
    */
   async getCompaniesByProduct(product: Product): Promise<Company[]> {
+    // Special case: "All Activity" returns all companies
+    if (product === "All Activity") {
+      return await this.db
+        .select()
+        .from(companiesTable)
+        .orderBy(companiesTable.name);
+    }
+
     // Query 1: Legacy field (companies.product)
     const legacyResults = await this.db
       .select()

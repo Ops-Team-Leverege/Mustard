@@ -34,6 +34,7 @@ export default function ProductSwitcher() {
         WorkWatch: "You're now viewing workforce management insights.",
         ExpressLane: "You're now viewing quick service operations data.",
         Partnerships: "You're now viewing strategic partnership meetings and discussions.",
+        "All Activity": "You're now viewing data across all products without filters.",
       };
 
       // Product-specific colors for visual distinction
@@ -43,6 +44,7 @@ export default function ProductSwitcher() {
         WorkWatch: "border-orange-500 bg-orange-50 dark:bg-orange-950",
         ExpressLane: "border-yellow-500 bg-yellow-50 dark:bg-yellow-950",
         Partnerships: "border-purple-500 bg-purple-50 dark:bg-purple-950",
+        "All Activity": "border-gray-500 bg-gray-50 dark:bg-gray-950",
       };
 
       toast({
