@@ -365,21 +365,7 @@ async function classifyByKeyword(
   }
 
   // ============================================================================
-  // FAST-PATH: Simple greetings (no LLM needed)
-  // ============================================================================
-  const trimmedLower = lower.trim();
-  if (SIMPLE_GREETINGS.includes(trimmedLower) || SIMPLE_GREETINGS.some(g => trimmedLower === g)) {
-    console.log(`[IntentClassifier] Fast-path: Simple greeting detected`);
-    return {
-      intent: Intent.GENERAL_HELP,
-      intentDetectionMethod: "keyword",
-      confidence: 1.0,
-      reason: "Simple greeting - no LLM needed",
-    };
-  }
-
-  // ============================================================================
-  // LLM handles nuanced classification - no fast-paths for SINGLE_MEETING or PRODUCT_KNOWLEDGE
+  // LLM handles all classification — no fast-paths for any intent.
   // The LLM is better at understanding semantic intent than brittle regex patterns.
   // Product knowledge signals (e.g. "based on PitCrew", "our value prop") are handled
   // by the LLM via the requiresProductKnowledge flag, not by regex fast-paths.
