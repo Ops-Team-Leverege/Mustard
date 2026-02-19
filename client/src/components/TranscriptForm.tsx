@@ -787,6 +787,7 @@ export default function TranscriptForm({ onSubmit, isSubmitting = false }: Trans
             <Label data-testid="label-customers">Customer Attendees <span className="text-destructive">*</span></Label>
 
             <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+              <p className="text-sm font-medium">Add a new contact</p>
               <div className="grid grid-cols-1 sm:grid-cols-[1fr,1fr,1fr,auto] gap-3 items-end">
                 <div>
                   <label className="text-sm font-medium mb-1 block">Name</label>
