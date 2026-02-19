@@ -24,12 +24,21 @@ export default function ProductSwitcher() {
       const res = await apiRequest("PUT", "/api/user/product", { product });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, product) => {
       queryClient.invalidateQueries();
-      
+
+      // Dynamic message based on what you're viewing
+      const contextMessages: Record<Product, string> = {
+        PitCrew: "You're now viewing tire and automotive service insights.",
+        AutoTrace: "You're now viewing vehicle tracking and fleet management data.",
+        WorkWatch: "You're now viewing workforce management insights.",
+        ExpressLane: "You're now viewing quick service operations data.",
+        Partnerships: "You're now viewing strategic partnership meetings and discussions.",
+      };
+
       toast({
-        title: "Product switched",
-        description: "All data has been refreshed for the new product.",
+        title: `Switched to ${product}`,
+        description: contextMessages[product] || `All data has been refreshed for ${product}.`,
       });
     },
     onError: (error: Error) => {
