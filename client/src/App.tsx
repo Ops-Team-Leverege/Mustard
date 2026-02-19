@@ -213,24 +213,22 @@ function AuthenticatedApp() {
   });
 
   const isPartnerships = user?.currentProduct === "Partnerships";
+  const isAllActivity = user?.currentProduct === "All Activity";
 
-  /**
-   * Filter tabs based on current product (Task 7.1)
-   * 
-   * For Partnerships:
-   * - Hide "Categories" tab
-   * - Hide "Features" tab
-   * - Hide "Product Insights" in Databases dropdown
-   */
   const filteredTabs = useMemo(() => {
-    if (!isPartnerships) {
-      return baseTabs;
+    let tabs = baseTabs;
+
+    if (isAllActivity) {
+      tabs = tabs.filter(tab => tab.id !== 'input');
     }
 
-    return baseTabs
+    if (!isPartnerships && !isAllActivity) {
+      return tabs;
+    }
+
+    return tabs
       .filter(tab => {
-        // Hide Categories and Features tabs for Partnerships
-        if (tab.id === 'categories' || tab.id === 'features') {
+        if (isPartnerships && (tab.id === 'categories' || tab.id === 'features')) {
           return false;
         }
         return true;
@@ -248,7 +246,7 @@ function AuthenticatedApp() {
         }
         return tab;
       });
-  }, [isPartnerships]);
+  }, [isPartnerships, isAllActivity]);
 
   useEffect(() => {
     if (error && !hasShownError.current) {
