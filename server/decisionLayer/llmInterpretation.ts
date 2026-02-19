@@ -41,7 +41,6 @@ export type IntentString =
   | "PRODUCT_KNOWLEDGE" 
   | "EXTERNAL_RESEARCH"
   | "GENERAL_HELP" 
-  | "REFUSE" 
   | "CLARIFY";
 
 export type ContractString = 
@@ -111,7 +110,7 @@ export type ClarifyWithInterpretation = {
 
 const INTENT_CONTRACT_MAPPING = getIntentContractMapping() as Record<IntentString, ContractString[]>;
 
-const VALID_INTENTS: IntentString[] = ["SINGLE_MEETING", "MULTI_MEETING", "PRODUCT_KNOWLEDGE", "EXTERNAL_RESEARCH", "GENERAL_HELP", "REFUSE", "CLARIFY"];
+const VALID_INTENTS: IntentString[] = ["SINGLE_MEETING", "MULTI_MEETING", "PRODUCT_KNOWLEDGE", "EXTERNAL_RESEARCH", "GENERAL_HELP", "CLARIFY"];
 
 const VALID_CONTRACTS: ContractString[] = [
   "MEETING_SUMMARY", "NEXT_STEPS", "ATTENDEES", "CUSTOMER_QUESTIONS", "EXTRACTIVE_FACT", "AGGREGATIVE_LIST",

@@ -35,7 +35,6 @@ export function getIntentContractMapping(): Record<string, string[]> {
   for (const [intent, cap] of Object.entries(CAPABILITIES_CONFIG.capabilities)) {
     mapping[intent] = cap.contracts;
   }
-  mapping["REFUSE"] = ["REFUSE"];
   mapping["CLARIFY"] = ["CLARIFY"];
   return mapping;
 }

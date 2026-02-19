@@ -544,18 +544,6 @@ export async function handleOpenAssistant(
     const cpResult = context.decisionLayerResult;
     console.log(`[OpenAssistant] Using full Decision Layer result: intent=${cpResult.intent}, contract=${cpResult.answerContract}, method=${cpResult.intentDetectionMethod}`);
 
-    if (cpResult.intent === Intent.REFUSE) {
-      return {
-        answer: "I'm sorry, but that question is outside of what I can help with. I'm designed to assist with PitCrew-related topics, customer meetings, and product information.",
-        intent: "general_assistance",
-        intentClassification: defaultClassification("Refused by Decision Layer"),
-        decisionLayerIntent: cpResult.intent,
-        answerContract: cpResult.answerContract,
-        dataSource: "clarification",
-        delegatedToSingleMeeting: false,
-      };
-    }
-
     if (cpResult.intent === Intent.CLARIFY) {
       // Check if the contract suggests meeting data is needed - if so, attempt meeting search
       // instead of immediately returning clarification

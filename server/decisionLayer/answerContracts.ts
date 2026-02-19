@@ -449,31 +449,8 @@ const CONTRACT_CONSTRAINTS: Record<AnswerContract, AnswerContractConstraints> = 
   },
 };
 
-const REFUSE_PATTERNS = [
-  /\b(weather|forecast|temperature)\b/i,
-  /\b(home address|personal address|private address)\b/i,
-  /\b(stock price|stock market|invest)\b/i,
-  /\b(revenue|profit|how much money)\s+(will|would|can|could)\b/i,
-  /\b(what's the time|current time|what time is it)\b/i,
-];
-
-function shouldRefuse(question: string): boolean {
-  return REFUSE_PATTERNS.some(pattern => pattern.test(question));
-}
-
 export function getContractConstraints(contract: AnswerContract): AnswerContractConstraints {
   return CONTRACT_CONSTRAINTS[contract];
-}
-
-function checkSafetyRefuse(question: string): AnswerContractResult | null {
-  if (shouldRefuse(question)) {
-    return {
-      contract: AnswerContract.REFUSE,
-      contractSelectionMethod: "keyword",
-      constraints: CONTRACT_CONSTRAINTS[AnswerContract.REFUSE],
-    };
-  }
-  return null;
 }
 
 async function selectContractByLLM(
@@ -552,12 +529,6 @@ export async function selectAnswerContract(
         constraints: CONTRACT_CONSTRAINTS[contract],
       };
     }
-  }
-
-  const refuseResult = checkSafetyRefuse(question);
-  if (refuseResult) {
-    console.log(`[AnswerContract] Selected: ${refuseResult.contract} (safety_refuse)`);
-    return refuseResult;
   }
 
   // LLM-FIRST contract selection: LLM decides the contract based on semantic understanding

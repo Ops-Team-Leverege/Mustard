@@ -2,7 +2,7 @@
  * Unit Tests: Decision Layer - Intent Classification (LLM-First Architecture)
  * 
  * These tests verify the Intent Router (server/decisionLayer/intent.ts):
- * - Minimal fast-paths (no LLM cost): REFUSE, simple greetings, multi-intent
+ * - Minimal fast-paths (no LLM cost): simple greetings, multi-intent
  * - Entity detection for known companies/contacts
  * - LLM-based semantic classification for all other queries
  * 
@@ -65,41 +65,6 @@ describe('Intent Classification - LLM-First Architecture', () => {
   });
 
   describe('Minimal Fast-Paths (No LLM Cost)', () => {
-    describe('REFUSE pattern detection', () => {
-      it('refuses weather questions', async () => {
-        const { classifyIntent, Intent } = await import('../decisionLayer/intent');
-        
-        const result = await classifyIntent('What is the weather in Seattle?');
-        
-        expect(result.intent).toBe(Intent.REFUSE);
-        expect(result.intentDetectionMethod).toBe('pattern');
-      });
-
-      it('refuses stock price questions', async () => {
-        const { classifyIntent, Intent } = await import('../decisionLayer/intent');
-        
-        const result = await classifyIntent('What is the stock price of Apple?');
-        
-        expect(result.intent).toBe(Intent.REFUSE);
-      });
-
-      it('refuses joke requests', async () => {
-        const { classifyIntent, Intent } = await import('../decisionLayer/intent');
-        
-        const result = await classifyIntent('Tell me a joke');
-        
-        expect(result.intent).toBe(Intent.REFUSE);
-      });
-
-      it('refuses poem writing requests', async () => {
-        const { classifyIntent, Intent } = await import('../decisionLayer/intent');
-        
-        const result = await classifyIntent('Write me a poem about cars');
-        
-        expect(result.intent).toBe(Intent.REFUSE);
-      });
-    });
-
     describe('Simple greetings as GENERAL_HELP', () => {
       it('detects "hello" as GENERAL_HELP', async () => {
         const { classifyIntent, Intent } = await import('../decisionLayer/intent');

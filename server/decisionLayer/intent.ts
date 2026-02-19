@@ -12,8 +12,7 @@
  * 1. Pattern-based fast-paths for common patterns (no LLM cost)
  * 2. Named entity detection (company names, contact names)
  * 3. Split detection for multi-intent requests (CLARIFY)
- * 4. REFUSE detection for out-of-scope requests
- * 5. LLM fallback for ambiguous queries
+ * 4. LLM fallback for ambiguous queries
  * 
  * Layer: Decision Layer (Intent Router)
  */
@@ -43,7 +42,6 @@ export enum Intent {
   EXTERNAL_RESEARCH = "EXTERNAL_RESEARCH",
   SLACK_SEARCH = "SLACK_SEARCH",
   GENERAL_HELP = "GENERAL_HELP",
-  REFUSE = "REFUSE",
   CLARIFY = "CLARIFY",
 }
 
@@ -123,38 +121,6 @@ export type IntentClassificationResult = {
 // Most classification is handled by LLM for semantic understanding
 // ============================================================================
 
-// Simple greetings that don't need LLM
-const SIMPLE_GREETINGS = [
-  "hello",
-  "hi",
-  "hi there",
-  "hey",
-  "hey there",
-  "good morning",
-  "good afternoon",
-  "good evening",
-  "thanks",
-  "thank you",
-  "thanks!",
-  "thank you!",
-];
-
-// ============================================================================
-// REGEX PATTERNS - Only for absolute certainties (REFUSE, MULTI_INTENT)
-// All other classification is handled by LLM for semantic understanding
-// ============================================================================
-
-const REFUSE_PATTERNS = [
-  /\bweather\s+(in|like|forecast)\b/i,
-  /\bstock\s+(price|market|ticker)\b/i,
-  /\bhome\s+address\b/i,
-  /\bpersonal\s+(address|phone|email)\b/i,
-  /\bhow\s+much\s+(revenue|money|profit)\s+will\b/i,
-  /\bwhat('s| is)\s+the\s+time\b/i,
-  /\b(tell\s+me\s+a\s+)?joke\b/i,
-  /\bwrite\s+(me\s+)?a?\s*(poem|story|song)\b/i,
-];
-
 
 // ============================================================================
 // KNOWN ENTITIES - Trigger SINGLE_MEETING or MULTI_MEETING based on context
@@ -212,15 +178,6 @@ const KNOWN_CONTACTS = [
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-function matchesKeywords(text: string, keywords: string[]): boolean {
-  const lower = text.toLowerCase();
-  return keywords.some(kw => lower.includes(kw));
-}
-
-function matchesPatterns(text: string, patterns: RegExp[]): boolean {
-  return patterns.some(pattern => pattern.test(text));
-}
 
 type CompanyMatchResult = {
   company: string;
@@ -325,16 +282,6 @@ async function classifyByKeyword(
   // The LLM classifier sees thread context and handles follow-ups semantically.
   // Pattern-based follow-up detection was "keyword creep" - LLM should understand intent.
 
-  // HARDENING: Check for REFUSE first (highest priority)
-  if (matchesPatterns(question, REFUSE_PATTERNS)) {
-    return {
-      intent: Intent.REFUSE,
-      intentDetectionMethod: "pattern",
-      confidence: 0.95,
-      reason: "Question is out of scope for this assistant",
-    };
-  }
-
   // ============================================================================
   // LLM handles all classification — no fast-paths for any intent.
   // The LLM is better at understanding semantic intent than brittle regex patterns.
@@ -417,7 +364,7 @@ async function classifyByLLM(
       "slack": "SLACK_SEARCH",
       "help": "GENERAL_HELP",
       "general": "GENERAL_HELP",
-      "refuse": "REFUSE",
+      "refuse": "GENERAL_HELP",
       "clarify": "CLARIFY",
     };
 
@@ -503,8 +450,8 @@ function needsLLMValidation(result: IntentClassificationResult): boolean {
     return false;
   }
 
-  // CLARIFY and REFUSE intents don't need validation
-  if (result.intent === Intent.CLARIFY || result.intent === Intent.REFUSE) {
+  // CLARIFY intents don't need validation
+  if (result.intent === Intent.CLARIFY) {
     return false;
   }
 
@@ -638,7 +585,6 @@ async function classifyWithInterpretation(
         "PRODUCT_KNOWLEDGE": Intent.PRODUCT_KNOWLEDGE,
         "EXTERNAL_RESEARCH": Intent.EXTERNAL_RESEARCH,
         "GENERAL_HELP": Intent.GENERAL_HELP,
-        "REFUSE": Intent.REFUSE,
         "CLARIFY": Intent.CLARIFY,
       };
 

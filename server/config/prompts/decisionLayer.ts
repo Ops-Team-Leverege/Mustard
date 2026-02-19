@@ -59,8 +59,7 @@ INTENT CLASSIFICATION:
 - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, integrations
 - EXTERNAL_RESEARCH: Requests requiring PUBLIC/WEB information
 - SLACK_SEARCH: User explicitly wants to search Slack messages or channels (not meeting transcripts)
-- GENERAL_HELP: General guidance, drafting, formatting, conversational help, and meta questions
-- REFUSE: Out-of-scope (weather, stock prices, personal info, jokes)
+- GENERAL_HELP: General guidance, drafting, formatting, conversational help, meta questions, and out-of-scope questions
 - CLARIFY: Request is genuinely ambiguous about what the user wants
 
 GENERAL_HELP PROTECTION (CRITICAL):
@@ -284,7 +283,7 @@ Examples:
 Respond with JSON (field order matters — reasoning MUST come before intent):
 {
   "reasoning": "explain step by step what the user wants and why",
-  "intent": "SINGLE_MEETING" | "MULTI_MEETING" | "PRODUCT_KNOWLEDGE" | "EXTERNAL_RESEARCH" | "SLACK_SEARCH" | "GENERAL_HELP" | "REFUSE" | "CLARIFY",
+  "intent": "SINGLE_MEETING" | "MULTI_MEETING" | "PRODUCT_KNOWLEDGE" | "EXTERNAL_RESEARCH" | "SLACK_SEARCH" | "GENERAL_HELP" | "CLARIFY",
   "confidence": 0.0-1.0, 
   "reason": "brief explanation",
   "extractedCompany": "single company name or null - ALWAYS extract even if not a known company",
@@ -452,8 +451,7 @@ VALID INTENTS:
   - MULTI_MEETING: Questions across multiple meetings(search all calls, find patterns, compare, or "all [company] calls")
     - PRODUCT_KNOWLEDGE: Questions about PitCrew product features, pricing, capabilities
       - EXTERNAL_RESEARCH: Research about companies NOT in our meeting database, OR explicit external research requests(earnings calls, news, market analysis)
-          - GENERAL_HELP: General guidance, drafting, formatting, and conversational help
-            - REFUSE: Out - of - scope requests(weather, jokes, personal info)
+          - GENERAL_HELP: General guidance, drafting, formatting, conversational help, and out-of-scope requests
 
 KEY DISTINCTIONS:
 - Just a known company name like "Les Schwab" → SINGLE_MEETING(they want meeting info)
@@ -500,8 +498,7 @@ VALID INTENTS:
   - MULTI_MEETING: Questions across multiple meetings(trends, patterns)
     - PRODUCT_KNOWLEDGE: Questions about PitCrew product capabilities
       - EXTERNAL_RESEARCH: Research requiring web / public information - either external companies(earnings calls, news, priorities) OR topics / concepts needing web research(industry practices, domain knowledge)
-          - GENERAL_HELP: General guidance, drafting, formatting, and conversational help
-            - REFUSE: Clearly out - of - scope requests
+          - GENERAL_HELP: General guidance, drafting, formatting, conversational help, and out-of-scope requests
 
 VALID CONTRACTS per intent:
 - SINGLE_MEETING: MEETING_SUMMARY, NEXT_STEPS, ATTENDEES, CUSTOMER_QUESTIONS, EXTRACTIVE_FACT, AGGREGATIVE_LIST

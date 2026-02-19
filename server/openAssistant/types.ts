@@ -155,7 +155,6 @@ export function deriveEvidenceSource(dlIntent: Intent): EvidenceSource {
     case Intent.EXTERNAL_RESEARCH:
       return "general_assistance"; // External research uses web sources
     case Intent.GENERAL_HELP:
-    case Intent.REFUSE:
     case Intent.CLARIFY:
     default:
       return "general_assistance";
