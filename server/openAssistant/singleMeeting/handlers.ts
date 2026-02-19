@@ -1,5 +1,5 @@
 import { PROMPT_VERSIONS } from "../../config/prompts/versions";
-import { MODEL_ASSIGNMENTS } from "../../config/models";
+import { MODEL_ASSIGNMENTS, LLM_MODELS } from "../../config/models";
 import { storage } from "../../storage";
 import { OpenAI } from "openai";
 import { AnswerContract } from "../../decisionLayer/answerContracts";
@@ -193,7 +193,7 @@ export async function handleExtractiveIntent(
 
   try {
     const llmResponse = await generateText({
-      model: "gpt-4o-mini",
+      model: LLM_MODELS.STANDARD_REASONING,
       messages: [
         { role: "system", content: RAG_EXTRACTIVE_ANSWER_SYSTEM_PROMPT },
         { role: "user", content: buildExtractiveAnswerUserPrompt(question, transcriptForLLM) },
