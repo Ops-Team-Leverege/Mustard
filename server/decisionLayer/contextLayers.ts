@@ -62,7 +62,7 @@ export const PRODUCT_IDENTITY_CONTEXT = {
   description: "This assistant operates in the context of PitCrew, a product developed by Leverege.",
 };
 
-export function computeContextLayers(intent: Intent): ContextLayerMetadata {
+export function computeContextLayers(intent: Intent, requiresProductKnowledge?: boolean): ContextLayerMetadata {
   const layers: ContextLayers = {
     product_identity: true,
     product_ssot: false,
@@ -103,6 +103,11 @@ export function computeContextLayers(intent: Intent): ContextLayerMetadata {
     case Intent.GENERAL_HELP:
       reason += "No additional layers for GENERAL_HELP intent.";
       break;
+  }
+
+  if (requiresProductKnowledge && !layers.product_ssot) {
+    layers.product_ssot = true;
+    reason += "product_ssot enabled by requiresProductKnowledge flag. ";
   }
 
   return {

@@ -242,7 +242,7 @@ export async function runDecisionLayer(
 
   console.log(`[DecisionLayer] Intent: ${intentResult.intent} (${intentResult.intentDetectionMethod})`);
 
-  const layersMeta = computeContextLayers(intentResult.intent);
+  const layersMeta = computeContextLayers(intentResult.intent, intentResult.requiresProductKnowledge);
 
   console.log(`[DecisionLayer] Context Layers: ${JSON.stringify(layersMeta.layers)}`);
 
