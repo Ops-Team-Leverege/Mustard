@@ -380,22 +380,10 @@ async function classifyByKeyword(
 
   // ============================================================================
   // LLM handles nuanced classification - no fast-paths for SINGLE_MEETING or PRODUCT_KNOWLEDGE
-  // The LLM is better at understanding semantic intent than brittle regex patterns
+  // The LLM is better at understanding semantic intent than brittle regex patterns.
+  // Product knowledge signals (e.g. "based on PitCrew", "our value prop") are handled
+  // by the LLM via the requiresProductKnowledge flag, not by regex fast-paths.
   // ============================================================================
-
-  // PRODUCT_KNOWLEDGE fast-path: Strategic advice requests should go directly to PRODUCT_KNOWLEDGE
-  // These phrases indicate the user wants strategic advice using PitCrew's products
-  // Also catches "our roadmap" (internal product roadmap) vs "their roadmap" (external)
-  const productKnowledgeSignals = /\b(based\s+on\s+pitcrew|pitcrew['']?s?\s+value|our\s+value\s+prop|how\s+(should\s+we|can\s+we|do\s+we)\s+(approach|help|handle)|help\s+me\s+think\s+through|think\s+through\s+how|our\s+(q[1-4]\s+)?roadmap|what['']?s\s+on\s+our\s+roadmap|features?\s+coming\s+next|our\s+recommended\s+approach|what['']?s\s+our\s+(recommended\s+)?approach)\b/i;
-  if (productKnowledgeSignals.test(question)) {
-    console.log(`[Intent] Detected PRODUCT_KNOWLEDGE signal - fast-path to PRODUCT_KNOWLEDGE (strategic advice request)`);
-    return {
-      intent: Intent.PRODUCT_KNOWLEDGE,
-      intentDetectionMethod: "product_signal",
-      confidence: 0.92,
-      reason: "Strategic advice request detected (based on PitCrew / help me think through)",
-    };
-  }
 
   // Entity detection: Detect known companies/contacts for observability logging,
   // but always defer to LLM for intent classification. Mentioning a company name
